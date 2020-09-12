@@ -6,3 +6,6 @@ Ottermatics_Lib.egg-info/not-zip-safe
 Ottermatics_Lib.egg-info/top_level.txt
 ottermatics/__init__.py
 ottermatics/configuration.py
+ottermatics/locations.py
+ottermatics/patterns.py
+ottermatics/process.py
