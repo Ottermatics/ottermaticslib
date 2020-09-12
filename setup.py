@@ -15,7 +15,7 @@ from setuptools import setup
 
 # install_reqs = parse_requirements('requirements.txt')
 
-setup(name='Ottermatics Lib',
+setup(name='ottermatics',
       version='0.1',
       description='The Ottermatic\'s Python Lib!',
       url='',
