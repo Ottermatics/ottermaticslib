@@ -9,8 +9,8 @@ watchgod
 dropbox
 
 #GUI
-kivy
-kivy-garden
+#kivy
+#kivy-garden
 dearpygui
 pyqt5
 
