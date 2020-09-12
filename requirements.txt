@@ -37,10 +37,10 @@ sqlalchemy
 #Supercomputing
 deco
 ray
-"ray[tune]"
+#ray[tune]
 tensorflow
-"ray[rllib]"
-"ray[serve]"
+#ray[rllib]
+#ray[serve]
 
 #Image
 pillow

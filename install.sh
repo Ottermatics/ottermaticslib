@@ -12,6 +12,7 @@ bash ./Miniconda3-latest-Linux-x86_64.sh
 conda create -n py3
 conda activate py3
 conda install -c anaconda pip
+pip install -U pip-tools
 
 echo 'Setting Up Github Account (first input)'
 git config --global user.email $1
