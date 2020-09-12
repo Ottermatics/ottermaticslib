@@ -5,8 +5,13 @@ Created on Sat May 11 22:38:11 2019
 
 @author: kevinrussell
 """
-from pip.req import parse_requirements
+
 from setuptools import setup
+
+def parse_requirements(filename):
+    """ load requirements from a pip requirements file """
+    lineiter = (line.strip() for line in open(filename))
+    return [line for line in lineiter if line and not line.startswith("#")]
 
 install_reqs = parse_requirements('requirements.txt')
 
