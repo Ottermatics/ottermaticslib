@@ -19,7 +19,7 @@ numpy
 scipy
 matplotlib
 jupyter
-jupyter-qtconsole
+qtconsole
 pandas
 scikit-learn
 croniter
