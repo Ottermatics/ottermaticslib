@@ -12,8 +12,8 @@ from matplotlib.pylab import *
 
 import os,shutil,copy,traceback,collections,logging
 
-from configuration import *
-from locations import *
+from .configuration import *
+from .locations import *
 
 LOG = logging.getLogger()
 LOG.setLevel( logging.INFO)
