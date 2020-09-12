@@ -1,7 +1,4 @@
 
-#lib
--e .
-
 #System
 virtualenv
 wheel
