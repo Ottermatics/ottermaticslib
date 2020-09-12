@@ -1,7 +1,4 @@
  
-
-
-
 echo 'Installing Python3'
 sudo apt-get install python3 python3-dev python3-setuptools
 python3 -m pip install --upgrade pip
