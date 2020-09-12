@@ -32,7 +32,7 @@ aioice
 aiohttp
 
 #Database
-psycopg2 
+#psycopg2 
 dataset
 sqlalchemy
 

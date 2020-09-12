@@ -5,7 +5,7 @@ sudo apt-get install git
 sudo apt install gcc
 sudo apt install g++
 sudo apt-get install build-essential
-
+sudo apt-get install postgresql
 
 # sudo apt-get install ffmpeg
 
