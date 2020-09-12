@@ -11,7 +11,7 @@ class Configuration(object):
             if hasattr(self,arg):
                 setattr(self,arg,val)
             else:
-                print '{} has no variable: {}'.format(self,arg)
+                print('{} has no variable: {}'.format(self,arg))
 
     @contextmanager
     def difference(self,**kwargs):
@@ -22,7 +22,7 @@ class Configuration(object):
 
         bad_vars = set.difference(set(kwargs.keys()),set(_temp_vars.keys()))
         if bad_vars:
-            print 'Could Not Change {}'.format( ','.join(list(bad_vars ) ))
+            print('Could Not Change {}'.format( ','.join(list(bad_vars ) )))
 
         try: #Change Variables To Input
             for arg,var in kwargs.items():
