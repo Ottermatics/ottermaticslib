@@ -8,7 +8,7 @@ Created on Sat May 11 22:38:11 2019
 from pip.req import parse_requirements
 from setuptools import setup
 
-install_reqs = parse_requirements(<requirements_path>)
+install_reqs = parse_requirements('requirements.txt')
 
 setup(name='Ottermatics Lib',
       version='0.1',
