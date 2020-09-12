@@ -6,7 +6,7 @@ Created on Sat May 11 22:28:07 2019
 @author: kevinrussell
 """
 
-print 'Starting Ottermatics Enviornment'
+print('Starting Ottermatics Enviornment')
 
 from matplotlib.pylab import *
 
