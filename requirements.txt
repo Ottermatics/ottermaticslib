@@ -22,6 +22,8 @@ jupyter
 jupyter-qtconsole
 pandas
 scikit-learn
+croniter
+
 
 #Networkign
 Twisted
@@ -35,14 +37,16 @@ dataset
 sqlalchemy
 
 #Supercomputing
+boto3
 deco
 ray
 #ray[tune]
 tensorflow
 #ray[rllib]
-#ray[serve]
+#ray[serve]boto3
 
 #Image
 pillow
 av
 cv
+
