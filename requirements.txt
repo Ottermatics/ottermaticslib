@@ -30,11 +30,14 @@ Twisted
 aiortc
 aioice
 aiohttp
+treq
 
 #Database
 #psycopg2 
 dataset
 sqlalchemy
+sqlalchemy_utils
+psycopg2
 
 #Supercomputing
 boto3
@@ -50,3 +53,4 @@ pillow
 av
 cv
 
+sphinx==3.2.1
