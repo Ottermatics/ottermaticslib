@@ -1,0 +1,13 @@
+README.md
+setup.py
+ottermatics/__init__.py
+ottermatics/configuration.py
+ottermatics/locations.py
+ottermatics/patterns.py
+ottermatics/process.py
+ottermatics.egg-info/PKG-INFO
+ottermatics.egg-info/SOURCES.txt
+ottermatics.egg-info/dependency_links.txt
+ottermatics.egg-info/entry_points.txt
+ottermatics.egg-info/not-zip-safe
+ottermatics.egg-info/top_level.txt

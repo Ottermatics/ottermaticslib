@@ -20,6 +20,13 @@ setup(name='ottermatics',
       description='The Ottermatic\'s Python Lib!',
       url='',
       author='Olly',
+      packages=["ottermatics"],
       author_email='olly@ottermatics.com',
       license='MIT',
+      entry_points={
+            'console_scripts': [
+                # command = package.module:function
+                'ollymakes=ottermatics.locations:main_cli'
+            ]
+      },
       zip_safe=False)

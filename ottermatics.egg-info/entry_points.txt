@@ -1,0 +1,3 @@
+[console_scripts]
+ollymakes = ottermatics.locations:main_cli
+

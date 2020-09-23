@@ -1,5 +1,5 @@
 class Singleton(type):
-    def __init__(cls, name, bases, dict):/Users/kevinrussell/Ottermatics Dropbox/Ottermatics/ottermaticslib/ottermatics/patterns.py
+    def __init__(cls, name, bases, dict):
         super(Singleton, cls).__init__(name, bases, dict)
         cls.instance = None
 
