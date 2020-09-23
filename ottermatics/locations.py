@@ -5,14 +5,17 @@ CORE_FOLDERS = ['invoices','research','media','documents']
 SOFTWARE_PROJECT = ['.creds','software']
 ELECTRONICS_PROJECT = ['electronics','firmware']
 DESIGN_PROJECT = ['design','render']
+ANALYSIS_PROJECT = ['analysis']
 
 PROJECT_FOLDER_OPTIONS = {'core': CORE_FOLDERS,
                           'software': CORE_FOLDERS+SOFTWARE_PROJECT,
-                          'electronics': CORE_FOLDERS+ELECTRONICS_PROJECT,
+                          'electronics': CORE_FOLDERS+ELECTRONICS_PROJECT+ANALYSIS_PROJECT,
                           'design': CORE_FOLDERS+DESIGN_PROJECT,
+                          'engineering': CORE_FOLDERS+DESIGN_PROJECT+ANALYSIS_PROJECT,
                           'iot': CORE_FOLDERS+SOFTWARE_PROJECT+ELECTRONICS_PROJECT,
-                          'hardware': CORE_FOLDERS+ELECTRONICS_PROJECT+DESIGN_PROJECT,
-                          'all': CORE_FOLDERS+SOFTWARE_PROJECT+ELECTRONICS_PROJECT+DESIGN_PROJECT}
+                          'hardware': CORE_FOLDERS+ELECTRONICS_PROJECT+DESIGN_PROJECT+ANALYSIS_PROJECT,
+                          'analysis': CORE_FOLDERS+ANALYSIS_PROJECT,
+                          'all': CORE_FOLDERS+SOFTWARE_PROJECT+ELECTRONICS_PROJECT+DESIGN_PROJECT+ANALYSIS_PROJECT}
 
 
 def _get_appdata_path():
@@ -117,7 +120,9 @@ def main_cli():
                 continue    
             else:
                 print('Making Content Folder: {}'.format(folder_stub))
-                os.mkdir(os.path.join(project_folder,folder_stub))
+                folder_path = os.path.join(project_folder,folder_stub)
+                if not os.path.exists(folder_path):
+                    os.mkdir(folder_path)
 
     else: #Is A Fresh Go
         print('Making Project Folder: {}'.format(args.project_name))
