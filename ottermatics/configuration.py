@@ -10,13 +10,6 @@ class Configuration(object):
 
     name = attr.ib(default='default')
 
-    # def __init__(self,**kwargs):
-    #     for arg,val in kwargs.items():
-    #         if hasattr(self,arg):
-    #             setattr(self,arg,val)
-    #         else:
-    #             print('{} has no variable: {}'.format(self,arg))
-
     @contextmanager
     def difference(self,**kwargs):
         '''Change Variables Temporarilly'''
