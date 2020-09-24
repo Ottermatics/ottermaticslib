@@ -100,14 +100,14 @@ def configure_db_connection(database_name):
 
 DataBase = declarative_base()
 
-def rebuild_database(engine,connection_string):
-    #Create Database If It Doesn't Exist
+def rebuild_database(engine,connection_string, confirm=True):
+    '''Rebuild database on confirmation, create the database if nessicary'''
     if not is_ec2_instance():
         answer = input("We Are Going To Overwrite The Databse {}\nType 'CONFIRM' to continue:\n".format(HOST))
     else:
         answer = 'CONFIRM'
 
-    if answer == 'CONFIRM':
+    if answer == 'CONFIRM' or confirm==False:
         #Create Database If It Doesn't Exist
         if not database_exists(connection_string):
             print("Creating Database: {}".format(connection_string))
@@ -120,18 +120,14 @@ def rebuild_database(engine,connection_string):
     else:
         raise Exception("Ah ah ah you didn't say the magic word")
 
+def ensure_database_exists(engine,connection_string):
+    '''Check if database exists, if not create it and tables'''
+    if not database_exists(connection_string):
+        print("Creating Database: {}".format(connection_string))
+        create_database(connection_string)
+        DataBase.metadata.create_all(engine) 
+          
+
 def cleanup_sessions(Session):
     print("Closing All Active Sessions")
     Session.close_all()
-
-def cleanup_sessions_on_exit(Session):
-    import atexit
-
-    def customHandler(signum, stackframe):
-        print("Got signal: {}".format(signum))
-        reactor.callFromThread(reactor.stop) # to stop twisted code when in the reactor loop
-    signal.signal(signal.SIGINT, customHandler)
-
-    reactor.addSystemEventTrigger('during', 'shutdown', cleanup_sessions)
-
-    atexit.register(cleanup_sessions,Session)
