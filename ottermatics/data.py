@@ -20,6 +20,8 @@ from urllib.request import urlopen
 from psycopg2.extensions import register_adapter, AsIs
 from os import sys
 
+from contextlib import contextmanager
+
 
 def addapt_numpy_float64(numpy_float64):
     return AsIs(numpy_float64)
@@ -96,7 +98,20 @@ def configure_db_connection(database_name):
     session_factory  = sessionmaker(bind=engine,expire_on_commit=True)
     Session = scoped_session(session_factory, scopefunc = scopefunc)
 
-    return Session,engine,connection_string
+    @contextmanager
+    def session_scope():
+        """Provide a transactional scope around a series of operations."""
+        session = Session()
+        try:
+            yield session
+            session.commit()
+        except:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    return session_scope,engine,connection_string
 
 DataBase = declarative_base()
 
