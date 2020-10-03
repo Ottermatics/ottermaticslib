@@ -2,7 +2,9 @@ README.md
 setup.py
 ottermatics/__init__.py
 ottermatics/configuration.py
+ottermatics/data.py
 ottermatics/locations.py
+ottermatics/logging.py
 ottermatics/patterns.py
 ottermatics/process.py
 ottermatics.egg-info/PKG-INFO

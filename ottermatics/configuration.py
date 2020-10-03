@@ -1,17 +1,14 @@
 from contextlib import contextmanager
+import attr
 
+
+
+@attr.s
 class Configuration(object):
 
     _temp_vars = None
 
-    name = 'default'
-
-    def __init__(self,**kwargs):
-        for arg,val in kwargs.items():
-            if hasattr(self,arg):
-                setattr(self,arg,val)
-            else:
-                print('{} has no variable: {}'.format(self,arg))
+    name = attr.ib(default='default')
 
     @contextmanager
     def difference(self,**kwargs):
