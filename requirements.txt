@@ -3,6 +3,9 @@
 virtualenv
 wheel
 
+attrs
+graypy
+
 #Filesystem
 watchdog
 watchgod
