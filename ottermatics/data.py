@@ -83,10 +83,10 @@ def is_ec2_instance():
     return False   
 
 #connection_string = "host='{host}' user='{user}'  password='{passd}'".format(host=HOST,user=USER,passd=PASS)
-def configure_db_connection(database_name):
+def configure_db_connection(database_name,host=HOST,user=USER,passd=PASS,port=PORT):
     '''Returns Scoped Session, engine, and a connection_string'''
     connection_string = "postgresql://{user}:{passd}@{host}:{port}/{database}"\
-                        .format(host=HOST,user=USER,passd=PASS,port=PORT,database=database_name)
+                        .format(host=host,user=user,passd=passd,port=port,database=database_name)
 
     print('Connecting with {}'.format(connection_string))
 
