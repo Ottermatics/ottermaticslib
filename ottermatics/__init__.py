@@ -14,7 +14,7 @@ import os,shutil,copy,traceback,collections,logging
 
 from .configuration import *
 from .locations import *
-
+import logging
 LOG = logging.getLogger()
 LOG.setLevel( logging.INFO)
 

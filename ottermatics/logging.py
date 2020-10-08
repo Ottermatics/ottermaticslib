@@ -34,13 +34,14 @@ credfile = lambda fil: os.path.join(CREDS,fil)
 #     gelf = graypy.GELFUDPHandler(host=GELF_HOST,port=12203, extra_fields=True)
 #     log.addHandler(gelf)
 
-# def installSTDLogger(fmt = BASIC_LOG_FMT):
-#     '''We only want std logging to start'''
-#     log = logging.getLogger('')
-#     sh = logging.StreamHandler(sys.stdout)
-#     peerlog = logging.Formatter()
-#     sh.setFormatter(peerlog)
-#     log.addHandler( sh )    
+def installSTDLogger(fmt = BASIC_LOG_FMT):
+    '''We only want std logging to start'''
+    log = logging.getLogger('')
+    log.setLevel(level=logging.DEBUG)
+    sh = logging.StreamHandler(sys.stdout)
+    peerlog = logging.Formatter()
+    sh.setFormatter(peerlog)
+    log.addHandler( sh )    
 
 class LoggingMixin(logging.Filter):
     '''Class to include easy formatting in subclasses'''
@@ -52,6 +53,7 @@ class LoggingMixin(logging.Filter):
     gelf = None
 
     log_fmt = "[%(namespace)-24s]%(message)s"
+    log_silo = False
 
     @property
     def logger(self):
@@ -59,11 +61,14 @@ class LoggingMixin(logging.Filter):
             self._log = logging.getLogger(self.identity+str(uuid.uuid4()))
             self._log.setLevel(level = logging.DEBUG)
             #Eliminate Outside Logging Interaction
-            self._log.propagate = False
+            
             self._log.handlers = []
+
             #We have our own methods since it doesn't interact
-            self.installSTDLogger()
-            #self.installGELFLogger()
+            if self.log_silo:
+                self._log.propagate = False
+                self.installSTDLogger()
+                #self.installGELFLogger()
 
             #Apply Filter Info
             self._log.addFilter(self)
