@@ -29,17 +29,20 @@ pip3 install virtualenv
 
 
 echo 'Installing Anaconda Python (follow instructions, agree & yes)'
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash ./Miniconda3-latest-Linux-x86_64.sh
+if [ ! -z "$CONDA_EXE" ]; then
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    bash ./Miniconda3-latest-Linux-x86_64.sh
+    source ~/.bashrc
 
-source ~/.bashrc
+    conda create -n py3
+    conda activate py3
+    conda install -c anaconda pip
+    pip install -U pip-tools
+fi
 
-conda create -n py3
-conda activate py3
-conda install -c anaconda pip
-pip install -U pip-tools
 
-if [ ! -f ~/.ssh/id_rsa ]; then
+
+if [ -f "~/.ssh/id_rsa" ]; then
     echo 'Setting Up Github Account (first input)'
     ssh-keygen -t rsa -b 4096 -C "$1"
     git config --global user.email "$1"
