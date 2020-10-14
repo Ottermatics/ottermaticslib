@@ -86,15 +86,17 @@ def google_api_token():
 
 def load_from_env(creds_path='./.creds/',env_file='env.sh'):
     '''extracts export statements from bash file and aplies them to the python env'''
-    creds_path = os.path.join([creds_path,env_file])
+    creds_path = os.path.join(creds_path,env_file)
+    log.info("checking {} for creds".format(creds_path))
     if os.path.exists(creds_path):
-        with os.open(creds_path,'r') as fp:
+        with open(creds_path,'r') as fp:
             txt = fp.read()
 
         lines = txt.split('\n')
         for line in lines:
             if line.startswith('export'):
                 key,val = line.replace('export','').split('=')
+                log.info('setting {}'.format(key))
                 os.environ[key.strip()]=val    
 
 def main_cli():
