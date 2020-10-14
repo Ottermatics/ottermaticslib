@@ -11,7 +11,7 @@ from twisted.internet import defer, reactor, threads, task
 from twisted.python import context
 
 import os
-
+import logging
 import numpy
 
 import signal
@@ -22,6 +22,7 @@ from os import sys
 
 from contextlib import contextmanager
 
+log = logging.getLogger('otterlib-data')
 
 def addapt_numpy_float64(numpy_float64):
     return AsIs(numpy_float64)
@@ -50,22 +51,22 @@ register_adapter(numpy.ndarray, addapt_numpy_array)
 
 if 'DB_CONNECTION' in os.environ:
     HOST = os.environ['DB_CONNECTION']
-    print("Getting OS DB_CONNECTION")
+    log.info("Getting OS DB_CONNECTION")
 else:
     HOST = 'localhost'
 if 'DB_USER' in os.environ:
     USER = os.environ['DB_USER']
-    print("Getting OS DB_USER")
+    log.info("Getting OS DB_USER")
 else:
     USER = 'postgres'
 if 'DB_PASS' in os.environ:
     PASS = os.environ['DB_PASS']
-    print("Getting OS DB_PASS")
+    log.info("Getting OS DB_PASS")
 else:
     PASS = ''
 if 'DB_PORT' in os.environ:
     PORT = os.environ['DB_PORT']
-    print("Getting OS DB_PORT")
+    log.info("Getting OS DB_PORT")
 else:
     PORT = 5432
 
@@ -82,14 +83,16 @@ def is_ec2_instance():
         return False
     return False   
 
+
+
+
 #connection_string = "host='{host}' user='{user}'  password='{passd}'".format(host=HOST,user=USER,passd=PASS)
 def configure_db_connection(database_name,host=HOST,user=USER,passd=PASS,port=PORT,pool_size=20, max_overflow=0):
     '''Returns Scoped Session, engine, and a connection_string'''
     connection_string = "postgresql://{user}:{passd}@{host}:{port}/{database}"\
                         .format(host=host,user=user,passd=passd,port=port,database=database_name)
 
-    print('Connecting with {}'.format(connection_string))
-
+    log.info('Connecting to db:{} {}:{} with user {}'.format(database_name,host,port,user))
     engine = create_engine(connection_string,pool_size=pool_size, max_overflow=max_overflow)
     engine.echo = False
 
@@ -125,12 +128,14 @@ def rebuild_database(engine,connection_string, confirm=True):
     if answer == 'CONFIRM' or confirm==False:
         #Create Database If It Doesn't Exist
         if not database_exists(connection_string):
-            print("Creating Database: {}".format(connection_string))
+            log.info("Creating Database: {}".format(connection_string))
             create_database(connection_string)
         else:
             #Otherwise Just Drop The Tables
+            log.debug("Dropping DB Metadata".format())
             DataBase.metadata.drop_all(engine)
         #(Re)Create Tables
+        log.debug("Creating DB Metadata".format())
         DataBase.metadata.create_all(engine)
     else:
         raise Exception("Ah ah ah you didn't say the magic word")
@@ -138,11 +143,11 @@ def rebuild_database(engine,connection_string, confirm=True):
 def ensure_database_exists(engine,connection_string):
     '''Check if database exists, if not create it and tables'''
     if not database_exists(connection_string):
-        print("Creating Database: {}".format(connection_string))
+        log.info("Creating Database: {}".format(connection_string))
         create_database(connection_string)
         DataBase.metadata.create_all(engine) 
           
 
 def cleanup_sessions(Session):
-    print("Closing All Active Sessions")
+    log.info("Closing All Active Sessions")
     Session.close_all()
