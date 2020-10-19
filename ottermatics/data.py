@@ -49,28 +49,32 @@ register_adapter(numpy.ndarray, addapt_numpy_array)
 #HOST = 'testdb.ctiuz8xrxfqe.us-east-1.rds.amazonaws.com'
 #HOST = 'smartx-dev-db.cluster-ctiuz8xrxfqe.us-east-1.rds.amazonaws.com'
 
-if 'DB_CONNECTION' in os.environ:
-    HOST = os.environ['DB_CONNECTION']
-    log.info("Getting OS DB_CONNECTION")
-else:
-    HOST = 'localhost'
-if 'DB_USER' in os.environ:
-    USER = os.environ['DB_USER']
-    log.info("Getting OS DB_USER")
-else:
-    USER = 'postgres'
-if 'DB_PASS' in os.environ:
-    PASS = os.environ['DB_PASS']
-    log.info("Getting OS DB_PASS")
-else:
-    PASS = ''
-if 'DB_PORT' in os.environ:
-    PORT = os.environ['DB_PORT']
-    log.info("Getting OS DB_PORT")
-else:
-    PORT = 5432
+PORT = 5432
+HOST = 'localhost'
+USER = 'postgres'
+PASS = 'dumbpass'
 
-#HOST = 'localhost'
+def load_configuration_from_env():
+    global PORT, PASS, USER, HOST
+    if 'DB_CONNECTION' in os.environ:
+        HOST = os.environ['DB_CONNECTION']
+        log.info("Getting OS DB_CONNECTION")
+        
+    if 'DB_USER' in os.environ:
+        USER = os.environ['DB_USER']
+        log.info("Getting OS DB_USER")
+        
+    if 'DB_PASS' in os.environ:
+        PASS = os.environ['DB_PASS']
+        log.info("Getting OS DB_PASS")
+        
+    if 'DB_PORT' in os.environ:
+        PORT = os.environ['DB_PORT']
+        log.info("Getting OS DB_PORT")
+    
+    return HOST,PORT,USER,PASS
+
+load_configuration_from_env()
 
 def is_ec2_instance():
     """Check if an instance is running on AWS."""
