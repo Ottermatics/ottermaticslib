@@ -35,6 +35,9 @@ class SolidMaterial:
     #Economic Properties
     cost_per_kg = attr.ib(default=1.0) #dollar per kg
 
+    #Saftey Properties
+    factor_of_saftey = attr.ib(default=1.5)
+
     @property
     def E(self):
         return self.modulus_of_elasticity
@@ -54,6 +57,7 @@ class SolidMaterial:
     def ultimate_stress(self):
         return self.tensile_strength_ultimate
 
+    @inst_vectorize
     def von_mises_stress_max(self,normal_stress,shear_stress):  
         a =  (normal_stress/2.0)
         b = numpy.sqrt(a**2.0 + shear_stress**2.0)
@@ -61,6 +65,10 @@ class SolidMaterial:
         v2 = a + b
         vout = v1 if abs(v1) > abs(v2) else v2
         return vout
+
+    @property
+    def allowable_stress(self):
+        return self.yield_stress / self.factor_of_saftey
 
 @attr.s
 class SS_316(SolidMaterial):
