@@ -1,3 +1,6 @@
+#!/bin/bash
+# Find our package manager
+
 sudo add-apt-repository ppa:mc3man/trusty-media
 sudo apt-get update
 
@@ -8,6 +11,9 @@ sudo apt-get install build-essential
 sudo apt-get install postgresql
 sudo apt install daemonize
 sudo apt-get install libpq-dev
+
+
+
 
 mkdir sw
 cd sw
@@ -29,7 +35,7 @@ pip3 install virtualenv
 
 
 echo 'Installing Anaconda Python (follow instructions, agree & yes)'
-if [ ! -z "$CONDA_EXE" ]; then
+if [ -z "$CONDA_EXE" ]; then
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     bash ./Miniconda3-latest-Linux-x86_64.sh
     source ~/.bashrc

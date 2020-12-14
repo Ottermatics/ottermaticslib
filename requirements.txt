@@ -15,7 +15,7 @@ dropbox
 #kivy
 #kivy-garden
 dearpygui
-pyqt5
+#pyqt5
 
 #Science
 numpy
@@ -30,14 +30,14 @@ croniter
 
 #Networkign
 Twisted
-aiortc
+#aiortc
 aioice
 aiohttp
 treq
 
 #Database
 #psycopg2 
-dataset
+#dataset
 sqlalchemy
 sqlalchemy_utils
 psycopg2
@@ -45,15 +45,16 @@ psycopg2
 #Supercomputing
 boto3
 deco
-ray
-#ray[tune]
-tensorflow
+ray==1.0.0
+ray[tune]
+#tensorflow
 #ray[rllib]
 #ray[serve]boto3
 
 #Image
-pillow
-av
-cv
+#pillow
+#av
+#cv
+graypy
 
 sphinx==3.2.1

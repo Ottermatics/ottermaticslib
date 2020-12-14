@@ -1,6 +1,11 @@
 import os, shutil, sys
 import re
 
+import logging
+
+log = logging.getLogger('otterlib-locations')
+
+
 CORE_FOLDERS = ['invoices','research','media','documents']
 SOFTWARE_PROJECT = ['.creds','software']
 ELECTRONICS_PROJECT = ['electronics','firmware']
@@ -79,6 +84,20 @@ def google_api_token():
     credfile = 'client_secret_456980504049-d52oq3rod7cfntg97eje5ui451j8dhs1.apps.googleusercontent.com.json'
     return str(os.path.abspath(os.path.join(os.sep,creds_folder(),credfile)))
 
+def load_from_env(creds_path='./.creds/',env_file='env.sh'):
+    '''extracts export statements from bash file and aplies them to the python env'''
+    creds_path = os.path.join(creds_path,env_file)
+    log.info("checking {} for creds".format(creds_path))
+    if os.path.exists(creds_path):
+        with open(creds_path,'r') as fp:
+            txt = fp.read()
+
+        lines = txt.split('\n')
+        for line in lines:
+            if line.startswith('export'):
+                key,val = line.replace('export','').split('=')
+                log.info('setting {}'.format(key))
+                os.environ[key.strip()]=val    
 
 def main_cli():
     '''
@@ -97,13 +116,13 @@ def main_cli():
 
     args = parser.parse_args()
 
-    print('Checking For Folder `{}` In {}'.format(args.project_name,ottermatics_projects()))
+    log.info('Checking For Folder `{}` In {}'.format(args.project_name,ottermatics_projects()))
 
     ott_projects = os.listdir(ottermatics_projects())
     lower_projects = [folder.lower() for folder in ott_projects]
 
     if args.project_name.lower() in lower_projects:
-        print('Found Project Folder: {}'.format(args.project_name))
+        log.info('Found Project Folder: {}'.format(args.project_name))
 
         index = lower_projects.index(args.project_name.lower())
         actual_folder = ott_projects[index]
@@ -116,21 +135,21 @@ def main_cli():
         for folder_stub in PROJECT_FOLDER_OPTIONS[ args.type ]:
             
             if folder_stub in folder_contents_lower:
-                print('Found Content Folder: {}'.format(folder_stub))
+                log.info('Found Content Folder: {}'.format(folder_stub))
                 continue    
             else:
-                print('Making Content Folder: {}'.format(folder_stub))
+                log.info('Making Content Folder: {}'.format(folder_stub))
                 folder_path = os.path.join(project_folder,folder_stub)
                 if not os.path.exists(folder_path):
                     os.mkdir(folder_path)
 
     else: #Is A Fresh Go
-        print('Making Project Folder: {}'.format(args.project_name))
+        log.info('Making Project Folder: {}'.format(args.project_name))
         project_folder = os.path.join(ottermatics_projects(),args.project_name.lower())
         os.mkdir( project_folder )
 
         for folder_stub in PROJECT_FOLDER_OPTIONS[ args.type ]:
-            print('Making Content Folder: {}'.format(folder_stub))
+            log.info('Making Content Folder: {}'.format(folder_stub))
             os.mkdir( os.path.join(project_folder, folder_stub))
 
 if __name__ == '__main__':
