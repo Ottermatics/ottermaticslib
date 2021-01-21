@@ -24,7 +24,7 @@ class AutoProcess(object):
 #unix_socket_path = 'unix:path=/var/run/adaptproc.sock'
 TRAN = 'tcp'
 HOST = '127.0.0.1'
-PORT = 40479
+REMOTE_PORT = 42069
 
 #Consider These Remote Objects Insecure
 class ProcessManager(pb.Root,LoggingMixin):
