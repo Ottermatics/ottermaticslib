@@ -1,10 +1,11 @@
 import os, shutil, sys
 import re
-
+import pathlib
+from platform import system,uname
 import logging
 
-log = logging.getLogger('otterlib-locations')
 
+log = logging.getLogger('otterlib-locations')
 
 CORE_FOLDERS = ['invoices','research','media','documents']
 SOFTWARE_PROJECT = ['.creds','software']
@@ -23,6 +24,22 @@ PROJECT_FOLDER_OPTIONS = {'core': CORE_FOLDERS,
                           'all': CORE_FOLDERS+SOFTWARE_PROJECT+ELECTRONICS_PROJECT+DESIGN_PROJECT+ANALYSIS_PROJECT}
 
 
+def in_wsl() -> bool:
+    """
+    WSL is thought to be the only common Linux kernel with Microsoft in the name, per Microsoft:
+
+    https://github.com/microsoft/WSL/issues/4071#issuecomment-496715404
+    """
+
+    return  system() in ('Linux', 'Darwin') and 'Microsoft' in uname().release
+
+def wsl_home():
+    if in_wsl():
+        stream = os.popen('wslpath "$(wslvar USERPROFILE)"')
+        out = stream.read()
+        return str(out.strip())
+    return None
+
 def _get_appdata_path():
     import ctypes
     from ctypes import wintypes, windll
@@ -37,12 +54,18 @@ def _get_appdata_path():
     result = _SHGetFolderPath(0, CSIDL_APPDATA, 0, 0, path_buf)
     return path_buf.value
 
+def current_diectory():
+    return os.path.realpath(os.curdir)
+
 def dropbox_home():
-    from platform import system
+    
     import base64
     import os.path
     _system = system()
-    if _system in ('Windows', 'cli'):
+    if '.dropbox_home' in os.listdir( os.path.expanduser('~')):
+        return os.path.realpath(os.path.expanduser(os.path.join('~','.dropbox_home')))
+
+    elif _system in ('Windows', 'cli'):
         host_db_path = os.path.join(_get_appdata_path(),
                                     'Dropbox',
                                     'host.db')
@@ -52,21 +75,20 @@ def dropbox_home():
                                           '/host.db')
     else:
         raise RuntimeError('Unknown system={}'
-                           .format(_system))
+                           .format( _system ))
     if not os.path.exists(host_db_path):
         raise RuntimeError("Config path={} doesn't exists"
                            .format(host_db_path))
     with open(host_db_path, 'r') as f:
         data = f.read().split()
-    return str(base64.b64decode(data[1]),encoding='utf-8')
+    return os.path.split(str(base64.b64decode(data[1]),encoding='utf-8'))[0]
 
 def ottermatics_dropbox():
-    company_dropbox_home = os.path.split(dropbox_home())[0]
+    company_dropbox_home = dropbox_home()
     return company_dropbox_home
 
 def user_home():
     return dropbox_home()
-
 
 def ottermatics_folder():
     return str(os.path.abspath(os.path.join(os.sep,ottermatics_dropbox(),'Ottermatics')))
@@ -75,20 +97,46 @@ def ottermatics_projects():
     return str(os.path.abspath(os.path.join(os.sep,ottermatics_dropbox(),'Projects')))
 
 def ottermatics_project(project_name):
-    return str(os.path.abspath(os.path.join(os.sep,ottermatics_projects(),project_name.lower())))
+    return str(os.path.abspath(os.path.join(os.sep,ottermatics_projects(),project_name)))
 
 def creds_folder():
-    return str(os.path.abspath(os.path.join(os.sep,ottermatics_folder(),'creds')))
+    return str(os.path.abspath(os.path.join(os.sep,ottermatics_folder(),'.creds')))
+
+def ottermatics_clients():
+    return list([ path for path in os.listdir( ottermatics_projects() ) \
+                if os.path.isdir(os.path.join(ottermatics_projects(),path)) ] )
 
 def google_api_token():
-    credfile = 'client_secret_456980504049-d52oq3rod7cfntg97eje5ui451j8dhs1.apps.googleusercontent.com.json'
+    credfile = 'client_secrets.json'
     return str(os.path.abspath(os.path.join(os.sep,creds_folder(),credfile)))
+
+def in_client_dir():
+    '''Checks if the current path is in the projects folder'''
+    parent_path = os.path.abspath( ottermatics_projects() )
+    child_path = os.path.abspath( current_diectory() )
+    return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
+
+def client_dir_name():
+    '''Finds subdirectory name in projects folder if its in a client folder
+    :returns: the client folder name in projects, otherwise none'''
+    if not in_client_dir():
+        return None
+    current_rel_path  = os.path.relpath(current_diectory(), ottermatics_projects())
+    return pathlib.Path(current_rel_path).parts[0]
+
+def bool_from_env(bool_env_canidate):
+    if bool_env_canidate.lower() in ('yes','true','y','1'):
+        return True
+    if bool_env_canidate.lower() in ('no','false','n','0'):
+        return False
+    return None
 
 def load_from_env(creds_path='./.creds/',env_file='env.sh'):
     '''extracts export statements from bash file and aplies them to the python env'''
     creds_path = os.path.join(creds_path,env_file)
     log.info("checking {} for creds".format(creds_path))
     if os.path.exists(creds_path):
+        log.info('creds found')
         with open(creds_path,'r') as fp:
             txt = fp.read()
 

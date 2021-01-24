@@ -6,17 +6,19 @@ Created on Sat May 11 22:28:07 2019
 @author: kevinrussell
 """
 
-print('Starting Ottermatics Enviornment')
 
 from matplotlib.pylab import *
 
 import os,shutil,copy,traceback,collections,logging
 
-from .configuration import *
-from .locations import *
-import logging
-LOG = logging.getLogger()
-LOG.setLevel( logging.INFO)
+from ottermatics.configuration import *
+from ottermatics.locations import *
+from ottermatics.logging import *
+
+log.info('Starting Ottermatics Enviornment')
+load_from_env('./.creds/','env.sh')
 
 #Constants
 gravity = 9.81 #m/s
+
+

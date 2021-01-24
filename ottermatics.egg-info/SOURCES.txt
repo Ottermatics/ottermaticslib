@@ -3,6 +3,7 @@ setup.py
 ottermatics/__init__.py
 ottermatics/configuration.py
 ottermatics/data.py
+ottermatics/docs.py
 ottermatics/locations.py
 ottermatics/logging.py
 ottermatics/patterns.py

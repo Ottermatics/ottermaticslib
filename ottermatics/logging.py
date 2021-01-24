@@ -58,8 +58,8 @@ class LoggingMixin(logging.Filter):
     @property
     def logger(self):
         if self._log is None:
-            self._log = logging.getLogger(self.identity+str(uuid.uuid4()))
-            self._log.setLevel(level = logging.DEBUG)
+            self._log = logging.getLogger(self.identity)
+            #self._log.setLevel(level = logging.INFO)
             #Eliminate Outside Logging Interaction
             
             self._log.handlers = []
