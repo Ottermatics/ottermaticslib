@@ -34,9 +34,31 @@ class ConfigurationAnalysis(Configuration):
     
     configuration analysis's own table will be structure mostly around primary variables for this problem,
     they could be created by hand for your table, reaching into other configuraitons, or they could be the default.
+
+    We will keep track of how deep we reach into the configuration to store tables, `store_level` starting at zero will only
+    save the table of this configuration
     '''
 
+    store_type = attr.ib(default=None, validator=attr.validators.in_(['csv','db','gsheets',None]))
+    store_level = attr.ib(default=1, validator=attr.validators.instance_of(int))
 
+    def go_through_configurations(self,parent_level):
+        pass
+
+    #Table Saving functionality
+    def save_file(self):
+        pass
+    
+    def remove_file(file):
+        pass
+
+    @property
+    def rel_store_path(self):
+        return 'analysis/{}'.format(datetime.date.today()).replace('-','_')
+
+    @property
+    def filename(self):
+        return '{}_{}'.format(self.identity,self.name,self.date).replace(' ','_')
 
 
 
@@ -78,21 +100,28 @@ class Configuration(LoggingMixin):
     __attrs_post_init__(self,*args,**kwargs):
         self.reset_table()
 
-    def internal_configurations(self):
-        '''go through all attributes determining which are configuration objects'''
-        return {k:v for v in for k,v in self.store.items() if isinstance(v,Configuration)}
 
     def evaluate(*args,**kwargs):
         '''evaluate is a fleixble method to be overriden. Oftentimes it might not be as configurations are 
-        useful stores'''
-        #override this
+        useful stores
+        
+        :return: isn't stored in table, but is returned through solve making it possibly useful to track error'''
         return None
 
     def solve(self,*args,**kwargs):
-        #dont override this    
+        #dont override this
         output = self.evaluate(*args,**kwargs)
-        self.table.append(self.data_row)
-        return self.output
+        self.save_data()
+        self.solve_configurations(*args,**kwargs)
+        return output
+
+    def solve_configurations(self,*args,**kwargs):
+        for config in self.internal_configurations:
+            self.config.solve(*args,**kwargs)
+
+    def save_data(self):
+        if self.anything_changed:
+            self.table.append(self.data_row)
 
     def reset_table(self):
         '''Resets the table, and attrs label stores'''
@@ -101,6 +130,15 @@ class Configuration(LoggingMixin):
         self._attr_labels = None
         return self._table = []
 
+    @property
+    def TABLE(self):
+        '''this should seem significant'''
+        return self._table
+
+    @property
+    def internal_configurations(self):
+        '''go through all attributes determining which are configuration objects'''
+        return {k:v for v in for k,v in self.store.items() if isinstance(v,Configuration)}
 
     @property
     def data_row(self):
@@ -118,8 +156,8 @@ class Configuration(LoggingMixin):
 
     @contextmanager
     def difference(self,**kwargs):
-        '''a context manager that will allow you to dynamically change any information,
-        then will change it back in a fail safe way.
+        '''may want to consider using attr.evolve instead.... a context manager that will allow you to dynamically change any information,
+        then will change it back in a fail safe way. 
         
         with self.difference(name='new_name', value = new_value) as new_config:
             #do stuff with config, ok to fail
