@@ -9,7 +9,7 @@ CERAMICS = []
 
 
 @attr.s
-class SolidMaterial:
+class SolidMaterial(Configuration):
     '''A class to hold physical properties of solid structural materials'''
     name = attr.ib(default='solid material')
 
