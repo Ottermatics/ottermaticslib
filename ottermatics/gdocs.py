@@ -6,6 +6,7 @@ import pydrive
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+import time
 
 import attr
 
@@ -37,12 +38,16 @@ class OtterDrive(LoggingMixin):
     sync_root = ''
     client_folder = None
 
+    file_cache = {}
+
     def __init__(self,sync_root=CLIENT_G_DRIVE):
         ''':param sync_root: the client path to sync to on command'''
         
         #self._folder_contents = {'/': None} #Should be lists when activated
         self.sync_root = sync_root
         self._folder_ids = {'/':'root',None:'root','root':'root','':'root'} #Should be lists when activated
+        
+        self.file_cache = {}
 
         self.authoirze_google_integrations()
 
@@ -91,58 +96,74 @@ class OtterDrive(LoggingMixin):
                         self.get_or_create_folder(clientname,parent_id=fol['id'])
 
     def sync_to_client_folder(self,force=False):
+        skipped_paths = []
         if self.is_syncable_to_client_gdrive:
             self.info('syncing {} to client folder: {}'.format(self.client_folder,self.sync_root))
             
             if self.sync_root not in self.folder_cache:
                 parent_id = self.ensure_g_path_get_id(self.sync_root)
-
             for dirpath, dirnames, dirfiles in os.walk(self.client_folder):
+                
+                try:
+                    any_hidden = any([ pth.startswith('.') for pth in dirpath.split(os.sep)])
 
-                any_hidden = any([ pth.startswith('.') for pth in dirpath.split(os.sep)])
+                    if '.skip_gsync' in dirfiles or '.skip_gsync' in dirnames:
+                        self.info('skipping {}'.format(dirpath))
+                        skipped_paths.append(dirpath)
+                        continue
 
-                if '.skip_gsync' in dirfiles or '.skip_gsync' in dirnames:
-                    self.info('skipping {}'.format(dirpath))
-                    continue
+                    if any([os.path.commonpath([dirpath,spath]) == os.path.commonpath([spath]) \
+                                                                            for spath in skipped_paths]):
+                        self.info('skipping {}'.format(dirpath))
+                        continue
 
-                if not any_hidden:
-                    dirpath = os.path.realpath(dirpath)
-                    gdrive_path = self.sync_path(dirpath)
 
-                    #parent_dir = os.path.split(gdrive_path)[0]
-                    if self.sync_root != gdrive_path:
-                        parent_id = self.ensure_g_path_get_id(gdrive_path)
+                    if not any_hidden:
+                        time.sleep(1)
+                        self.debug('syncing {}'.format(dirpath))
+                        dirpath = os.path.realpath(dirpath)
+                        gdrive_path = self.sync_path(dirpath)
 
-                    #This folder
-                    if gdrive_path not in self.folder_cache:
-                        gdir_id = self.get_or_create_folder(os.path.split(gdrive_path)[-1],parent_id)['id']
-                    else:
-                        gdir_id = self.folder_cache[gdrive_path]
-                    
-                    self.sync_folder_contents_locally(gdir_id)
-                    
-                    #Folders
-                    for folder in dirnames:
-                        absfold = os.path.join(dirpath,folder)
-                        gfold = self.sync_path(absfold)
-                        if gfold not in self.folder_cache:
-                            if self.valid_sync_file(folder):
-                                gfol = self.get_or_create_folder(folder,gdir_id)
-                            else:
-                                self.debug('skipping {}'.format(absfold))                                
+                        #parent_dir = os.path.split(gdrive_path)[0]
+                        if self.sync_root != gdrive_path:
+                            parent_id = self.ensure_g_path_get_id(gdrive_path)
+
+                        #This folder
+                        if gdrive_path not in self.folder_cache:
+                            gdir_id = self.get_or_create_folder(os.path.split(gdrive_path)[-1],parent_id)['id']
+                        else:
+                            gdir_id = self.folder_cache[gdrive_path]
                         
+                        self.sync_folder_contents_locally(gdir_id)
+                        
+                        #Folders
+                        for folder in dirnames:
+                            absfold = os.path.join(dirpath,folder)
+                            gfold = self.sync_path(absfold)
+                            if gfold not in self.folder_cache:
+                                if self.valid_sync_file(folder):
+                                    gfol = self.get_or_create_folder(folder,gdir_id)
+                                else:
+                                    self.debug('skipping {}'.format(absfold))                                
+                            
 
-                    #Finally files
-                    for file in dirfiles:
-                        absfile = os.path.join(dirpath,file)
-                        gfile = self.sync_path(absfile)
-                        if gfile not in self.folder_cache or force:
-                            if self.valid_sync_file(file):
-                                self.upload_or_update_file(absfile,gdir_id)
+                        #Finally files
+                        for file in dirfiles:
+                            absfile = os.path.join(dirpath,file)
+                            gfile = self.sync_path(absfile)
+                            if gfile not in self.file_cache or force:
+                                if self.valid_sync_file(file):
+                                    self.upload_or_update_file(absfile,gdir_id)
+                                else:
+                                    self.debug('skipping {}'.format(file))
                             else:
-                                self.debug('skipping {}'.format(file))
-
-                                
+                                self.debug('found existing {}'.format(gfile))
+                    else:
+                        self.debug('skipping hidden dir {}'.format(dirpath))
+                        
+                except Exception as e:
+                    self.warning('Failure in gdrive sync: {}'.format(e))
+                             
         else:
             self.warning('not able to sync: client folder: {} sync root: {}'.format(self.client_folder,self.sync_root))
 
@@ -168,23 +189,56 @@ class OtterDrive(LoggingMixin):
         #Only sync from client folder
         assert os.path.commonpath([self.client_folder]) == os.path.commonpath([file_path, self.client_folder])
 
+        #Check existing
         file_path = os.path.realpath(file_path)
-        
-        self.info('creating {}->{}'.format(parent_id,file_path))
-        file = self.gdrive.CreateFile()
+        file_name = os.path.basename(file_path)
+        gfile_path = self.sync_path(file_path)
+
+        if gfile_path in self.file_cache:
+            self.info('updating {}->{}'.format(parent_id,file_path))
+            file = self.gdrive.CreateFile({"id": self.file_cache[gfile_path],
+                                            'parents': [{'id': parent_id }]})
+
+        else:
+            self.info('creating {}->{}'.format(parent_id,file_path))
+            file = self.gdrive.CreateFile({"title":file_name,
+                                         'parents': [{'id': parent_id }]})
 
         file.SetContentFile(file_path)
         file.Upload() # Upload the file.
         self.debug('uploaded {}->{}'.format(parent_id,file_path))
 
-        self.add_cached_file(file,parent_id)
+
+        
+        self.add_cached_file(file,gfile_path)
+        time.sleep(1)
 
 
-    def add_cached_file(self,folder_meta,parent_id):
+    def add_cached_folder(self,folder_meta,parent_id):
         if parent_id in self.reverse_folder_cache:
             parent_path = self.reverse_folder_cache[parent_id]
             folder_path = os.path.join('',parent_path,folder_meta['title'])
-            self.folder_cache[folder_path] = folder_meta['id']
+            self.debug('caching file {}'.format(folder_path))
+            if folder_meta['mimeType'] == 'application/vnd.google-apps.folder':
+                self.folder_cache[folder_path] = folder_meta['id']
+            elif folder_meta['mimeType'] == 'application/vnd.google-apps.shortcut':
+                shortcut = self.gdrive.CreateFile({'id':folder_meta['id']})
+                shortcut.FetchMetadata(fields='shortcutDetails')
+                if 'shortcutDetails' in shortcut:
+                    details = shortcut['shortcutDetails']
+                    if 'targetId' in details and details['targetMimeType'] == 'application/vnd.google-apps.folder':
+                        self.folder_cache[folder_path] = details['targetId']
+
+    def add_cached_file(self,file_meta,gfile_parent_path):
+
+        if gfile_parent_path is not None:
+            
+            gfile_path = os.path.join(gfile_parent_path,file_meta['title'])
+            self.debug('caching file {}'.format(gfile_path))
+
+            self.file_cache[gfile_path] = file_meta['id']
+
+
 
     def get_or_create_folder(self,folder_name,parent_id='root',**kwargs):
         '''Creates a folder in the parent folder if it doesn't already exist, otherwise return folder
@@ -206,20 +260,26 @@ class OtterDrive(LoggingMixin):
                                         "mimeType": "application/vnd.google-apps.folder"})            
             self.debug('uploading {}->{}'.format(parent_id,folder_name))                                        
             fol.Upload()
-            self.add_cached_file(fol,parent_id)
+            self.add_cached_folder(fol,parent_id)
 
         else:
             self.debug('found folder {} in parent {}'.format(folder_name,parent_id))
             fol = folders_in_path[folder_name]
-            self.add_cached_file(fol,parent_id)
+            self.add_cached_folder(fol,parent_id)
         
         return fol
 
-    def sync_folder_contents_locally(self,parent_id):
+    def sync_folder_contents_locally(self,parent_id,parent_folder_path=None):
         #Update Subdirectories - more efficient all at once
+        if parent_id in self.reverse_folder_cache and parent_folder_path is None:
+            parent_folder_path = self.reverse_folder_cache[parent_id]
+
         self.debug('updating subdirecories of {}'.format(parent_id))
-        for sfol in self.all_in_folder(parent_id):
-            self.add_cached_file(sfol,parent_id)        
+        for sfol in self.folders_in_folder(parent_id):
+            self.add_cached_folder(sfol,parent_id)
+
+        for sfil in self.files_in_folder(parent_id):
+            self.add_cached_file(sfil,parent_folder_path)                
 
     def ensure_g_path_get_id(self,gpath):
         '''walks these internal google paths ensuring everythign is created from root'''
@@ -227,8 +287,13 @@ class OtterDrive(LoggingMixin):
         self.info('ensuring path {}'.format(gpath))
         parent_id = 'root'
 
+        #avoid expensive calls
         if gpath in self.folder_cache:
             return self.folder_cache[gpath]
+        elif gpath.startswith('/'):
+            if gpath.replace('/','',1) in self.folder_cache:
+                 return self.folder_cache[gpath.replace('/','',1)]
+
 
         for sub in gpath.split(os.sep):
             if sub != '' and sub != 'root':
@@ -241,15 +306,17 @@ class OtterDrive(LoggingMixin):
     def files_in_folder(self,folder_id='root'):
         if folder_id is not None:
             self.debug("searching {} for files".format(folder_id))
-            for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder'".format(folder_id)}).GetList():
+            for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder' and mimeType != 'application/vnd.google-apps.shortcut'".format(folder_id)}).GetList():
                 yield file
 
     def folders_in_folder(self,folder_id='root'):
         if folder_id is not None:
             self.debug("searching {} for files".format(folder_id))
+            #Folders
             for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType = 'application/vnd.google-apps.folder'".format(folder_id)}).GetList():
                 yield file
-            for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType = 'application/vnd.google-apps.folder'".format(folder_id)}).GetList():
+            #Shortcuts
+            for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType = 'application/vnd.google-apps.shortcut'".format(folder_id)}).GetList():
                 yield file                
 
     def all_in_folder(self,folder_id='root'):
