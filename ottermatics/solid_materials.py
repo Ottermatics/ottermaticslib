@@ -1,4 +1,4 @@
-from ottermatics import Configuration,inst_vectorize
+from ottermatics.configuration import Configuration,inst_vectorize, otter_class
 import attr
 import numpy
 
@@ -8,7 +8,7 @@ PLASTICS = []
 CERAMICS = []
 
 
-@attr.s
+@otter_class
 class SolidMaterial(Configuration):
     '''A class to hold physical properties of solid structural materials'''
     name = attr.ib(default='solid material')
@@ -70,7 +70,8 @@ class SolidMaterial(Configuration):
     def allowable_stress(self):
         return self.yield_stress / self.factor_of_saftey
 
-@attr.s
+
+@otter_class
 class SS_316(SolidMaterial):
     name = attr.ib(default='stainless steel 316')
 
@@ -94,7 +95,8 @@ class SS_316(SolidMaterial):
     #Economic Properties
     cost_per_kg = attr.ib(default=3.26) #dollar per kg
 
-@attr.s
+
+@otter_class
 class ANSI_4130(SolidMaterial):
     name = attr.ib(default='steel 4130')
 
@@ -119,7 +121,7 @@ class ANSI_4130(SolidMaterial):
     cost_per_kg = attr.ib(default=2.92) #dollar per kg   
 
 
-@attr.s
+@otter_class
 class ANSI_4340(SolidMaterial):
     name = attr.ib(default='steel 4340')
 
@@ -145,7 +147,7 @@ class ANSI_4340(SolidMaterial):
 
 
 
-@attr.s
+@otter_class
 class Aluminum(SolidMaterial):
     name = attr.ib(default='aluminum generic')
 

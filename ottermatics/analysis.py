@@ -19,23 +19,20 @@ class AnalysisConfiguration(Configuration):
     '''
 
     def solve(self,*args,**kwargs):
-        #dont override this
+        '''dont override this unless you call evaluate, followed by save_data. 
+        This will maintain table saving functionality'''
         output = self.evaluate(*args,**kwargs)
         self.save_data()
-        self.solve_configurations(*args,**kwargs)
         return output
 
-    def solve_configurations(self,*args,**kwargs):
-        for config in self.internal_configurations.values():
-            config.save_data()
-            config.solve(*args,**kwargs) #will at a minimum save data
+    #Report Functionality
+    def post_process(self):
+        pass
 
-
-    #Table Saving functionality
-    def save_file(self):
+    def save_report(self):
         pass
     
-    def remove_file(file):
+    def remove_report(file):
         pass
 
     @property

@@ -7,7 +7,7 @@ import logging
 
 log = logging.getLogger('otterlib-locations')
 
-CORE_FOLDERS = ['invoices','research','media','documents']
+CORE_FOLDERS = ['invoices','research','media','documents','reports']
 SOFTWARE_PROJECT = ['.creds','software']
 ELECTRONICS_PROJECT = ['electronics','firmware']
 DESIGN_PROJECT = ['design','render']

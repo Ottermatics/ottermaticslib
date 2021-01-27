@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import attr
 
 from ottermatics.logging import LoggingMixin, log
+from ottermatics.locations import *
 
 import numpy
 import functools
@@ -9,6 +10,9 @@ import itertools
 import datetime
 import pandas
 import os
+import inspect
+
+import matplotlib.pyplot as plt
 
 #Decorators
 '''Ok get ready for some fancy bullshit, this represents alot of meta functionality to get nice
@@ -125,7 +129,7 @@ def table_stats_property(f=None,**meta):
         return wrapper
 
 #Not sure where to put this, this will vecorize a class fcuntion
-class vectorize_inst(numpy.vectorize):
+class inst_vectorize(numpy.vectorize):
     def __get__(self, obj, objtype):
         return functools.partial(self.__call__, obj)
 
@@ -155,6 +159,11 @@ class Configuration(LoggingMixin):
 
     importantly since its an attr's class we don't use __init__, instead overide __attrs_post_init__ 
     and use it the same way.
+
+    Report Generation:
+    you can call the wrapped subplots generator in this method which will automatically record the saved
+    plots, catch errors and save files in a valid image format.
+    with self.subplots(*args) as (fig,axes):
     '''
     _temp_vars = None
 
@@ -166,11 +175,17 @@ class Configuration(LoggingMixin):
 
     #yours to implement
     _skip_attr = None
+    
 
     #table property internal variables
     __store_options = ('csv','excel')#,'db','gsheets','excel','json')
     _store_types = None
     _store_level = 0
+
+    #plotting & post processing calls
+    _stored_plots = []
+    _report_path = 'reports/'
+    _default_image_format = '.png'
 
     #Ultra private variables
     _val_tab_funtions = None
@@ -180,19 +195,20 @@ class Configuration(LoggingMixin):
     _attr_labels = None 
     _anything_changed = False
 
-    #Solver Configuration
+    #A solver function that will be called on every configuration
     def evaluate(self,*args,**kwargs):
         '''evaluate is a fleixble method to be overriden. Oftentimes it might not be used as 
-        configurations are useful stores
+        configurations are useful stores. These must be called from the top level, or solve will call 
         
         :return: not stored in table, but is returned through solve making it possibly useful 
         to track error, or other feedback for control'''
-        return None 
+        return None
     
+    #Identity & locatoin Methods
     @property
     def filename(self):
         '''A nice to have, good to override'''
-        return self.name.replace(' ','_')
+        return self.identity.replace(' ','_').replace('-','_')
 
     @property
     def identity(self):
@@ -201,7 +217,75 @@ class Configuration(LoggingMixin):
 
     def add_fields(self, record):
         '''Overwrite this to modify logging fields, change log_fmt in your class to use the value set here.'''
-        record.identity = self.identity        
+        record.identity = self.identity
+
+    @property
+    def client_folder_root(self):
+        if in_client_dir():
+            return ottermatics_project(client_dir_name())
+        else:
+            self.warning('not in a client folder')
+            return '.'
+
+    @property
+    def report_path(self):
+        path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
+        if not os.path.exists(path):
+            self.warning('report does not exist {}'.format(path))
+        return path            
+
+    #Clearance Methods
+    def reset_data(self):
+        self.reset_table()
+        self._stored_plots = []
+        self.index = 0
+        for config in self.internal_configurations.values():
+            config.reset_data()        
+
+
+    #Plotting & Report Methods:
+    @property
+    def saved_plots(self):
+        return self._stored_plots
+
+    @property
+    def plotting_methods(self):
+        return {fname:func for fname,func in inspect.getmembers(self, predicate=inspect.ismethod) \
+                                          if fname.startswith('plot_')}
+
+    @contextmanager
+    def subplots(self,plot_tile,save=True,*args,**kwargs):
+        '''context manager for matplotlib subplots, which will save the plot if no failures occured
+        using a context manager makes sense so we can record the plots made, and then upload them in 
+        the post processing steps.
+        
+        it makes sense to always save images, but to override them.
+        plot id should be identity+plot_title and these should be stored by date in the report path'''
+        fig,maxes = plt.subplots(*args,**kwargs)
+
+        try:
+            yield fig,maxes
+            
+            if save:
+                #determine file name
+                filename = '{}_{}'.format(self.filename,plot_tile)                
+                supported_filetypes = plt.gcf().canvas.get_supported_filetypes()
+                if not any([filename.endswith(ext) for ext in supported_filetypes.keys()]):
+                    if '.' in filename:
+                        filename = '.'.join(filename.split('.')[:-1])+self._default_image_format
+                    else:
+                        filename += self._default_image_format
+
+                filepath = os.path.join(self.report_path,filename)
+
+                self.info('saving plot {}'.format(filename))
+                fig.savefig(filepath)
+
+                self._stored_plots.append( filepath )
+
+        except Exception as e:
+            self.error(e,'issue plotting {}'.format(plot_tile))
+
 
     #Data Tabulation - Intelligent Lookups
     def reset_table(self):
@@ -349,7 +433,6 @@ class Configuration(LoggingMixin):
         return { (meta['title'] if 'title' in meta else fname) :meta  \
                                     for fname,meta in self._stat_tab_functions.items()}
             
-
     @property
     def has_random_stats_properties(self):
         '''looks at stat tab function metadata for 'random=True' 
@@ -359,7 +442,7 @@ class Configuration(LoggingMixin):
                 return True
         return False
 
-    #Recursive Configuration Information
+    #Configuration Information
     @property
     def internal_configurations(self):
         '''go through all attributes determining which are configuration objects'''
@@ -403,6 +486,7 @@ class Configuration(LoggingMixin):
 
     #Save functionality
     def save_table(self,filename=None,*args,**kwargs):
+        '''Header method to save the config in many different formats'''
         for save_format in self.store_types:
             if save_format == 'csv':
                 self.save_csv(filename,*args,**kwargs)
