@@ -22,6 +22,7 @@ handles runtime meta operatoins, while Configuration is more like a normal class
 how to do is use the 3rd party attr's libray. Sorry if you dont like it!
 '''
 
+
 #Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
     instance._anything_changed = True
@@ -90,14 +91,15 @@ class OtterProp(property):
             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
             return None 
 
-
-
 def table_property(f=None,**meta):
     '''A decorator that wraps a function like a regular property
     The output will be tabulized for use in the ottermatics table methods
     values must be single valued (str, float, int) 
     
-    _val_prop is the key variable set, otter_class looks it up'''
+    _val_prop is the key variable set, otter_class looks it up
+    :param random: set this to true if you walways want it a property to refreshh even if underlying data
+    hasn't changed
+    :param title: the name the field will have in a table     '''
     if f is not None:
         prop =  OtterProp(f)
         prop._val_prop = {'func':f}
@@ -109,14 +111,15 @@ def table_property(f=None,**meta):
             return prop
         return wrapper
 
-
-
 def table_stats_property(f=None,**meta):
     '''A decorator that wraps a function like a regular property
     The output must be a numpy array or list of number which can be 
     tabulized into columns like average, min, max and std for use in the ottermatics table methods
     
-    _stat_prop is the key variable set, otter_class looks it up'''
+    _stat_prop is the key variable set, otter_class looks it up
+    :param random: set this to true if you walways want it a property to refreshh even if underlying data
+    hasn't changed
+    :param title: the name the field will have in a table '''
     if f is not None:  
         prop =  OtterProp(f)
         prop._stat_prop = {'func':f}
@@ -345,6 +348,7 @@ class Configuration(LoggingMixin):
             yield 1,self.TABLE[0],self.data_label
         else:
             for col,label in zip(zip(*self.TABLE),self.data_label):
+                col = numpy.array(col).flatten().tolist()
                 if len(set(col)) <= 1:
                     yield 2, col[0] ,label #Can assume that first value is equal to all
                 else:
@@ -377,12 +381,13 @@ class Configuration(LoggingMixin):
         will ignore any attributes labeled in _skip_attr which is a list
         best to not override these, but you can if you really want'''
 
-        prop_vals = [val for key,val in self.tab_value_properties.items()]
+        prop_vals = [float(val) if isinstance(val,numpy.ndarray) else val \
+                                for key,val in self.tab_value_properties.items()]
         
         stats_vals = [ OtterProp.stats_return( val ) for key,val in self.tab_stats_properties.items() ]
         stats_vals = list(filter(None,itertools.chain.from_iterable(stats_vals)))
 
-        return self.attr_row + prop_vals + stats_vals
+        return numpy.array(self.attr_row + prop_vals + stats_vals).flatten().tolist()
 
     @property
     def data_label(self):
