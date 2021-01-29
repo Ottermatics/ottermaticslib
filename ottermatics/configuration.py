@@ -3,6 +3,7 @@ import attr
 
 from ottermatics.logging import LoggingMixin, log
 from ottermatics.locations import *
+from ottermatics.gdocs import OtterDrive
 
 import numpy
 import functools
@@ -53,11 +54,21 @@ def otter_class(cls,*args,**kwargs):
 
     return acls
 
+def meta(title,desc=None,**kwargs):
+    '''a convienience wrapper to add metadata to attr.ib
+    :param title: a title that gets formatted for column headers
+    :param desc: a description of the property'''
+    out = {'title':title.replace('_',' ').replace('-',' ').title(),
+            'desc':None,
+            **kwargs}
+    return out
 
 #Properties to register certian class functions
+class OtterCacheProp(functools.cached_property):
+    pass
+
 class OtterProp(property):
     '''We cant modify property code sooo we have OtterProps!'''
-    pass
 
     stats_labels = ['min','avg','std','max']
 
@@ -99,7 +110,8 @@ def table_property(f=None,**meta):
     _val_prop is the key variable set, otter_class looks it up
     :param random: set this to true if you walways want it a property to refreshh even if underlying data
     hasn't changed
-    :param title: the name the field will have in a table     '''
+    :param title: the name the field will have in a table     
+    :param desc: some information about the field'''
     if f is not None:
         prop =  OtterProp(f)
         prop._val_prop = {'func':f}
@@ -119,7 +131,8 @@ def table_stats_property(f=None,**meta):
     _stat_prop is the key variable set, otter_class looks it up
     :param random: set this to true if you walways want it a property to refreshh even if underlying data
     hasn't changed
-    :param title: the name the field will have in a table '''
+    :param title: the name the field will have in a table
+    :param desc: some information about the field'''
     if f is not None:  
         prop =  OtterProp(f)
         prop._stat_prop = {'func':f}
@@ -131,13 +144,57 @@ def table_stats_property(f=None,**meta):
             return prop
         return wrapper
 
+def table_cached_property(f=None,**meta):
+    '''A decorator that caches and wraps a function like a regular property
+    The output will be tabulized for use in the ottermatics table methods
+    values must be single valued (str, float, int)
+    
+    _val_prop is the key variable set, otter_class looks it up
+    :param random: set this to true if you walways want it a property to refreshh even if underlying data
+    hasn't changed
+    :param title: the name the field will have in a table
+    :param desc: some information about the field'''
+    if f is not None:
+        prop =  OtterCacheProp(f)
+        prop._val_prop = {'func':f}
+        return prop
+    else:
+        def wrapper(f):
+            prop =  OtterCacheProp(f)
+            prop._val_prop = {'func':f,**meta}
+            return prop
+        return wrapper
+
+def table_cached_stats_property(f=None,**meta):
+    '''A decorator that caches and wraps a function like a regular property
+    The output must be a numpy array or list of number which can be 
+    tabulized into columns like average, min, max and std for use in the ottermatics table methods
+    
+    _stat_prop is the key variable set, otter_class looks it up
+    :param random: set this to true if you walways want it a property to refreshh even if underlying data
+    hasn't changed
+    :param title: the name the field will have in a table
+    :param desc: some information about the field'''
+    if f is not None:  
+        prop =  OtterCacheProp(f)
+        prop._stat_prop = {'func':f}
+        return prop
+    else:
+        def wrapper(f):
+            prop =  OtterCacheProp(f)
+            prop._stat_prop = {'func':f,**meta}
+            return prop
+        return wrapper        
+
 #Not sure where to put this, this will vecorize a class fcuntion
 class inst_vectorize(numpy.vectorize):
     def __get__(self, obj, objtype):
         return functools.partial(self.__call__, obj)
 
-
-
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
 
 
 
@@ -181,7 +238,7 @@ class Configuration(LoggingMixin):
     
 
     #table property internal variables
-    __store_options = ('csv','excel')#,'db','gsheets','excel','json')
+    __store_options = ('csv','excel','gsheets')#,'db','gsheets','excel','json')
     _store_types = None
     _store_level = 0
 
@@ -211,7 +268,9 @@ class Configuration(LoggingMixin):
     @property
     def filename(self):
         '''A nice to have, good to override'''
-        return self.identity.replace(' ','_').replace('-','_')
+        fil = self.identity.replace(' ','_').replace('-','_').replace(':','-').replace('|','_').title()
+        filename = "".join([c for c in fil if c.isalpha() or c.isdigit() or c=='_' or c=='-']).rstrip()
+        return filename
 
     @property
     def identity(self):
@@ -235,7 +294,11 @@ class Configuration(LoggingMixin):
         path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
         if not os.path.exists(path):
             self.warning('report does not exist {}'.format(path))
-        return path            
+        return path  
+
+    @property
+    def report_path_daily(self):
+        return os.path.join(self.report_path,'{}'.format(datetime.date.today()).replace('-','_'))                  
 
     #Clearance Methods
     def reset_data(self):
@@ -309,6 +372,38 @@ class Configuration(LoggingMixin):
     def dataframe(self):
         return pandas.DataFrame(data = self.TABLE, columns = self.data_label,copy=True)
 
+    @property
+    def variable_dataframe(self):
+        vals = list(zip(*list((self.variable_data_dict.values()))))
+        cols = list((self.variable_data_dict.keys()))
+        if vals:
+            return pandas.DataFrame(data = vals, columns=cols, copy = True)
+        return None
+
+    @property
+    def static_dataframe(self):
+        vals = [list((self.static_data_dict.values()))]
+        cols = list((self.static_data_dict.keys()))
+        if vals:
+            return pandas.DataFrame(data = vals, columns=cols, copy = True)
+        return None
+
+    def split_dataframe_by_colmum(self,df,max_columns=10):
+        df_cols = list(df.columns)
+        if len(df_cols) < max_columns:
+            return [df]
+        
+        col_chunks = list(chunks(df_cols,max_columns))
+        dat_chunks = [df[colck].copy() for colck in col_chunks]
+
+        return dat_chunks
+
+    def cleanup_dataframe(self,df,badwords=('index','min','max')):
+        tl_df = self.static_dataframe
+        to_drop = [cl for cl in tl_df.columns if any([bw in cl.lower() for bw in badwords])]
+        out_df = tl_df.drop(columns=to_drop)        
+        return out_df
+
     def save_data(self,index=None):
         '''We'll save data for this object and any other internal configuration if 
         anything changed or if the table is empty This should result in at least one row of data, 
@@ -354,6 +449,8 @@ class Configuration(LoggingMixin):
                 else:
                     yield 3, col,label
 
+
+
     @property
     def static_data_dict(self):
         '''returns key-value pairs in table that are single valued, all in type 1, some in type 2'''
@@ -375,6 +472,9 @@ class Configuration(LoggingMixin):
                 output[label] = value
         return output
 
+    def format_label(self,label):
+        return label.replace('_',' ').replace('-',' ').title()
+
     @property
     def data_row(self):
         '''method that returns collects valid tabiable attributes immediately from this config
@@ -385,7 +485,7 @@ class Configuration(LoggingMixin):
                                 for key,val in self.tab_value_properties.items()]
         
         stats_vals = [ OtterProp.stats_return( val ) for key,val in self.tab_stats_properties.items() ]
-        stats_vals = list(filter(None,itertools.chain.from_iterable(stats_vals)))
+        stats_vals = list(filter(lambda v: v is not None,itertools.chain.from_iterable(stats_vals)))
 
         return numpy.array(self.attr_row + prop_vals + stats_vals).flatten().tolist()
 
@@ -397,9 +497,9 @@ class Configuration(LoggingMixin):
         prop_labels = [key for key,meta in self.tab_value_meta.items()]
 
         stats_labels = [ OtterProp.create_stats_label(val,key) for key,val in self.tab_stats_properties.items()]                        
-        stats_labels = list(filter(None,itertools.chain.from_iterable(stats_labels)))
+        stats_labels = list(filter(lambda v: v is not None,itertools.chain.from_iterable(stats_labels)))
 
-        return self.attr_labels + prop_labels + stats_labels
+        return list(map(self.format_label,self.attr_labels + prop_labels + stats_labels))
 
     @property
     def skip_attr(self) -> list: 
@@ -409,14 +509,18 @@ class Configuration(LoggingMixin):
 
     @property
     def attr_labels(self) -> list:
+        get_label = lambda k,v: self.format_label(v.metadata['title']) if v.metadata \
+                                and 'title' in v.metadata else self.format_label(k)
+
         if self._attr_labels is None:
-            self._attr_labels = list([k for k in attr.fields_dict(self.__class__).keys() \
+            self._attr_labels = list([get_label(k,v) for k,v in attr.fields_dict(self.__class__).items() \
                                                 if k not in self.skip_attr])
         return self._attr_labels
 
     @property
     def attr_row(self) -> list:
-        return list([self.store[k] for k in self.attr_labels])
+        return list([self.store[k] for k in attr.fields_dict(self.__class__).keys() \
+                                         if k not in self.skip_attr])
 
     @property
     def tab_value_properties(self):
@@ -450,8 +554,10 @@ class Configuration(LoggingMixin):
     #Configuration Information
     @property
     def internal_configurations(self):
-        '''go through all attributes determining which are configuration objects'''
-        return {k:v for k,v in self.store.items() if isinstance(v,Configuration)}
+        '''go through all attributes determining which are configuration objects
+        we skip any configuration that start with an underscore (private variable)'''
+        return {k:v for k,v in self.store.items() \
+                if isinstance(v,Configuration) and not k.startswith('_')}
 
 
 
@@ -468,8 +574,9 @@ class Configuration(LoggingMixin):
         if should_yield_level(level):
             yield level,self
 
+        level += 1
         for config in self.internal_configurations.values():
-            for level,iconf in config.go_through_configurations(level+1,levels_to_descend,parent_level):
+            for level,iconf in config.go_through_configurations(level,levels_to_descend,parent_level):
                 yield level,iconf
 
     def recursive_data_structure(self,levels_to_descend = -1, parent_level=0):
@@ -482,9 +589,12 @@ class Configuration(LoggingMixin):
 
         for level,conf in self.go_through_configurations(0,levels_to_descend,parent_level):
             if level in output:
-                output[level].append({'static':conf.static_data_dict,'variable':conf.variable_data_dict})
+                output[level].append({'static':conf.static_dataframe,\
+                                      'variable':conf.variable_dataframe,'conf':conf})
             else:
-                output[level] = [{'static':conf.static_data_dict,'variable':conf.variable_data_dict}]
+                output[level] = [{'static':conf.static_dataframe,\
+                                  'variable':conf.variable_dataframe,\
+                                  'conf':conf}]
 
         return output
 
@@ -497,8 +607,8 @@ class Configuration(LoggingMixin):
                 self.save_csv(filename,*args,**kwargs)
             elif save_format == 'excel':
                 self.save_excel(filename,*args,**kwargs)
-            #elif save_format == 'gsheets':
-            #    self.save_excel(filename,*args,**kwargs)                                
+            elif save_format == 'gsheets':
+               self.save_gsheets(filename,*args,**kwargs)                                
 
     def save_csv(self,filename=None,*args,**kwargs):
         if self.TABLE:
@@ -517,8 +627,24 @@ class Configuration(LoggingMixin):
             self.dataframe.to_excel(path_or_buf=filename,*args,**kwargs)
 
     def save_gsheets(self,filename=None,*args,**kwargs):
-        pass
+        
+        od = OtterDrive.instance()
 
+        filepath = os.path.join(self.report_path,self.filename)
+        self.info('saving as gsheets in dir {}'.format(filepath))
+
+        gpath = od.sync_path(filepath)
+
+        od.ensure_g_path_get_id(gpath)
+        pth_id = od.folder_cache[gpath]
+
+        sht = od.gsheets.create(filename,folder=pth_id)
+        wk = sht.sheet1
+        wk.set_dataframe(self.dataframe,start='A1')
+
+        self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
+
+        
     @property
     def store_level(self):
         return self._store_level
@@ -589,7 +715,6 @@ class Configuration(LoggingMixin):
     def store(self):
         '''lets pretend we're not playing with fire'''
         return self.__dict__
-
 
 
 

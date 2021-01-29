@@ -22,7 +22,11 @@ FILE = os.path.dirname(__file__)
 CREDS = os.path.join(FILE, 'creds')
 credfile = lambda fil: os.path.join(CREDS,fil)
 
-
+try:
+    logging.getLogger('parso.cache').disabled=True
+    logging.getLogger('parso.cache.pickle').disabled=True
+except:
+    log.warning('could not diable parso')
 # def installGELFLogger():
 #     '''Installs GELF Logger'''
 #     # self.gelf = graypy.GELFTLSHandler(GELF_HOST,GELF_PORT, validate=True,\

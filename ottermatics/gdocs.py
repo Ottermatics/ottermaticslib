@@ -1,6 +1,9 @@
 import os
+import ottermatics
 from ottermatics.locations import google_api_token, creds_folder, ottermatics_clients, bool_from_env, client_dir_name, ottermatics_project
 from ottermatics.logging import LoggingMixin
+from ottermatics.patterns import Singleton
+
 import pygsheets
 import pydrive
 
@@ -24,10 +27,13 @@ if 'CLIENT_GMAIL' in os.environ:
     CLIENT_GMAIL = os.environ['CLIENT_GMAIL']    
 
 
+@Singleton
 class OtterDrive(LoggingMixin):
     '''Authenticates To Your Google Drive To Edit Sheets and Your Drive Files
-    :param otter_sheets: is the google sheets object
-    :param otter_drive: is the google drive object'''    
+
+    OtterDrive is a singleton so insantiated: OtterDrive.instance() and you can do this
+    anywhere in the same code and preserve cached information, however its not threadsafe (yet)
+    '''    
     gauth = None
     gsheets = None
     gdrive = None
@@ -42,8 +48,11 @@ class OtterDrive(LoggingMixin):
 
     def __init__(self,sync_root=CLIENT_G_DRIVE):
         ''':param sync_root: the client path to sync to on command'''
-        
         #self._folder_contents = {'/': None} #Should be lists when activated
+        if sync_root is None and 'CLIENT_GDRIVE_PATH' in os.environ:
+            self.debug('getting CLIENT_GDRIVE_PATH from environment')
+            sync_root = os.environ['CLIENT_GDRIVE_PATH']
+
         self.sync_root = sync_root
         self._folder_ids = {'/':'root',None:'root','root':'root','':'root'} #Should be lists when activated
         
@@ -175,6 +184,9 @@ class OtterDrive(LoggingMixin):
         return True
 
     def sync_path(self,path):
+        '''Sync path likes absolute paths'''
+        assert os.path.commonpath([self.client_folder]) == os.path.commonpath([path, self.client_folder])
+
         rel_root = os.path.relpath(path,self.client_folder)
         gdrive_root = os.path.join(self.sync_root,rel_root)
         #remove current directory /.
@@ -214,13 +226,14 @@ class OtterDrive(LoggingMixin):
         time.sleep(1)
 
 
-    def add_cached_folder(self,folder_meta,parent_id):
+    def add_cached_folder(self,folder_meta,parent_id,sync=False):
         if parent_id in self.reverse_folder_cache:
             parent_path = self.reverse_folder_cache[parent_id]
             folder_path = os.path.join('',parent_path,folder_meta['title'])
             self.debug('caching file {}'.format(folder_path))
             if folder_meta['mimeType'] == 'application/vnd.google-apps.folder':
                 self.folder_cache[folder_path] = folder_meta['id']
+                if sync: self.sync_folder_contents_locally(folder_meta['id'],folder_path)
             elif folder_meta['mimeType'] == 'application/vnd.google-apps.shortcut':
                 shortcut = self.gdrive.CreateFile({'id':folder_meta['id']})
                 shortcut.FetchMetadata(fields='shortcutDetails')
@@ -228,6 +241,7 @@ class OtterDrive(LoggingMixin):
                     details = shortcut['shortcutDetails']
                     if 'targetId' in details and details['targetMimeType'] == 'application/vnd.google-apps.folder':
                         self.folder_cache[folder_path] = details['targetId']
+                        if sync: self.sync_folder_contents_locally(details['targetId'],folder_path)
 
     def add_cached_file(self,file_meta,gfile_parent_path):
 
@@ -260,7 +274,7 @@ class OtterDrive(LoggingMixin):
                                         "mimeType": "application/vnd.google-apps.folder"})            
             self.debug('uploading {}->{}'.format(parent_id,folder_name))                                        
             fol.Upload()
-            self.add_cached_folder(fol,parent_id)
+            self.add_cached_folder(fol,parent_id,True)
 
         else:
             self.debug('found folder {} in parent {}'.format(folder_name,parent_id))
@@ -282,7 +296,8 @@ class OtterDrive(LoggingMixin):
             self.add_cached_file(sfil,parent_folder_path)                
 
     def ensure_g_path_get_id(self,gpath):
-        '''walks these internal google paths ensuring everythign is created from root'''
+        '''walks these internal google paths ensuring everythign is created from root
+        This one is good for a cold entry of a path'''
         
         self.info('ensuring path {}'.format(gpath))
         parent_id = 'root'
@@ -294,10 +309,14 @@ class OtterDrive(LoggingMixin):
             if gpath.replace('/','',1) in self.folder_cache:
                  return self.folder_cache[gpath.replace('/','',1)]
 
-
+        current_pos = ''
         for sub in gpath.split(os.sep):
             if sub != '' and sub != 'root':
+                if current_pos in self.folder_cache:
+                    self.debug('ensure-path: grabing existing path {}'.format(current_pos) )
+                    parent_id = self.folder_cache[current_pos]
                 fol = self.get_or_create_folder(sub,parent_id)
+                current_pos = os.path.join(current_pos,sub)
                 parent_id = fol['id']
 
         return fol['id'] #should be last!
