@@ -42,7 +42,7 @@ def wsl_home():
 
 def _get_appdata_path():
     import ctypes
-    from ctypes import wintypes, windll
+    from ctypes import wintypes, windll, create_unicode_buffer
     CSIDL_APPDATA = 26
     _SHGetFolderPath = windll.shell32.SHGetFolderPathW
     _SHGetFolderPath.argtypes = [wintypes.HWND,
@@ -50,7 +50,7 @@ def _get_appdata_path():
                                  wintypes.HANDLE,
                                  wintypes.DWORD,
                                  wintypes.LPCWSTR]
-    path_buf = wintypes.create_unicode_buffer(wintypes.MAX_PATH)
+    path_buf = create_unicode_buffer(wintypes.MAX_PATH)
     result = _SHGetFolderPath(0, CSIDL_APPDATA, 0, 0, path_buf)
     return path_buf.value
 
@@ -67,8 +67,8 @@ def dropbox_home():
 
     elif _system in ('Windows', 'cli'):
         host_db_path = os.path.join(_get_appdata_path(),
-                                    'Dropbox',
-                                    'host.db')
+                                    'Ottermatics Dropbox')
+        return host_db_path
     elif _system in ('Linux', 'Darwin'):
         host_db_path = os.path.expanduser('~'
                                           '/.dropbox'

@@ -28,10 +28,10 @@ fi
 
 cd ~/
 
-echo 'Installing Python3'
-sudo apt-get install python3 python3-pip python3-dev python3-setuptools
-python3 -m pip install --upgrade pip
-pip3 install virtualenv
+# echo 'Installing Python3'
+# sudo apt-get install python3 python3-pip python3-dev python3-setuptools
+# python3 -m pip install --upgrade pip
+# pip3 install virtualenv
 
 
 echo 'Installing Anaconda Python (follow instructions, agree & yes)'

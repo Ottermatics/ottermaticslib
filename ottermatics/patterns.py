@@ -15,9 +15,11 @@ class Singleton:
     """
 
     def __init__(self, decorated):
-        self._decorated = decorated
+        self._decorated_cls = decorated
 
-    def instance(self):
+        self.__class__.__name__ = self._decorated_cls.__name__
+
+    def instance(self,*args,**kwargs):
         """
         Returns the singleton instance. Upon its first call, it creates a
         new instance of the decorated class and calls its `__init__` method.
@@ -27,7 +29,7 @@ class Singleton:
         try:
             return self._instance
         except AttributeError:
-            self._instance = self._decorated()
+            self._instance = self._decorated_cls(*args,**kwargs)
             return self._instance
 
     def __call__(self):
@@ -35,3 +37,54 @@ class Singleton:
 
     def __instancecheck__(self, inst):
         return isinstance(inst, self._decorated)
+
+
+
+#These are not working  vvvvvv
+class SingletonMeta(type):
+    """Metaclass for singletons. Any instantiation of a Singleton class yields
+    the exact same object, e.g.:
+
+    >>> class MyClass(metaclass=Singleton):
+            pass
+    >>> a = MyClass()
+    >>> b = MyClass()
+    >>> a is b
+    True
+    """
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(SingletonMeta, cls).__call__(*args,
+                                                                **kwargs)
+        return cls._instances[cls]
+
+    @classmethod
+    def __instancecheck__(mcs, instance):
+        if instance.__class__ is mcs:
+            return True
+        else:
+            return isinstance(instance.__class__, mcs)
+
+def singleton_meta_object(cls):
+    """Class decorator that transforms (and replaces) a class definition (which
+    must have a Singleton metaclass) with the actual singleton object. Ensures
+    that the resulting object can still be "instantiated" (i.e., called),
+    returning the same object. Also ensures the object can be pickled, is
+    hashable, and has the correct string representation (the name of the
+    singleton)
+    """
+    assert isinstance(cls, SingletonMeta), \
+        cls.__name__ + " must use Singleton metaclass"
+
+    def instance(self):
+        return cls
+
+    cls.__call__ = instance
+    cls.__hash__ = lambda self: hash(cls)
+    cls.__repr__ = lambda self: cls.__name__
+    cls.__reduce__ = lambda self: cls.__name__
+    obj = cls()
+    obj.__name__ = cls.__name__
+    return obj

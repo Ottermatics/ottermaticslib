@@ -23,12 +23,23 @@ class AnalysisConfiguration(Configuration):
     max_col_width_static:int = 10
     _store_level:int = -1
 
+    _solved = False
+
     def solve(self,*args,**kwargs):
         '''dont override this unless you call evaluate, followed by save_data. 
         This will maintain table saving functionality'''
-        output = self.evaluate(*args,**kwargs)
-        self.save_data()
-        return output
+        self.info("Solving Analysis...")
+        if not self._solved:
+            output = self.evaluate(*args,**kwargs)
+            self.save_data()
+            self._solved = True
+            return output
+        else:
+            raise Exception('Analysis Already Solved')
+
+    def reset_analysis(self):
+        self.reset_data()
+        self._solved = False
 
     #High Level Component Tables
     @property
@@ -53,6 +64,24 @@ class AnalysisConfiguration(Configuration):
         return output
 
     @property
+    def joined_table(self):
+        return pandas.concat([ vt['df'] for vt in self.variable_tables],axis=1)
+
+    def get_field_from_table(self,field):
+        '''Converts Pandas To Numpy Array By Key, also handles poorly formated fields'''
+        if field in self.joined_table:                                              
+            table = self.joined_table[field]
+        elif field.title():
+            table = self.joined_table[field.title()]
+        else:
+            raise Exception('No Field Named {}'.format(field))
+        
+        #Remove Infinity
+        table = table.replace([numpy.inf, -numpy.inf], numpy.nan)
+        return table.to_numpy(dtype=float,copy=True)
+        
+
+    @property
     def other_static_tables(self):
         rds = self.recursive_data_structure(self.store_level)
         output = []
@@ -66,10 +95,13 @@ class AnalysisConfiguration(Configuration):
 
     def save_to_worksheet(self,worksheet:pygsheets.Worksheet):
         '''Saves to a gsheets via pygsheets'''
+
+        title = self.identity.replace('_',' ').title()
+
+        self.info('saving worksheet as {}'.format(title))
         wksh = worksheet
 
         wksh.clear()
-        wksh.title = self.identity.replace('_',' ').title()
 
         #Static data
         start = pygsheets.Address((2,2))
@@ -79,9 +111,10 @@ class AnalysisConfiguration(Configuration):
 
         cur_index = start + (1,0)
         for i,df in enumerate(sdf):
+            self.debug('saving dataframe {}'.format(df))
             wksh.update_value(start.label,self.identity)
             wksh.cell(start.label).set_text_format('bold',True)
-            wksh.set_dataframe(df,cur_index.label )
+            wksh.set_dataframe(df,cur_index.label , extend=True)
             cur_index += (2,0)
 
         cur_index += (3,0)
@@ -89,17 +122,22 @@ class AnalysisConfiguration(Configuration):
         var_index = pygsheets.Address(cur_index.label)
 
         max_row = 0
-        for dfpack in self.variable_tables:
+
+        vrt = self.variable_tables
+        self.info('saving {} other static tables'.format(len(vrt)))
+
+        for dfpack in vrt:
             conf = dfpack['conf']
             df = dfpack['df']
-            
+            self.debug('saving dataframe {}'.format(df))
+
             (num_rows,num_cols) = df.shape
             max_row = max(max_row,num_rows)
             
-            wksh.update_value((var_index-(1,0)).label,conf.identity)
+            wksh.update_value((var_index-(1,0)).label,conf.classname)
             wksh.cell((var_index-(1,0)).label).set_text_format('bold',True)    
 
-            wksh.set_dataframe(df,start=var_index.label)
+            wksh.set_dataframe(df,start=var_index.label,extend=True)
             
             var_index += (0,num_cols)
             
@@ -107,14 +145,19 @@ class AnalysisConfiguration(Configuration):
             
         ost = self.other_static_tables
 
+        self.info('saving {} other static tables'.format(len(ost)))
+
         for dfpack in ost:
             conf = dfpack['conf']
             sdf = dfpack['dfs']
+
             wksh.update_value((cur_index-(1,0)).label,conf.identity)
             wksh.cell((cur_index-(1,0)).label).set_text_format('bold',True)            
 
             for i,df in enumerate(sdf):
-                wksh.set_dataframe(df,cur_index.label )
+                
+                self.debug('saving {} dataframe {}'.format(conf.identity, df))
+                wksh.set_dataframe(df,start=cur_index.label ,extend=True)
                 cur_index += (2,0)
             
             cur_index += (3,0)

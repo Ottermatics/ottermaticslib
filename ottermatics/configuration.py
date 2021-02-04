@@ -12,8 +12,17 @@ import datetime
 import pandas
 import os
 import inspect
+import pathlib
 
 import matplotlib.pyplot as plt
+
+pandas.set_option('use_inf_as_na', True)
+
+#Type Checking
+NUMERIC_TYPES = (float,int)
+
+def NUMERIC_VALIDATOR():
+    return attr.validators.instance_of(NUMERIC_TYPES)
 
 #Decorators
 '''Ok get ready for some fancy bullshit, this represents alot of meta functionality to get nice
@@ -32,12 +41,12 @@ def property_changed(instance, variable, value):
 #This one should wrap all configuraitons to track changes, and special methods
 def otter_class(cls,*args,**kwargs):
     '''Wrap all Configurations with this decorator'''
-    acls = attr.s(cls, on_setattr= property_changed,*args,**kwargs)
+    acls = attr.s(cls, on_setattr= property_changed, repr=False, *args,**kwargs)
     
     #Register Tabular Properties
     acls._val_tab_funtions = {}
     acls._stat_tab_functions = {}
-    #acls._vect_tab_functions = {}
+    acls._avg_tab_functions = {}
 
     #Go through all in class and assign functions appropriately
     for methodname in dir(acls):
@@ -48,9 +57,9 @@ def otter_class(cls,*args,**kwargs):
         if hasattr(method, '_stat_prop'):
             acls._stat_tab_functions.update(
                 {methodname: method._stat_prop}) 
-        # if hasattr(method, '_vect_prop'):
-        #     acls._stat_tab_functions.update(
-        #         {methodname: method._vect_prop})                              
+        if hasattr(method, '_avg_prop'):
+            acls._avg_tab_functions.update(
+                {methodname: method._avg_prop})                                          
 
     return acls
 
@@ -63,9 +72,19 @@ def meta(title,desc=None,**kwargs):
             **kwargs}
     return out
 
+
+
 #Properties to register certian class functions
 class OtterCacheProp(functools.cached_property):
-    pass
+
+    def __getstate__(self):
+        attributes = self.__dict__.copy()
+        attr_out = {}
+        for key,att in attributes.items():
+            #print('GS:',key,att)
+            if key not in ('_val_props','_stat_prop','_avg_prop'):
+                attr_out[key] = att
+        return attr_out
 
 class OtterProp(property):
     '''We cant modify property code sooo we have OtterProps!'''
@@ -76,9 +95,9 @@ class OtterProp(property):
     def stats_return(cls,value):
         '''we run stats on a vectorized input, and return the value
         If the value is a numeric type we will just return it in a list'''
-        if isinstance(value,(float,int)):
-            return [value]
-        elif isinstance(value,numpy.ndarray):
+        # if isinstance(value,NUMERIC_TYPES):
+        #     return [value]
+        if isinstance(value,numpy.ndarray):
             max =  numpy.nanmax(value)
             min =  numpy.nanmin(value)
             avg =  numpy.nanmean(value)
@@ -86,13 +105,13 @@ class OtterProp(property):
             return [min,avg,max,std]
         else:
             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
-            return None 
+            return [None] #is sacreed
 
     @classmethod
     def create_stats_label(cls,value,title):
-        if isinstance(value,(float,int)):
-            return [title]
-        elif isinstance(value,numpy.ndarray):
+        # if isinstance(value,NUMERIC_TYPES):
+        #     return [title]
+        if isinstance(value,numpy.ndarray):
             max =  '{} max'.format(title)
             min =  '{} min'.format(title)
             avg =  '{} avg'.format(title)
@@ -100,7 +119,43 @@ class OtterProp(property):
             return [min,avg,max,std]
         else:
             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
-            return None 
+            return [None] #is sacreed
+
+    @classmethod
+    def avg_return(cls,value):
+        '''we run stats on a vectorized input, and return the value
+        If the value is a numeric type we will just return it in a list'''
+        if isinstance(value,NUMERIC_TYPES):
+            return value
+        elif isinstance(value,numpy.ndarray):
+            avg =  numpy.nanmean(value)
+            return avg
+        else:
+            log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
+            return None #is sacreed
+
+    @classmethod
+    def create_avg_label(cls,value,title):
+        if isinstance(value,NUMERIC_TYPES):
+            return title
+        elif isinstance(value,numpy.ndarray):
+            avg =  '{} avg'.format(title)
+            return avg
+        else:
+            log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
+            return None
+
+    def __getstate__(self):
+        attributes = self.__dict__.copy()
+        attr_out = {}
+        for key,att in attributes.items():
+            #print('GS:',key,att)
+            if key not in ('_val_props','_stat_prop','_avg_prop'):
+                attr_out[key] = att
+        return attr_out
+
+    #def __reduce__(self):
+    #    return (self.__class__, 
 
 def table_property(f=None,**meta):
     '''A decorator that wraps a function like a regular property
@@ -144,6 +199,27 @@ def table_stats_property(f=None,**meta):
             return prop
         return wrapper
 
+def table_avg_property(f=None,**meta):
+    '''A decorator that caches and wraps a function like a regular property
+    The output must be a numpy array or list of number which can be 
+    tabulized into columns like based on the array average for use in the ottermatics table methods
+    
+    _stat_prop is the key variable set, otter_class looks it up
+    :param random: set this to true if you walways want it a property to refreshh even if underlying data
+    hasn't changed
+    :param title: the name the field will have in a table
+    :param desc: some information about the field'''
+    if f is not None:  
+        prop =  OtterProp(f)
+        prop._avg_prop = {'func':f}
+        return prop
+    else:
+        def wrapper(f):
+            prop =  OtterProp(f)
+            prop._avg_prop = {'func':f,**meta}
+            return prop
+        return wrapper           
+
 def table_cached_property(f=None,**meta):
     '''A decorator that caches and wraps a function like a regular property
     The output will be tabulized for use in the ottermatics table methods
@@ -171,6 +247,29 @@ def table_cached_stats_property(f=None,**meta):
     tabulized into columns like average, min, max and std for use in the ottermatics table methods
     
     _stat_prop is the key variable set, otter_class looks it up
+    :param random: se
+    t this to true if you walways want it a property to refreshh even if underlying data
+    hasn't changed
+    :param title: the name the field will have in a table
+    :param desc: some information about the field'''
+    if f is not None:  
+        prop =  OtterCacheProp(f)
+        prop._avg_prop = {'func':f}
+        return prop
+    else:
+        def wrapper(f):
+            prop =  OtterCacheProp(f)
+            prop._avg_prop = {'func':f,**meta}
+            return prop
+        return wrapper
+
+
+def table_cached_avg_property(f=None,**meta):
+    '''A decorator that caches and wraps a function like a regular property
+    The output must be a numpy array or list of number which can be 
+    tabulized into columns like based on the array average for use in the ottermatics table methods
+    
+    _stat_prop is the key variable set, otter_class looks it up
     :param random: set this to true if you walways want it a property to refreshh even if underlying data
     hasn't changed
     :param title: the name the field will have in a table
@@ -184,7 +283,7 @@ def table_cached_stats_property(f=None,**meta):
             prop =  OtterCacheProp(f)
             prop._stat_prop = {'func':f,**meta}
             return prop
-        return wrapper        
+        return wrapper              
 
 #Not sure where to put this, this will vecorize a class fcuntion
 class inst_vectorize(numpy.vectorize):
@@ -217,8 +316,9 @@ class Configuration(LoggingMixin):
     solve() is the wrapper for evaluate() which will be overriden, the variables will be saved in 
     TABLE after evaluating them.  
 
-    importantly since its an attr's class we don't use __init__, instead overide __attrs_post_init__ 
-    and use it the same way.
+    importantly since its an attr's class we don't use __init__, instead overide __on_init__ 
+    and use it the same way, this replaces __attrs_post_init__ which is called by attrs. Our implementation
+    calls __on_init__ for you to use!
 
     Report Generation:
     you can call the wrapped subplots generator in this method which will automatically record the saved
@@ -233,10 +333,13 @@ class Configuration(LoggingMixin):
     log_fmt = "[%(identity)-24s]%(message)s"
     log_silo = True
 
+    stored_path = None
+    stored_client_folder = None
+    stored_client_name = None
+
     #yours to implement
     _skip_attr = None
     
-
     #table property internal variables
     __store_options = ('csv','excel','gsheets')#,'db','gsheets','excel','json')
     _store_types = None
@@ -249,11 +352,27 @@ class Configuration(LoggingMixin):
 
     #Ultra private variables
     _val_tab_funtions = None
-    _stat_tab_functions = None    
+    _stat_tab_functions = None
+    _avg_tab_functions = None
+
     _table = None
     _cls_attrs = None
     _attr_labels = None 
+    _attr_keys = None
     _anything_changed = False
+    _skip_table = False #This prevents config from reportin up through internal configurations
+    _started_datetime = None
+
+    def __on_init__(self):
+        '''Override this when creating your special init functionality, you must use attrs for input variables'''
+        pass
+
+    def __attrs_post_init__(self):
+        '''This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!'''
+        #Store abs path On Creation, in case we change. 
+        self.report_path
+        self._started_datetime = datetime.date.today()
+        self.__on_init__()
 
     #A solver function that will be called on every configuration
     def evaluate(self,*args,**kwargs):
@@ -268,37 +387,93 @@ class Configuration(LoggingMixin):
     @property
     def filename(self):
         '''A nice to have, good to override'''
-        fil = self.identity.replace(' ','_').replace('-','_').replace(':','-').replace('|','_').title()
+        fil = self.identity.replace(' ','_').replace('-','_').replace(':','').replace('|','_').title()
         filename = "".join([c for c in fil if c.isalpha() or c.isdigit() or c=='_' or c=='-']).rstrip()
         return filename
 
     @property
+    def displayname(self):
+        dn = self.identity.replace('_',' ').replace('|',' ').replace('-',' ').replace('  ',' ').title()
+        #dispname = "".join([c for c in dn if c.isalpha() or c.isdigit() or c=='_' or c=='-']).rstrip()
+        return dn
+
+    @property
     def identity(self):
         '''A customizeable property that will be in the log by default'''
-        return '{}-{}'.format(type(self).__name__,self.name).lower()
+        return '{}-{}'.format(self.classname,self.name).lower()
+
+    @property
+    def classname(self):
+        return str( type(self).__name__ )
 
     def add_fields(self, record):
         '''Overwrite this to modify logging fields, change log_fmt in your class to use the value set here.'''
         record.identity = self.identity
 
     @property
+    def client_name(self):
+        if self.stored_client_name is None:
+            if 'CLIENT_NAME' in os.environ:
+                self.stored_client_folder = os.environ['CLIENT_NAME']
+            elif in_client_dir(): #infer from path
+                self.stored_client_name = client_dir_name()
+            else:
+                self.stored_client_folder  = 'Ottermatics'
+                self.warning('no client info found - using{}'.format(self.stored_client_folder))
+        return self.stored_client_folder
+            
+
+    @property
     def client_folder_root(self):
-        if in_client_dir():
-            return ottermatics_project(client_dir_name())
-        else:
-            self.warning('not in a client folder')
-            return '.'
+        if self.stored_client_folder is None:
+            self.stored_client_folder = ottermatics_project(self.client_name)
+        return self.stored_client_folder
 
     @property
     def report_path(self):
-        path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
-        if not os.path.exists(path):
-            self.warning('report does not exist {}'.format(path))
-        return path  
+        if self.stored_path is None:
+            self.stored_path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
+
+        if not os.path.exists(self.stored_path):
+            self.warning('report does not exist {}'.format(self.stored_path))
+        return self.stored_path  
 
     @property
     def report_path_daily(self):
-        return os.path.join(self.report_path,'{}'.format(datetime.date.today()).replace('-','_'))                  
+        return os.path.join(self.report_path,'{}'.format(self._started_datetime).replace('-','_'))                  
+
+    @property
+    def config_path(self):
+        return os.path.join(self.report_path,self.filename)
+
+    @property
+    def config_path_daily(self):
+        return os.path.join(self.report_path_daily,self.filename)
+
+
+    #Sync Convenicne Functions
+    def gsync_this_config(self,force = True):
+        #Sync all local to google
+        od = OtterDrive.instance()
+        od.sync_to_client_folder(force=force,sub_path=self.config_path_daily)
+
+    def gsync_this_report(self,force = True):
+        #Sync all local to google
+        od = OtterDrive.instance()
+        od.sync_to_client_folder(force=force,sub_path=self.report_path_daily)
+
+    def gsync_all_reports(self,force = True):
+        #Sync all local to google
+        od = OtterDrive.instance()
+        od.sync_to_client_folder(force=force,sub_path=self.report_path)
+        
+    def gsync_client_folder(self,force = True):
+        #Sync all local to google
+        od = OtterDrive.instance()
+        od.sync_to_client_folder(force=force,sub_path=self.client_folder_root)     
+
+
+
 
     #Clearance Methods
     def reset_data(self):
@@ -342,7 +517,7 @@ class Configuration(LoggingMixin):
                     else:
                         filename += self._default_image_format
 
-                filepath = os.path.join(self.report_path,filename)
+                filepath = os.path.join(self.config_path_daily,filename)
 
                 self.info('saving plot {}'.format(filename))
                 fig.savefig(filepath)
@@ -410,26 +585,26 @@ class Configuration(LoggingMixin):
         or minimal number of rows to track changes
         
         This should capture all changes but save data'''
-        self.debug('saving data')
         if self.anything_changed or not self.TABLE:
+            self.TABLE.append(self.data_row)
+            self.debug('saving data {}'.format(self.index))
+
             if index is not None: #only set this after we check if anything changed
                 self.index = index
             else:
                 self.index += 1
-            self.TABLE.append(self.data_row)
+            
         for config in self.internal_configurations.values():
             config.save_data(index)
         self._anything_changed = False
-
 
     @property
     def anything_changed(self):
         '''use the on_setattr method to determine if anything changed, 
         also assume that stat_tab could change without input changes'''
-        if self._anything_changed or self.has_random_stats_properties:
+        if self._anything_changed or self.has_random_properties:
             return True
         return False
-
 
     @property
     def table_iterator(self):
@@ -445,11 +620,9 @@ class Configuration(LoggingMixin):
             for col,label in zip(zip(*self.TABLE),self.data_label):
                 col = numpy.array(col).flatten().tolist()
                 if len(set(col)) <= 1:
-                    yield 2, col[0] ,label #Can assume that first value is equal to all
+                    yield 2, col[0], label #Can assume that first value is equal to all
                 else:
-                    yield 3, col,label
-
-
+                    yield 3, col, label
 
     @property
     def static_data_dict(self):
@@ -487,7 +660,9 @@ class Configuration(LoggingMixin):
         stats_vals = [ OtterProp.stats_return( val ) for key,val in self.tab_stats_properties.items() ]
         stats_vals = list(filter(lambda v: v is not None,itertools.chain.from_iterable(stats_vals)))
 
-        return numpy.array(self.attr_row + prop_vals + stats_vals).flatten().tolist()
+        avg_vals = [ OtterProp.avg_return( val ) for key,val in self.tab_avg_properties.items() ]
+
+        return numpy.array(self.attr_row + prop_vals + avg_vals + stats_vals).flatten().tolist()
 
     @property
     def data_label(self):
@@ -499,7 +674,9 @@ class Configuration(LoggingMixin):
         stats_labels = [ OtterProp.create_stats_label(val,key) for key,val in self.tab_stats_properties.items()]                        
         stats_labels = list(filter(lambda v: v is not None,itertools.chain.from_iterable(stats_labels)))
 
-        return list(map(self.format_label,self.attr_labels + prop_labels + stats_labels))
+        avg_labels = [ OtterProp.create_avg_label(val,key) for key,val in self.tab_avg_properties.items()]      
+
+        return list(map(self.format_label,self.attr_labels + prop_labels + avg_labels + stats_labels))
 
     @property
     def skip_attr(self) -> list: 
@@ -507,20 +684,32 @@ class Configuration(LoggingMixin):
             return list(self.internal_configurations.keys())
         return self._skip_attr + list(self.internal_configurations.keys())
 
+    def get_label(self,k,v):
+        if v.metadata and 'title' in v.metadata:
+            return self.format_label(v.metadata['title'])
+        return self.format_label(k)
+
     @property
     def attr_labels(self) -> list:
-        get_label = lambda k,v: self.format_label(v.metadata['title']) if v.metadata \
-                                and 'title' in v.metadata else self.format_label(k)
-
+        '''Returns formated attr label if the value is numeric'''
         if self._attr_labels is None:
-            self._attr_labels = list([get_label(k,v) for k,v in attr.fields_dict(self.__class__).items() \
-                                                if k not in self.skip_attr])
+            _attr_labels = list([self.get_label(k,v) for k,v in attr.fields_dict(self.__class__).items() \
+                                                if k not in self.skip_attr and k.lower() != 'index' \
+                                                and not type(self.store[k]) == str \
+                                                   and isinstance(self.store[k],NUMERIC_TYPES)])
+            self._attr_labels = _attr_labels                                            
         return self._attr_labels
 
     @property
     def attr_row(self) -> list:
+        '''Returns formated attr data if the value is numeric'''
         return list([self.store[k] for k in attr.fields_dict(self.__class__).keys() \
-                                         if k not in self.skip_attr])
+                                            if k not in self.skip_attr and k.lower()  != 'index' \
+                                            and not type(self.store[k]) == str \
+                                            and isinstance(self.store[k],NUMERIC_TYPES)])
+    @property
+    def attr_raw_keys(self) -> list:
+        return [k for k in attr.fields_dict(self.__class__).keys()]
 
     @property
     def tab_value_properties(self):
@@ -541,24 +730,40 @@ class Configuration(LoggingMixin):
     def tab_stats_meta(self):
         return { (meta['title'] if 'title' in meta else fname) :meta  \
                                     for fname,meta in self._stat_tab_functions.items()}
+
+    @property
+    def tab_avg_properties(self):
+        return {(meta['title'] if 'title' in meta else fname):meta['func'](self) 
+                                    for fname,meta in self._avg_tab_functions.items()}
+
+    @property
+    def tab_avg_meta(self):
+        return { (meta['title'] if 'title' in meta else fname) :meta  \
+                                    for fname,meta in self._avg_tab_functions.items()}                                    
             
     @property
-    def has_random_stats_properties(self):
+    def has_random_properties(self):
         '''looks at stat tab function metadata for 'random=True' 
         by default it is assumed that properties do not change unless underlying attributes change'''
         for meta in self._stat_tab_functions.values():
             if 'random' in meta and meta['random'] == True:
                 return True
+        for meta in self._avg_tab_functions.values():
+            if 'random' in meta and meta['random'] == True:
+                return True                
         return False
 
     #Configuration Information
     @property
     def internal_configurations(self):
         '''go through all attributes determining which are configuration objects
-        we skip any configuration that start with an underscore (private variable)'''
+        we skip any configuration that start with an underscore (private variable), _skip_table=True,
+        or isnt in attr_keys'''
         return {k:v for k,v in self.store.items() \
-                if isinstance(v,Configuration) and not k.startswith('_')}
-
+                if isinstance(v,Configuration) and \
+                    k in self.attr_raw_keys and \
+                    not k.startswith('_') and \
+                    not v._skip_table}
 
 
     def go_through_configurations(self,level = 0,levels_to_descend = -1, parent_level=0):
@@ -600,37 +805,46 @@ class Configuration(LoggingMixin):
 
 
     #Save functionality
-    def save_table(self,filename=None,*args,**kwargs):
+    def save_table(self,dataframe=None,filename=None,*args,**kwargs):
         '''Header method to save the config in many different formats'''
+        if dataframe is None:
+            dataframe = self.dataframe
         for save_format in self.store_types:
-            if save_format == 'csv':
-                self.save_csv(filename,*args,**kwargs)
-            elif save_format == 'excel':
-                self.save_excel(filename,*args,**kwargs)
-            elif save_format == 'gsheets':
-               self.save_gsheets(filename,*args,**kwargs)                                
+            try:
+                if save_format == 'csv':
+                    self.save_csv(dataframe,filename,*args,**kwargs)
+                elif save_format == 'excel':
+                    self.save_excel(dataframe,filename,*args,**kwargs)
+                elif save_format == 'gsheets':
+                    self.save_gsheets(dataframe,filename,*args,**kwargs)
+            except Exception as e:
+                self.error(e,'Issue Saving Tables:')                      
 
-    def save_csv(self,filename=None,*args,**kwargs):
+    def save_csv(self,dataframe,filename=None,*args,**kwargs):
         if self.TABLE:
             if filename is None:
                 filename = '{}.csv'.format(self.filename)
             if type(filename) is str and not filename.endswith('.csv'):
                 filename += '.csv'
-            self.dataframe.to_csv(path_or_buf=filename,*args,**kwargs)
+            filepath = os.path.join(self.config_path_daily,filename)
+            dataframe.to_csv(path_or_buf=filepath,*args,**kwargs)
 
-    def save_excel(self,filename=None,*args,**kwargs):
+    def save_excel(self,dataframe,filename=None,*args,**kwargs):
         if self.TABLE:
             if filename is None:
                 filename = '{}.xlsx'.format(self.filename)
             if type(filename) is str and not filename.endswith('.xlsx'):
                 filename += '.xlsx'
-            self.dataframe.to_excel(path_or_buf=filename,*args,**kwargs)
+            filepath = os.path.join(self.config_path_daily,filename)
+            dataframe.to_excel(path_or_buf=filepath,*args,**kwargs)
 
-    def save_gsheets(self,filename=None,*args,**kwargs):
+    def save_gsheets(self,dataframe,filename=None,*args,**kwargs):
         
         od = OtterDrive.instance()
+        
+        
+        filepath = self.config_path_daily
 
-        filepath = os.path.join(self.report_path,self.filename)
         self.info('saving as gsheets in dir {}'.format(filepath))
 
         gpath = od.sync_path(filepath)
@@ -640,7 +854,7 @@ class Configuration(LoggingMixin):
 
         sht = od.gsheets.create(filename,folder=pth_id)
         wk = sht.sheet1
-        wk.set_dataframe(self.dataframe,start='A1')
+        wk.set_dataframe(dataframe,start='A1')
 
         self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
 
@@ -715,6 +929,7 @@ class Configuration(LoggingMixin):
     def store(self):
         '''lets pretend we're not playing with fire'''
         return self.__dict__
+
 
 
 
