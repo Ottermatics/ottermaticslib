@@ -4,6 +4,26 @@ from ottermatics.configuration import Configuration
 from CoolProp.CoolProp import PropsSI
 import CoolProp.CoolProp as CP
 
+from numpy import vectorize
+
+#Thermodynamics
+@vectorize
+def heat_of_vaporization(P,material='Water',measure='Hmolar'):
+    '''Returns heat of vaporization for material
+    :param P: pressure in P
+    '''
+    assert measure.startswith('H') #Must be an enthalpy
+    if P > 2.2063e+07: #Critical Pressure
+        return 0.0
+    H_L = PropsSI(measure,'P',P,'Q',0,material)
+    H_V = PropsSI(measure,'P',P,'Q',1,material)
+    return H_V - H_L
+
+@vectorize
+def boiling_point(P,material='Water'):
+    '''Returns the boiling point in `K` for the material'''
+    return PropsSI('T','P',P,'Q',1,material)
+
 #Heat Exchanger
 def dp_he_entrance(sigma,G,rho):
     '''Heat Exchanger Entrance Pressure Loss

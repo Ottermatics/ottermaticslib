@@ -1,8 +1,6 @@
 import logging
 
 
-from twisted.python import log
-
 import datetime
 import logging
 
@@ -15,14 +13,20 @@ import graypy
 
 BASIC_LOG_FMT = "[%(name)-24s]%(message)s"
 
+LOG_LEVEL = logging.INFO
+
 log = logging.getLogger('')
-logging.basicConfig(format=BASIC_LOG_FMT,level=logging.INFO)
+logging.basicConfig(format=BASIC_LOG_FMT,level=LOG_LEVEL)
 
 FILE = os.path.dirname(__file__)
 CREDS = os.path.join(FILE, 'creds')
 credfile = lambda fil: os.path.join(CREDS,fil)
 
-
+try:
+    logging.getLogger('parso.cache').disabled=True
+    logging.getLogger('parso.cache.pickle').disabled=True
+except:
+    log.warning('could not diable parso')
 # def installGELFLogger():
 #     '''Installs GELF Logger'''
 #     # self.gelf = graypy.GELFTLSHandler(GELF_HOST,GELF_PORT, validate=True,\
@@ -43,6 +47,17 @@ def installSTDLogger(fmt = BASIC_LOG_FMT):
     sh.setFormatter(peerlog)
     log.addHandler( sh )    
 
+def set_all_loggers_to(level):
+    global LOG_LEVEL
+    LOG_LEVEL = level
+    logging.basicConfig(level = LOG_LEVEL) #basic config
+    #log.setLevel(level) #root
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    for logger in loggers:
+        if logger.__class__.__name__.lower().startswith('otterlog'):
+            logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
+            logger.setLevel(LOG_LEVEL)
+
 class LoggingMixin(logging.Filter):
     '''Class to include easy formatting in subclasses'''
     
@@ -57,9 +72,10 @@ class LoggingMixin(logging.Filter):
 
     @property
     def logger(self):
+        global LOG_LEVEL
         if self._log is None:
-            self._log = logging.getLogger(self.identity)
-            #self._log.setLevel(level = logging.INFO)
+            self._log = logging.getLogger('otterlog_' +self.identity)
+            self._log.setLevel(level = LOG_LEVEL)
             #Eliminate Outside Logging Interaction
             
             self._log.handlers = []
@@ -79,6 +95,9 @@ class LoggingMixin(logging.Filter):
     #     '''Installs GELF Logger'''
     #     gelf = graypy.GELFUDPHandler(host=GELF_HOST,port=12203, extra_fields=True)
     #     self._log.addHandler(gelf)
+
+    def resetLog(self):
+        self._log = None
 
     def installSTDLogger(self):
         '''We only want std logging to start'''

@@ -7,7 +7,7 @@ import logging
 
 log = logging.getLogger('otterlib-locations')
 
-CORE_FOLDERS = ['invoices','research','media','documents']
+CORE_FOLDERS = ['invoices','research','media','documents','reports']
 SOFTWARE_PROJECT = ['.creds','software']
 ELECTRONICS_PROJECT = ['electronics','firmware']
 DESIGN_PROJECT = ['design','render']
@@ -42,7 +42,7 @@ def wsl_home():
 
 def _get_appdata_path():
     import ctypes
-    from ctypes import wintypes, windll
+    from ctypes import wintypes, windll, create_unicode_buffer
     CSIDL_APPDATA = 26
     _SHGetFolderPath = windll.shell32.SHGetFolderPathW
     _SHGetFolderPath.argtypes = [wintypes.HWND,
@@ -50,7 +50,7 @@ def _get_appdata_path():
                                  wintypes.HANDLE,
                                  wintypes.DWORD,
                                  wintypes.LPCWSTR]
-    path_buf = wintypes.create_unicode_buffer(wintypes.MAX_PATH)
+    path_buf = create_unicode_buffer(wintypes.MAX_PATH)
     result = _SHGetFolderPath(0, CSIDL_APPDATA, 0, 0, path_buf)
     return path_buf.value
 
@@ -67,8 +67,8 @@ def dropbox_home():
 
     elif _system in ('Windows', 'cli'):
         host_db_path = os.path.join(_get_appdata_path(),
-                                    'Dropbox',
-                                    'host.db')
+                                    'Ottermatics Dropbox')
+        return host_db_path
     elif _system in ('Linux', 'Darwin'):
         host_db_path = os.path.expanduser('~'
                                           '/.dropbox'
@@ -135,17 +135,22 @@ def load_from_env(creds_path='./.creds/',env_file='env.sh'):
     '''extracts export statements from bash file and aplies them to the python env'''
     creds_path = os.path.join(creds_path,env_file)
     log.info("checking {} for creds".format(creds_path))
-    if os.path.exists(creds_path):
-        log.info('creds found')
-        with open(creds_path,'r') as fp:
-            txt = fp.read()
+    if not 'OTTER_CREDS_SET' in os.environ or not bool_from_env(os.environ['OTTER_CREDS_SET']):        
+        if os.path.exists(creds_path):
+            log.info('creds found')
+            with open(creds_path,'r') as fp:
+                txt = fp.read()
 
-        lines = txt.split('\n')
-        for line in lines:
-            if line.startswith('export'):
-                key,val = line.replace('export','').split('=')
-                log.info('setting {}'.format(key))
-                os.environ[key.strip()]=val    
+            lines = txt.split('\n')
+            for line in lines:
+                if line.startswith('export'):
+                    key,val = line.replace('export','').split('=')
+                    log.info('setting {}'.format(key))
+                    os.environ[key.strip()]=val
+        
+        os.environ['OTTER_CREDS_SET'] = 'yes'
+    else:
+        log.info('credientials already set') 
 
 def main_cli():
     '''

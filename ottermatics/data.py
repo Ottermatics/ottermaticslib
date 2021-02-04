@@ -20,7 +20,12 @@ from urllib.request import urlopen
 from psycopg2.extensions import register_adapter, AsIs
 from os import sys
 
+from ottermatics.patterns import Singleton, SingletonMeta, singleton_meta_object
+from ottermatics.logging import LoggingMixin, set_all_loggers_to
+
 from contextlib import contextmanager
+
+import diskcache
 
 log = logging.getLogger('otterlib-data')
 
@@ -45,36 +50,276 @@ register_adapter(numpy.float32, addapt_numpy_float32)
 register_adapter(numpy.int32, addapt_numpy_int32)
 register_adapter(numpy.ndarray, addapt_numpy_array)
 
-#Pull IN User / Password from OS ENVIORNMENTAL
-#HOST = 'testdb.ctiuz8xrxfqe.us-east-1.rds.amazonaws.com'
-#HOST = 'smartx-dev-db.cluster-ctiuz8xrxfqe.us-east-1.rds.amazonaws.com'
-
+#Backwards Compatability
 PORT = 5432
 HOST = 'localhost'
 USER = 'postgres'
 PASS = 'dumbpass'
+DB_NAME = 'dumbdb'
 
-def load_configuration_from_env():
-    global PORT, PASS, USER, HOST
-    if 'DB_CONNECTION' in os.environ:
-        HOST = os.environ['DB_CONNECTION']
-        log.info("Getting OS DB_CONNECTION")
-        
-    if 'DB_USER' in os.environ:
-        USER = os.environ['DB_USER']
-        log.info("Getting OS DB_USER")
-        
-    if 'DB_PASS' in os.environ:
-        PASS = os.environ['DB_PASS']
-        log.info("Getting OS DB_PASS")
-        
-    if 'DB_PORT' in os.environ:
-        PORT = os.environ['DB_PORT']
-        log.info("Getting OS DB_PORT")
+DataBase = declarative_base()
+
+#@Singleton
+
+#@singleton_meta_object
+class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
+    '''A singleton object with safe methods for file access,
+    Aims to prevent large number of file pointers open
     
-    return HOST,PORT,USER,PASS
+    These should be subclassed for each cache location you want'''
 
-load_configuration_from_env()
+    _cache = None
+    size_limit = 10E9 #10GB
+    alt_path = None
+    cache_class = diskcache.Cache
+    timeout = 1.0
+    cache_init_kwargs = None
+    #cache_class = diskcache.FanoutCache
+    # def __init__(self,**kwargs):
+    #     '''Takes a path and size limit to create for the cache on startup,
+    #     first initalize it cannot be chagned
+    #     :param alt_path: a different name than the formatted name of the class
+    #     :param size_limit: the size of that the cache should respect in bytes'''
+
+    #     self.info('initalizing disk cache')
+    #     if 'size_limit' in kwargs:
+    #         self.size_limit = kwargs['size_limit']
+
+    #     if 'alt_path' in kwargs:
+    #         self.alt_path = kwargs['alt_path']            
+
+    def __init__(self,**kwargs):
+        self.cache_init_kwargs = kwargs
+
+    @property
+    def cache_root(self):
+        if self.alt_path is not None:
+            return os.path.join( 'cache' , self.alt_path)
+        return os.path.join( 'cache' , '{}'.format(type(self).__name__).lower())
+    
+    @property
+    def cache(self):
+        if self._cache is None:
+            self.debug('setting cache')
+            self._cache = self.cache_class(self.cache_root,timeout=self.timeout,\
+                                            size_limit=self.size_limit,** self.cache_init_kwargs)
+        return self._cache
+
+
+    def __getstate__(self):
+        d = self.__dict__.copy()
+        d['_cache'] = None #don't pickle file objects!
+        return d
+
+    def set(self,key,data,retry=True,**kwargs):
+        '''Passes default arguments to set the key:data relationship
+        :param expire: time in seconds to expire the data
+        '''
+        with self.cache as ch:
+            ch.set(key,data,retry=retry,**kwargs)
+
+    def get(self,key,retry=True):
+        with self.cache as ch:
+            if key in ch:
+                return self.cache.get(key,retry=retry)
+            else:
+                self.warning('key {} not in cache')
+        return None
+
+    def expire(self):
+        '''wrapper for diskcache expire method'''
+        self.cache.expire()
+
+    @property
+    def current_keys(self):
+        self.cache.expire()
+        return set(list(self.cache))
+
+    def __iter__(self):
+        return self.cache.__iter__()
+
+    @property
+    def identity(self):
+        return '{}:{}'.format(self.__class__.__name__.lower(), self.cache_root)
+
+
+class DBConnection(LoggingMixin, metaclass=SingletonMeta):
+    '''A database singleton that is thread safe and pickleable (serializable)
+    to get the active instance use DBConnection.instance(**non_default_connection_args)'''
+
+    _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}"
+    pool_size=20
+    max_overflow=0
+    echo=False
+
+    dbname = None
+    host = None
+    user = None
+    passd = None
+    port = 5432
+
+    #Reset
+    connection_string = None
+    engine = None
+    scopefunc = None
+    session_factory = None
+    Session = None
+
+    def __init__(self,database_name=None,host=None,user=None,passd=None,**kwargs):
+        '''On the Singleton DBconnection.instance(): __init__(*args,**kwargs) will get called, technically you 
+        could do it this way but won't be thread safe, or a single instance
+        :param database_name: the name for the database inside the db server
+        :param host: hostname
+        :param user: username
+        :param passd: password
+        :param port: hostname'''
+        self.info('initalizing db connection')
+        #Get ENV Defaults
+        self.load_configuration_from_env()
+
+        if database_name is not None:
+            self.dbname = database_name
+        if host is not None:
+            self.info("Getting DB host arg")
+            self.host = host
+        if user is not None:
+            self.info("Getting DB user arg")
+            self.user = user            
+        if passd is not None:
+            self.info("Getting DB pass arg")
+            self.passd = passd
+        
+        #Args with defaults
+        if 'port' in kwargs:
+            self.info("Getting DB port arg")
+            self.port = kwargs['port'] 
+
+        self.resetLog()
+        self.configure()
+    
+
+
+    def configure(self):
+        '''A boilerplate configure method'''
+        self.info('Configuring...')
+        self.connection_string = self._connection_template.format(host=self.host,user=self.user,passd=self.passd,
+                                                                    port=self.port,database=self.dbname)
+                                                                    
+        self.engine = create_engine(self.connection_string,pool_size=self.pool_size, max_overflow=self.max_overflow)
+        self.engine.echo = self.echo
+
+        self.scopefunc = functools.partial(context.get, "uuid")
+
+        self.session_factory  = sessionmaker(bind=self.engine,expire_on_commit=True)
+        self.Session = scoped_session(self.session_factory, scopefunc = self.scopefunc)                
+
+    @contextmanager
+    def session_scope(self):
+        """Provide a transactional scope around a series of operations."""
+        if not hasattr(self,'Session'):
+            self.configure()
+        self.session = self.Session()
+        try:
+            yield self.session
+            self.session.commit()
+        except:
+            self.session.rollback()
+            raise
+        finally:
+            self.session.close()
+        del self.session
+
+
+    def load_configuration_from_env(self):
+        global PORT, PASS, USER, HOST, DB_NAME #Backwards Compatability
+
+        if 'DB_NAME' in os.environ:
+            self.dbname = DB_NAME = os.environ['DB_NAME']
+            self.info("Getting ENV DB_NAME")
+            
+        if 'DB_CONNECTION' in os.environ:
+            self.host = HOST = os.environ['DB_CONNECTION']
+            self.info("Getting ENV DB_CONNECTION")
+            
+        if 'DB_USER' in os.environ:
+            self.user = USER = os.environ['DB_USER']
+            self.info("Getting ENV DB_USER")
+            
+        if 'DB_PASS' in os.environ:
+            self.passd = PASS = os.environ['DB_PASS']
+            self.info("Getting ENV DB_PASS")
+            
+        if 'DB_PORT' in os.environ:
+            self.port = PORT = os.environ['DB_PORT']
+            self.info("Getting ENV DB_PORT")
+
+        return PORT, PASS, USER, HOST
+
+
+    def rebuild_database(self, confirm=True):
+        '''Rebuild database on confirmation, create the database if nessicary'''
+        if not is_ec2_instance():
+            answer = input("We Are Going To Overwrite The Databse {}\nType 'CONFIRM' to continue:\n".format(HOST))
+        else:
+            answer = 'CONFIRM'
+
+        if answer == 'CONFIRM' or confirm==False:
+            #Create Database If It Doesn't Exist
+            if not database_exists(self.connection_string):
+                self.info("Creating Database")
+                create_database(self.connection_string)
+            else:
+                #Otherwise Just Drop The Tables
+                self.debug("Dropping DB Metadata")
+                DataBase.metadata.drop_all(self.engine)
+            #(Re)Create Tables
+            self.debug("Creating DB Metadata")
+            DataBase.metadata.create_all(self.engine)
+        else:
+            try:
+                raise Exception("Ah ah ah you didn't say the magic word")
+            except Exception as e:
+                self.error(e)
+
+    def ensure_database_exists(self):
+        '''Check if database exists, if not create it and tables'''
+        if not database_exists(self.connection_string):
+            self.info("Creating Database")
+            create_database(self.connection_string)
+            DataBase.metadata.create_all(self.engine) 
+            
+
+    def cleanup_sessions(self):
+        self.info("Closing All Active Sessions")
+        self.Session.close_all()
+
+    @property
+    def identity(self):
+        return 'DB Con: {s.user}@{s.dbname}'.format(s=self)
+
+    def __getstate__(self):
+        '''Remove active connection objects, they are not picklable'''
+        d = self.__dict__.copy()
+        d['connection_string'] = None
+        d['engine'] = None
+        d['scopefunc'] = None
+        d['session_factory'] = None
+        d['Session'] = None
+        return d
+    
+    def __setstate__(self,d):
+        '''We reconfigure on opening a pickle'''
+        self.__dict__ = d
+        self.configure()
+
+
+# class DBConnection(Singleton):
+
+#     _decorated = DB
+
+#     def __init__(self,*args,**kwargs):
+#         print('this is not a singleton, call DBConnection.instance()')
+#         self._decorated.__init__(self,*args,**kwargs)
 
 def is_ec2_instance():
     """Check if an instance is running on AWS."""
@@ -88,70 +333,3 @@ def is_ec2_instance():
     return False   
 
 
-
-
-#connection_string = "host='{host}' user='{user}'  password='{passd}'".format(host=HOST,user=USER,passd=PASS)
-def configure_db_connection(database_name,host=HOST,user=USER,passd=PASS,port=PORT,pool_size=20, max_overflow=0):
-    '''Returns Scoped Session, engine, and a connection_string'''
-    connection_string = "postgresql://{user}:{passd}@{host}:{port}/{database}"\
-                        .format(host=host,user=user,passd=passd,port=port,database=database_name)
-
-    log.info('Connecting to db:{} {}:{} with user {}'.format(database_name,host,port,user))
-    engine = create_engine(connection_string,pool_size=pool_size, max_overflow=max_overflow)
-    engine.echo = False
-
-    scopefunc = functools.partial(context.get, "uuid")
-
-    session_factory  = sessionmaker(bind=engine,expire_on_commit=True)
-    Session = scoped_session(session_factory, scopefunc = scopefunc)
-
-    @contextmanager
-    def session_scope():
-        """Provide a transactional scope around a series of operations."""
-        session = Session()
-        try:
-            yield session
-            session.commit()
-        except:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-
-    return session_scope,engine,connection_string
-
-DataBase = declarative_base()
-
-def rebuild_database(engine,connection_string, confirm=True):
-    '''Rebuild database on confirmation, create the database if nessicary'''
-    if not is_ec2_instance():
-        answer = input("We Are Going To Overwrite The Databse {}\nType 'CONFIRM' to continue:\n".format(HOST))
-    else:
-        answer = 'CONFIRM'
-
-    if answer == 'CONFIRM' or confirm==False:
-        #Create Database If It Doesn't Exist
-        if not database_exists(connection_string):
-            log.info("Creating Database: {}".format(connection_string))
-            create_database(connection_string)
-        else:
-            #Otherwise Just Drop The Tables
-            log.debug("Dropping DB Metadata".format())
-            DataBase.metadata.drop_all(engine)
-        #(Re)Create Tables
-        log.debug("Creating DB Metadata".format())
-        DataBase.metadata.create_all(engine)
-    else:
-        raise Exception("Ah ah ah you didn't say the magic word")
-
-def ensure_database_exists(engine,connection_string):
-    '''Check if database exists, if not create it and tables'''
-    if not database_exists(connection_string):
-        log.info("Creating Database: {}".format(connection_string))
-        create_database(connection_string)
-        DataBase.metadata.create_all(engine) 
-          
-
-def cleanup_sessions(Session):
-    log.info("Closing All Active Sessions")
-    Session.close_all()

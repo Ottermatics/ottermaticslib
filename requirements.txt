@@ -42,10 +42,15 @@ sqlalchemy
 sqlalchemy_utils
 psycopg2
 
+#Documetnation
+sphinx==3.2.1
+pygsheets
+pydrive
+
 #Supercomputing
 boto3
 deco
-ray==1.0.0
+ray==1.1.0
 ray[tune]
 #tensorflow
 #ray[rllib]
@@ -57,4 +62,3 @@ ray[tune]
 #cv
 graypy
 
-sphinx==3.2.1
