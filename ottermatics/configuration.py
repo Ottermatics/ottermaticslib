@@ -705,7 +705,6 @@ class Configuration(LoggingMixin):
         '''Returns formated attr data if the value is numeric'''
         return list([self.store[k] for k in attr.fields_dict(self.__class__).keys() \
                                             if k not in self.skip_attr and k.lower()  != 'index' \
-                                            and not type(self.store[k]) == str \
                                             and isinstance(self.store[k],NUMERIC_TYPES)])
     @property
     def attr_raw_keys(self) -> list:
