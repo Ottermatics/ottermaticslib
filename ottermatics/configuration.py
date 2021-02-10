@@ -327,8 +327,10 @@ class Configuration(LoggingMixin):
     '''
     _temp_vars = None
 
-    name = attr.ib(default='default',validator= attr.validators.instance_of(str))
-    index = attr.ib(default=0,validator= attr.validators.instance_of(int))
+    name = attr.ib(default='default',validator= attr.validators.instance_of(str),kw_only=True)
+
+    #Super Special Tabulating Index
+    index = 0 #attr.ib(default=0,validator= attr.validators.instance_of(int),kw_only=True)
 
     log_fmt = "[%(identity)-24s]%(message)s"
     log_silo = True

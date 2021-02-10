@@ -169,10 +169,9 @@ class LoggingMixin(logging.Filter):
         msg = self.extract_message(args)
         self.logger.critical(msg)
 
-        if is_ec2_instance() and SLACK_WEBHOOK_NOTIFICATION is not None:
-            self.slack_notification(self.identity.title(),msg)        
+        self.slack_notification(self.identity.title(),msg)        
 
-    def slack_notification(self, category, message):
+    def slack_notification(self, category, message, stage='MASTER'):
         global SLACK_WEBHOOK_NOTIFICATION
         if SLACK_WEBHOOK_NOTIFICATION is None and 'SLACK_WEBHOOK_NOTIFICATION' in os.environ:
             self.info('getting slack webhook')
@@ -180,7 +179,7 @@ class LoggingMixin(logging.Filter):
         headers = {'Content-type': 'application/json'}
         data = {'text':"{category} on {stage}:\n```{message}```".format(\
                             category=category.upper(),\
-                            stage='MASTER',\
+                            stage=stage,\
                             message=message)}
         self.info(f'Slack Notification : {SLACK_WEBHOOK_NOTIFICATION}:{category},{message}')
         slack_note = requests.post(SLACK_WEBHOOK_NOTIFICATION,data= json.dumps(data).encode('ascii'),headers=headers) 

@@ -231,16 +231,16 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
         """Provide a transactional scope around a series of operations."""
         if not hasattr(self,'Session'):
             self.configure()
-        self.session = self.Session()
+        session = self.Session()
         try:
-            yield self.session
-            self.session.commit()
+            yield session
+            session.commit()
         except:
-            self.session.rollback()
+            session.rollback()
             raise
         finally:
-            self.session.close()
-        del self.session
+            session.close()
+        del session
 
 
     def load_configuration_from_env(self):
