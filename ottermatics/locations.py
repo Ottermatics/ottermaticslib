@@ -4,6 +4,13 @@ import pathlib
 from platform import system,uname
 import logging
 
+'''
+This locations system is designed to work with dropbox, there are workaroudn for linux
+by creating these in your home directory which will then point to the correct location
+.dropbox_home: link
+.creds_home: link
+'''
+
 
 log = logging.getLogger('otterlib-locations')
 
@@ -100,6 +107,8 @@ def ottermatics_project(project_name):
     return str(os.path.abspath(os.path.join(os.sep,ottermatics_projects(),project_name)))
 
 def creds_folder():
+    if '.creds_home' in os.listdir( os.path.expanduser('~')):
+        return os.path.realpath(os.path.expanduser(os.path.join('~','.creds_home')))    
     return str(os.path.abspath(os.path.join(os.sep,ottermatics_folder(),'.creds')))
 
 def ottermatics_clients():
