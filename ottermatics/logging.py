@@ -10,10 +10,16 @@ import json
 import sys,os
 import uuid
 import graypy
+from urllib.request import urlopen
+
+import requests
 
 BASIC_LOG_FMT = "[%(name)-24s]%(message)s"
 
 LOG_LEVEL = logging.INFO
+
+global SLACK_WEBHOOK_NOTIFICATION
+SLACK_WEBHOOK_NOTIFICATION = None
 
 log = logging.getLogger('')
 logging.basicConfig(format=BASIC_LOG_FMT,level=LOG_LEVEL)
@@ -21,6 +27,18 @@ logging.basicConfig(format=BASIC_LOG_FMT,level=LOG_LEVEL)
 FILE = os.path.dirname(__file__)
 CREDS = os.path.join(FILE, 'creds')
 credfile = lambda fil: os.path.join(CREDS,fil)
+
+def is_ec2_instance():
+    """Check if an instance is running on AWS."""
+    result = False
+    meta = 'http://169.254.169.254/latest/meta-data/public-ipv4'
+    try:
+        result = urlopen(meta,timeout=5.0).status == 200
+        return True
+    except:
+        return False
+    return False   
+
 
 try:
     logging.getLogger('parso.cache').disabled=True
@@ -147,8 +165,24 @@ class LoggingMixin(logging.Filter):
 
     def critical(self,*args):
         '''A routine to communicate to the root of the server network that there is an issue'''
+        global SLACK_WEBHOOK_NOTIFICATION
         msg = self.extract_message(args)
         self.logger.critical(msg)
+
+        self.slack_notification(self.identity.title(),msg)        
+
+    def slack_notification(self, category, message, stage='MASTER'):
+        global SLACK_WEBHOOK_NOTIFICATION
+        if SLACK_WEBHOOK_NOTIFICATION is None and 'SLACK_WEBHOOK_NOTIFICATION' in os.environ:
+            self.info('getting slack webhook')
+            SLACK_WEBHOOK_NOTIFICATION = os.environ['SLACK_WEBHOOK_NOTIFICATION']
+        headers = {'Content-type': 'application/json'}
+        data = {'text':"{category} on {stage}:\n```{message}```".format(\
+                            category=category.upper(),\
+                            stage=stage,\
+                            message=message)}
+        self.info(f'Slack Notification : {SLACK_WEBHOOK_NOTIFICATION}:{category},{message}')
+        slack_note = requests.post(SLACK_WEBHOOK_NOTIFICATION,data= json.dumps(data).encode('ascii'),headers=headers) 
 
     def extract_message(self,args):
         for arg in args:

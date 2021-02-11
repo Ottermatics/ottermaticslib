@@ -21,7 +21,7 @@ from psycopg2.extensions import register_adapter, AsIs
 from os import sys
 
 from ottermatics.patterns import Singleton, SingletonMeta, singleton_meta_object
-from ottermatics.logging import LoggingMixin, set_all_loggers_to
+from ottermatics.logging import LoggingMixin, set_all_loggers_to, is_ec2_instance
 
 from contextlib import contextmanager
 
@@ -118,12 +118,18 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         with self.cache as ch:
             ch.set(key,data,retry=retry,**kwargs)
 
-    def get(self,key,retry=True):
+    def get(self,key,on_missing=None,retry=True):
+        '''Helper method to get an item, return None it doesn't exist and warn.
+        :param on_missing: a callback to use if the data is missing, which will set the data at the key, and return it'''
         with self.cache as ch:
             if key in ch:
                 return self.cache.get(key,retry=retry)
             else:
-                self.warning('key {} not in cache')
+                if on_missing is not None:
+                    data = on_missing()
+                    self.set(key,data)
+                    return data
+                self.warning('key {} not in cache'.format(key))
         return None
 
     def expire(self):
@@ -157,7 +163,7 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
     user = None
     passd = None
     port = 5432
-
+    
     #Reset
     connection_string = None
     engine = None
@@ -172,7 +178,8 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
         :param host: hostname
         :param user: username
         :param passd: password
-        :param port: hostname'''
+        :param port: hostname
+        :param echo: if the engine echos or not'''
         self.info('initalizing db connection')
         #Get ENV Defaults
         self.load_configuration_from_env()
@@ -188,6 +195,12 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
         if passd is not None:
             self.info("Getting DB pass arg")
             self.passd = passd
+
+        if 'echo' in kwargs:
+            self.info("Setting Echo")
+            self.echo = kwargs['echo']
+        else:
+            self.echo = False    
         
         #Args with defaults
         if 'port' in kwargs:
@@ -218,16 +231,16 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
         """Provide a transactional scope around a series of operations."""
         if not hasattr(self,'Session'):
             self.configure()
-        self.session = self.Session()
+        session = self.Session()
         try:
-            yield self.session
-            self.session.commit()
+            yield session
+            session.commit()
         except:
-            self.session.rollback()
+            session.rollback()
             raise
         finally:
-            self.session.close()
-        del self.session
+            session.close()
+        del session
 
 
     def load_configuration_from_env(self):
@@ -311,25 +324,4 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
         '''We reconfigure on opening a pickle'''
         self.__dict__ = d
         self.configure()
-
-
-# class DBConnection(Singleton):
-
-#     _decorated = DB
-
-#     def __init__(self,*args,**kwargs):
-#         print('this is not a singleton, call DBConnection.instance()')
-#         self._decorated.__init__(self,*args,**kwargs)
-
-def is_ec2_instance():
-    """Check if an instance is running on AWS."""
-    result = False
-    meta = 'http://169.254.169.254/latest/meta-data/public-ipv4'
-    try:
-        result = urlopen(meta,timeout=5.0).status == 200
-        return True
-    except:
-        return False
-    return False   
-
 

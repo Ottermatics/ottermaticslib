@@ -327,8 +327,10 @@ class Configuration(LoggingMixin):
     '''
     _temp_vars = None
 
-    name = attr.ib(default='default',validator= attr.validators.instance_of(str))
-    index = attr.ib(default=0,validator= attr.validators.instance_of(int))
+    name = attr.ib(default='default',validator= attr.validators.instance_of(str),kw_only=True)
+
+    #Super Special Tabulating Index
+    index = 0 #attr.ib(default=0,validator= attr.validators.instance_of(int),kw_only=True)
 
     log_fmt = "[%(identity)-24s]%(message)s"
     log_silo = True
@@ -705,7 +707,6 @@ class Configuration(LoggingMixin):
         '''Returns formated attr data if the value is numeric'''
         return list([self.store[k] for k in attr.fields_dict(self.__class__).keys() \
                                             if k not in self.skip_attr and k.lower()  != 'index' \
-                                            and not type(self.store[k]) == str \
                                             and isinstance(self.store[k],NUMERIC_TYPES)])
     @property
     def attr_raw_keys(self) -> list:
