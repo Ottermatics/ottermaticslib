@@ -56,25 +56,37 @@ except:
 #     gelf = graypy.GELFUDPHandler(host=GELF_HOST,port=12203, extra_fields=True)
 #     log.addHandler(gelf)
 
+
 def installSTDLogger(fmt = BASIC_LOG_FMT):
     '''We only want std logging to start'''
     log = logging.getLogger('')
-    log.setLevel(level=logging.DEBUG)
     sh = logging.StreamHandler(sys.stdout)
     peerlog = logging.Formatter()
     sh.setFormatter(peerlog)
     log.addHandler( sh )    
 
-def set_all_loggers_to(level):
+
+def set_all_loggers_to(level,set_stdout=False,all_loggers=False):
     global LOG_LEVEL
     LOG_LEVEL = level
+    
+    if set_stdout: installSTDLogger()
+
     logging.basicConfig(level = LOG_LEVEL) #basic config
+    log = logging.getLogger()
+    log.setLevel(LOG_LEVEL)# Set Root Logger
+
     #log.setLevel(level) #root
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
     for logger in loggers:
         if logger.__class__.__name__.lower().startswith('otterlog'):
             logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
             logger.setLevel(LOG_LEVEL)
+        elif all_loggers:
+            logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
+            logger.setLevel(LOG_LEVEL)
+
+
 
 class LoggingMixin(logging.Filter):
     '''Class to include easy formatting in subclasses'''
@@ -94,12 +106,10 @@ class LoggingMixin(logging.Filter):
         if self._log is None:
             self._log = logging.getLogger('otterlog_' +self.identity)
             self._log.setLevel(level = LOG_LEVEL)
-            #Eliminate Outside Logging Interaction
             
-            self._log.handlers = []
-
-            #We have our own methods since it doesn't interact
+            #Eliminate Outside Logging Interaction
             if self.log_silo:
+                self._log.handlers = []
                 self._log.propagate = False
                 self.installSTDLogger()
                 #self.installGELFLogger()
