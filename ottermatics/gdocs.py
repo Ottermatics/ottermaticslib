@@ -1,6 +1,7 @@
 import os
 import ottermatics
-from ottermatics.locations import google_api_token, creds_folder, ottermatics_clients, bool_from_env, client_dir_name, ottermatics_project,load_from_env
+from ottermatics.common import *
+from ottermatics.locations import google_api_token, creds_folder, ottermatics_clients, client_dir_name, ottermatics_project
 from ottermatics.logging import LoggingMixin, logging
 from ottermatics.patterns import Singleton
 
@@ -15,33 +16,12 @@ import attr
 
 log = logging.getLogger('otterlib-gdocs')
 
-load_from_env('./.creds/','env.sh')
-
 GoogleAuth.DEFAULT_SETTINGS['client_config_file'] = google_api_token()
 
 #Filed will be None until assigned an folder id
 STANDARD_FOLDERS = {'ClientFolders':None,'InternalClientDocuments':None}
 #We'll hook this up with functionality at the module level
-CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME = None,None,None,None
-
-if 'CLIENT_GDRIVE_PATH' in os.environ:
-    log.info('got CLIENT_GDRIVE_PATH')
-    CLIENT_G_DRIVE = os.environ['CLIENT_GDRIVE_PATH']
-
-if 'CLEINT_GDRIVE_SYNC' in os.environ:
-    log.info('got CLEINT_GDRIVE_SYNC')
-    CLIENT_GDRIVE_SYNC = bool_from_env(os.environ['CLIENT_GDRIVE_SYNC'])
-
-if 'CLIENT_GMAIL' in os.environ:
-    log.info('got CLIENT_GMAIL')
-    CLIENT_GMAIL = os.environ['CLIENT_GMAIL']
-
-if 'CLIENT_NAME' in os.environ:
-    log.info('got CLIENT_NAME')
-    CLIENT_NAME = os.environ['CLIENT_NAME'] 
-    if CLIENT_G_DRIVE is None:
-        log.info('setting CLIENT_G_DRIVE')
-        CLIENT_G_DRIVE = os.path.join('ClientFolders',CLIENT_NAME)
+global CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME
 
 
 

@@ -9,8 +9,9 @@ This locations system is designed to work with dropbox, there are workaroudn for
 by creating these in your home directory which will then point to the correct location
 .dropbox_home: link
 .creds_home: link
-'''
 
+Do not use global variables set in __init__.py in this file, locations is key to discovering those
+'''
 
 log = logging.getLogger('otterlib-locations')
 
@@ -132,34 +133,6 @@ def client_dir_name():
         return None
     current_rel_path  = os.path.relpath(current_diectory(), ottermatics_projects())
     return pathlib.Path(current_rel_path).parts[0]
-
-def bool_from_env(bool_env_canidate):
-    if bool_env_canidate.lower() in ('yes','true','y','1'):
-        return True
-    if bool_env_canidate.lower() in ('no','false','n','0'):
-        return False
-    return None
-
-def load_from_env(creds_path='./.creds/',env_file='env.sh'):
-    '''extracts export statements from bash file and aplies them to the python env'''
-    creds_path = os.path.join(creds_path,env_file)
-    log.info("checking {} for creds".format(creds_path))
-    if not 'OTTER_CREDS_SET' in os.environ or not bool_from_env(os.environ['OTTER_CREDS_SET']):        
-        if os.path.exists(creds_path):
-            log.info('creds found')
-            with open(creds_path,'r') as fp:
-                txt = fp.read()
-
-            lines = txt.split('\n')
-            for line in lines:
-                if line.startswith('export'):
-                    key,val = line.replace('export','').split('=')
-                    log.info('setting {}'.format(key))
-                    os.environ[key.strip()]=val
-        
-        os.environ['OTTER_CREDS_SET'] = 'yes'
-    else:
-        log.info('credientials already set') 
 
 def main_cli():
     '''
