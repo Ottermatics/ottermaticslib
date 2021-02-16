@@ -71,7 +71,9 @@ class AnalysisConfiguration(Configuration):
 
     def get_field_from_table(self,field):
         '''Converts Pandas To Numpy Array By Key, also handles poorly formated fields'''
-        if field in self.joined_table:                                              
+        if self.joined_table is None:
+            return numpy.array([])
+        elif field in self.joined_table:                                              
             table = self.joined_table[field]
         elif field.title():
             table = self.joined_table[field.title()]
