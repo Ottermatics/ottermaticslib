@@ -10,7 +10,7 @@ import pydrive
 
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
-import time
+import time, random
 
 import attr
 
@@ -23,8 +23,17 @@ STANDARD_FOLDERS = {'ClientFolders':None,'InternalClientDocuments':None}
 #We'll hook this up with functionality at the module level
 global CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME
 
-
-
+def retry_on_rateerror(function):
+    def great_success(self,*args,**kwargs):
+        try:
+            return function(self,*args,**kwargs)
+        except Exception as e:
+            if '403' in str(e):
+                time.sleep(random.randint(5.0,60.0))
+                return great_success(self,*args,**kwargs)
+            else:
+                self.warning(f'{function} error with args {args},{kwargs}: {e}')
+    return great_success
 
 @Singleton
 class OtterDrive(LoggingMixin):
@@ -205,6 +214,7 @@ class OtterDrive(LoggingMixin):
         return gdrive_root
 
     #User Methods
+    @retry_on_rateerror
     def upload_or_update_file(self,file_path,parent_id):
         #Only sync from client folder
         assert os.path.commonpath([self.client_folder]) == os.path.commonpath([file_path, self.client_folder])
@@ -264,7 +274,7 @@ class OtterDrive(LoggingMixin):
             self.file_cache[gfile_path] = file_meta['id']
 
 
-
+    @retry_on_rateerror
     def get_or_create_folder(self,folder_name,parent_id='root',**kwargs):
         '''Creates a folder in the parent folder if it doesn't already exist, otherwise return folder
         :param folder_name: the name of the folder to create
@@ -308,6 +318,7 @@ class OtterDrive(LoggingMixin):
         for sfil in self.files_in_folder(parent_id):
             self.add_cached_file(sfil,parent_folder_path)                
 
+    @retry_on_rateerror
     def ensure_g_path_get_id(self,gpath):
         '''walks these internal google paths ensuring everythign is created from root
         This one is good for a cold entry of a path'''
@@ -335,6 +346,7 @@ class OtterDrive(LoggingMixin):
         return fol['id'] #should be last!
 
     #Utility Methods
+    @retry_on_rateerror
     def files_in_folder(self,folder_id='root'):
         if folder_id is not None:
             self.sleep()
@@ -342,6 +354,7 @@ class OtterDrive(LoggingMixin):
             for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType != 'application/vnd.google-apps.folder' and mimeType != 'application/vnd.google-apps.shortcut'".format(folder_id)}).GetList():
                 yield file
 
+    @retry_on_rateerror
     def folders_in_folder(self,folder_id='root'):
         if folder_id is not None:
             self.sleep()
@@ -353,7 +366,8 @@ class OtterDrive(LoggingMixin):
             #Shortcuts
             for file in self.gdrive.ListFile({'q':"'{}' in parents and trashed=false and mimeType = 'application/vnd.google-apps.shortcut'".format(folder_id)}).GetList():
                 yield file                
-
+    
+    @retry_on_rateerror
     def all_in_folder(self,folder_id='root'):
         if folder_id is not None:
             self.sleep()

@@ -13,6 +13,7 @@ import pandas
 import os
 import inspect
 import pathlib
+import marshal, types
 
 import matplotlib.pyplot as plt
 
@@ -52,14 +53,20 @@ def otter_class(cls,*args,**kwargs):
     for methodname in dir(acls):
         method = getattr(acls, methodname)
         if hasattr(method, '_val_prop'):
+            this = method._val_prop
+            this['func'] = method.fget
             acls._val_tab_funtions.update(
-                {methodname: method._val_prop})
+                { methodname: this })
         if hasattr(method, '_stat_prop'):
+            this = method._stat_prop
+            this['func'] = method.fget            
             acls._stat_tab_functions.update(
-                {methodname: method._stat_prop}) 
+                { methodname: this }) 
         if hasattr(method, '_avg_prop'):
+            this = method._avg_prop
+            this['func'] = method.fget               
             acls._avg_tab_functions.update(
-                {methodname: method._avg_prop})                                          
+                { methodname: this })                                          
 
     return acls
 
@@ -73,20 +80,56 @@ def meta(title,desc=None,**kwargs):
     return out
 
 
+class BaseProperty:
+    "Emulate PyProperty_Type() in Objects/descrobject.c"
+
+    def __init__(self, fget=None, fset=None, fdel=None, doc=None):
+        self.fget = fget
+        self.fset = fset
+        self.fdel = fdel
+        if doc is None and fget is not None:
+            doc = fget.__doc__
+        self.__doc__ = doc
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        if self.fget is None:
+            raise AttributeError("unreadable attribute")
+        return self.fget(obj)
+
+    def __set__(self, obj, value):
+        if self.fset is None:
+            raise AttributeError("can't set attribute")
+        self.fset(obj, value)
+
+    def __delete__(self, obj):
+        if self.fdel is None:
+            raise AttributeError("can't delete attribute")
+        self.fdel(obj)
+
+    def getter(self, fget):
+        return type(self)(fget, self.fset, self.fdel, self.__doc__)
+
+    def setter(self, fset):
+        return type(self)(self.fget, fset, self.fdel, self.__doc__)
+
+    def deleter(self, fdel):
+        return type(self)(self.fget, self.fset, fdel, self.__doc__)    
 
 #Properties to register certian class functions
 class OtterCacheProp(functools.cached_property):
+    pass
+    # def __getstate__(self):
+    #     attributes = self.__dict__.copy()
+    #     attr_out = {}
+    #     for key,att in attributes.items():
+    #         #print('GS:',key,att)
+    #         if key not in ('_val_props','_stat_prop','_avg_prop'):
+    #             attr_out[key] = att
+    #     return attr_out
 
-    def __getstate__(self):
-        attributes = self.__dict__.copy()
-        attr_out = {}
-        for key,att in attributes.items():
-            #print('GS:',key,att)
-            if key not in ('_val_props','_stat_prop','_avg_prop'):
-                attr_out[key] = att
-        return attr_out
-
-class OtterProp(property):
+class OtterProp(BaseProperty):
     '''We cant modify property code sooo we have OtterProps!'''
 
     stats_labels = ['min','avg','std','max']
@@ -150,11 +193,31 @@ class OtterProp(property):
         attr_out = {}
         for key,att in attributes.items():
             #print('GS:',key,att)
-            if key not in ('_val_props','_stat_prop','_avg_prop'):
+            if key in ('_val_props','_stat_prop','_avg_prop'):
+                print(f'skip get {self} {key} with {att}')
+                #code_string = marshal.dumps(att['func'].__code__  )
+                #att['func'] = code_string
+                #attr_out[key] = att
+            else:
                 attr_out[key] = att
         return attr_out
 
-    #def __reduce__(self):
+    # def __setstate__(self,new_state):
+    #     attr_out = {}
+    #     for key,att in new_state.items():
+    #         #print('GS:',key,att)
+    #         if key in ('_val_props','_stat_prop','_avg_prop'):
+    #             print(f'skil set {self} {key} with {att}')
+    #             #code = marshal.loads(att['func'])
+    #             #func = types.MethodType( code, self, key )
+    #             #att['func'] = func
+    #             #attr_out[key] = att
+    #         else:
+    #             attr_out[key] = att
+
+    #     self.__dict__ = attr_out      
+
+    # def __reduce__(self):
     #    return (self.__class__, 
 
 def table_property(f=None,**meta):
@@ -169,12 +232,12 @@ def table_property(f=None,**meta):
     :param desc: some information about the field'''
     if f is not None:
         prop =  OtterProp(f)
-        prop._val_prop = {'func':f}
+        prop._val_prop = {'func':True}
         return prop
     else:
         def wrapper(f):
             prop =  OtterProp(f)
-            prop._val_prop = {'func':f,**meta}
+            prop._val_prop = {'func':True,**meta}
             return prop
         return wrapper
 
@@ -190,12 +253,12 @@ def table_stats_property(f=None,**meta):
     :param desc: some information about the field'''
     if f is not None:  
         prop =  OtterProp(f)
-        prop._stat_prop = {'func':f}
+        prop._stat_prop = {'func':True}
         return prop
     else:
         def wrapper(f):
             prop =  OtterProp(f)
-            prop._stat_prop = {'func':f,**meta}
+            prop._stat_prop = {'func':True,**meta}
             return prop
         return wrapper
 
@@ -211,12 +274,12 @@ def table_avg_property(f=None,**meta):
     :param desc: some information about the field'''
     if f is not None:  
         prop =  OtterProp(f)
-        prop._avg_prop = {'func':f}
+        prop._avg_prop = {'func':True}
         return prop
     else:
         def wrapper(f):
             prop =  OtterProp(f)
-            prop._avg_prop = {'func':f,**meta}
+            prop._avg_prop = {'func':True,**meta}
             return prop
         return wrapper           
 
@@ -232,12 +295,12 @@ def table_cached_property(f=None,**meta):
     :param desc: some information about the field'''
     if f is not None:
         prop =  OtterCacheProp(f)
-        prop._val_prop = {'func':f}
+        prop._val_prop = {'func':True}
         return prop
     else:
         def wrapper(f):
             prop =  OtterCacheProp(f)
-            prop._val_prop = {'func':f,**meta}
+            prop._val_prop = {'func':True,**meta}
             return prop
         return wrapper
 
@@ -254,12 +317,12 @@ def table_cached_stats_property(f=None,**meta):
     :param desc: some information about the field'''
     if f is not None:  
         prop =  OtterCacheProp(f)
-        prop._avg_prop = {'func':f}
+        prop._avg_prop = {'func':True}
         return prop
     else:
         def wrapper(f):
             prop =  OtterCacheProp(f)
-            prop._avg_prop = {'func':f,**meta}
+            prop._avg_prop = {'func':True,**meta}
             return prop
         return wrapper
 
@@ -276,12 +339,12 @@ def table_cached_avg_property(f=None,**meta):
     :param desc: some information about the field'''
     if f is not None:  
         prop =  OtterCacheProp(f)
-        prop._stat_prop = {'func':f}
+        prop._stat_prop = {'func':True}
         return prop
     else:
         def wrapper(f):
             prop =  OtterCacheProp(f)
-            prop._stat_prop = {'func':f,**meta}
+            prop._stat_prop = {'func':True,**meta}
             return prop
         return wrapper              
 
@@ -588,7 +651,7 @@ class Configuration(LoggingMixin):
         or minimal number of rows to track changes
         
         This should capture all changes but save data'''
-        if self.anything_changed or not self.TABLE:
+        if self.anything_changed or not self.TABLE or index is not None:
             self.TABLE.append(self.data_row)
             self.debug('saving data {}'.format(self.index))
 
@@ -649,6 +712,9 @@ class Configuration(LoggingMixin):
         return output
 
     def format_label(self,label):
+        return label.replace('-','_')
+
+    def output_format_label(self,label):
         return label.replace('_',' ').replace('-',' ').title()
 
     @property
@@ -665,7 +731,7 @@ class Configuration(LoggingMixin):
 
         avg_vals = [ OtterProp.avg_return( val ) for key,val in self.tab_avg_properties.items() ]
 
-        return numpy.array(self.attr_row + prop_vals + avg_vals + stats_vals).flatten().tolist()
+        return numpy.array( self.attr_row + prop_vals + avg_vals + stats_vals ).flatten().tolist()
 
     @property
     def data_label(self):
@@ -679,7 +745,7 @@ class Configuration(LoggingMixin):
 
         avg_labels = [ OtterProp.create_avg_label(val,key) for key,val in self.tab_avg_properties.items()]      
 
-        return list(map(self.format_label,self.attr_labels + prop_labels + avg_labels + stats_labels))
+        return list(map( self.format_label, self.attr_labels + prop_labels + avg_labels + stats_labels ))
 
     @property
     def skip_attr(self) -> list: 
@@ -698,8 +764,7 @@ class Configuration(LoggingMixin):
         if self._attr_labels is None:
             _attr_labels = list([self.get_label(k,v) for k,v in attr.fields_dict(self.__class__).items() \
                                                 if k not in self.skip_attr and k.lower() != 'index' \
-                                                and not type(self.store[k]) == str \
-                                                   and isinstance(self.store[k],NUMERIC_TYPES)])
+                                                and isinstance(self.store[k],NUMERIC_TYPES)])
             self._attr_labels = _attr_labels                                            
         return self._attr_labels
 
@@ -810,7 +875,10 @@ class Configuration(LoggingMixin):
     def save_table(self,dataframe=None,filename=None,*args,**kwargs):
         '''Header method to save the config in many different formats'''
         if dataframe is None:
-            dataframe = self.dataframe
+            dataframe = self.dataframe.copy()
+            #Make Coulmns Human Readabile
+            dataframe.columns = [self.output_format_label(col) for col in dataframe.columns]
+            
         for save_format in self.store_types:
             try:
                 if save_format == 'csv':

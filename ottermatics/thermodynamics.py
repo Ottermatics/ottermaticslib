@@ -1,10 +1,11 @@
 import attr
 from ottermatics.configuration import Configuration, otter_class
-
+from ottermatics.solid_materials import SolidMaterial
 from CoolProp.CoolProp import PropsSI
 import CoolProp.CoolProp as CP
 
 from numpy import vectorize
+import numpy
 
 #Thermodynamics
 @vectorize
@@ -74,6 +75,24 @@ def fanning_friction_factor(Re,method='turbulent'):
         return 16.0 / Re
     else: #Default to turbulent
         return fanning_friction_factor(Re,method='turbulent')
+
+def cylindrical_thermal_resistance(Ro,Ri,L,k):
+    '''Returns the cylindrical wall thermal resistance
+    :param Ro: wall outside diameter (m)
+    :param Ri: wall outside diameter (m)
+    :param L: cylinder length (m)
+    :param k: thermal conductivity (W/mK)'''    
+    assert Ro > Ri
+    top = numpy.log(Ro/Ri)
+    btm = 2 * numpy.pi * L * k
+    return top / btm
+    
+def wall_thermal_resistance(t,A,k):
+    '''Returns the 2d wall thermal resistance
+    :param t: wall thickness (m)
+    :param A: wall surface area (m2)
+    :param k: thermal conductivity (W/mK)'''
+    return t / (A * k)
 
 #Simple Elements
 @otter_class
@@ -155,3 +174,21 @@ class SimpleCompressor(Configuration):
 
     def pressure_out(self,pressure_in):
         return self.pressure_ratio * pressure_in
+
+
+@otter_class
+class CylindricalHeatTransferElement(Configuration):
+    '''
+    Models the heat transfer through a cylindirically arrange system
+    '''
+
+    ri = attr.ib()
+    ro = attr.ib()
+    L = attr.ib()
+
+    material = attr.ib( validator = attr.validators.instance_of(SolidMaterial) )
+
+    @property
+    def thermal_resistance(self):
+        logR = numpy.log( self.ro / self.ri )
+        return logR / ( 2.0 * numpy.pi * self.material.thermal_conductivity * self.L )

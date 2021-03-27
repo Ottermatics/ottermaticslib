@@ -93,8 +93,8 @@ class AnalysisConfiguration(Configuration):
             if index > 0:
                 for comp in components:
                     if comp['static'] is not None:
-                        df_list = self.split_dataframe_by_colmum(comp['static'],self.max_col_width_static)                        
-                        output.append({'conf':comp['conf'],'dfs': df_list})
+                        df_list = self.split_dataframe_by_colmum( comp['static'] , self.max_col_width_static )                        
+                        output.append( {'conf':comp['conf'],'dfs': df_list} )
         return output
 
     def save_to_worksheet(self,worksheet:pygsheets.Worksheet):
