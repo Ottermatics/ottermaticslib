@@ -50,13 +50,6 @@ register_adapter(numpy.float32, addapt_numpy_float32)
 register_adapter(numpy.int32, addapt_numpy_int32)
 register_adapter(numpy.ndarray, addapt_numpy_array)
 
-#Backwards Compatability
-PORT = 5432
-HOST = 'localhost'
-USER = 'postgres'
-PASS = 'dumbpass'
-DB_NAME = 'dumbdb'
-
 DataBase = declarative_base()
 
 #@Singleton
@@ -89,7 +82,8 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     #         self.alt_path = kwargs['alt_path']            
 
     def __init__(self,**kwargs):
-        self.cache_init_kwargs = kwargs
+        if kwargs:
+            self.cache_init_kwargs = kwargs
 
     @property
     def cache_root(self):
