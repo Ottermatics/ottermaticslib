@@ -11,13 +11,13 @@ sudo apt-get install build-essential
 sudo apt-get install postgresql
 sudo apt install daemonize
 sudo apt-get install libpq-dev
-
+sudo apt-get install net-tools
 
 
 
 mkdir sw
 cd sw
-if grep -q Microsoft /proc/version; then
+if grep -q microsoft /proc/version; then
   #Install SYSTEMCTL
   echo "Install WSL Stuff... systemctl"
   git clone https://github.com/DamionGans/ubuntu-wsl2-systemd-script.git
@@ -34,16 +34,16 @@ cd ~/
 # pip3 install virtualenv
 
 
-echo 'Installing Anaconda Python (follow instructions, agree & yes)'
+echo 'Installing Anaconda Python (follow instructions, agree & yes^10)'
 if [ -z "$CONDA_EXE" ]; then
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     bash ./Miniconda3-latest-Linux-x86_64.sh
     source ~/.bashrc
 
-    conda create -n py3
-    conda activate py3
-    conda install -c anaconda pip
-    pip install -U pip-tools
+    ~/miniconda3/bin/conda create -n py3
+    ~/miniconda3/bin/conda activate py3
+    ~/miniconda3/bin/conda install -c anaconda pip
+    ~/miniconda3/bin/pip install -U pip-tools
 fi
 
 
@@ -64,7 +64,14 @@ read -p "Press enter to continue"
 echo 'Installing Ottermatics Lib'
 git clone git@github.com:SoundsSerious/ottermaticslib.git
 cd ottermaticslib
-python3 -m pip install -r requirements.txt
-python3 setup.py install
+~/miniconda3/bin/python3 -m pip install -r requirements.txt
+~/miniconda3/bin/python3 setup.py install
 
- 
+
+echo "export DISPLAY=:0" >> ~/.bashrc 
+sudo apt-get install x11-apps
+sudo apt-get install libxkbcommon-x11-0
+sudo apt-get install qt5-default
+sudo apt-get install mesa-common-dev
+
+alias ipythonqt="ipython qtconsole --style=monokai --gui-completion=droplist"

@@ -65,11 +65,15 @@ class AnalysisConfiguration(Configuration):
 
     @property
     def joined_table(self):
-        return pandas.concat([ vt['df'] for vt in self.variable_tables],axis=1)
+        if self.variable_tables:
+            return pandas.concat([ vt['df'] for vt in self.variable_tables],axis=1)
+        return None
 
     def get_field_from_table(self,field):
         '''Converts Pandas To Numpy Array By Key, also handles poorly formated fields'''
-        if field in self.joined_table:                                              
+        if self.joined_table is None:
+            return numpy.array([])
+        elif field in self.joined_table:                                              
             table = self.joined_table[field]
         elif field.title():
             table = self.joined_table[field.title()]

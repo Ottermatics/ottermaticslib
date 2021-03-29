@@ -193,7 +193,9 @@ class OtterDrive(LoggingMixin):
         '''Sync path likes absolute paths'''
         assert os.path.commonpath([self.client_folder]) == os.path.commonpath([path, self.client_folder])
 
+        self.debug(f'finding relative path from {path} and {self.client_folder}')
         rel_root = os.path.relpath(path,self.client_folder)
+        self.debug(f'getting gdrive path {self.sync_root} and {rel_root}')
         gdrive_root = os.path.join(self.sync_root,rel_root)
         #remove current directory /.
         if gdrive_root.endswith('{}.'.format(os.sep)):

@@ -491,10 +491,11 @@ class Configuration(LoggingMixin):
     def saved_plots(self):
         return self._stored_plots
 
-    @property
-    def plotting_methods(self):
-        return {fname:func for fname,func in inspect.getmembers(self, predicate=inspect.ismethod) \
-                                          if fname.startswith('plot_')}
+    #BUG: This breaks cloudpickle due to inspect+property recursion, lets find a different answer
+    #@property
+    # def plotting_methods(self):
+    #     return {fname:func for fname,func in inspect.getmembers(self, predicate=inspect.ismethod) \
+    #                                       if fname.startswith('plot_')}
 
     @contextmanager
     def subplots(self,plot_tile,save=True,*args,**kwargs):

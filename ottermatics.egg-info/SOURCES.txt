@@ -2,6 +2,7 @@ README.md
 setup.py
 ottermatics/__init__.py
 ottermatics/analysis.py
+ottermatics/common.py
 ottermatics/configuration.py
 ottermatics/data.py
 ottermatics/gdocs.py

@@ -10,6 +10,7 @@ import json
 import sys,os
 import uuid
 import graypy
+import socket
 from urllib.request import urlopen
 
 import requests
@@ -20,6 +21,12 @@ LOG_LEVEL = logging.INFO
 
 global SLACK_WEBHOOK_NOTIFICATION
 SLACK_WEBHOOK_NOTIFICATION = None
+
+try:
+    #This should always work unless we don't have privideges (rare assumed)
+    HOSTNAME = socket.gethostname().upper()
+except:
+    HOSTNAME = 'MASTER'
 
 log = logging.getLogger('')
 logging.basicConfig(format=BASIC_LOG_FMT,level=LOG_LEVEL)
@@ -181,7 +188,7 @@ class LoggingMixin(logging.Filter):
 
         self.slack_notification(self.identity.title(),msg)        
 
-    def slack_notification(self, category, message, stage='MASTER'):
+    def slack_notification(self, category, message, stage=HOSTNAME):
         global SLACK_WEBHOOK_NOTIFICATION
         if SLACK_WEBHOOK_NOTIFICATION is None and 'SLACK_WEBHOOK_NOTIFICATION' in os.environ:
             self.info('getting slack webhook')
