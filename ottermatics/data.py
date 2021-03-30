@@ -13,7 +13,7 @@ from twisted.python import context
 import os
 import logging
 import numpy
-
+import time
 import signal
 
 from urllib.request import urlopen
@@ -81,6 +81,9 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     #     if 'alt_path' in kwargs:
     #         self.alt_path = kwargs['alt_path']            
 
+    last_expire = 0
+    expire_threshold = 240.0
+
     def __init__(self,**kwargs):
         if kwargs:
             self.cache_init_kwargs = kwargs
@@ -127,12 +130,15 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         return None
 
     def expire(self):
-        '''wrapper for diskcache expire method'''
-        self.cache.expire()
+        '''wrapper for diskcache expire method that only permits expiration on a certain interval'''
+        now =time.time()
+        if now - self.last_expire > self.expire_threshold:
+            self.cache.expire()
+            self.last_expire = now
 
     @property
     def current_keys(self):
-        self.cache.expire()
+        self.expire()
         return set(list(self.cache))
 
     def __iter__(self):
