@@ -81,8 +81,9 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     #     if 'alt_path' in kwargs:
     #         self.alt_path = kwargs['alt_path']            
 
-    last_expire = 0
-    expire_threshold = 240.0
+    last_expire = None
+    _current_keys = None
+    expire_threshold = 60.0
 
     def __init__(self,**kwargs):
         if kwargs:
@@ -130,16 +131,22 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         return None
 
     def expire(self):
-        '''wrapper for diskcache expire method that only permits expiration on a certain interval'''
+        '''wrapper for diskcache expire method that only permits expiration on a certain interval
+        :return: bool, True if expired called'''
         now =time.time()
-        if now - self.last_expire > self.expire_threshold:
+        if self.last_expire is None or now - self.last_expire > self.expire_threshold:
             self.cache.expire()
             self.last_expire = now
+            return True
+        return False
 
     @property
     def current_keys(self):
-        self.expire()
-        return set(list(self.cache))
+        has_new_keys = self.expire()
+        if has_new_keys or self._current_keys is None:
+            self._current_keys =  set(list(self.cache))
+
+        return self._current_keys
 
     def __iter__(self):
         return self.cache.__iter__()
