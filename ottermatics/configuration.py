@@ -807,10 +807,17 @@ class Configuration(LoggingMixin):
 
 
     #Save functionality
-    def save_table(self,dataframe=None,filename=None,*args,**kwargs):
-        '''Header method to save the config in many different formats'''
+    def save_table(self,dataframe=None,filename=None,meta_tags=None,*args,**kwargs):
+        '''Header method to save the config in many different formats
+        :param meta_tags: a dictionary with headers being column names, and the value as the item to fill that column'''
         if dataframe is None:
             dataframe = self.dataframe
+
+        if meta_tags is not None and type(meta_tags) is dict:
+            for tag,value in meta_tags.items():
+                dataframe[tag] = value
+
+
         for save_format in self.store_types:
             try:
                 if save_format == 'csv':
@@ -841,9 +848,10 @@ class Configuration(LoggingMixin):
             dataframe.to_excel(path_or_buf=filepath,*args,**kwargs)
 
     def save_gsheets(self,dataframe,filename=None,*args,**kwargs):
-        
+        '''A function to save the table to google sheets
+        :param filename: the filepath on google drive - be careful!
+        '''
         od = OtterDrive.instance()
-        
         
         filepath = self.config_path_daily
 

@@ -45,7 +45,7 @@ class OtterDrive(LoggingMixin):
 
     file_cache = {}
 
-    _sleep_time = 0.1
+    _sleep_time = 2.0
 
     def __init__(self,sync_root=CLIENT_G_DRIVE):
         ''':param sync_root: the client path to sync to on command'''
