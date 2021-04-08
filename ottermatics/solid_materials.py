@@ -171,6 +171,81 @@ class Aluminum(SolidMaterial):
     #Economic Properties
     cost_per_kg = attr.ib(default=1.90) #dollar per kg    
 
+
+@otter_class
+class DrySoil(SolidMaterial):
+    name = attr.ib(default='dry soil')
+
+    #Structural Properties
+    density = attr.ib(default=1600.0) #kg/m3
+    modulus_of_elasticity = attr.ib(default=70.3E9) #Pa
+    tensile_strength_yield = attr.ib(default=0.0) #Pa
+    tensile_strength_ultimate = attr.ib(default=0.0) #Pa
+    poisson_ratio = attr.ib(default=0.33)
+
+    #Thermal Properties
+    melting_point = attr.ib(default=1550+273) #K
+    maxium_service_temp = attr.ib(default=1450+273) #K
+    thermal_conductivity = attr.ib(default=0.25) #W/mK
+    specific_heat = attr.ib(default=800) #J/kgK
+    thermal_expansion = attr.ib(default = 16.41E-6) #m/mK
+ 
+    #Electrical Properties
+    electrical_resistitivity = attr.ib(default=940.0) #ohm-m
+
+    #Economic Properties
+    cost_per_kg = attr.ib(default=44.78/1000.0) #dollar per kg        
+
+@otter_class
+class WetSoil(SolidMaterial):
+    name = attr.ib(default='wet soil')
+
+    #Structural Properties
+    density = attr.ib(default=2080.0) #kg/m3
+    modulus_of_elasticity = attr.ib(default=70.3E9) #Pa
+    tensile_strength_yield = attr.ib(default=0.0) #Pa
+    tensile_strength_ultimate = attr.ib(default=0.0) #Pa
+    poisson_ratio = attr.ib(default=0.33)
+
+    #Thermal Properties
+    melting_point = attr.ib(default=1550+273) #K
+    maxium_service_temp = attr.ib(default=1450+273) #K
+    thermal_conductivity = attr.ib(default=2.75) #W/mK
+    specific_heat = attr.ib(default=1632) #J/kgK
+    thermal_expansion = attr.ib(default = 16.41E-6) #m/mK
+ 
+    #Electrical Properties
+    electrical_resistitivity = attr.ib(default=940.0) #ohm-m
+
+    #Economic Properties
+    cost_per_kg = attr.ib(default=34.44/1000.0) #dollar per kg   
+
+
+@otter_class
+class Rubber(SolidMaterial):
+    name = attr.ib(default='rubber')
+
+    #Structural Properties
+    density = attr.ib(default=1100.0) #kg/m3
+    modulus_of_elasticity = attr.ib(default=0.1E9) #Pa
+    tensile_strength_yield = attr.ib(default=0.248E6) #Pa
+    tensile_strength_ultimate = attr.ib(default=0.5E6) #Pa
+    poisson_ratio = attr.ib(default=0.33)
+
+    #Thermal Properties
+    melting_point = attr.ib(default=600+273) #K
+    maxium_service_temp = attr.ib(default=300+273) #K
+    thermal_conductivity = attr.ib(default=0.108) #W/mK
+    specific_heat = attr.ib(default=2005) #J/kgK
+    thermal_expansion = attr.ib(default = 100E-6) #m/mK
+ 
+    #Electrical Properties
+    electrical_resistitivity = attr.ib(default=1E13) #ohm-m
+
+    #Economic Properties
+    cost_per_kg = attr.ib(default=40.0/1000.0) #dollar per kg  
+
+
 # @attr.s
 # class AL_6063(SolidMaterial):
 #     name = attr.ib(default='aluminum 6063')

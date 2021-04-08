@@ -143,7 +143,7 @@ class SimpleCompressor(Configuration):
 
     @property
     def temperature_ratio(self):
-        return self.pressure_ratio**((self.gamma-1.0)/self.gamma) / self.efficiency
+        return (self.pressure_ratio**((self.gamma-1.0)/self.gamma)  - 1.0)/ self.efficiency
 
     @property
     def Tout(self):
@@ -155,3 +155,32 @@ class SimpleCompressor(Configuration):
 
     def pressure_out(self,pressure_in):
         return self.pressure_ratio * pressure_in
+
+@otter_class
+class SimpleTurbine(Configuration):   
+
+    Pout = attr.ib()
+    
+    Pin = attr.ib()
+    Tin = attr.ib()
+
+    mdot = attr.ib()
+
+    Cp = attr.ib()
+    gamma = attr.ib(default=1.4)
+
+    efficiency = attr.ib(default=0.80)
+    name = attr.ib(default='Turbine')
+
+    @property
+    def pressure_ratio(self):
+        return self.Pin / self.Pout
+
+    @property
+    def Tout(self):
+        return self.Tin * ( 1 - self.efficiency * (1.0 - (1/self.pressure_ratio)**((self.gamma-1.0)/self.gamma))  )
+        #return self.Tin * self.pressure_ratio**((self.gamma-1.0)/self.gamma)/ self.efficiency 
+
+    @property
+    def power_output(self):
+        return  self.Cp * self.mdot * ( self.Tin - self.Tout ) 

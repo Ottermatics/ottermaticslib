@@ -433,12 +433,16 @@ class Configuration(LoggingMixin):
 
     @property
     def report_path(self):
-        if self.stored_path is None:
-            self.stored_path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
+        try:
+            if self.stored_path is None:
+                self.stored_path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
 
-        if not os.path.exists(self.stored_path):
-            self.warning('report does not exist {}'.format(self.stored_path))
-        return self.stored_path  
+            if not os.path.exists(self.stored_path):
+                self.warning('report does not exist {}'.format(self.stored_path))
+            return self.stored_path
+        except Exception as e:
+            self.error(e)
+        return None
 
     @property
     def report_path_daily(self):
