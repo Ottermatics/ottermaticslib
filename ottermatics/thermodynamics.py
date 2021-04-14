@@ -1,5 +1,5 @@
 import attr
-from ottermatics.configuration import Configuration, otter_class
+from ottermatics.configuration import Configuration, otterize
 
 from CoolProp.CoolProp import PropsSI
 import CoolProp.CoolProp as CP
@@ -76,7 +76,7 @@ def fanning_friction_factor(Re,method='turbulent'):
         return fanning_friction_factor(Re,method='turbulent')
 
 #Simple Elements
-@otter_class
+@otterize
 class SimpleHeatExchanger(Configuration):
 
     Thi = attr.ib()
@@ -127,7 +127,7 @@ class SimpleHeatExchanger(Configuration):
 
 
 #Compression
-@otter_class
+@otterize
 class SimpleCompressor(Configuration):   
 
     pressure_ratio = attr.ib()
@@ -156,7 +156,7 @@ class SimpleCompressor(Configuration):
     def pressure_out(self,pressure_in):
         return self.pressure_ratio * pressure_in
 
-@otter_class
+@otterize
 class SimpleTurbine(Configuration):   
 
     Pout = attr.ib()

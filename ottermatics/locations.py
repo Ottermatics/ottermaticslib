@@ -2,6 +2,7 @@ import os, shutil, sys
 import re
 import pathlib
 from platform import system,uname
+from ottermatics.logging import LoggingMixin
 import logging
 
 '''
@@ -186,6 +187,7 @@ def main_cli():
         for folder_stub in PROJECT_FOLDER_OPTIONS[ args.type ]:
             log.info('Making Content Folder: {}'.format(folder_stub))
             os.mkdir( os.path.join(project_folder, folder_stub))
+
 
 if __name__ == '__main__':
     main_cli()

@@ -1,3 +1,16 @@
+import numpy, functools
+
+class inst_vectorize(numpy.vectorize):
+    def __get__(self, obj, objtype):
+        return functools.partial(self.__call__, obj)
+
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]   
+
+
+
 class Singleton:
     """
     A non-thread-safe helper class to ease implementing singletons.

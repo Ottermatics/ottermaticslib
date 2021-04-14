@@ -22,6 +22,7 @@ from os import sys
 
 from ottermatics.patterns import Singleton, SingletonMeta, singleton_meta_object
 from ottermatics.logging import LoggingMixin, set_all_loggers_to, is_ec2_instance
+from ottermatics.tabulation import * #This should be considered a module of data
 
 from contextlib import contextmanager
 
@@ -52,7 +53,6 @@ register_adapter(numpy.ndarray, addapt_numpy_array)
 
 DataBase = declarative_base()
 
-#@Singleton
 
 #@singleton_meta_object
 class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):

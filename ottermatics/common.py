@@ -11,6 +11,9 @@ from matplotlib.pylab import *
 
 import os,shutil,copy,traceback,collections,logging
 
+from typing import Callable, Iterator, Union, Optional, List
+
+
 import logging
 log = logging.getLogger('otterlib-init')
 log.setLevel(logging.WARNING)
