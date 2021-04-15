@@ -9,7 +9,7 @@ global PORT, PASS, USER, HOST, DB_NAME, CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT
 
 from matplotlib.pylab import *
 
-import os,shutil,copy,traceback,collections,logging
+import os,shutil,copy,traceback,collections,logging, subprocess
 
 from typing import Callable, Iterator, Union, Optional, List
 
@@ -42,10 +42,28 @@ def load_from_env(creds_path='./.creds/',env_file='env.sh',set_env=True):
                     key,val = line.replace('export','').split('=')
                     log.info('setting {}'.format(key))
                     os.environ[key.strip()]=val
+                    
         
         if set_env: os.environ['OTTER_CREDS_SET'] = 'yes'
     else:
         log.info('credientials already set') 
+
+
+def set_conda_from_env(creds_path='./.creds/',env_file='env.sh',set_env=True):
+    '''extracts export statements from bash file and aplies them to the python env'''
+    creds_path = os.path.join(creds_path,env_file)
+    log.info("checking {} for creds".format(creds_path))
+    if os.path.exists(creds_path):
+        log.info('creds found')
+        with open(creds_path,'r') as fp:
+            txt = fp.read()
+
+        lines = txt.split('\n')
+        for line in lines:
+            if line.startswith('export'):
+                key,val = line.replace('export','').split('=')
+                log.info('setting {}'.format(key))
+                subprocess.run(['conda','env','config','vars','set',f'{key.strip()}={val}'])
 
 load_from_env('./.creds/','env.sh',set_env=False)
 
@@ -116,3 +134,17 @@ r_electron = 2.8179403262E-15
 from ottermatics.configuration import *
 from ottermatics.logging import *
 from ottermatics.locations import *
+
+def main_cli():
+    import argparse
+
+    parser = argparse.ArgumentParser('Set Conda Envs')
+    parser.add_argument('-env',help='path to env.sh file')
+
+    args = parser.parse_args()
+
+    set_conda_from_env(os.path.dirname(args.env),os.path.basename(args.env))
+
+if __name__ == '__main__':
+    '''CLI To set Enviornmental Variables in Conda'''
+    main_cli()
