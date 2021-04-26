@@ -71,20 +71,20 @@ class ClientInfoMixin(LoggingMixin):
     #Sync Convenicne Functions
     def gsync_this_config(self,force = True):
         #Sync all local to google
-        od = OtterDrive.instance()
+        od = OtterDrive()
         od.sync_to_client_folder(force=force,sub_path=self.config_path_daily)
 
     def gsync_this_report(self,force = True):
         #Sync all local to google
-        od = OtterDrive.instance()
+        od = OtterDrive()
         od.sync_to_client_folder(force=force,sub_path=self.report_path_daily)
 
     def gsync_all_reports(self,force = True):
         #Sync all local to google
-        od = OtterDrive.instance()
+        od = OtterDrive()
         od.sync_to_client_folder(force=force,sub_path=self.report_path)
         
     def gsync_client_folder(self,force = True):
         #Sync all local to google
-        od = OtterDrive.instance()
+        od = OtterDrive()
         od.sync_to_client_folder(force=force,sub_path=self.client_folder_root)  

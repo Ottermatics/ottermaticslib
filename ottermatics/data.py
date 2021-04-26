@@ -109,26 +109,40 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         d['_cache'] = None #don't pickle file objects!
         return d
 
-    def set(self,key,data,retry=True,**kwargs):
+    def set(self,key,data,retry=True,ttl=2,**kwargs):
         '''Passes default arguments to set the key:data relationship
         :param expire: time in seconds to expire the data
         '''
-        with self.cache as ch:
-            ch.set(key,data,retry=retry,**kwargs)
+        try:        
+            with self.cache as ch:
+                ch.set(key,data,retry=retry,**kwargs)
+        except Exception as e:
+            ttl -= 1
+            if ttl > 0:
+                return self.set(key,data,retry=True,ttl=ttl)
+            else:
+                self.error(e,'Issue Getting Item From Cache')            
 
-    def get(self,key,on_missing=None,retry=True):
+    def get(self,key,on_missing=None,retry=True,ttl=2):
         '''Helper method to get an item, return None it doesn't exist and warn.
         :param on_missing: a callback to use if the data is missing, which will set the data at the key, and return it'''
-        with self.cache as ch:
-            if key in ch:
-                return self.cache.get(key,retry=retry)
+        try:
+            with self.cache as ch:
+                if key in ch:
+                    return self.cache.get(key,retry=retry)
+                else:
+                    if on_missing is not None:
+                        data = on_missing()
+                        self.set(key,data)
+                        return data
+                    self.warning('key {} not in cache'.format(key))
+            return None
+        except Exception as e:
+            ttl -= 1
+            if ttl > 0:
+                return self.get(key,on_missing,retry=True,ttl=ttl)
             else:
-                if on_missing is not None:
-                    data = on_missing()
-                    self.set(key,data)
-                    return data
-                self.warning('key {} not in cache'.format(key))
-        return None
+                self.error(e,'Issue Getting Item From Cache')
 
     def expire(self):
         '''wrapper for diskcache expire method that only permits expiration on a certain interval

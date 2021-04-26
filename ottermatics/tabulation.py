@@ -593,27 +593,48 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             filepath = os.path.join(self.config_path_daily,filename)
             dataframe.to_excel(path_or_buf=filepath,*args,**kwargs)
 
-    def save_gsheets(self,dataframe,filename=None,*args,**kwargs):
+    def save_gsheets(self,dataframe,filename=None,retry=True,ttl=3,*args,**kwargs):
         '''A function to save the table to google sheets
         :param filename: the filepath on google drive - be careful!
         '''
-        od = OtterDrive.instance()
-        
+        self.od = od = OtterDrive()
+        try:
+            gpath, pth_id = self.enable_cloud_sync()
+            self.info(f'saving as gsheets in dir {self.config_path_daily} -> {gpath}')
+
+            
+            sht = od.gsheets.create(filename,folder=pth_id)
+            
+            wk = sht.sheet1
+            wk.set_dataframe(dataframe,start='A1')
+
+            #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
+            self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
+
+        except Exception as e:
+            ttl -= 1
+            
+            if retry and ttl > 0:
+                self.warning(f'encountered error saving gsheets, retrying')
+                self.od.sleep()
+                self.save_gsheets(dataframe,filename,retry=True,ttl=ttl)
+            
+            else:
+                self.error(e,'error saving gsheets')
+
+            
+            
+
+    def enable_cloud_sync(self):
+        '''Ensure configuration's daily path is created'''
+        self.info('enabling cloud sync')
+        self.od = od = OtterDrive()
         filepath = self.config_path_daily
-
-        self.info('saving as gsheets in dir {}'.format(filepath))
-
         gpath = od.sync_path(filepath)
 
         od.ensure_g_path_get_id(gpath)
         pth_id = od.folder_cache[gpath]
-
-        sht = od.gsheets.create(filename,folder=pth_id)
-        wk = sht.sheet1
-        wk.set_dataframe(dataframe,start='A1')
-
-        self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
-
+        return gpath, pth_id
         
     @property
     def store_level(self):
