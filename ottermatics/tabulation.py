@@ -602,9 +602,10 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             gpath, pth_id = self.enable_cloud_sync()
             self.info(f'saving as gsheets in dir {self.config_path_daily} -> {gpath}')
 
-            
             sht = od.gsheets.create(filename,folder=pth_id)
             
+            od.cache_directory(pth_id)
+
             wk = sht.sheet1
             wk.set_dataframe(dataframe,start='A1')
 

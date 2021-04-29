@@ -85,7 +85,7 @@ def set_conda_from_env(creds_path='./.creds/',env_file='env.sh',set_env=True):
                 log.info('setting {}'.format(key))
                 subprocess.run(['conda','env','config','vars','set',f'{key.strip()}={val}'])
 
-load_from_env('./.creds/','env.sh',set_env=False)
+#load_from_env('./.creds/','env.sh',set_env=False)
 
 CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME,SLACK_WEBHOOK_NOTIFICATION = None,None,None,None,None
 
@@ -96,12 +96,16 @@ USER = 'postgres'
 PASS = 'dumbpass'
 DB_NAME = 'dumbdb'
 
+DEFAULT_GDRIVE = "shared:OTTERBOX"
+
 if 'CLIENT_GDRIVE_PATH' in os.environ:
     log.info('got CLIENT_GDRIVE_PATH')
     CLIENT_G_DRIVE = os.environ['CLIENT_GDRIVE_PATH']
+else:
+    CLIENT_G_DRIVE = DEFAULT_GDRIVE
 
-if 'CLEINT_GDRIVE_SYNC' in os.environ:
-    log.info('got CLEINT_GDRIVE_SYNC')
+if 'CLIENT_GDRIVE_SYNC' in os.environ:
+    log.info('got CLIENT_GDRIVE_SYNC')
     CLIENT_GDRIVE_SYNC = bool_from_env(os.environ['CLIENT_GDRIVE_SYNC'])
 
 if 'CLIENT_GMAIL' in os.environ:
@@ -111,9 +115,6 @@ if 'CLIENT_GMAIL' in os.environ:
 if 'CLIENT_NAME' in os.environ:
     log.info('got CLIENT_NAME')
     CLIENT_NAME = os.environ['CLIENT_NAME'] 
-    if CLIENT_G_DRIVE is None:
-        log.info('setting CLIENT_G_DRIVE')
-        CLIENT_G_DRIVE = os.path.join('ClientFolders',CLIENT_NAME)
 
 if 'DB_NAME' in os.environ:
     DB_NAME = os.environ['DB_NAME']

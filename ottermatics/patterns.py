@@ -52,8 +52,6 @@ class Singleton:
         return isinstance(inst, self._decorated)
 
 
-
-#These are not working  vvvvvv
 class SingletonMeta(type):
     """Metaclass for singletons. Any instantiation of a Singleton class yields
     the exact same object, e.g.:
@@ -79,6 +77,37 @@ class SingletonMeta(type):
             return True
         else:
             return isinstance(instance.__class__, mcs)
+
+class InputSingletonMeta(type):
+    """Metaclass for singletons. Any instantiation of a Singleton class yields
+    the exact same object, for the same given input, e.g.:
+
+    >>> class MyClass(metaclass=Singleton):
+            pass
+    >>> a = MyClass(input='same')
+    >>> b = MyClass(input='diff')
+    >>> a is b
+    False
+    """
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        keyarg = {'class':cls,'args':args,**kwargs}
+        keyarg['class'] = cls
+        keyarg['args'] = args
+        key = frozenset(keyarg.items())
+        if key not in cls._instances:
+            #print(f'creating new {keyarg}')
+            cls._instances[key] = super(InputSingletonMeta, cls).__call__(*args,
+                                                                **kwargs)
+        return cls._instances[key]
+
+    @classmethod
+    def __instancecheck__(mcs, instance):
+        if instance.__class__ is mcs:
+            return True
+        else:
+            return isinstance(instance.__class__, mcs)            
 
 def singleton_meta_object(cls):
     """Class decorator that transforms (and replaces) a class definition (which
@@ -111,49 +140,6 @@ import numpy
 import os
 import logging
 import arrow, datetime
-
-
-log = logging.getLogger('neptunya-common')
-
-#DB Name
-DB_NAME = 'neptunya_ocean_data'
-
-#SLACK_WEBHOOK
-if 'SLACK_WEBHOOK_NOTIFICATION' in os.environ:
-    log.info('Getting Slack Webhook ID')
-    SLACK_WEBHOOK_NOTIFICATION = os.environ['SLACK_WEBHOOK_NOTIFICATION']
-else:
-    log.info('Default Slack Webhook')
-    SLACK_WEBHOOK_NOTIFICATION = 'http://hooks.slack.com/services/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'
-
-#Global Grid which is sacred
-#Thou Shalt Not Touch
-MIN_RESOLUTION = 0.25 #30 NM (some source are 0.25deg or 15nm)
-GLOBAL_LATS = numpy.arange(-89.875,90,MIN_RESOLUTION)
-GLOBAL_LONS = numpy.arange(-179.875,180,MIN_RESOLUTION)
-GGLON,GGLAT = GLOBAL_GRID = numpy.meshgrid( GLOBAL_LONS, GLOBAL_LATS)
-
-WEATHER_EARLIEST = 	arrow.get('2018-07-15').to('UTC') #This is when we can get current data
-WEATHER_LATEST   = 	arrow.utcnow()
-
-LOG_LEVEL = logging.INFO
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 #TODO: Move to ray-util
