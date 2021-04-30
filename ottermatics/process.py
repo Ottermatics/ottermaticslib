@@ -233,7 +233,7 @@ class RemoteProcess(pb.Referenceable,LoggingMixin):
     @classmethod
     def run_remote_client(cls,t=TRAN,h=HOST,p=PORT):
 
-        start_system_logging()
+        #start_system_logging()
                 
         factory = pb.PBClientFactory()
 
@@ -269,7 +269,7 @@ if __name__ == '__main__': #Python Approach
     parser.add_argument("--tran","-t", default = TRAN)    
     parser.add_argument("--role",'-r' ,default='manager',choices = ["manager", "remote"])
 
-    start_system_logging()
+    #start_system_logging()
 
     args = parser.parse_args()
 

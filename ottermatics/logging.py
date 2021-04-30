@@ -104,7 +104,7 @@ class LoggingMixin(logging.Filter):
     log_on = True
     gelf = None
 
-    log_fmt = "[%(namespace)-24s]%(message)s"
+    log_fmt = "[%(name)-24s]%(message)s"
     log_silo = False
 
     @property
@@ -114,15 +114,15 @@ class LoggingMixin(logging.Filter):
             self._log = logging.getLogger('otterlog_' +self.identity)
             self._log.setLevel(level = LOG_LEVEL)
             
+            #Apply Filter Info
+            self._log.addFilter(self)
+
             #Eliminate Outside Logging Interaction
             if self.log_silo:
                 self._log.handlers = []
                 self._log.propagate = False
                 self.installSTDLogger()
                 #self.installGELFLogger()
-
-            #Apply Filter Info
-            self._log.addFilter(self)
 
         return self._log
 
@@ -149,7 +149,7 @@ class LoggingMixin(logging.Filter):
     def filter(self, record):
         '''This acts as the interface for `logging.Filter`
         Don't overwrite this, use `add_fields` instead.'''
-        record.namespace = self.identity.lower()
+        record.name = self.identity.lower()
         self.add_fields(record)
         return True
 
