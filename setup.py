@@ -28,7 +28,7 @@ setup(name='ottermatics',
                 # command = package.module:function
                 'condaenvset=ottermatics.common:main_cli',
                 'ollymakes=ottermatics.locations:main_cli',
-                'otterdrive=ottermatics.locations:main_cli'
+                'otterdrive=ottermatics.gdocs:main_cli'
             ]
       },
       zip_safe=False)

@@ -16,7 +16,7 @@ import pydrive2
 import traceback
 import pathlib
 import googleapiclient
-
+import functools
 from pydrive2.auth import GoogleAuth, ServiceAccountCredentials
 from pydrive2.drive import GoogleDrive
 import time
@@ -64,7 +64,16 @@ class FileNode(LoggingMixin):
 
         if self._item.http is not None:
             for c in self._item.http.connections.values():
-                c.close()        
+                c.close()
+
+        if not threading.main_thread(): #save some time yo!
+            try:
+                if self in self.drive.item_cache:
+                    self.absolute_path
+
+            except Exception as e:
+                self.error(e,f'Issue caching path for {self.identity}')
+
 
     @property
     def id(self):
@@ -96,13 +105,13 @@ class FileNode(LoggingMixin):
 
     @property
     def parents(self):
-        with self.filesystem as fs:
-            return [self.drive.item_nodes[key] for key in list(fs.predecessors(self))]
+        #with self.filesystem as fs:
+        return [self.drive.item_nodes[key] for key in list(self._drive._filesystem.predecessors(self))]
 
     @property
     def contents(self):
-        with self.filesystem as fs:
-            return [self.drive.item_nodes[key] for key in list(fs.neighbors(self))]   
+        #with self.filesystem as fs:
+        return [self.drive.item_nodes[key] for key in list(self._drive._filesystem.neighbors(self))]   
 
     @property
     def listed_parents(self):
@@ -229,10 +238,19 @@ class FileNode(LoggingMixin):
             self.error(e)
         return None
 
+    
+    @property
+    def parents_path(self):
+        #WIP: this should be faster
+        for parent in self.parents:
+            return parent.parents_path + [self.id]
+        else:
+            return [self.id]
+
     @property
     def absolute_path(self):
         if self._absolute_path is None:
-            npath = self.best_nodeid_path
+            npath = self.best_nodeid_path #self.best_nodeid_path
             if npath:
                 self._absolute_path = os.path.join(*[self.drive.item_nodes[itdd].title for itdd in npath])
         
@@ -247,12 +265,11 @@ class FileNode(LoggingMixin):
 
     def delete(self):
         if not self.is_protected and not self.drive.dry_run:
-            with self.rate_limit_manager(self.delete,gfileMeta=self.item):
-                with self.filesystem as fs:
-                    self.debug(f'deleting: {self.title}')                
-                    self.item.Trash()
-                    self.sleep()
-                    self.drive.removeNode(self)
+            with self.drive.rate_limit_manager(self.delete,gfileMeta=self.item):
+                self.info(f'deleting: {self.title}')                
+                self.item.Trash()
+                self.drive.sleep()
+                self.drive.removeNode(self)
         else:
             if self.is_protected:
                 self.debug(f'could not delete protected {self.title} ')
@@ -277,8 +294,6 @@ class FileNode(LoggingMixin):
 
     def __repr__(self):
         return f'FileNode({self.id}|{self.title})'
-
-
 
 class RootNode(FileNode):
     '''A wrapper for shared drive objects to work in a graph and store conveinence functions'''
@@ -349,14 +364,10 @@ class RootNode(FileNode):
         return self.title
 
 
-
-
-
-
-
-
-
-
+default_timestamp = 1577858461 #jan 1 2020
+timestamp_divider = (24 * 3600) #a day in seconds
+newness = lambda item: (item.createdDate.timestamp() - default_timestamp)/ timestamp_divider
+content_size = lambda item: len(item.contents)
 
 #@Singleton
 class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
@@ -393,10 +404,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     _sync_root_id = None #For Shared Drive Root
     _target_folder_id = None #For Sync Path
 
-    max_sleep_time = 10.0
-    min_sleep_time = 0.1
-    _sleep_time = 0.2
+    call_count = 0 #updated every sleep()
+    max_sleep_time = 5.0
+    _sleep_time = 0.75
     time_fuzz = 2.0 #base * ( 1+ rand(0,time_fuzz))
+    thread_time_multiplier = 1.0
 
     #Default is most permissive
     explict_input_only = False
@@ -404,7 +416,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     #Thread Pool
     use_threadpool = True
-    _max_num_threads = 40
+    _max_num_threads = 12
 
     #defaults
     default_shared_drive = 'shared:OTTERBOX'
@@ -420,7 +432,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     fast_cache = None #To handle expensive graph calls
 
-    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False):
+
+
+    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 12, use_threadpool=True):
         '''
         :param shared_drive: share drive to use as a root directory
         :param sync_root: the relative directory from shared_drive root to the place where sync occurs
@@ -432,7 +446,12 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #We're gonna use this to store graph information, aka dynamic programming
         #self.fast_cache = ExpiringDict(max_age_seconds=5)
 
+        self.use_threadpool = use_threadpool
+        self._max_num_threads = num_workers
+
+
         #This is to guard access across threads to the filesystem networkx, which is not threadsafe
+        #TODO: load graph from disk if exists
         self.net_lock = threading.RLock() 
         self._filesystem = nx.DiGraph()
         
@@ -465,12 +484,12 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         self.initalize()
 
-
     @property
     @contextmanager
     def filesystem(self):
         if self.use_threadpool: self.net_lock.acquire()
         try:
+            #TODO: add a saving mechanism on disk overtime
             yield self._filesystem
         except Exception as e:
             self.error(e,'Error Accessing Filesystem')
@@ -489,8 +508,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Initalization Methods
     def initalize(self):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
-        self.info('Initalizing')
-        
+        self.info(f'Initalizing from {self.filepath_root}')
+        self.thread_time_multiplier = 2.0
         gpath = self.sync_path(self.filepath_root)
 
         #First level is protected!
@@ -510,6 +529,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6)) 
 
         self.status_message('Otterdrive Ready For Use')
+        self.thread_time_multiplier = 2.0
 
     def status_message(self,header=''):
         self.info(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
@@ -610,7 +630,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self._shared_drives = output
         return output
 
-    def sync_folder_contents_locally(self,parent_id,stop_when_found=None,recursive=False,ttl=1,protect=False,pool=None, already_cached = None):
+    def sync_folder_contents_locally(self,parent_id,stop_when_found=None,recursive=False,ttl=1,protect=False,pool=None, already_cached = None, top=True):
         '''This function takes a parent id for a folder then caches everything to folder / file caches
         Recrusvie functionality with recursive=True and ttl > 0'''
         #Update Subdirectories - more efficient all at once
@@ -622,9 +642,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         if protect: self.protected_ids.add(parent_id)
 
         if pool is None and self.use_threadpool:
+            if top: self.info('GET DRIVE INFO USING THREADS!!!')
             pool = ThreadPoolExecutor(max_workers=self.num_threads)
             pool_set_here = True
         else:
+            if top: self.info('GET DRIVE INFO SINGLE THREAD')
             pool = None
             pool_set_here = False
 
@@ -633,7 +655,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         try:
             #This caches it for us through seach_item(), and hopefully removes  duplicates
-            for item in self.all_in_folder(parent_id): 
+            items = list(self.all_in_folder(parent_id))
+            for item in items:
+                self.sleep()
                 if stop_when_found is not None and item.id == stop_when_found:
                     if not stop:
                         stop = True
@@ -643,22 +667,28 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                         #TODO: handle duplicates
 
                 if item.is_folder: #if it had contents it was already cached!!
+                    
                     if recursive and not stop: 
                         ttl -= 1
                         if ttl == 0:
                             if pool is not None:
                                 if item.id not in already_cached:
+                                    self.sleep()
                                     already_cached.add(item.id)
-                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached)
+                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
                             else:
-                                self.sync_folder_contents_locally(item.id,recursive=False,ttl=ttl,protect=protect)
+                                self.sync_folder_contents_locally(item.id,recursive=False,ttl=ttl,protect=protect, top=False)
+
                         elif ttl > 0:
                             if pool is not None:
                                 if item.id not in already_cached:
-                                    already_cached.add(item.id)                            
-                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached)
+                                    self.sleep()
+                                    already_cached.add(item.id)
+                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
                             else:                        
-                                self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect)
+                                self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect, top=False)
+                
+
         except Exception as e:
             self.error(e,'Issue Syncing Locally')
         finally:
@@ -691,6 +721,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             if err.resp.status in [403]:
                 self.hit_rate_limit()
                 return retry_function(*args,**kwargs)
+            if err.resp.status in [500]:
+                self.sleep(30.0) #back da fuq off
+                self.hit_rate_limit()
+                return retry_function(*args,**kwargs)                
             else:
                 self.error(err,'Google API Error')
 
@@ -761,35 +795,50 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.cache_directory(parent_id)
 
         for i, (dirpath, dirnames, dirfiles) in enumerate(os.walk(self.filepath_root)):
+
+                #we will modify dirnames in place to eliminate options for walking
                 self.debug('looping through directory {}'.format(dirpath))
                 #Handle File Sync Ignores
-                any_hidden = any([ pth.startswith('.') or pth.startswith('_') for pth in dirpath.split(os.sep)])
+                hidden = [ pth.startswith('.') or pth.startswith('_') for pth in dirpath.split(os.sep)]
+                any_hidden = any(hidden)
                 if any_hidden:
+                    for item in hidden:
+                        if item in dirnames:
+                            dirnames.pop( dirnames.index(item) )
+
                     continue
 
                 if '.skip_gsync' in dirfiles or '.skip_gsync' in dirnames:
                     #self.debug('skipping {}'.format(dirpath))
+                    dirnames = [] #just completely over it
                     skipped_paths.append(dirpath)
                     continue
 
                 if any([os.path.commonpath([dirpath,spath]) == os.path.commonpath([spath]) \
                                                                         for spath in skipped_paths]):
+                    dirnames = [] #just completely over it
                     #self.debug('skipping {}'.format(dirpath))
                     continue
                 
-
+                self.info(f'checking files in  {dirpath}')
+                gfypathfile = lambda fil:  self.sync_path(os.path.realpath(os.path.join(dirpath,fil)))
+                        
                 file_paths = self.file_paths
-                for fil in dirfiles:
-                    self.debug('checking file {}'.format(fil))
-                    filpath = os.path.realpath(os.path.join(dirpath,fil))
-                    gdrive_path = self.sync_path(filpath)
+                #Check if they already exist and we're skipping existing
 
-                    if gdrive_path in file_paths and skip_existing:
-                        self.debug('skipping {}'.format(gdrive_path))
-                        continue
-                    
-                    self.debug('new file to create! {}'.format(gdrive_path))
-                    yield filpath , gdrive_path
+                if not all([gfypathfile(fil) in file_paths for fil in dirfiles ]) or not skip_existing:
+
+                    for fil in dirfiles:
+                        self.debug('checking file {}'.format(fil))
+                        filpath = os.path.realpath(os.path.join(dirpath,fil))
+                        gdrive_path = gfypathfile(fil)
+
+                        if gdrive_path in self.file_paths and skip_existing: #update file paths if work to be done 
+                            self.debug('skipping {}'.format(gdrive_path))
+                            continue
+                        
+                        self.debug('new file to create! {}'.format(gdrive_path))
+                        yield filpath , gdrive_path
                             
     def sync(self,force=False):
         '''
@@ -809,68 +858,48 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if not self.use_threadpool:
                     self.info('SYNCING WITH SINGLE THREAD...')
                     for lpath, gpath in self.generate_sync_filepath_pairs(skip_existing= not force):
-                        item_paths = self.item_paths
-                        if gpath not in item_paths or force:
+                        if gpath not in self.item_paths or force:
                             dirname =  os.path.dirname(gpath)
-                            if dirname not in item_paths:
+                            if dirname not in self.item_paths:
                                 parent_id = self.ensure_g_path_get_id(dirname) #Prevent duplicates!!!
                             else:
-                                parent_id = self.get_gpath_item(dirname).id
+                                parent_id = self.get_gpath_id(dirname)
                             
                             
 
                             self.sync_path_pair_single(lpath,gpath)
 
                         else:
-                            if gpath in item_paths: self.debug( 'found existing {}'.format(gpath) )
+                            if gpath in self.item_paths: self.debug( 'found existing {}'.format(gpath) )
                 
                 else:
-                    self.info('SYNCING WITH THREADPOOL...')
                     
-                    dirs_sent = {} #add when you encounter a new dir!, then send off the request
-
-                    def thread_iter(iterable):
-                        files_delayed = []
-
-                        with ThreadPoolExecutor(max_workers=self.num_threads) as pool:
-                            for lpath, gpath in iterable:
-                                item_paths = self.item_paths
-                                dirname =  os.path.dirname(gpath)
-
-                                in_dirs_sent = any([ key.startswith(dirname) in key for key in dirs_sent.keys() ])
-                                
-                                #Send a get thread job if its the first time we encounter a dirname
-                                if dirname not in item_paths and in_dirs_sent: 
-                                    self.debug(f'ensuring {dir}')
-                                    dirs_sent[dirname] = pool.submit(self.ensure_g_path_get_id,dirname) 
-
-                                elif in_dirs_sent and dirname not in item_paths:
-                                    self.info(f'delaying execution for {dirname}')
-                                    files_delayed.append((lpath,gpath))
-                                else:
-                                    parent_id = self.get_gpath_item(dirname).id
-
-                                if gpath not in item_paths or force:
-                                    #OK to upload!
-                                    pool.submit(self.sync_path_pair_thread,lpath,gpath,parent_id)
-                                else:
-                                    if gpath in item_paths: self.debug( 'found existing {}'.format(gpath) )
+                    self.info('SYNCING WITH THREADPOOL...')
+                    self.thread_time_multiplier = 1.0 #ensure its normal
+                    # #Conventional way make folders if they don't exist
+                    submitted_set = set()
+                    with ThreadPoolExecutor(max_workers=self.num_threads) as pool:
                         
-                        pool.shutdown()
 
-                        return files_delayed
+                        for lpath, gpath in self.generate_sync_filepath_pairs(skip_existing= not force):
+
+                            dirname =  os.path.dirname(gpath)
 
 
 
-                    self.info('Pre-processing paths')
-                    complete_pairs_list = list(self.generate_sync_filepath_pairs())
+                            if dirname not in self.item_paths:
+                                parent_id = self.ensure_g_path_get_id(dirname) #Prevent duplicates, by holding threads!!!
+                            else:
+                                parent_id = self.get_gpath_id(dirname)
+                            
 
-                    run_list = complete_pairs_list
-                    while run_list: #Go until there arent anythings left!
-                        run_list = thread_iter( complete_pairs_list )
+                            if any((gpath not in self.item_paths , force)) and gpath not in submitted_set:
+                                submitted_set.add(gpath)
+                                pool.submit(self.sync_path_pair_thread,lpath,gpath,parent_id)
+                            else:
+                                if gpath in self.item_paths: self.debug( 'found existing {}'.format(gpath) )
+                    self.thread_time_multiplier = 1.0
 
-            else:
-                self.status_message('Not Ready!!!')
 
         except Exception as e:
             self.error(e,'ISSUE SYNCING!')
@@ -880,20 +909,34 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def sync_path_pair_single(self,filepath,syncpath):
         try:
-            self.debug(f'syncing paths {filepath} -> {syncpath}')
             gdirpath = os.path.dirname( syncpath )
             par_id = self.ensure_g_path_get_id( gdirpath)
-            self.upload_or_update_file(par_id,file_path=filepath)    
-            self.cache_directory(parent_id)
+            
+            if syncpath in self.item_paths:
+                self.debug(f'updating {filepath} -> {syncpath}')
+                fid = self.get_gpath_id(syncpath)
+                self.upload_or_update_file(parent_id,file_path=filepath, file_id = fid)
+                self.cache_directory(parent_id)
+            else:
+                self.debug(f'uploading {filepath} -> {syncpath}')
+                self.upload_or_update_file(par_id,file_path=filepath)    
+                self.cache_directory(parent_id)
 
         except Exception as e:
             self.error(e,'Error Syncing Path ')    
 
     def sync_path_pair_thread(self,filepath,syncpath,parent_id=None):
         try:
-            self.debug(f'syncing paths {filepath} -> {syncpath}')
-            self.upload_or_update_file(parent_id,file_path=filepath)    
-            self.cache_directory(parent_id)
+           
+            if syncpath in self.item_paths:
+                self.debug(f'updating {filepath} -> {syncpath}')
+                fid = self.get_gpath_id(syncpath)
+                self.upload_or_update_file(parent_id,file_path=filepath, file_id = fid)
+                self.cache_directory(parent_id)
+            else:
+                self.debug(f'uploading {filepath} -> {syncpath}')
+                self.upload_or_update_file(parent_id,file_path=filepath)    
+                self.cache_directory(parent_id)
         except Exception as e:
             self.error(e,'Error Syncing Path ')
 
@@ -915,14 +958,16 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         with self.rate_limit_manager(self.create_file,input_args,file_path,content):
             if not self.dry_run and any((file_path is not None, content is not None )):
                 
+                action = 'creating' if 'id' not in input_args else 'updating'
+
                 if content is not None:
                     gfile_path = file_path #Direct conversion, we have to input correctly
                     if isinstance( content, (str,unicode)):
-                        self.info(f'creating file with content string {input_args} -> {gfile_path}')
+                        self.info(f'{action} file with content string {input_args} -> {gfile_path}')
                         file.SetContentString(content)
                         self.sleep()
                     else:
-                        self.info(f'creating file with content bytes {input_args} -> {gfile_path}')
+                        self.info(f'{action} file with content bytes {input_args} -> {gfile_path}')
                         file.content = content
                     
 
@@ -931,7 +976,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     file_name = os.path.basename(file_path)
                     gfile_path = self.sync_path(file_path)    
 
-                    self.info(f'creating file with args {input_args} -> {gfile_path}')
+                    self.info(f'{action} file with args {input_args} -> {gfile_path}')
                     file.SetContentFile(file_path)
                     self.sleep()
 
@@ -978,15 +1023,15 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                                         file_path=file_path )
                 return fil        
 
-            elif gfile_path in self.file_cache:
+            elif gfile_path in self.file_paths:
                 self.debug( 'updating file {}->{}'.format(parent_id,gfile_path) )
 
-                fil = self.create_file( {"id": self.file_cache[gfile_path], 'parents': [{'id': parent_id }]} ,
+                fil = self.create_file( {"id": self.get_gpath_id(gfile_path), 'parents': [{'id': parent_id }]} ,
                                         file_path=file_path )
                 return fil            
 
             else:
-                self.debug( 'creating file {}->{}'.format(file_path,file_path) )
+                self.debug( 'creating file {}->{}'.format(file_path,gfile_path) )
                 fil = self.create_file( {"title":file_name,'parents': [{'id': parent_id }]} ,
                                         file_path=file_path )
                 return fil
@@ -996,9 +1041,6 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
             if file_id is not None:
                 
-                if file_id in self.reverse_file_cache:
-                    file_path = self.reverse_file_cache[ file_id ]
-
                 self.debug( 'updating file w/ content id:{} par:{}'.format(file_id, parent_id) )
                 fil = self.create_file( {"id": file_id, 'parents': [{'id': parent_id }]} ,
                                         file_path = file_path, content=content ) #Add file_path for the caching portion
@@ -1059,14 +1101,24 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         else:
             override = False
 
-        #Why don't we just refresh this guy
-        folders_in_path =  self.dict_by_title(self.folders_in_folder(parent_id))
+        #Refresh parent
+        self.cache_directory(parent_id)
+        assert parent_id in self.item_nodes
+
+        parent_dir = self.item_nodes[parent_id]
+        assert parent_dir.is_folder
+
+        #We only know the file 
+        parent_folders = [item.title for item in parent_dir.contents]
+        assert len(parent_folders) == len(set(parent_folders))
+        parent_items = {item.title:item for item in parent_dir.contents}
+
 
         protect_name = not folder_name in self.protected_filenames
         
-        self.debug('found folder in parent {}: {}'.format(parent_id,folders_in_path.keys()))
+        self.debug('found folder in parent {}: {}'.format(parent_id,parent_folders))
 
-        if folder_name not in folders_in_path.keys(): #Create It
+        if folder_name not in parent_folders: #Create It
             
             self.debug( f'creating {parent_id}->{folder_name}' )
             fol = self.create_folder({'title': folder_name, 
@@ -1077,124 +1129,202 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         else: #Grab It
             
             self.debug('found folder {} in parent {}'.format(folder_name,parent_id))
-            fol = folders_in_path[folder_name]
-            return self.cache_item(fol)
+            return parent_items[folder_name]
 
-    def copy_file(self, origin_id, target_id = None, create_filename=None, parent_id = None):
-        self.debug(f'copy file: {origin_id}, {target_id}, {create_filename}, {parent_id} ')
+    #Duplicate Handiling
+    @property
+    def duplicates_exist(self):
+        '''check if the number of paths is equal to the unique number of paths'''
+        self.info('checking duplicates...')
+        #TODO: Speed This Up, top down tree with parent caching, or try parallel processing. 
+
+        paths = self.file_paths
+        spaths = set(paths)
+        duplicates_exist = not (len(paths) == len(spaths))
+        if duplicates_exist: 
+            self.info('DUPLICATES EXIST!!')
+        else:
+            self.info('no duplicates found :)')
+        return duplicates_exist
+
+    def identify_duplicates(self):
+        '''we want to get a list of items which are duplicates, this doesnt determine if we should keep them'''
+        items = set()
+        duplicates = {}
+        for node in self.item_nodes.values():
+            abspath = node.absolute_path
+            if abspath in items:
+                self.debug(f'Duplicate {abspath}')
+                duplicates[node.id] = node
+            else:
+                items.add(abspath)
+        return duplicates     
+
+    def group_duplicate_pairs(self, duplicate_paths_identified):
+        '''Groups sets of items per our intended unique path, we'll later select which to keep and which to remove'''
+
+        self.info('checking for duplicates...')
+        duplicates_fols = {} #path: [it1,it2...]
+        duplicates_fil_sets = {} #path: [it1,it2...]
+
+        if duplicate_paths_identified:
+            self.info(f'duplicate paths identified {len(duplicate_paths_identified)}')
+            
+            files,folders = {},{}
+            for mtch_id, mtch in duplicate_paths_identified.items():
+                if mtch.is_folder:
+                    folders[mtch_id] = mtch
+                elif mtch.is_file:
+                    files[mtch_id] = mtch
+
+            #Get duplicate folder items
+            dup_paths = []
+            for fid, fol in folders.items():
+                dup_paths.append(fol.absolute_path)
+
+            
+            for iid, fil in self.folder_nodes.items():
+                if any([ folpath == fil.absolute_path for folpath in dup_paths]):
+                    if fil.absolute_path in duplicates_fols:
+                        duplicates_fols[fil.absolute_path].append(fil)
+                    else:
+                        duplicates_fols[fil.absolute_path] = [fil]
+
+            #This identifies which items exist not in duplicate folders
+            file_duplicates = {mtch_id:mtch for mtch_id, mtch in files.items() if not any([self.path_contains( fol.absolute_path, mtch.absolute_path) for fid,fol in folders.items()])}
+            
+            self.info(f'num file issues: {len(file_duplicates)}')
+
+            #Find items that exist in identified duplicate folders
+            #Unessicary since we can just use the graph to determine these!
+            # duplicates_fol_items = {} #path: [it1,it2...]
+
+            # for iid, fil in self.file_nodes.items():
+            #     if any([ self.path_contains(folpath, fil.absolute_path) for folpath in dup_paths]):
+            #         if fil.absolute_path in duplicates_fol_items:
+            #             duplicates_fol_items[fil.absolute_path].append(fil)
+            #         else:
+            #             duplicates_fol_items[fil.absolute_path] = [fil]
+            
+            
+            #Find items that exist only as pure duplicates
+            
+            oked_paths = set()
+
+            duplicate_file_paths = set([ sfil.absolute_path for sid,sfil in file_duplicates.items()])
+            for iid, fil in self.file_nodes.items():
+                if fil.absolute_path in oked_paths:
+                    continue
+                if fil.absolute_path in duplicates_fil_sets:
+                    duplicates_fil_sets[fil.absolute_path].append(fil)
+                else:
+                    if fil.absolute_path in duplicate_file_paths:
+                        duplicates_fil_sets[fil.absolute_path] = [fil]    
+                    else:
+                        oked_paths.add(fil.absolute_path)
+
+            self.info(f'duplicate files paths to fix: {len(duplicate_file_paths)}')
+
+            check_fol_fil_intersection = {path:mtch for path, mtch in duplicates_fil_sets.items() if any([self.path_contains( folpath, path) for folpath in dup_paths]) }
+            
+            assert len(check_fol_fil_intersection) == 0
+            self.info(f'looks ok, proceeding')
+
+        return   duplicates_fols, duplicates_fil_sets
+
+    def remove_duplicates(self):
+        self.info('REMOVING DUPLICATES!!')
+        
+        self.sleep(2)
+
+        duplicate_paths_identified = self.identify_duplicates()
+
+        duplicates_fols, duplicates_fil_sets = self.group_duplicate_pairs(duplicate_paths_identified)
+        #Proceed with work
+        self.process_duplicates(duplicates_fols, duplicates_fil_sets)
+
+    def process_duplicates(self,duplicate_folder_groups , duplicate_file_groups):
+            '''evaluates a set of duplicates and adjusts the fileystem as nessicary, the files and folders input should have no interaction'''
+
+
+            self.delete_duplicate_items(duplicate_file_groups)
+            self.delete_duplicate_folders(duplicate_folder_groups)
+            
+    def delete_duplicate_items(self,item_dict):
+
+        self.info(f'DELETING {len(item_dict)} ITEMS')
+        
+        pool = None
+        if self.use_threadpool:
+            pool = ThreadPoolExecutor(max_workers=self.num_threads)
 
         try:
-            assert not any((all( (target_id is None, create_filename is None)) , parent_id is None))
+            #First we want to delete the duplicate files since thats easy
+            for fpath, items in item_dict.items():
+                group = [{'it':item,'new':newness(item)}  for i,item in enumerate(items)]
+                order_items = sorted(group, key=lambda itd: itd['new'])
+                keep = order_items[0]['it']
+                discard = order_items[1:]
                 
-            origin_file = self.create_file({'id' : origin_id })
-            
-            if origin_file is not None and 'mimeType' in origin_file and origin_file['mimeType'] == 'text/plain':
-                #We can version plain text!
-                content = origin_file.GetContentString()
-
-                if origin_file is not None and origin_file.http is not None:
-                    for c in origin_file.http.connections.values():
-                        c.close()                
-            else:
-                return None
-                #TODO: Somehow Version Non Plain Text Files
-                #origin_file.FetchContent()
-                #content = origin_file.content
-
-            self.sleep()
-
-            if target_id is not None: #We know origin and target, good to go!
-                #We're just getting the reference!
-                target_file = self.upload_or_update_file( parent_id, file_id = target_id, content= content)
-                return target_file
-
-            elif create_filename is not None:
-                target_file = self.upload_or_update_file( parent_id , file_path  =create_filename , content= content )
-                return target_file
+                self.debug(f'keeping {keep}, removing {discard} for {fpath}')
+                for remove in discard:
+                    item = remove['it']
+                    if pool is not None:
+                        pool.submit(item.delete)
+                    else:
+                        item.delete()
 
         except Exception as e:
-            self.error(e,f'Could not copy file  {origin_id}, {target_id}, {create_filename}, {parent_id}')
+            self.error(e,'Issue deleting duplicates')
+        finally:
+            if pool is not None:
+                pool.shutdown()   
 
-    def merge_folder(self, target_id, origin_id):
-        '''NOT READY: Use to map origin to target'''
-        
-        self.debug(f'merge_folder: {origin_id}, {target_id}')
+    def delete_duplicate_folders(self,item_dict):
 
-        target_files = self.cache_directory(target_id) #This will take care of duplicates in target folder via search
-        other_files = self.cache_directory(origin_id) #This will take care of duplicates in other folder via search
-        target_titles = { tar['title']:tar['id'] for tar in target_files }
+        def score_folders_suggest_action(items):
+            '''Score size x newness by days from jan1st 2020 if content, otherwise just by date'''
+            assert all([it.is_folder for it in items])
 
-        for ofil in other_files:
-            otitle = ofil['title']
-            oid = ofil['id']
-            if self.is_folder(ofil):
-                fol_id = self.get_or_create_folder( otitle ,parent_id = target_id)
-                self.merge_folder( fol_id, oid)
+            all_empty =  all([content_size(it) == 0 for it in items])
+            if all_empty: #Score on date
+                group = [{'it':item,'new':newness(item),'size':content_size(item), 'score': newness(item)}  for i,item in enumerate(items)]
+            else:
+                group = [{'it':item,'new':newness(item),'size':content_size(item), 'score': content_size(item)*newness(item)}  for i,item in enumerate(items)]                    
 
-            if self.is_file(ofil):
-                if otitle in target_titles: #update it
-                    fil = self.copy_file( oid, target_id = target_titles[otitle], parent_id = target_id)
-
-            else: #create it
-                fil = self.copy_file( oid, create_filename = otitle,  parent_id = target_id)
-
-    def handle_duplicates(self, duplicate_canidates, parent_id):
-        #Check if actually duplicates
-        self.debug(f'handle duplicates: {len(duplicate_canidates)}, {parent_id}')
-        titles  = [ rt['title']  for rt in duplicate_canidates ]
-        parent_ids  = [ set([par['id'] for par in rt['parents']])  for rt in duplicate_canidates ]
-        common_parent_ids = list(set.intersection(*parent_ids))
-        common_titles = list(set(titles))
-        if len(common_titles) > 1 or len(common_parent_ids) > 1:
-            self.warning(f'These dont seem to be duplicates {common_titles} {common_parent_ids}')
-            return
-        
-        #Ok they're actually duplicates, lets handle the files and folders sort by date
-        sortByDate = lambda fol: self.get_datetime(fol['createdDate'])
-        folders = sorted(filter(self.is_folder, duplicate_canidates) , key = sortByDate)
-        files = sorted(filter(self.is_file, duplicate_canidates) , key = sortByDate)
-        
-        if len(files) > 1 and len(folders) > 1:
-            self.warning('we have duplicates for both files and folders!!! will only take care of folders')
-
-        if folders:
-            oldest_folder = folders[0]
-            duplicate_folders = folders[1:]        
-            for other_folder in duplicate_folders:
-                #self.merge_folder(oldest_folder['id'], other_folder['id'] )
-                self.delete(other_folder)
-
-                #Update References
-                if oldest_folder['id'] not in self.reverse_folder_cache \
-                    and other_folder['id'] in self.reverse_folder_cache:
-
-                    folder_path = self.reverse_folder_cache[other_folder['id']]
-                    self.folder_cache[folder_path] = oldest_folder['id']
+            #Sort by highest score
+            order_items = sorted(group, key=lambda itd: itd['score'], reverse=True)
+            keep = order_items[0]
+            remove = order_items[1:]
+            out = {'keep':keep,'remove':remove}
+            self.info(f'suggested work: {out}')
+            return out
 
 
+        for pth, items in item_dict.items():
+            work_order = score_folders_suggest_action(items)
+            removals = work_order['remove']
+            target = work_order['keep']
 
-        if files:
-            if all([fil['mimeType'] == 'text/plain' for fil in files]): #We use oldest to merge
-                oldest_file = files[0]
-                duplicate_files = files[1:]
-            else: #we will keep the newest file since we can't version it
-                oldest_file = files[-1]
-                duplicate_files = files[:-1]
-            for other_file in duplicate_files:
-                if not self.is_protected(other_file):
-                    self.info( f'moving file:{other_file["createdDate"]} -> Target:{oldest_file["createdDate"]}' )
-                    self.copy_file( other_file['id'], oldest_file['id'], parent_id=parent_id)
-                    self.delete( other_file )
+            target_contents = target['it'].contents
 
-            #Update References
-            if oldest_file['id'] in self.reverse_file_cache:
-                file_path = self.reverse_file_cache[oldest_file['id']]
-                self.file_cache[file_path] = oldest_file['id']
+            for remove in removals:
+                duplicate_folder = remove['it']
+                if remove['size'] == 0:
+                    duplicate_folder.delete()
+                else:
+                    remove_contents = duplicate_folder.contents
+                    self.info(f'found a duplicate folder with contents {remove_contents}')
+                    pass 
 
-        #self.cache_directory(parent_id)
+                    #TODO: change parent for items in this folder
+                    #for item in this folder, change the parent to the target folder after checking if its new than the other folder's contents.
+                    #First prep the target folder by deleting any duplicates.
+                    #finally delete this folder
 
-        return oldest_file
-    
+                    #MAKE SURE FILESYSTEM IS CORRECTED UPDATED AS GOOGLE IS, removing the folder reference after adding the other parent should work
+
+    #Id and path relationships
     def ensure_g_path_get_id(self,gpath):
         '''walks these internal google paths ensuring everythign is created from root
         This one is good for a cold entry of a path
@@ -1207,9 +1337,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         parent_id = self.target_folder_id
 
         if gpath in self.folder_paths:
-            match = self.get_gpath_item(gpath)
-            self.cache_directory(match.id)
-            return match.id            
+            parent_id =  self.get_gpath_id(gpath)
+            self.cache_directory(parent_id)
+            return parent_id       
 
         current_pos = ''
         for sub in gpath.split(os.sep):
@@ -1218,20 +1348,48 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 current_pos = os.path.join(current_pos,sub)
                 self.info(f'ensure-path: {current_pos}')
                 if current_pos in self.folder_paths:
-                    match = self.get_gpath_item(current_pos)
-                    parent_id = match.id
+                    parent_id =  self.get_gpath_id(current_pos)
+                    
                     self.info(f'ensure-path: grabing existing path {current_pos}:{parent_id}' )
                     self.cache_directory(parent_id)    
 
                 else:
                     self.info(f'path doesnt exist, create it {current_pos}' )
-                    fol = self.get_or_create_folder(sub,parent_id)
-                    parent_id = fol.id
-                    self.cache_directory(parent_id)
+                    if parent_id is not None:
+                        fol = self.get_or_create_folder(sub,parent_id)
+                        if fol is not None:
+                            parent_id = fol.id
+                            self.cache_directory(parent_id)
+                        else:
+                            parent_id = None
 
-        return parent_id
 
-    def get_gpath_item(self,gpath):
+        if parent_id is not None:                
+            return parent_id
+        else:
+            self.warning(f'Failed To get Gpath {gpath} Trying again ')
+            return self.ensure_g_path_get_id(gpath)
+
+    def get_gpath_id(self,gpath):
+        '''ensure only one match is found, duplicates are delt with'''
+
+        fids, paths = list(zip(*self.item_cache.items()))
+        fids, paths = numpy.array(fids),numpy.array(paths)
+
+        matches = list(fids[paths==gpath])
+        if len(matches) > 1:
+            self.warning(f'found matches {matches} for {gpath}, using first')
+            #TODO: Handle this case!
+            nodes = [ self.item_nodes[mtch] for mtch in matches]
+            snodes = sorted(nodes,key=lambda it: newness(it), reverse=True)
+            return snodes[0].id
+        elif len(matches) == 1:
+            return self.item_nodes[matches[0]].id
+        
+        self.warning(f'found no match, ensuring path')
+        return self.ensure_g_path_get_id(gpath)
+
+    def get_gpath_matches(self,gpath):
         '''ensure only one match is found, duplicates are delt with'''
         
         fids, paths = list(zip(*self.item_cache.items()))
@@ -1239,35 +1397,21 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         matches = list(fids[paths==gpath])
         if len(matches) > 1:
-            self.waring(f'found matches {matches} for {gpath}, using first')
+            self.warning(f'found matches {matches} for {gpath}, using first')
             #TODO: Handle this case!
-            return self.item_nodes[matches[0]]
+            return [self.item_nodes[mtc] for mtc in matches]
+        
         elif len(matches) == 1:
             return self.item_nodes[matches[0]]
         
-        self.waring(f'found matches {matches} for {gpath}, using first')
-        return None
-
-    def identify_duplicates(self):
-        items = set()
-        duplicates = {}
-        for node in self.item_nodes.values():
-            abspath = node.absolute_path
-            if abspath in items:
-                print(f'Duplicate {abspath}')
-                duplicates[node.id] = node
-            else:
-                items.add(abspath)
-        return duplicates     
-
-    @property
-    def duplicates_exist(self):
-        '''check if the number of paths is equal to the unique number of paths'''
-        paths = self.file_paths
-        spaths = set(paths)
-        return len(paths) == len(spaths)
+        self.warning(f'found no match, ensuring path')
+        return self.ensure_g_path_get_id(gpath)        
 
     #Meta Based Caching
+    @property 
+    def nodes(self):
+        return list(fs.nodes())
+
     @property
     def item_nodes(self):
         with self.filesystem as fs:
@@ -1329,9 +1473,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def removeNode(self, node):
         self.debug(f'removing node {node}')
-        with self.filesystem as fs:
-            #Add items to network
-            fs.remove(node)
+        if node.id in self.item_nodes:
+            with self.filesystem as fs:
+                #Add items to network
+                fs.remove_node(node)
 
         if node.id in self.protected_ids:
             self.protected_ids.remove(node.id)            
@@ -1343,12 +1488,13 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             return node
 
     def path_contains(self,rootpath,checkpath):
-        return os.path.commonpath([rootpath]) == os.path.commonpath([file_path, checkpath])      
+        return os.path.commonpath([rootpath]) == os.path.commonpath([rootpath, checkpath])      
 
     def in_client_folder(self,local_file_path):
         return os.path.commonpath([self.filepath_root]) == os.path.commonpath([file_path, self.filepath_root])      
 
     def search_items(self,q='',parent_id=None,**kwargs):
+
         '''A wrapper for `ListFile` that manages exceptions'''
         if 'in_trash' in kwargs:
             q += ' and trashed=true' 
@@ -1361,7 +1507,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         
         input_args = {  'q':q,
                         'supportsAllDrives': True, 
-                        'includeItemsFromAllDrives': True}
+                        'includeItemsFromAllDrives': True,
+                        'maxResults': 100}
         for key in input_args.keys():
             if key in kwargs:
                 kwargs.pop(key)
@@ -1376,13 +1523,13 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         success = False
         with self.rate_limit_manager(self.search_items,q,parent_id,**kwargs):
             self.sleep()
-            output = self.gdrive.ListFile(input_args).GetList()
-            for file in output:
-                filenode = self.cache_item(file)
-                if filenode.id in existing_contents:
-                    existing_contents.pop(filenode.id) #Ones not observed will remain for later
-                yield filenode
-            self.sleep()
+            for output in  self.gdrive.ListFile(input_args):
+                for file in output:
+                    filenode = self.cache_item(file)
+                    if filenode.id in existing_contents:
+                        existing_contents.pop(filenode.id) #Ones not observed will remain for later
+                    yield filenode
+                self.sleep()
             success = True
 
         if existing_contents and success:
@@ -1426,22 +1573,40 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def hit_rate_limit(self,sleep_time=5):
         old_sleeptime = self._sleep_time
-        self._sleep_time = min(self._sleep_time * 2.0**(2.0/self.num_threads),self.max_sleep_time)
+        self._sleep_time = min(self._sleep_time * 1.5**(2.0/self.num_threads),self.max_sleep_time)
 
-        self.warning(f'Warning Hit Rate Limit, sleeping {sleep_time}s, change sleep {old_sleeptime} -> {self._sleep_time} then continuing')
+        dynamicsleep = sleep_time*0.5 + random.random() * sleep_time
+        self.warning(f'sleeping {dynamicsleep}s, change sleep {old_sleeptime} -> {self._sleep_time} then continuing')
         
-        self.sleep(sleep_time)        
-        self.sleep()
+        self.sleep(dynamicsleep)
         
     def sleep(self,val=None):
-        if isinstance(val,(float,int)):
-            time.sleep(val)
-        else:
-            if self._sleep_time > self.min_sleep_time:
-                self._sleep_time = self._sleep_time * (0.95**(1.0/self.num_threads)) #This normalizes decay
+        self.call_count += 1.0
+
+        main_thread = threading.main_thread()
+    
+        if not main_thread: 
+
+            if isinstance(val,(float,int)):
+                time.sleep(val)
+
             else:
-                self._sleep_time = max(self._sleep_time,self.min_sleep_time) * (1.0 + random.random()*self.time_fuzz)
-            time.sleep(self._sleep_time)
+                if self._sleep_time > self.min_sleep_time:
+                    self._sleep_time = self._sleep_time * (0.60**(1.0/self.num_threads)) #This normalizes decay
+
+                else:
+                    self._sleep_time =  (max(self._sleep_time,self.min_sleep_time) * (1.0 + 0.5*random.random()*self.time_fuzz))
+
+                time.sleep( min(self.thread_time_multiplier * self._sleep_time, self.max_sleep_time) )
+        else:
+            time.sleep( self.min_sleep_time * 2)
+
+    @property
+    def min_sleep_time(self):
+        #not going too fast is important since rate limits will result in incompete searches and PyDrive doesn't make those accessible
+        reqpermin = 10000
+        reqpersec = reqpermin / 60.0
+        return self.num_threads * 3.0 / reqpersec 
 
     def draw_filesystem(self,*args,**kwargs):
         nx.draw(self._filesystem,*args,**kwargs)
@@ -1688,28 +1853,109 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.initalize()
 
 
+    def save(self):
+        with open(f".otterdrive_fs_{self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk",'wb') as fp:
+            fp.write( pickle.dumps( od._filesystem) )        
+
+gpi = logging.getLogger('googleapiclient.http')
+gpi.setLevel(60)
+
 def main_cli():
     import argparse
 
-    parser = argparse.ArgumentParser('Otter Drive Sync To Folder')
+    parser = argparse.ArgumentParser('Otter Drive Sync From Folder')
     
     parser.add_argument('--shared-drive','-D',default=None,help='shared drive name')
     parser.add_argument('--syncpath','-S',default=None,help='sync path relative to shared drive name')
-    parser.add_argument('--filepath','-F',default=None,help='filpath to sync to google shared_drive:syncpath')
+    parser.add_argument('--filepath','-F',default=None,help='filpath to sync to google shared_drive:syncpath, otherwise it will start here!')
     parser.add_argument('--verbose','-v',action='store_true',help='verbose')
     parser.add_argument('--creds','-c',default=None,help='path to service account credentials, can be a json file, or a directory where its stored. ')
     parser.add_argument('--dry-run','-R',action='store_true',help='dry run, dont do any work! (WIP)')    
+    parser.add_argument('--sync',action='store_true',help='sync the directories!')
+    parser.add_argument('--remove-duplicates',action='store_true',help='remove any duplicates')      
     
     args = parser.parse_args()
     
     if args.verbose:
         set_all_loggers_to(logging.DEBUG)
+    else:
+        gpi = logging.getLogger('googleapiclient.http')
+        gpi.setLevel(60)
 
-    od = OtterDrive(shared_drive = args.shared_drive, sync_root = args.syncpath,filepath = args.filepath,creds_path=args.creds, dry_run=args.dry_run)
-    od.sync()    
+    od = OtterDrive(shared_drive = args.shared_drive, sync_root = args.syncpath,filepath_root= args.filepath,creds_path=args.creds, dry_run=args.dry_run)
+
+    if args.sync: od.sync()    
+    if args.remove_duplicates or all((args.sync,od.duplicates_exist)): od.remove_duplicates() 
+
+    import pickle
+
+    od.save()
+
+    
 
 
 if __name__ == '__main__':
 
-    def main_cli()
+    main_cli()
 
+
+
+
+# def copy_file(self, origin_id, target_id = None, create_filename=None, parent_id = None):
+#     self.debug(f'copy file: {origin_id}, {target_id}, {create_filename}, {parent_id} ')
+
+#     try:
+#         assert not any((all( (target_id is None, create_filename is None)) , parent_id is None))
+            
+#         origin_file = self.create_file({'id' : origin_id })
+        
+#         if origin_file is not None and 'mimeType' in origin_file and origin_file['mimeType'] == 'text/plain':
+#             #We can version plain text!
+#             content = origin_file.GetContentString()
+
+#             if origin_file is not None and origin_file.http is not None:
+#                 for c in origin_file.http.connections.values():
+#                     c.close()                
+#         else:
+#             return None
+#             #TODO: Somehow Version Non Plain Text Files
+#             #origin_file.FetchContent()
+#             #content = origin_file.content
+
+#         self.sleep()
+
+#         if target_id is not None: #We know origin and target, good to go!
+#             #We're just getting the reference!
+#             target_file = self.upload_or_update_file( parent_id, file_id = target_id, content= content)
+#             return target_file
+
+#         elif create_filename is not None:
+#             target_file = self.upload_or_update_file( parent_id , file_path  =create_filename , content= content )
+#             return target_file
+
+#     except Exception as e:
+#         self.error(e,f'Could not copy file  {origin_id}, {target_id}, {create_filename}, {parent_id}')
+
+# def merge_folder(self, target_id, origin_id):
+#     '''NOT READY: Use to map origin to target
+#     #FIXME: instead of actually moving the content, just add the appropriate parent id and then check duplicates again'''
+    
+#     self.debug(f'merge_folder: {origin_id}, {target_id}')
+
+#     target_files = self.cache_directory(target_id) #This will take care of duplicates in target folder via search
+#     other_files = self.cache_directory(origin_id) #This will take care of duplicates in other folder via search
+#     target_titles = { tar['title']:tar['id'] for tar in target_files }
+
+#     for ofil in other_files:
+#         otitle = ofil['title']
+#         oid = ofil['id']
+#         if self.is_folder(ofil):
+#             fol_id = self.get_or_create_folder( otitle ,parent_id = target_id)
+#             self.merge_folder( fol_id, oid)
+
+#         if self.is_file(ofil):
+#             if otitle in target_titles: #update it
+#                 fil = self.copy_file( oid, target_id = target_titles[otitle], parent_id = target_id)
+
+#         else: #create it
+#             fil = self.copy_file( oid, create_filename = otitle,  parent_id = target_id)
