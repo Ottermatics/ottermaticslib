@@ -45,7 +45,9 @@ psycopg2
 #Documetnation
 sphinx==3.2.1
 pygsheets
-pydrive
+pydrive2==1.8.1
+networkx-query==1.0.1
+networkx==4.4.2
 
 #Supercomputing
 boto3

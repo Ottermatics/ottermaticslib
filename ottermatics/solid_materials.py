@@ -1,4 +1,6 @@
-from ottermatics.configuration import Configuration,inst_vectorize, otter_class
+from ottermatics.configuration import Configuration, otterize
+from ottermatics.patterns import inst_vectorize
+
 import attr
 import numpy
 
@@ -8,7 +10,7 @@ PLASTICS = []
 CERAMICS = []
 
 
-@otter_class
+@otterize
 class SolidMaterial(Configuration):
     '''A class to hold physical properties of solid structural materials'''
     name = attr.ib(default='solid material')
@@ -71,7 +73,7 @@ class SolidMaterial(Configuration):
         return self.yield_stress / self.factor_of_saftey
 
 
-@otter_class
+@otterize
 class SS_316(SolidMaterial):
     name = attr.ib(default='stainless steel 316')
 
@@ -96,7 +98,7 @@ class SS_316(SolidMaterial):
     cost_per_kg = attr.ib(default=3.26) #dollar per kg
 
 
-@otter_class
+@otterize
 class ANSI_4130(SolidMaterial):
     name = attr.ib(default='steel 4130')
 
@@ -121,7 +123,7 @@ class ANSI_4130(SolidMaterial):
     cost_per_kg = attr.ib(default=2.92) #dollar per kg   
 
 
-@otter_class
+@otterize
 class ANSI_4340(SolidMaterial):
     name = attr.ib(default='steel 4340')
 
@@ -147,7 +149,7 @@ class ANSI_4340(SolidMaterial):
 
 
 
-@otter_class
+@otterize
 class Aluminum(SolidMaterial):
     name = attr.ib(default='aluminum generic')
 
@@ -172,7 +174,7 @@ class Aluminum(SolidMaterial):
     cost_per_kg = attr.ib(default=1.90) #dollar per kg    
 
 
-@otter_class
+@otterize
 class DrySoil(SolidMaterial):
     name = attr.ib(default='dry soil')
 
@@ -196,7 +198,7 @@ class DrySoil(SolidMaterial):
     #Economic Properties
     cost_per_kg = attr.ib(default=44.78/1000.0) #dollar per kg        
 
-@otter_class
+@otterize
 class WetSoil(SolidMaterial):
     name = attr.ib(default='wet soil')
 
@@ -221,7 +223,7 @@ class WetSoil(SolidMaterial):
     cost_per_kg = attr.ib(default=34.44/1000.0) #dollar per kg   
 
 
-@otter_class
+@otterize
 class Rubber(SolidMaterial):
     name = attr.ib(default='rubber')
 

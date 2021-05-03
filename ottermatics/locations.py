@@ -2,6 +2,7 @@ import os, shutil, sys
 import re
 import pathlib
 from platform import system,uname
+from ottermatics.logging import LoggingMixin
 import logging
 
 '''
@@ -31,6 +32,7 @@ PROJECT_FOLDER_OPTIONS = {'core': CORE_FOLDERS,
                           'analysis': CORE_FOLDERS+ANALYSIS_PROJECT,
                           'all': CORE_FOLDERS+SOFTWARE_PROJECT+ELECTRONICS_PROJECT+DESIGN_PROJECT+ANALYSIS_PROJECT}
 
+SERIVCE_CREDS_FILE = 'ottermaticsgdocs_serviceid.json'
 
 def in_wsl() -> bool:
     """
@@ -107,6 +109,24 @@ def ottermatics_projects():
 def ottermatics_project(project_name):
     return str(os.path.abspath(os.path.join(os.sep,ottermatics_projects(),project_name)))
 
+def in_dropbox_dir(input_path=None):
+    '''Checks if the current path is in the projects folder'''
+    if input_path is None:
+        input_path = current_diectory()     
+
+    parent_path = os.path.abspath( ottermatics_dropbox() )
+    child_path = os.path.abspath( input_path )
+    return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])    
+
+def in_otter_dir(input_path=None):
+    '''Checks if the current path is in the projects folder'''
+    if input_path is None:
+        input_path = current_diectory() 
+
+    parent_path = os.path.abspath( ottermatics_folder() )
+    child_path = os.path.abspath( input_path )
+    return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])    
+
 def creds_folder():
     if '.creds_home' in os.listdir( os.path.expanduser('~')):
         return os.path.realpath(os.path.expanduser(os.path.join('~','.creds_home')))    
@@ -116,14 +136,17 @@ def ottermatics_clients():
     return list([ path for path in os.listdir( ottermatics_projects() ) \
                 if os.path.isdir(os.path.join(ottermatics_projects(),path)) ] )
 
-def google_api_token():
-    credfile = 'client_secrets.json'
+def google_api_token(): #Depricated now we use service accounts
+    credfile = SERIVCE_CREDS_FILE
     return str(os.path.abspath(os.path.join(os.sep,creds_folder(),credfile)))
 
-def in_client_dir():
+def in_client_dir(input_path=None):
     '''Checks if the current path is in the projects folder'''
+    if input_path is None:
+        input_path = current_diectory()
+
     parent_path = os.path.abspath( ottermatics_projects() )
-    child_path = os.path.abspath( current_diectory() )
+    child_path = os.path.abspath( input_path )
     return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
 
 def client_dir_name():
@@ -133,6 +156,11 @@ def client_dir_name():
         return None
     current_rel_path  = os.path.relpath(current_diectory(), ottermatics_projects())
     return pathlib.Path(current_rel_path).parts[0]
+
+def client_path():
+    if not in_client_dir():
+        return None
+    return ottermatics_project( client_dir_name() )
 
 def main_cli():
     '''
@@ -186,6 +214,7 @@ def main_cli():
         for folder_stub in PROJECT_FOLDER_OPTIONS[ args.type ]:
             log.info('Making Content Folder: {}'.format(folder_stub))
             os.mkdir( os.path.join(project_folder, folder_stub))
+
 
 if __name__ == '__main__':
     main_cli()
