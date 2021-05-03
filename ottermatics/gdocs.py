@@ -27,7 +27,7 @@ import random
 from pathlib import Path
 import networkx as nx
 from networkx_query import search_nodes, search_edges
-
+import pickle
 from expiringdict import ExpiringDict #To aid dynamic programming, store network calls they are expensive
 
 log = logging.getLogger('otterlib-gdocs')
@@ -66,13 +66,13 @@ class FileNode(LoggingMixin):
             for c in self._item.http.connections.values():
                 c.close()
 
-        if not threading.main_thread(): #save some time yo!
-            try:
-                if self in self.drive.item_cache:
-                    self.absolute_path
+        # if not threading.main_thread(): #save some time yo!
+        #     try:
+        #         if self in self.drive.item_cache:
+        #             self.absolute_path
 
-            except Exception as e:
-                self.error(e,f'Issue caching path for {self.identity}')
+        #     except Exception as e:
+        #         self.error(e,f'Issue caching path for {self.identity}')
 
 
     @property
@@ -250,9 +250,14 @@ class FileNode(LoggingMixin):
     @property
     def absolute_path(self):
         if self._absolute_path is None:
-            npath = self.best_nodeid_path #self.best_nodeid_path
-            if npath:
-                self._absolute_path = os.path.join(*[self.drive.item_nodes[itdd].title for itdd in npath])
+            parents = self.parents
+
+            if parents:            
+                self._absolute_path = os.path.join(parents[0].absolute_path, self.title)
+                #self.debug(f'caching file abspath for node {self._absolute_path}')
+            else:                
+                self._absolute_path = self.title
+                #self.info(f'caching file abspath for root node {self._absolute_path}')
         
         return self._absolute_path
 
@@ -294,6 +299,7 @@ class FileNode(LoggingMixin):
 
     def __repr__(self):
         return f'FileNode({self.id}|{self.title})'
+
 
 class RootNode(FileNode):
     '''A wrapper for shared drive objects to work in a graph and store conveinence functions'''
@@ -416,7 +422,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     #Thread Pool
     use_threadpool = True
-    _max_num_threads = 12
+    _max_num_threads = 8
 
     #defaults
     default_shared_drive = 'shared:OTTERBOX'
@@ -434,7 +440,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
 
 
-    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 12, use_threadpool=True):
+    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 8, use_threadpool=True):
         '''
         :param shared_drive: share drive to use as a root directory
         :param sync_root: the relative directory from shared_drive root to the place where sync occurs
@@ -509,7 +515,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     def initalize(self):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
         self.info(f'Initalizing from {self.filepath_root}')
-        self.thread_time_multiplier = 2.0
+
+        #did_read = self.read()
+        #if not did_read:
+
+        self.thread_time_multiplier = 1.0
         gpath = self.sync_path(self.filepath_root)
 
         #First level is protected!
@@ -524,12 +534,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self._target_folder_id = self.ensure_g_path_get_id(gpath)
         elif gpath == '':
             self._target_folder_id = self.sync_root_id
-
+        
         #cache everythign!!!
         self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6)) 
 
         self.status_message('Otterdrive Ready For Use')
-        self.thread_time_multiplier = 2.0
+        self.thread_time_multiplier = 1.0
+
+        self.save()
 
     def status_message(self,header=''):
         self.info(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
@@ -672,7 +684,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                         ttl -= 1
                         if ttl == 0:
                             if pool is not None:
-                                if item.id not in already_cached:
+                                if item.id not in already_cached and item.id not in self.item_nodes:
                                     self.sleep()
                                     already_cached.add(item.id)
                                     pool.submit(self.sync_folder_contents_locally,item.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
@@ -681,7 +693,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
                         elif ttl > 0:
                             if pool is not None:
-                                if item.id not in already_cached:
+                                if item.id not in already_cached and item.id not in self.item_nodes:
                                     self.sleep()
                                     already_cached.add(item.id)
                                     pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
@@ -1132,12 +1144,20 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             return parent_items[folder_name]
 
     #Duplicate Handiling
+    def generate_file_paths(self):
+        
+        for node in self.nodes:
+            if node._absolute_path is None:
+                self.debug(f'generating filepath for {node.identity}')
+                node.absolute_path
+
+
     @property
     def duplicates_exist(self):
         '''check if the number of paths is equal to the unique number of paths'''
         self.info('checking duplicates...')
         #TODO: Speed This Up, top down tree with parent caching, or try parallel processing. 
-
+        self.generate_file_paths()
         paths = self.file_paths
         spaths = set(paths)
         duplicates_exist = not (len(paths) == len(spaths))
@@ -1410,7 +1430,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Meta Based Caching
     @property 
     def nodes(self):
-        return list(fs.nodes())
+        return list(self._filesystem.nodes())
 
     @property
     def item_nodes(self):
@@ -1483,9 +1503,12 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def cache_item(self,item_meta):
         if 'teamDriveId' in item_meta and item_meta['teamDriveId'] == self.sync_root_id:
-            node = FileNode(self,item_meta)
-            self.addFileNode(node)
-            return node
+            if item_meta['id'] not in self.item_nodes:
+                node = FileNode(self,item_meta)
+                self.addFileNode(node)
+                return node
+            else:
+                return self.item_nodes[item_meta['id']]
 
     def path_contains(self,rootpath,checkpath):
         return os.path.commonpath([rootpath]) == os.path.commonpath([rootpath, checkpath])      
@@ -1842,20 +1865,47 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         d['_log'] = None
         d['gdrive'] = None
         d['gauth'] = None
+        d['net_lock'] = None
         return d
     
     def __setstate__(self,d):
         '''We reconfigure on opening a pickle'''
         self.debug('seralizing')
         self.__dict__ = d
-
+        self.net_lock = threading.RLock()
         self.authoirze_google_integrations()
-        self.initalize()
+        #self.initalize()
 
+    @property
+    def fs_cache_filename(self):
+        return f".otterdrive_fs_{ self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk"
 
     def save(self):
-        with open(f".otterdrive_fs_{self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk",'wb') as fp:
-            fp.write( pickle.dumps( od._filesystem) )        
+        try:
+
+            self.info(f'saving  {self.fs_cache_filename}!')
+            with open(self.fs_cache_filename,'wb') as fp:
+                fp.write(pickle.dumps(self))
+
+        except Exception as e:
+            self.error( e , 'Issue Saving File System' )
+
+
+    def read(self):
+        ''':returns: success as bool'''
+        try:
+
+            self.info(f'reading {self.fs_cache_filename}!')
+            with open(self.fs_cache_filename,'rb') as fp:
+                old = pickle.loads(fp.read())
+                self.__dict__ = old.__dict__
+
+        except Exception as e:
+            self.error( e , 'Issue Reading File System' )
+            return False
+        else:
+            return True
+
 
 gpi = logging.getLogger('googleapiclient.http')
 gpi.setLevel(60)
@@ -1886,8 +1936,6 @@ def main_cli():
 
     if args.sync: od.sync()    
     if args.remove_duplicates or all((args.sync,od.duplicates_exist)): od.remove_duplicates() 
-
-    import pickle
 
     od.save()
 
