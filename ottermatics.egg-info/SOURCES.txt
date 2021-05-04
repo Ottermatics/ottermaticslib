@@ -21,4 +21,5 @@ ottermatics.egg-info/SOURCES.txt
 ottermatics.egg-info/dependency_links.txt
 ottermatics.egg-info/entry_points.txt
 ottermatics.egg-info/not-zip-safe
+ottermatics.egg-info/requires.txt
 ottermatics.egg-info/top_level.txt

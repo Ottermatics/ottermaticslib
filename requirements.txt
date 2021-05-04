@@ -48,6 +48,7 @@ pygsheets
 pydrive2==1.8.1
 networkx-query==1.0.1
 networkx>=2.5.1
+expiringdict>=1.2.1
 
 #Supercomputing
 boto3
