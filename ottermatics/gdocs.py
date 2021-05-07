@@ -29,6 +29,9 @@ import networkx as nx
 from networkx_query import search_nodes, search_edges
 import pickle
 from expiringdict import ExpiringDict #To aid dynamic programming, store network calls they are expensive
+import concurrent
+
+from ray.runtime_context import get_runtime_context
 
 log = logging.getLogger('otterlib-gdocs')
 
@@ -300,6 +303,26 @@ class FileNode(LoggingMixin):
     def __repr__(self):
         return f'FileNode({self.id}|{self.title})'
 
+    #Magic Methods (Pickling here)
+    def __getstate__(self):
+        '''Remove active connection objects, they are not picklable'''
+        self.debug('removing unpicklable info')
+        d = self.__dict__.copy()
+        #d['_drive'] = None
+        d['_log'] = None
+        d['drive_args'] = self._drive.initial_args
+        
+        if isinstance( d['_item'], pydrive2.files.GoogleDriveFile): #catch shared drives and skip
+            d['_item'].__dict__['attr']['auth'] = None
+
+        return d
+    
+    def __setstate__(self,d):
+        '''We reconfigure on opening a pickle'''
+        self.__dict__ = d
+        self.debug('seralizing')
+        
+
 
 class RootNode(FileNode):
     '''A wrapper for shared drive objects to work in a graph and store conveinence functions'''
@@ -375,7 +398,19 @@ timestamp_divider = (24 * 3600) #a day in seconds
 newness = lambda item: (item.createdDate.timestamp() - default_timestamp)/ timestamp_divider
 content_size = lambda item: len(item.contents)
 
+
+#worker functions
+def absolvify(node):
+    node.debug(f'generating filepath')
+    return node.absolute_path
+
+def set_node_abs_path(node,future):
+    abspath = future.result()
+    node.debug(f'setting absolut path {abspath}')
+    node._absolute_path = abspath
+
 #@Singleton
+#TODO: Figure out how to use InputSingleton and save args
 class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     '''Authenticates To Your Google Drive To Edit Sheets and Your Drive Files
 
@@ -412,7 +447,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     call_count = 0 #updated every sleep()
     max_sleep_time = 5.0
-    _sleep_time = 0.75
+    _sleep_time = 0.5
     time_fuzz = 2.0 #base * ( 1+ rand(0,time_fuzz))
     thread_time_multiplier = 1.0
 
@@ -438,15 +473,21 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     fast_cache = None #To handle expensive graph calls
 
+    initial_args = None
+    init_after_read = False
 
+    #attributes to keep after a pickle read
+    keep_keys = ['_filesystem','protected_ids','protected_filenames','_creds_file','_shared_drives','_shared_drive','_sync_root_id']
 
-    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 8, use_threadpool=True):
+    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 8, use_threadpool=True, init_on_creation = True, init_after_read = False):
         '''
         :param shared_drive: share drive to use as a root directory
         :param sync_root: the relative directory from shared_drive root to the place where sync occurs
         :param filepath_root: the local machine file path to sync to google drive
         :param creds_path: can be none if filesys if configured, otherwise you can input a path to a json, or a folder to look for `ottermaticsgdocs_serviceid.json`'''
         
+        self.initial_args = dict(shared_drive = shared_drive, sync_root=sync_root, filepath_root=filepath_root, creds_path = creds_path, dry_run=dry_run, num_workers = num_workers, use_threadpool=use_threadpool)
+
         self.info(f'starting with input share={shared_drive}, filepath={filepath_root}, sync_root={sync_root}')
 
         #We're gonna use this to store graph information, aka dynamic programming
@@ -455,6 +496,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.use_threadpool = use_threadpool
         self._max_num_threads = num_workers
 
+        self.init_after_read = init_after_read
 
         #This is to guard access across threads to the filesystem networkx, which is not threadsafe
         #TODO: load graph from disk if exists
@@ -488,7 +530,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #3) set and check sync path and infer from #1 / 2 if not input
         self.sync_root = sync_root
 
-        self.initalize()
+        if init_on_creation: self.initalize()
 
     @property
     @contextmanager
@@ -514,34 +556,54 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Initalization Methods
     def initalize(self):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
-        self.info(f'Initalizing from {self.filepath_root}')
+        self.info( f'Initalizing from { self.filepath_root }' )
 
-        #did_read = self.read()
-        #if not did_read:
+        init_after_read = self.init_after_read #rope a dope, read replaces __dict__ so keep this one fresh
+        did_read = self.read()
 
-        self.thread_time_multiplier = 1.0
-        gpath = self.sync_path(self.filepath_root)
+        if not did_read or init_after_read:
+            
+            
+            self.thread_time_multiplier = 1.0
+            gpath = self.sync_path( self.filepath_root )
 
-        #First level is protected!
-        self.sync_folder_contents_locally(self.sync_root_id, protect=True )
-        target = self.sync_folder_contents_locally(self.sync_root_id,stop_when_found= gpath,recursive=True, ttl=int(5))
+            #First level is protected!
+            if self._target_folder_id is None:
+                self.sync_folder_contents_locally(self.sync_root_id, protect=True )
+                target = self.sync_folder_contents_locally(self.sync_root_id, stop_when_found= gpath, recursive=True, ttl=int(1), refresh=True)
 
-        self.gsheets.drive.enable_team_drive(self.sync_root_id)
+                self.gsheets.drive.enable_team_drive( self.sync_root_id )
 
-        if target is not None and target.id in self.item_cache:
-            self._target_folder_id = target.id
-        elif gpath:
-            self._target_folder_id = self.ensure_g_path_get_id(gpath)
-        elif gpath == '':
-            self._target_folder_id = self.sync_root_id
+                if target is not None and target.id in self.item_cache:
+                    self._target_folder_id = target.id
+                elif gpath:
+                    self._target_folder_id = self.ensure_g_path_get_id(gpath)
+                elif gpath == '':
+                    self._target_folder_id = self.sync_root_id
+            
+            #cache everythign!!!
+            self.sync_folder_contents_locally( self.target_folder_id , recursive=True, ttl = int(1E6) , refresh=True) 
+
+            self.status_message('Otterdrive Ready For Use')
+            self.thread_time_multiplier = 1.0
+            
+            self.generate_file_paths()
+            self.save()
         
-        #cache everythign!!!
-        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6)) 
+        else:
+            #Repair non pickleable items
+            for nid,node in self.item_nodes.items():
+                node._drive = self
+                if isinstance( node._item, pydrive2.files.GoogleDriveFile):
+                    node._item.attr['auth'] = self.gauth
 
-        self.status_message('Otterdrive Ready For Use')
-        self.thread_time_multiplier = 1.0
+            gpath = self.sync_path( self.filepath_root )
+            self.gsheets.drive.enable_team_drive( self.sync_root_id )
+            self._target_folder_id = self.ensure_g_path_get_id(gpath)
+            self.sync_folder_contents_locally( self.target_folder_id , recursive=True, ttl = int(1E6))
+            self.generate_file_paths()
 
-        self.save()
+
 
     def status_message(self,header=''):
         self.info(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
@@ -642,7 +704,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self._shared_drives = output
         return output
 
-    def sync_folder_contents_locally(self,parent_id,stop_when_found=None,recursive=False,ttl=1,protect=False,pool=None, already_cached = None, top=True):
+    def sync_folder_contents_locally(self,parent_id,stop_when_found=None,recursive=False,ttl=1,protect=False,pool=None, already_cached = None, top=True, refresh=False):
         '''This function takes a parent id for a folder then caches everything to folder / file caches
         Recrusvie functionality with recursive=True and ttl > 0'''
         #Update Subdirectories - more efficient all at once
@@ -654,11 +716,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         if protect: self.protected_ids.add(parent_id)
 
         if pool is None and self.use_threadpool:
-            if top: self.info('GET DRIVE INFO USING THREADS!!!')
+            if top: self.info(f'GET DRIVE INFO {parent_id} USING {self.num_threads} THREADS!!!')
             pool = ThreadPoolExecutor(max_workers=self.num_threads)
             pool_set_here = True
         else:
-            if top: self.info('GET DRIVE INFO SINGLE THREAD')
+            if top: self.info(f'GET DRIVE INFO {parent_id} SINGLE {self.num_threads} THREAD')
             pool = None
             pool_set_here = False
 
@@ -667,7 +729,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         try:
             #This caches it for us through seach_item(), and hopefully removes  duplicates
-            items = list(self.all_in_folder(parent_id))
+            if any((parent_id not in self.item_nodes, refresh)):
+                items = list(self.all_in_folder(parent_id))
+
+            elif parent_id in self.item_nodes:
+                parent = self.item_nodes[parent_id]
+                items = parent.contents
+
+            ttl -= 1 #Thick this before iterating items
             for item in items:
                 self.sleep()
                 if stop_when_found is not None and item.id == stop_when_found:
@@ -681,22 +750,27 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if item.is_folder: #if it had contents it was already cached!!
                     
                     if recursive and not stop: 
-                        ttl -= 1
                         if ttl == 0:
                             if pool is not None:
-                                if item.id not in already_cached and item.id not in self.item_nodes:
+                                if item.id not in already_cached and any((item.id not in self.item_nodes, refresh)):
                                     self.sleep()
                                     already_cached.add(item.id)
-                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
+                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False, refresh = refresh)
+                                elif item.id in self.item_nodes and item.is_folder:
+                                    already_cached.add(item.id)
+                                    for fil in item.contents:
+                                        if fil.is_folder:
+                                            pool.submit(self.sync_folder_contents_locally,fil.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False, refresh = refresh)                                    
+
                             else:
                                 self.sync_folder_contents_locally(item.id,recursive=False,ttl=ttl,protect=protect, top=False)
 
                         elif ttl > 0:
                             if pool is not None:
-                                if item.id not in already_cached and item.id not in self.item_nodes:
+                                if item.id not in already_cached and any((item.id not in self.item_nodes, refresh)):
                                     self.sleep()
                                     already_cached.add(item.id)
-                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
+                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False, refresh = refresh)
                             else:                        
                                 self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect, top=False)
                 
@@ -918,6 +992,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         
         else:
             self.info('SYNCING COMPLETE!')
+            self.save()
 
     def sync_path_pair_single(self,filepath,syncpath):
         try:
@@ -1146,10 +1221,34 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Duplicate Handiling
     def generate_file_paths(self):
         
+        self.info("Generating Node Filepaths")
+
+        if __name__ == '__main__':
+            try:
+                res = {}
+                with concurrent.futures.ProcessPoolExecutor( min(4,os.cpu_count()) )  as pool:
+                    for node in self.nodes:
+                        #if not node._absolute_path:
+                        fut = pool.submit( absolvify, node)
+                        #fut.add_done_callback(lambda future: set_node_abs_path(node, future))
+                        res[node] = fut
+                            
+                futures = list(res.values())
+
+                concurrent.futures.wait(futures)
+
+                for node, future in res.items():
+                    set_node_abs_path(node, future)
+            except Exception as e:
+                self.error(e, 'Issue using process pool executor')
+            else:
+                return
+        
+        #Ok try this
         for node in self.nodes:
             if node._absolute_path is None:
-                self.debug(f'generating filepath for {node.identity}')
                 node.absolute_path
+
 
 
     @property
@@ -1636,7 +1735,15 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     @property
     def num_threads(self):
+        #TODO: add a try fail to determine if in ray worker, if we are use 1
         if self.use_threadpool:
+            try:
+                rtc = get_runtime_context()        
+                if not rtc.worker.actor_id.is_nil():
+                    return 1 #in ray task
+            except Exception as e:
+                self.error(e, 'issue checking ray sync context')
+
             return self._max_num_threads
         return 1
 
@@ -1858,6 +1965,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Magic Methods (Pickling here)
     def __getstate__(self):
         '''Remove active connection objects, they are not picklable'''
+        #TODO: Embed credentials when pickling
         self.debug('removing unpiclable info')
         d = self.__dict__.copy()
         d['gsheets'] = None
@@ -1866,19 +1974,23 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         d['gdrive'] = None
         d['gauth'] = None
         d['net_lock'] = None
+        if 'init_after_read' in d: d.pop('init_after_read')
         return d
     
     def __setstate__(self,d):
         '''We reconfigure on opening a pickle'''
         self.debug('seralizing')
-        self.__dict__ = d
+
+        for dkey,dval in d.items():
+            if dkey in self.keep_keys:
+                self.__dict__[dkey] = dval
+
         self.net_lock = threading.RLock()
-        self.authoirze_google_integrations()
-        #self.initalize()
+        if self.gauth is None: self.authoirze_google_integrations()
 
     @property
     def fs_cache_filename(self):
-        return f".otterdrive_fs_{ self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk"
+        return f".otterdrive_fs_{ self.shared_drive.replace('shared:','').replace(os.sep,'_') }.pk"
 
     def save(self):
         try:
@@ -1898,7 +2010,12 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self.info(f'reading {self.fs_cache_filename}!')
             with open(self.fs_cache_filename,'rb') as fp:
                 old = pickle.loads(fp.read())
-                self.__dict__ = old.__dict__
+                for dkey,dval in old.__dict__.items():
+                    if dkey in self.keep_keys:
+                        self.__dict__[dkey] = dval        
+
+        except FileNotFoundError as e:
+            return False
 
         except Exception as e:
             self.error( e , 'Issue Reading File System' )
