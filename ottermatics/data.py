@@ -172,7 +172,9 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
 class DBConnection(LoggingMixin, metaclass=SingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
-    to get the active instance use DBConnection.instance(**non_default_connection_args)'''
+    to get the active instance use DBConnection.instance(**non_default_connection_args)
+    
+    TODO: Make Threadsafe W/ ThreadPoolExecutor!'''
 
     _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}"
     pool_size=20

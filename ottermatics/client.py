@@ -21,7 +21,27 @@ class ClientInfoMixin(LoggingMixin):
     _stored_plots = []
     _report_path = 'reports/'
     _default_image_format = '.png'
+
+    _drive = None
+    _drive_init_args = None
+
+    @property
+    def drive(self):
+        '''wrapper for private OtterDrive Instance'''
+        return self._drive
     
+    def enable_cloud_sync(self,**kwargs):
+        '''Ensure configuration's daily path is created'''
+        self.info('enabling cloud sync')
+        self._drive = OtterDrive(**kwargs)
+        self._drive_init_args = self.drive.initial_args
+        filepath = self.config_path_daily
+        gpath = self.drive.sync_path(filepath)
+
+        self.drive.ensure_g_path_get_id( gpath )
+        pth_id = self.drive.folder_cache[ gpath ]
+        return gpath, pth_id
+
     @property
     def client_name(self):
         if self.stored_client_name is None:
@@ -45,10 +65,10 @@ class ClientInfoMixin(LoggingMixin):
     def report_path(self):
         try:
             if self.stored_path is None:
-                self.stored_path =  os.path.realpath(os.path.join(self.client_folder_root,self._report_path))
+                self.stored_path =  os.path.realpath( os.path.join( self.client_folder_root, self._report_path ) )
 
-            if not os.path.exists(self.stored_path):
-                self.warning('report does not exist {}'.format(self.stored_path))
+            if not os.path.exists( self.stored_path ):
+                self.warning('report does not exist {}'.format( self.stored_path ))
             return self.stored_path
         except Exception as e:
             self.error(e)

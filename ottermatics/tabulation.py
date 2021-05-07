@@ -624,18 +624,6 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 self.error(e,'error saving gsheets')
 
             
-            
-
-    def enable_cloud_sync(self):
-        '''Ensure configuration's daily path is created'''
-        self.info('enabling cloud sync')
-        self.od = od = OtterDrive()
-        filepath = self.config_path_daily
-        gpath = od.sync_path(filepath)
-
-        od.ensure_g_path_get_id(gpath)
-        pth_id = od.folder_cache[gpath]
-        return gpath, pth_id
         
     @property
     def store_level(self):

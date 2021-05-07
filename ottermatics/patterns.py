@@ -97,7 +97,7 @@ class InputSingletonMeta(type):
         keyarg['args'] = args
         key = frozenset(keyarg.items())
         if key not in cls._instances:
-            #print(f'creating new {keyarg}')
+            #print(f'creating new {key}')
             cls._instances[key] = super(InputSingletonMeta, cls).__call__(*args,
                                                                 **kwargs)
         return cls._instances[key]
