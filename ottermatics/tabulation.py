@@ -597,14 +597,14 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         '''A function to save the table to google sheets
         :param filename: the filepath on google drive - be careful!
         '''
-        self.od = od = OtterDrive()
         try:
-            gpath, pth_id = self.enable_cloud_sync()
             self.info(f'saving as gsheets in dir {self.config_path_daily} -> {gpath}')
-
-            sht = od.gsheets.create(filename,folder=pth_id)
             
-            od.cache_directory(pth_id)
+            parent_id = self.drive.get_gpath_id(self.sync_path(self.config_path_daily))
+            sht = self.drive.gsheets.create(filename,folder=parent_id)
+            
+            self.drive.sleep() 
+            self.drive.cache_directory(parent_id)
 
             wk = sht.sheet1
             wk.set_dataframe(dataframe,start='A1')
@@ -617,7 +617,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             
             if retry and ttl > 0:
                 self.warning(f'encountered error saving gsheets, retrying')
-                self.od.sleep()
+                self.drive.sleep()
                 self.save_gsheets(dataframe,filename,retry=True,ttl=ttl)
             
             else:

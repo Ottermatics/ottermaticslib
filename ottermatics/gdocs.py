@@ -541,7 +541,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.status_message('Otterdrive Ready For Use')
         self.thread_time_multiplier = 1.0
 
-        self.save()
+        #self.save()
+
+    def reset_target_id(self):
+        self._target_folder_id = self.ensure_g_path_get_id(self.sync_path(self.filepath_root))
+        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6)) 
 
     def status_message(self,header=''):
         self.info(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
@@ -601,7 +605,6 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     def sync_path(self,path):
         '''Sync path likes absolute paths to google drive relative'''
         assert os.path.commonpath([self.filepath_root,path]) == os.path.commonpath([self.filepath_root])
-
 
         self.debug(f'finding relative path from {path} and {self.filepath_root}')
         rel_root = os.path.relpath( path, self.filepath_root )
@@ -1649,6 +1652,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     @filepath_root.setter
     def filepath_root(self,filepath_root):
         '''Check the filepath exists and set it'''
+        if self._filepath_root is not None: 
+            do_reinitalize = True #We already initalize with previous input, do it again!
+        else:
+            do_reinitalize = False
+
         if filepath_root is not None:
             if os.path.exists(filepath_root):
                 self._filepath_root = os.path.realpath(filepath_root)
@@ -1665,6 +1673,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 self._filepath_root = current_diectory()
                 self.filepath_inferred = True
                 self.info(f'using infered ottermatics path: {self._filepath_root}')
+
+        if do_reinitalize:
+            self.reset_target_id()
 
     @property
     def shared_drive(self):
