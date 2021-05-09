@@ -105,6 +105,10 @@ class ClientInfoMixin(LoggingMixin):
         return out
 
     @property
+    def full_cloud_sync_path(self):
+        return os.path.join(self.drive.shared_drive, self.cloud_sync_path)
+
+    @property
     def rel_report_path(self):
         if self.rel_report_mode == 'default':
             return self.report_path
@@ -154,6 +158,11 @@ class ClientInfoMixin(LoggingMixin):
         self.info('enabling cloud sync')
         self._drive = OtterDrive(**kwargs)
         self._drive_init_args = kwargs #self.drive.initial_args
+        #Setup Context
+        #with self.drive.context(filepath_root = self.local_sync_path, sync_root = self.cloud_sync_path) as cdrive:
+        #    pass
+        if self.full_cloud_sync_path not in self.drive.folder_paths:
+            self.drive.ensure_g_path_get_id(self.cloud_sync_path)
         
     def gsync(self,force=False):
         '''Changes drive context to this component then syncs it according to the filepath mode'''

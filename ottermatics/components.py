@@ -89,6 +89,7 @@ class ComponentIterator(Component):
     _components = []
 
     shuffle_mode = False
+    _shuffled = None
 
     @property
     def component_list(self):
@@ -126,9 +127,12 @@ class ComponentIterator(Component):
         return self.current_component.plot_variables
 
     #Magicz
+    #@functools.cached_property
     def _item_generator(self):
         if self.shuffle_mode:
-            return random.shuffle(self.component_list)
+            if self._shuffled is None:
+                self._shuffled = random.sample(self.component_list,len(self.component_list))
+            return self._shuffled
         return self.component_list
 
     def __getitem__(self,index):

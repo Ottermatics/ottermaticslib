@@ -129,12 +129,14 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     def __init__(self,**kwargs):
         if kwargs:
             self.cache_init_kwargs = kwargs
+        self.info(f'Created DiskCacheStore In {self.cache_root}')
 
     @property
     def cache_root(self):
+        #TODO: CHECK CACHE IS NOT SYNCED TO DROPBOX
         if self.alt_path is not None:
-            return os.path.join( 'cache' , self.alt_path)
-        return os.path.join( 'cache' , '{}'.format(type(self).__name__).lower())
+            return os.path.join(client_path(skip_wsl=False), 'cache' , self.alt_path)
+        return os.path.join(client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower())
     
     @property
     def cache(self):
@@ -216,7 +218,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
     @property
     def identity(self):
-        return '{}:{}'.format(self.__class__.__name__.lower(), self.cache_root)
+        return '{}'.format(self.__class__.__name__.lower())
 
 
 class DBConnection(LoggingMixin, metaclass=SingletonMeta):
