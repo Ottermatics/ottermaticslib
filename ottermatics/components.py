@@ -3,6 +3,7 @@ import attr
 
 from ottermatics.logging import LoggingMixin, log
 from ottermatics.tabulation import TabulationMixin
+from ottermatics.configuration import otterize, Configuration
 
 import numpy
 import functools
@@ -12,10 +13,10 @@ import pandas
 import os
 import inspect
 import pathlib
-
+import random
 import matplotlib.pyplot as plt
 
-
+@otterize
 class Component(TabulationMixin):
     '''Component is an Evaluatable configuration with tabulation and reporting functionality'''
     
@@ -78,3 +79,67 @@ class Component(TabulationMixin):
 
         except Exception as e:
             self.error(e,'issue plotting {}'.format(plot_tile))
+
+@otterize
+class ComponentIterator(Component):
+    '''An object to loop through a list of components as the system is evaluated,
+    
+    iterates through each component and pipes data_row and data_label to this objects table'''
+
+    _components = []
+
+    shuffle_mode = False
+
+    @property
+    def component_list(self):
+        return self._components
+
+    @component_list.setter
+    def component_list(self, new_components):
+        if all([isinstance(item,Component) for item in new_components]):
+            self._components = new_components
+        else:
+            self.warning('Input Components Were Not All Of Type Component')
+
+    @property
+    def current_component(self) -> Component:
+        out = self[ self.index ]
+        if out is None:
+            if self.index == 0:
+                return self[ 0 ]
+            return self[ -1 ]
+        return out
+
+
+
+    #Wrappers for current component
+    @property
+    def data_row(self):
+        return self.current_component.data_row
+
+    @property
+    def data_label(self):
+        return self.current_component.data_label
+
+    @property
+    def plot_variables(self):    
+        return self.current_component.plot_variables
+
+    #Magicz
+    def _item_generator(self):
+        if self.shuffle_mode:
+            return random.shuffle(self.component_list)
+        return self.component_list
+
+    def __getitem__(self,index):
+        if index >= 0 and index < len(self.component_list):
+            return self.component_list[index]
+        if index < 0 and index > -len(self.component_list):
+            return self.component_list[index]
+        
+    def __iter__(self):
+        #TODO: Add shuffle mode!
+        for item in self._item_generator():
+            self._anything_changed = True
+            yield item
+            self._anything_changed = True

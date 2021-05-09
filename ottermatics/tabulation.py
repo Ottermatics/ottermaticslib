@@ -201,7 +201,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         self._toplevel_static= None
         self._otherstatic_tables= None
         self._variable_tables= None
-        self._joined_dataframe= None        
+        self._joined_dataframe= None    
 
     @property
     def TABLE(self):
@@ -290,25 +290,25 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     @property
     def variable_tables(self):
         '''Grabs all valid variable dataframes and puts them in a list'''
-        if self._variable_tables is None or self._anything_changed:
-            rds = self.recursive_data_structure(self.store_level)
+        #if self._variable_tables is None or self._anything_changed:
+        rds = self.recursive_data_structure(self.store_level)
 
-            output = []
-            for index, components in rds.items():
-                for comp in components:
-                    if comp['variable'] is not None:
-                        output.append({'conf':comp['conf'],'df':comp['variable']})
+        output = []
+        for index, components in rds.items():
+            for comp in components:
+                if comp['variable'] is not None:
+                    output.append({'conf':comp['conf'],'df':comp['variable']})
 
-            self._variable_tables = output
+        self._variable_tables = output
         return self._variable_tables
 
     @property
     def joined_dataframe(self):
-        if self._joined_dataframe is None or self._anything_changed:
-            if self.variable_tables:
-                self._joined_dataframe = pandas.concat([ vt['df'] for vt in self.variable_tables],axis=1)
-            else:
-                self._joined_dataframe = None
+        #if self._joined_dataframe is None or self._anything_changed:
+        if self.variable_tables:
+            self._joined_dataframe = pandas.concat([ vt['df'] for vt in self.variable_tables],axis=1)
+        else:
+            self._joined_dataframe = None
         return self._joined_dataframe
         
 
@@ -558,6 +558,8 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         :param meta_tags: a dictionary with headers being column names, and the value as the item to fill that column'''
         if dataframe is None:
             dataframe = self.dataframe
+        
+        self.info('saving gsheets...')
 
         if meta_tags is not None and type(meta_tags) is dict:
             for tag,value in meta_tags.items():
@@ -597,45 +599,36 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         '''A function to save the table to google sheets
         :param filename: the filepath on google drive - be careful!
         '''
-        self.od = od = OtterDrive()
+        
         try:
-            gpath, pth_id = self.enable_cloud_sync()
-            self.info(f'saving as gsheets in dir {self.config_path_daily} -> {gpath}')
 
-            sht = od.gsheets.create(filename,folder=pth_id)
-            
-            od.cache_directory(pth_id)
+            with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
+                gpath = gdrive.sync_path(self.local_sync_path)
+                self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
+                parent_id = gdrive.get_gpath_id(gpath)
+                #TODO: delete old file if exists
+                sht = gdrive.gsheets.create(filename,folder=parent_id)
+                
+                gdrive.sleep() 
+                gdrive.cache_directory(parent_id)
 
-            wk = sht.sheet1
-            wk.set_dataframe(dataframe,start='A1')
+                wk = sht.sheet1
+                wk.set_dataframe(dataframe,start='A1')
 
-            #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
-            self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
+                #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
+                self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
 
         except Exception as e:
             ttl -= 1
             
             if retry and ttl > 0:
                 self.warning(f'encountered error saving gsheets, retrying')
-                self.od.sleep()
+                self.drive.sleep()
                 self.save_gsheets(dataframe,filename,retry=True,ttl=ttl)
             
             else:
                 self.error(e,'error saving gsheets')
-
             
-            
-
-    def enable_cloud_sync(self):
-        '''Ensure configuration's daily path is created'''
-        self.info('enabling cloud sync')
-        self.od = od = OtterDrive()
-        filepath = self.config_path_daily
-        gpath = od.sync_path(filepath)
-
-        od.ensure_g_path_get_id(gpath)
-        pth_id = od.folder_cache[gpath]
-        return gpath, pth_id
         
     @property
     def store_level(self):

@@ -1,7 +1,8 @@
 import attr
 from ottermatics.configuration import otterize
-from ottermatics.components import Component
+from ottermatics.components import Component, ComponentIterator
 import datetime
+import os 
 
 @otterize  
 class Analysis(Component):
@@ -17,37 +18,145 @@ class Analysis(Component):
 
     We will keep track of how deep we reach into the configuration to store tables, `store_level` 
     starting at zero will only save the table of this configuration
+
+    Analysis has an iterator which is looped over for the table creation, also a default mode with just a single evaluate()
+
+    Several name modes exist when having an iterator, names can be based on both the analysis and iterator
     '''
 
+    iterator = None
     _solved = False
+    
+    modes = ['default','iterator']
+    mode = 'default'
+
+    namepath_modes = ['analysis','iterator','both']
+    namepath_mode = 'both'
+    namepath_root = 'reports/'
+
+    @property
+    def _report_path(self):
+        '''Add some name options that work into ClientInfoMixin'''
+        if self.namepath_mode == 'both' and self.mode == 'iterator' and self.component_iterator is not None:
+            return os.path.join( self.namepath_root, f'{self.name}', f'{self.component_iterator.name}' )
+        elif self.namepath_mode == 'iterator' and self.mode == 'iterator'  and self.component_iterator is not None:
+            return os.path.join( self.namepath_root, f'{self.component_iterator.name}' )
+        else:
+            return os.path.join( self.namepath_root, f'{self.name}' )
+
+    @property
+    def component_iterator(self)-> ComponentIterator: 
+        '''Override me!'''
+        return self.iterator
 
     def solve(self,*args,**kwargs):
-        '''dont override this unless you call evaluate, followed by save_data. 
-        This will maintain table saving functionality'''
-        self.info("Solving {}...".format(self.displayname))
+        '''override at your own peril'''
+        prev_item = None
+        self.info(f'running analysis: {self} with input {self.component_iterator}')
+
         if not self._solved:
-            output = self.evaluate(*args,**kwargs)
-            self.save_data()
-            self._solved = True
-            return output
+            #with alive_bar(len(locations)) as bar:
+            if self.mode=='iterator' and self.component_iterator is not None:
+                output = []
+                for item in self.component_iterator:
+                    #curloc = self.component_iterator.current_location
+                    
+                    # if prev_item is not None: #We hotpatch the table since we loop over configs
+                    #     #loc._table = prev_loc._table
+                    #     prev_item.reset_table()
+                    
+                    output.append(self.evaluate(item,*args,**kwargs))
+
+                    self.save_data()
+                    
+                    prev_item = item #We hotpatch the table since we loop over configs
+
+                self._solved = True
+
+            else: #mode == 'default':                 
+                output = self.evaluate(*args,**kwargs)
+                self.save_data()
+                self._solved = True
+                return output
+
         else:
-            raise Exception('Analysis Already Solved')
+            raise Exception('Analysis Already Solved')            
+    
+    def post_process(self):
+        '''override me!'''
+        pass
 
     def reset_analysis(self):
         self.reset_data()
         self._solved = False
 
+    def gsync_results(self,filename='Analysis', meta_tags = None,ttl=3,retry=True):
+        '''Syncs All Variable Tables To The Cloud'''
+        try:
+            with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
+                gpath = gdrive.sync_path(self.local_sync_path)
+                self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
+                parent_id = gdrive.get_gpath_id(gpath)
+                #TODO: delete old file if exists
+                
+                gdrive.sleep() 
+                gdrive.cache_directory(parent_id)
 
+                #Remove items with same name in parent dir
+                parent = gdrive.item_nodes[parent_id]
+                parent.remove_contents_with_title(filename)
+                
+                #Make the new sheet
+                sht = gdrive.gsheets.create(filename,folder=parent_id)
 
-class Report(Analysis):
-    '''Class capable of comparing several analyses'''
+                wk = sht.add_worksheet(filename)
+                wk.update_value('A1',filename)
+                gdrive.sleep()
+                wk.set_dataframe(self.joined_dataframe,start='A3')
+                gdrive.sleep()                
 
-    def post_process(self):
-        pass
+                for df_result in self.variable_tables:
+                    df = df_result['df']
+                    conf = df_result['conf']
 
-    def save_report(self):
-        pass
+                    if meta_tags is not None and type(meta_tags) is dict:
+                        for tag,value in meta_tags.items():
+                            df[tag] = value
+
+                    wk = sht.add_worksheet(conf.displayname)
+                    wk.update_value('A1',conf.displayname)
+                    gdrive.sleep()
+                    wk.set_dataframe(df,start='A3')
+                    gdrive.sleep()
+                    
+                    
+
+                sht.del_worksheet(sht.sheet1)
+
+                #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
+                self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))            
+
+        except Exception as e:
+            ttl -= 1
+            
+            if retry and ttl > 0:
+                self.warning(f'encountered error gsyncing results, retrying')
+                self.drive.sleep(5)
+                self.gsync_results(filename=filename,meta_tags=meta_tags,ttl=ttl,retry=True)
+            
+            else:
+                self.error(e,'error saving gsheets')            
+
+#WIP
+# class Report(Analysis):
+#     '''Class capable of comparing several analyses'''
+
+#     def post_process(self):
+#         pass
+
+#     def save_report(self):
+#         pass
     
-    def remove_report(file):
-        pass
+#     def remove_report(file):
+#         pass
      
