@@ -595,23 +595,24 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             filepath = os.path.join(self.config_path_daily,filename)
             dataframe.to_excel(path_or_buf=filepath,*args,**kwargs)
 
-    def save_gsheets(self,dataframe,filename=None,retry=True,ttl=3,*args,**kwargs):
+    def save_gsheets(self,dataframe,filename=None,*args,**kwargs):
         '''A function to save the table to google sheets
         :param filename: the filepath on google drive - be careful!
         '''
         with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
-            try:
-                gpath = gdrive.sync_path(self.local_sync_path)
+            with gdrive.rate_limit_manager(self.save_gsheets,dataframe,filename=None,*args,**kwargs) as tdrive:
+
+                gpath = tdrive.sync_path(self.local_sync_path)
                 self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
                 parent_id = gdrive.get_gpath_id(gpath)
                 #TODO: delete old file if exists
-                gdrive.sleep(5) 
-                sht = gdrive.gsheets.create(filename,folder=parent_id)
+                tdrive.sleep(5) 
+                sht = tdrive.gsheets.create(filename,folder=parent_id)
                 
-                gdrive.sleep() 
-                gdrive.cache_directory(parent_id)
+                tdrive.sleep(3) 
+                tdrive.cache_directory(parent_id)
 
-                gdrive.sleep(3) 
+                tdrive.sleep(3) 
                 wk = sht.sheet1
                 wk.set_dataframe(dataframe,start='A1')
                 
@@ -619,16 +620,6 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
                 self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
 
-            except Exception as e:
-                ttl -= 1
-                
-                if retry and ttl >= 0:
-                    self.warning(f'encountered error saving gsheets, retrying')
-                    self.drive.sleep(15*(1 + 3-ttl))
-                    self.save_gsheets(dataframe,filename,retry=True,ttl=ttl)
-                
-                else:
-                    self.error(e,'error saving gsheets')
             
         
     @property

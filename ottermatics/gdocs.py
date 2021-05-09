@@ -1424,10 +1424,13 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         This one is good for a cold entry of a path
         
         This method can create duplicates when used in parallel contexts'''
+        # if gpath.startswith(self.shared_drive):
+        #     gpath = gpath.replace(self.shared_drive,'')
+
         if gpath.startswith('/'):
             gpath = gpath.replace('/','',1)
 
-        if gpath.startswith('..'):
+        if '..' in gpath or 'mnt' in gpath: #guard on wsl
             return self.sync_root_id
 
         self.info('ensuring path {}'.format(gpath))
@@ -1697,7 +1700,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
             else:
                 if self._sleep_time > self.min_sleep_time:
-                    self._sleep_time = self._sleep_time * (0.60**(1.0/self.num_threads)) #This normalizes decay
+                    self._sleep_time = self._sleep_time * (0.80**(1.0/self.num_threads)) #This normalizes decay
 
                 else:
                     self._sleep_time =  (max(self._sleep_time,self.min_sleep_time) * (1.0 + 0.5*random.random()*self.time_fuzz))
@@ -1780,6 +1783,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 self.debug(f'using verified filepath {self._filepath_root}')
             else:
                 raise SourceFolderNotFound(f'could not find filepath {filepath_root}')
+
         elif not self.explict_input_only and self.guess_sync_path: #Infer It
             if in_client_dir():
                 if in_wsl():
@@ -1792,7 +1796,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if in_wsl():
                     self._filepath_root = client_path(skip_wsl=False)
                 else:
-                    self._filepath_root = current_diectory()
+                    self._filepath_root = client_path(skip_wsl=False)
                 self.filepath_inferred = True
                 self.info(f'using infered ottermatics path: {self._filepath_root}')
 
