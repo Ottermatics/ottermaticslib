@@ -605,16 +605,17 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
                 parent_id = gdrive.get_gpath_id(gpath)
                 #TODO: delete old file if exists
-                gdrive.sleep(2) 
+                gdrive.sleep(5) 
                 sht = gdrive.gsheets.create(filename,folder=parent_id)
                 
-                gdrive.sleep(2) 
+                gdrive.sleep() 
                 gdrive.cache_directory(parent_id)
 
+                gdrive.sleep(3) 
                 wk = sht.sheet1
                 wk.set_dataframe(dataframe,start='A1')
-                gdrive.sleep(2) 
                 
+
                 #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
                 self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
 
@@ -623,7 +624,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 
                 if retry and ttl >= 0:
                     self.warning(f'encountered error saving gsheets, retrying')
-                    self.drive.sleep(3*(3-ttl))
+                    self.drive.sleep(15*(1 + 3-ttl))
                     self.save_gsheets(dataframe,filename,retry=True,ttl=ttl)
                 
                 else:
