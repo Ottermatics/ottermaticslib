@@ -155,7 +155,7 @@ class ClientInfoMixin(LoggingMixin):
 
     def enable_cloud_sync(self,**kwargs):
         '''Ensure configuration's daily path is created'''
-        self.info('enabling cloud sync')
+        self.debug('enabling cloud sync')
         self._drive = OtterDrive(**kwargs)
         self._drive_init_args = kwargs #self.drive.initial_args
         #Setup Context

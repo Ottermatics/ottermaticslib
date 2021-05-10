@@ -4,6 +4,8 @@ from ottermatics.components import Component, ComponentIterator
 import datetime
 import os 
 
+import random
+
 @otterize  
 class Analysis(Component):
     '''A type of configuration that will reach down among all attribues of a configuration,
@@ -90,16 +92,16 @@ class Analysis(Component):
         self.reset_data()
         self._solved = False
 
-    def gsync_results(self,filename='Analysis', meta_tags = None,ttl=3,retry=True):
+    def gsync_results(self,filename='Analysis', meta_tags = None):
         '''Syncs All Variable Tables To The Cloud'''
-        try:
-            with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
+        with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
+            with self.drive.rate_limit_manager(self.gsync_results,filename=filename, meta_tags = meta_tags)
                 gpath = gdrive.sync_path(self.local_sync_path)
-                self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
+                self.debug(f'saving as gsheets {gpath}')
                 parent_id = gdrive.get_gpath_id(gpath)
                 #TODO: delete old file if exists
                 
-                gdrive.sleep() 
+                gdrive.sleep(3*(1+random.random())) 
                 gdrive.cache_directory(parent_id)
 
                 #Remove items with same name in parent dir
@@ -108,12 +110,15 @@ class Analysis(Component):
                 
                 #Make the new sheet
                 sht = gdrive.gsheets.create(filename,folder=parent_id)
+                gdrive.sleep(3*(1+random.random())) 
 
                 wk = sht.add_worksheet(filename)
+                gdrive.sleep(3*(1+random.random()))
                 wk.update_value('A1',filename)
-                gdrive.sleep()
+                gdrive.sleep(3*(1+random.random())) 
+                
                 wk.set_dataframe(self.joined_dataframe,start='A3')
-                gdrive.sleep()                
+                gdrive.sleep(3*(1+random.random()))                 
 
                 for df_result in self.variable_tables:
                     df = df_result['df']
@@ -123,29 +128,23 @@ class Analysis(Component):
                         for tag,value in meta_tags.items():
                             df[tag] = value
 
+                    gdrive.sleep(3*(1+random.random())) 
                     wk = sht.add_worksheet(conf.displayname)
+                    gdrive.sleep(3*(1+random.random())) 
                     wk.update_value('A1',conf.displayname)
-                    gdrive.sleep()
+                    gdrive.sleep(3*(1+random.random())) 
                     wk.set_dataframe(df,start='A3')
-                    gdrive.sleep()
+                    gdrive.sleep(3*(1+random.random())) 
+
                     
                     
 
                 sht.del_worksheet(sht.sheet1)
+                gdrive.sleep(3*(1+random.random()))
 
                 #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
                 self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))            
-
-        except Exception as e:
-            ttl -= 1
-            
-            if retry and ttl > 0:
-                self.warning(f'encountered error gsyncing results, retrying')
-                self.drive.sleep(5)
-                self.gsync_results(filename=filename,meta_tags=meta_tags,ttl=ttl,retry=True)
-            
-            else:
-                self.error(e,'error saving gsheets')            
+          
 
 #WIP
 # class Report(Analysis):

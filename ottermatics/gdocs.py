@@ -560,7 +560,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Initalization Methods
     def initalize(self):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
-        self.info(f'Initalizing from {self.filepath_root}')
+        self.debug(f'Initalizing from {self.filepath_root}')
 
         #did_read = self.read()
         #if not did_read:
@@ -613,7 +613,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     def authoirze_google_integrations(self,retry=True,ttl=3):
         try:
             self.sleep(self._sleep_time + 3 * random.random())
-            self.info('Authorizing...')
+            self.debug('Authorizing...')
             #Drive Authentication Using Service Account
             scope = ['https://www.googleapis.com/auth/drive']
 
@@ -799,9 +799,12 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             if file is not None and file.http is not None:
                 for c in file.http.connections.values():
                     c.close()
+            if err.resp.status in [429]:
+                self.hit_rate_limit(10.0 + 10.0*random.random())
+                return retry_function(*args,**kwargs)
 
-            if err.resp.status in [403,429]:
-                self.hit_rate_limit(5.0 * 5.0*random.random())
+            elif err.resp.status in [403]:
+                self.hit_rate_limit(5.0 + 5.0*random.random())
                 return retry_function(*args,**kwargs)
             if err.resp.status in [500, 104]:
                 self.sleep(30.0) #back da fuq off
@@ -1572,9 +1575,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     def addFileNode(self, node):
         if node.id not in self.item_nodes: #Don't do it again!
             if node.is_file:
-                self.debug(f'adding file {node}')
+                self.msg(f'adding file {node}')
             elif node.is_folder:
-                self.info(f'adding folder {node}')
+                self.debug(f'adding folder {node}')
 
             with self.filesystem as fs:
                 #Add items to network
@@ -2062,6 +2065,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
 gpi = logging.getLogger('googleapiclient.http')
 gpi.setLevel(60)
+gpi = logging.getLogger('oauth2client.transport')
+gpi.setLevel(50)
+gpi = logging.getLogger('oauth2client.client')
+gpi.setLevel(50)
 
 def main_cli():
     import argparse
