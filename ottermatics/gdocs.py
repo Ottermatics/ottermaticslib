@@ -443,7 +443,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     call_count = 0 #updated every sleep()
     max_sleep_time = 5.0
-    _sleep_time = 0.2
+    _sleep_time = 0.5
     time_fuzz = 2.0 #base * ( 1+ rand(0,time_fuzz))
     thread_time_multiplier = 1.0
 
@@ -783,7 +783,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         try:
 
             yield self #We just want error handiling, context should be useful
-                
+        
+        except ConnectionError as err:
+            self.info("connection reset, retrying auth")
+            self.sleep(5) #back da fuq off
+            self.authoirze_google_integrations()
+            self.sleep(5) #back da fuq off
+            return retry_function(*args,**kwargs)
+
         except googleapiclient.errors.HttpError as err:
             # If the error is a rate limit or connection error,
             # wait and try again.
