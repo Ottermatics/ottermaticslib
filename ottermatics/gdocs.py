@@ -717,11 +717,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         if protect: self.protected_ids.add(parent_id)
 
         if pool is None and self.use_threadpool:
-            if top: self.info('GET DRIVE INFO USING THREADS!!!')
+            if top: self.debug('GET DRIVE INFO USING THREADS!!!')
             pool = ThreadPoolExecutor(max_workers=self.num_threads)
             pool_set_here = True
         else:
-            if top: self.info('GET DRIVE INFO SINGLE THREAD')
+            if top: self.debug('GET DRIVE INFO SINGLE THREAD')
             pool = None
             pool_set_here = False
 
@@ -938,7 +938,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     self.warning(f'found duplicates {duplicates}')
 
                 if not self.use_threadpool:
-                    self.info('SYNCING WITH SINGLE THREAD...')
+                    self.debug('SYNCING WITH SINGLE THREAD...')
                     for lpath, gpath in self.generate_sync_filepath_pairs(skip_existing= not force):
                         if gpath not in self.item_paths or force:
                             dirname =  os.path.dirname(gpath)
@@ -956,7 +956,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 
                 else:
                     
-                    self.info('SYNCING WITH THREADPOOL...')
+                    self.debug('SYNCING WITH THREADPOOL...')
                     self.thread_time_multiplier = 1.0 #ensure its normal
                     # #Conventional way make folders if they don't exist
                     submitted_set = set()
@@ -1045,11 +1045,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if content is not None:
                     gfile_path = file_path #Direct conversion, we have to input correctly
                     if isinstance( content, (str,unicode)):
-                        self.info(f'{action} file with content string {input_args} -> {gfile_path}')
+                        self.debug(f'{action} file with content string {input_args} -> {gfile_path}')
                         file.SetContentString(content)
                         self.sleep()
                     else:
-                        self.info(f'{action} file with content bytes {input_args} -> {gfile_path}')
+                        self.debug(f'{action} file with content bytes {input_args} -> {gfile_path}')
                         file.content = content
                     
 
@@ -1058,7 +1058,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     file_name = os.path.basename(file_path)
                     gfile_path = self.sync_path(file_path)    
 
-                    self.info(f'{action} file with args {input_args} -> {gfile_path}')
+                    self.debug(f'{action} file with args {input_args} -> {gfile_path}')
                     file.SetContentFile(file_path)
                     self.sleep()
 
@@ -1440,7 +1440,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         if '..' in gpath or 'mnt' in gpath: #guard on wsl
             return self.sync_root_id
 
-        self.info('ensuring path {}'.format(gpath))
+        self.debug('ensuring path {}'.format(gpath))
         parent_id = self.target_folder_id
 
         if gpath in self.folder_paths:
@@ -1464,7 +1464,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     self.cache_directory(parent_id)    
 
                 else:
-                    self.info(f'path doesnt exist, create it {current_pos}' )
+                    self.debug(f'path doesnt exist, create it {current_pos}' )
                     if parent_id is not None and not any([fol.startswith('.') for fol in current_pos.split(os.sep)]):
                         fol = self.get_or_create_folder(sub,parent_id)
                         if fol is not None:
@@ -1798,14 +1798,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 else:
                     self._filepath_root = current_diectory()
                 self.filepath_inferred = True
-                self.info(f'using infered client path: {self._filepath_root}')
+                self.debug(f'using infered client path: {self._filepath_root}')
             elif self._shared_drive == self.default_shared_drive and in_dropbox_dir(): #OTTERSYNC
                 if in_wsl():
                     self._filepath_root = client_path(skip_wsl=False)
                 else:
                     self._filepath_root = client_path(skip_wsl=False)
                 self.filepath_inferred = True
-                self.info(f'using infered ottermatics path: {self._filepath_root}')
+                self.debug(f'using infered ottermatics path: {self._filepath_root}')
 
         if do_reinitalize:
             self.reset_target_id()
@@ -1823,7 +1823,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             has_drives = self.shared_drives
             if just_drive in has_drives:
                 self._shared_drive = f'shared:{just_drive}'
-                self.info(f'using input shared drive: {self._shared_drive}')
+                self.debug(f'using input shared drive: {self._shared_drive}')
             else:
                 raise SharedDriveNotFound(f'Could not find {shared_drive}')
         elif not self.explict_input_only: #Inferance
@@ -1832,7 +1832,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             #1) Look for credentials in service account creds
             if 'shared_drive' in creds_info: 
                 self._shared_drive = creds_info['shared_drive']
-                self.info(f'using service account shared drive: {self._shared_drive}')
+                self.debug(f'using service account shared drive: {self._shared_drive}')
             
             #2) Look for enviornmental variable
             elif 'CLIENT_GDRIVE_PATH' in os.environ \
@@ -1854,7 +1854,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     drive_canidate = drive_canidate.replace('shared:','')
                     if drive_canidate in self.shared_drives:
                         self._shared_drive = f'shared:{drive_canidate}'
-                        self.info(f'using env-var shared drive: {self._shared_drive}')
+                        self.debug(f'using env-var shared drive: {self._shared_drive}')
                     else:
                         raise SharedDriveNotFound(f'env var shared drive not found {gpath}->{drive_canidate}')
                 else:
@@ -1863,7 +1863,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             #3) Use Default
             else:
                 self._shared_drive = self.default_shared_drive
-                self.info(f'using default shared drive: {self._shared_drive}')
+                self.debug(f'using default shared drive: {self._shared_drive}')
 
         #Set the root_id after everything has settled
         if self._shared_drive is not None:
@@ -1903,7 +1903,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if '\\' in sync_root:
                     sync_root = os.path.join('\\',sync_root.split('\\')[1:])
             self._sync_root = sync_root
-            self.info(f'using input sync root {self._sync_root}')         
+            self.debug(f'using input sync root {self._sync_root}')         
 
         elif not self.explict_input_only:
             creds_info = self.credentials_info
@@ -1911,7 +1911,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             #1) Look for credentials in service account creds
             if 'shared_sync_path' in creds_info and creds_info['shared_sync_path']: 
                 self._sync_root = creds_info['shared_sync_path']
-                self.info(f'using service account sync path: {self._sync_root}')
+                self.debug(f'using service account sync path: {self._sync_root}')
             
             #2) Look for enviornmental variable
             elif 'CLIENT_GDRIVE_PATH' in os.environ and \
@@ -1934,7 +1934,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     drive_canidate = gpath #one could only assume this is correct
                 
                 self._sync_root = drive_canidate
-                self.info(f'using env-var sync path: {self._sync_root}')
+                self.debug(f'using env-var sync path: {self._sync_root}')
 
             #3) We do our best
             elif self.guess_sync_path:
@@ -1952,7 +1952,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     else:
                         #Map to /matching/path... since client drive assumed root
                         self._sync_root =  os.path.relpath(guessfilepath,client_path(skip_wsl=False))
-                    self.info(f'client infered sync path from given filepath : {self._sync_root}')
+                    self.debug(f'client infered sync path from given filepath : {self._sync_root}')
 
                 elif in_dropbox_dir(guessfilepath): #we're not in a client folder
                     if self.shared_drive == self.default_shared_drive: 
@@ -1961,10 +1961,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     else:
                         #Its Root!
                         self._sync_root =  ''
-                    self.info(f'client infered sync path from given filepath : {self._sync_root}')
+                    self.debug(f'client infered sync path from given filepath : {self._sync_root}')
                 else:
                     self._sync_root = ''
-                    self.info(f'client infered sync path from given filepath : {self._sync_root}')
+                    self.debug(f'client infered sync path from given filepath : {self._sync_root}')
 
         if self._sync_root is None: raise SyncPathNotFound(f'No sync_path found for {self._sync_root}')
 
