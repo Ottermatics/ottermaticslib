@@ -1493,7 +1493,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         matches = list(fids[paths==gpath])
         if len(matches) > 1:
-            self.warning(f'found matches {matches} for {gpath}, using first')
+            self.warning(f'gpathid found matches {matches} for {gpath}, using first')
             #TODO: Handle this case!
             nodes = [ self.item_nodes[mtch] for mtch in matches]
             snodes = sorted(nodes,key=lambda it: newness(it), reverse=True)
@@ -1691,10 +1691,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def hit_rate_limit(self,sleep_time=5):
         old_sleeptime = self._sleep_time
-        self._sleep_time = min(self._sleep_time * 1.5**(2.0/self.num_threads),self.max_sleep_time)
+        self._sleep_time = min(self._sleep_time * 1.8**(2.0/self.num_threads),self.max_sleep_time)
 
         dynamicsleep = sleep_time*0.5 + random.random() * sleep_time
-        self.warning(f'sleeping {dynamicsleep}s, change sleep {old_sleeptime} -> {self._sleep_time} then continuing')
+        self.warning(f'sleepingx{self.num_threads} {dynamicsleep}s, change sleep {old_sleeptime} -> {self._sleep_time} then continuing')
         
         self.sleep(dynamicsleep)
         
@@ -1710,7 +1710,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
             else:
                 if self._sleep_time > self.min_sleep_time:
-                    self._sleep_time = self._sleep_time * (0.80**(1.0/self.num_threads)) #This normalizes decay
+                    self._sleep_time = self._sleep_time * (0.90**(1.0/self.num_threads)) #This normalizes decay
 
                 else:
                     self._sleep_time =  (max(self._sleep_time,self.min_sleep_time) * (1.0 + 0.5*random.random()*self.time_fuzz))
@@ -1731,6 +1731,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     @property
     def is_ray_context(self):
+        return False
+
+        #FIXME: not working on return
         try:
             rtc = get_runtime_context()        
             if not rtc.worker.actor_id.is_nil():
@@ -2021,6 +2024,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         for dkey,dval in d.items():
             if dkey in self.keep_keys:
                 self.__dict__[dkey] = dval
+
+        #Force distributed drive contexts to be single threaded
+        self._use_threadpool = False
+        self._max_num_threads = 1
 
         self.net_lock = threading.RLock()
         if self.gauth is None: self.authoirze_google_integrations()
