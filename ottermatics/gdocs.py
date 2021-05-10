@@ -608,7 +608,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6)) 
 
     def status_message(self,header=''):
-        self.info(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
+        self.debug(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
 
     def authoirze_google_integrations(self,retry=True,ttl=3):
         try:
