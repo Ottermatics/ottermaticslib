@@ -65,9 +65,7 @@ class FileNode(LoggingMixin):
 
         self.debug(f'Created Node {self.title}')
 
-        if self._item.http is not None:
-            for c in self._item.http.connections.values():
-                c.close()
+        self.close_http()
 
         # if not threading.main_thread(): #save some time yo!
         #     try:
@@ -277,9 +275,24 @@ class FileNode(LoggingMixin):
     def get_datetime(self,dts:str):
         return datetime.datetime.strptime(dts, '%Y-%m-%dT%H:%M:%S.%fZ')
 
+    def close_http(self):
+        '''to use multi-threads we must close connections'''
+        if self._item.http is not None:
+            for c in self._item.http.connections.values():
+                c.close()
+            del self._item.http
+            self._item.http = None
+
+    def ensure_http(self):
+        '''close and create new connection to ensure that its in the right context in thread'''
+        if self._item.http is not None:
+            self.close_http()
+            self._item.http = self.drive.gauth.Get_Http_Object()
+
     def delete(self):
+        self.ensure_http()
         if not self.is_protected and not self.drive.dry_run:
-            with self.drive.rate_limit_manager(self.delete,gfileMeta=self.item):
+            with self.drive.rate_limit_manager(self.delete,2,gfileMeta=self.item):
                 self.info(f'deleting: {self.title}')                
                 self.item.Trash()
                 self.drive.sleep()
@@ -312,7 +325,7 @@ class FileNode(LoggingMixin):
     #Magic Methods (Pickling here)
     def __getstate__(self):
         '''Remove active connection objects, they are not picklable'''
-        self.debug('removing unpicklable info')
+        #self.debug('removing unpicklable info')
         d = self.__dict__.copy()
         #d['_drive'] = None
         d['_log'] = None
@@ -328,9 +341,6 @@ class FileNode(LoggingMixin):
         self.__dict__ = d
         self.debug('seralizing')
         
-
-
-
 class RootNode(FileNode):
     '''A wrapper for shared drive objects to work in a graph and store conveinence functions'''
     
@@ -402,8 +412,12 @@ class RootNode(FileNode):
 
 default_timestamp = 1577858461 #jan 1 2020
 timestamp_divider = (24 * 3600) #a day in seconds
-newness = lambda item: (item.createdDate.timestamp() - default_timestamp)/ timestamp_divider
+
+days_since_2020 = lambda item: (item.createdDate.timestamp() - default_timestamp)/ timestamp_divider
 content_size = lambda item: len(item.contents)
+
+
+#FIXME: Implement Thread Saftey To Prevent Rare Segmentation Faults
 
 #@Singleton
 class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
@@ -445,6 +459,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     max_sleep_time = 5.0
     _sleep_time = 0.5
     time_fuzz = 2.0 #base * ( 1+ rand(0,time_fuzz))
+    _absolute_min_sleep = 0.2
     thread_time_multiplier = 1.0
 
     #Default is most permissive
@@ -517,6 +532,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #Authoirize yoself foo
         self.authoirze_google_integrations()
 
+        self.info('Initalizing...')
         #These use setters via properties so order is important
         #0) Get Share Drive Info
         self.update_shared_drives()
@@ -526,7 +542,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.filepath_root = filepath_root
         #3) set and check sync path and infer from #1 / 2 if not input
         self.sync_root = sync_root
-
+        
         self.initalize()
 
     @property
@@ -598,7 +614,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         else:
             self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=2)#light refresh
 
-        self.status_message('Otterdrive Ready For Use')
+        self.status_message('Otterdrive Ready!')
         self.thread_time_multiplier = 1.0
 
         #self.save()
@@ -636,7 +652,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self.gdrive.http = self.gauth.Get_Http_Object() #Do in advance for share drives
             self.sleep()
 
-            self.info('Ready!')
+            self.info('Authorized!')
         
         except Exception as e:
             ttl -= 1
@@ -766,13 +782,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         except Exception as e:
             self.error(e,'Issue Syncing Locally')
-        finally:
-            pool.shutdown()
-
+        
+        finally:    
+            if pool is not None: pool.shutdown()
+            
         return result
 
     @contextmanager
-    def rate_limit_manager(self,retry_function,*args,**kwargs):
+    def rate_limit_manager(self,retry_function,multiplier,*args,**kwargs):
         '''A context manager that handles authentication and rate limit errors'''
 
         if 'gfileMeta' in kwargs:
@@ -780,15 +797,27 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         else:
             file = None
 
+        # def retry(function,*args,**kwargs):
+        #     with self.rate_limit_manger(retry_function,multiplier,*args,**kwargs):
+        #         return function(*args,**kwargs)
+        
+
         try:
 
             yield self #We just want error handiling, context should be useful
+
+        # except OSError as e:
+        #     if e.errno == 101:
+        #         self.hit_rate_limit(60.0 + 30.0*random.random())
+        #         return retry_function(*args,**kwargs)
+        #     else:
+        #         self.error(e,'Unexpected OSError:')             
         
         except ConnectionError as err:
             self.info("connection reset, retrying auth")
-            self.sleep(5) #back da fuq off
+            self.hit_rate_limit(30.0 + 30.0*random.random(),multiplier=multiplier)
             self.authoirze_google_integrations()
-            self.sleep(5) #back da fuq off
+            self.sleep(10.0 + 10.0*random.random())
             return retry_function(*args,**kwargs)
 
         except googleapiclient.errors.HttpError as err:
@@ -800,15 +829,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 for c in file.http.connections.values():
                     c.close()
             if err.resp.status in [429]:
-                self.hit_rate_limit(10.0 + 10.0*random.random())
+                self.hit_rate_limit(30.0 + 10.0*random.random(),multiplier=multiplier)
                 return retry_function(*args,**kwargs)
 
             elif err.resp.status in [403]:
-                self.hit_rate_limit(5.0 + 5.0*random.random())
+                self.hit_rate_limit(30.0 + 10.0*random.random(),multiplier=multiplier)
                 return retry_function(*args,**kwargs)
             if err.resp.status in [500, 104]:
-                self.sleep(30.0) #back da fuq off
-                self.hit_rate_limit()
+                self.hit_rate_limit(30.0 + 10.0*random.random(),multiplier=multiplier)
                 return retry_function(*args,**kwargs)                
             else:
                 self.error(err,'Google API Error')
@@ -822,8 +850,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 for c in file.http.connections.values():
                     c.close()
 
-            if 'code' in err.error and int(err.error['code']) in [403]:
-                self.hit_rate_limit()
+            if 'code' in err.error and int(err.error['code']) in [403,429,500,104]:
+                self.hit_rate_limit(multiplier=multiplier)
                 return retry_function(*args,**kwargs)
             else:
                 self.error(err,'Google API Error')
@@ -983,6 +1011,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                                 pool.submit(self.sync_path_pair_thread,lpath,gpath,parent_id)
                             else:
                                 if gpath in self.item_paths: self.debug( 'found existing {}'.format(gpath) )
+
                     self.thread_time_multiplier = 1.0
 
 
@@ -1037,15 +1066,18 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         
         self.debug(f'creating file w/ args: {input_args}')
 
+        self.sleep()
         file = self.gdrive.CreateFile(input_args)
+        self.ensure_item_http(file)
         self.sleep()
 
-        with self.rate_limit_manager(self.create_file,input_args,file_path,content):
+        with self.rate_limit_manager(self.create_file,2,input_args,file_path,content):
             if not self.dry_run and any((file_path is not None, content is not None )):
                 
                 action = 'creating' if 'id' not in input_args else 'updating'
 
                 if content is not None:
+                    
                     gfile_path = file_path #Direct conversion, we have to input correctly
                     if isinstance( content, (str,unicode)):
                         self.debug(f'{action} file with content string {input_args} -> {gfile_path}')
@@ -1076,7 +1108,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
             elif self.dry_run:
                 pass
-                #TOOD: Create fake folder item and cache it
+                #TODO: Create fake folder item and cache it
 
         if file.http is not None:
             for c in file.http.connections.values():
@@ -1152,9 +1184,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             input_args['mimeType'] = "application/vnd.google-apps.folder"
 
         file = self.gdrive.CreateFile(input_args)
+        self.ensure_item_http(file)
         self.sleep()
 
-        with self.rate_limit_manager(self.create_folder,input_args,upload,gfileMeta=file):
+        with self.rate_limit_manager(self.create_folder,2,input_args,upload,gfileMeta=file):
             if upload and not self.dry_run:
                 file.Upload(param={'supportsTeamDrives': True}) # Upload the file.
                 self.sleep()
@@ -1365,18 +1398,18 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         try:
             #First we want to delete the duplicate files since thats easy
             for fpath, items in item_dict.items():
-                group = [{'it':item,'new':newness(item)}  for i,item in enumerate(items)]
+                group = [{'item':item,'new':days_since_2020(item)}  for i,item in enumerate(items)]
                 order_items = sorted(group, key=lambda itd: itd['new'])
-                keep = order_items[0]['it']
-                discard = order_items[1:]
+                keep = order_items[-1] #This will be the newest!
+                discard = order_items[:-1]
                 
                 self.debug(f'keeping {keep}, removing {discard} for {fpath}')
                 for remove in discard:
-                    item = remove['it']
-                    if pool is not None:
-                        pool.submit(item.delete)
-                    else:
-                        item.delete()
+                    item = remove['item']
+                    #if pool is not None:
+                    #    pool.submit(item.delete) #make thread safe
+                    #else:
+                    item.delete()
 
         except Exception as e:
             self.error(e,'Issue deleting duplicates')
@@ -1392,13 +1425,13 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
             all_empty =  all([content_size(it) == 0 for it in items])
             if all_empty: #Score on date
-                group = [{'it':item,'new':newness(item),'size':content_size(item), 'score': newness(item)}  for i,item in enumerate(items)]
+                group = [{'it':item,'new':days_since_2020(item),'size':content_size(item), 'score': days_since_2020(item)}  for i,item in enumerate(items)]
             else:
-                group = [{'it':item,'new':newness(item),'size':content_size(item), 'score': content_size(item)*newness(item)}  for i,item in enumerate(items)]                    
+                group = [{'it':item,'new':days_since_2020(item),'size':content_size(item), 'score': content_size(item)*days_since_2020(item)}  for i,item in enumerate(items)]                    
 
             #Sort by highest score
             order_items = sorted(group, key=lambda itd: itd['score'], reverse=True)
-            keep = order_items[0]
+            keep = order_items[0] #keep oldest folder
             remove = order_items[1:]
             out = {'keep':keep,'remove':remove}
             self.info(f'suggested work: {out}')
@@ -1496,8 +1529,15 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self.warning(f'gpathid found matches {matches} for {gpath}, using first')
             #TODO: Handle this case!
             nodes = [ self.item_nodes[mtch] for mtch in matches]
-            snodes = sorted(nodes,key=lambda it: newness(it), reverse=True)
-            return snodes[0].id
+            snodes = sorted(nodes,key=lambda it: days_since_2020(it), reverse=True)
+            if snodes[0].is_folder:
+                return snodes[0].id #This returns the oldest folder
+            
+            elif snodes[-1].is_file:
+                return snodes[-1].id #This returns the newest file
+
+            return snodes[0].id #This returns the oldest folder
+
         elif len(matches) == 1:
             return self.item_nodes[matches[0]].id
         
@@ -1523,6 +1563,19 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         return self.ensure_g_path_get_id(gpath)        
 
     #Meta Based Caching
+    def close_item_http(self,item):
+        if item.http is not None:
+            for c in item.http.connections.values():
+                c.close()        
+
+    def ensure_item_http(self,item):
+        '''to use multi-threads we must close connections'''
+        if item.http is not None:
+            self.close_item_http(item)
+            item.http = self.gauth.Get_Http_Object()  
+        else:
+            item.http = self.gauth.Get_Http_Object()
+
     @property 
     def nodes(self):
         return list(self._filesystem.nodes())
@@ -1639,7 +1692,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             existing_contents = {}
 
         success = False
-        with self.rate_limit_manager(self.search_items,q,parent_id,**kwargs):
+        with self.rate_limit_manager(self.search_items,2,q,parent_id,**kwargs):
             self.sleep()
             for output in  self.gdrive.ListFile(input_args):
                 for file in output:
@@ -1689,42 +1742,55 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     def dict_by_title(self,items_list):
         return {(it.title if isinstance(it,FileNode) else it['title']):it for it in items_list}
 
-    def hit_rate_limit(self,sleep_time=5):
+    def hit_rate_limit(self,sleep_time=5,multiplier=2):
         old_sleeptime = self._sleep_time
-        self._sleep_time = min(self._sleep_time * 1.8**(2.0/self.num_threads),self.max_sleep_time)
+
+        if not isinstance(multiplier, (int,float)):
+            multiplier = 2.0
+
+        if self.use_threadpool:
+            self._sleep_time = min(self._sleep_time * multiplier**(1.0/self.num_threads),self.max_sleep_time)
+        else:
+            self._sleep_time = min(self._sleep_time * multiplier,self.max_sleep_time)
+        
 
         dynamicsleep = sleep_time*0.5 + random.random() * sleep_time
         self.warning(f'sleepingx{self.num_threads} {dynamicsleep}s, change sleep {old_sleeptime} -> {self._sleep_time} then continuing')
         
-        self.sleep(dynamicsleep)
+        self.sleep( dynamicsleep )
         
     def sleep(self,val=None):
+        '''a serious effort has gone into avoiding spamming rate limits.
+        
+        This would be a great place for a ray actor'''
         self.call_count += 1.0
 
+        if isinstance(val,(float,int)):
+            time.sleep( self._sleep_time + val ) #ultra conservative 
+            return
+
         main_thread = threading.main_thread()
-    
-        if not main_thread: 
 
-            if isinstance(val,(float,int)):
-                time.sleep(val)
-
+        #Decay sleep time
+        if self._sleep_time > self.min_sleep_time:
+            if self.use_threadpool:
+                self._sleep_time = self._sleep_time * (0.999**(1.0/self.num_threads)) #This normalizes decay
             else:
-                if self._sleep_time > self.min_sleep_time:
-                    self._sleep_time = self._sleep_time * (0.90**(1.0/self.num_threads)) #This normalizes decay
+                self._sleep_time = self._sleep_time * 0.995
+        else:
+            self._sleep_time =  (max(self._sleep_time,self.min_sleep_time) * (1.0 + random.random()*self.time_fuzz))
 
-                else:
-                    self._sleep_time =  (max(self._sleep_time,self.min_sleep_time) * (1.0 + 0.5*random.random()*self.time_fuzz))
-
+        if not main_thread: 
                 time.sleep( min(self.thread_time_multiplier * self._sleep_time, self.max_sleep_time) )
         else:
-            time.sleep( self.min_sleep_time * 2)
+            time.sleep( self._sleep_time )
 
     @property
     def min_sleep_time(self):
         #not going too fast is important since rate limits will result in incompete searches and PyDrive doesn't make those accessible
         reqpermin = 10000
         reqpersec = reqpermin / 60.0
-        return self.num_threads * 2.0 / reqpersec 
+        return max(self.num_threads * 3.0 / reqpersec, self._absolute_min_sleep)
 
     def draw_filesystem(self,*args,**kwargs):
         nx.draw(self._filesystem,*args,**kwargs)
@@ -2008,7 +2074,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #Magic Methods (Pickling here)
     def __getstate__(self):
         '''Remove active connection objects, they are not picklable'''
-        self.debug('removing unpiclable info')
+        #self.debug('removing unpiclable info')
         d = self.__dict__.copy()
         d['gsheets'] = None
         #d['engine'] = None
@@ -2028,6 +2094,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #Force distributed drive contexts to be single threaded
         self._use_threadpool = False
         self._max_num_threads = 1
+        self.time_fuzz = 6
 
         self.net_lock = threading.RLock()
         if self.gauth is None: self.authoirze_google_integrations()

@@ -169,6 +169,8 @@ class ClientInfoMixin(LoggingMixin):
         try:
             with self.drive.context(filepath_root = self.local_sync_path, sync_root = self.cloud_sync_path) as cdrive:
                 cdrive.sync(force=force)
+                if cdrive.duplicates_exist:
+                    cdrive.remove_duplicates() #clean haus
 
         except Exception as e:
             self.error(e, 'issue syncing config')

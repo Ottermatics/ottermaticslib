@@ -116,15 +116,15 @@ class ComponentIterator(Component):
     #Wrappers for current component
     @property
     def data_row(self):
-        return self.current_component.data_row
+        return super(ComponentIterator,self).data_row + self.current_component.data_row
 
     @property
     def data_label(self):
-        return self.current_component.data_label
+        return super(ComponentIterator,self).data_label + self.current_component.data_label
 
     @property
     def plot_variables(self):    
-        return self.current_component.plot_variables
+        return super(ComponentIterator,self).plot_variables + self.current_component.plot_variables
 
     #Magicz
     #@functools.cached_property
