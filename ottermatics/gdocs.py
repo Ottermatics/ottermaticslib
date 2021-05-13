@@ -732,14 +732,13 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         if protect: self.protected_ids.add(parent_id)
 
-        if pool is None and self.use_threadpool:
+        if pool is None: #and self.use_threadpool #Always use threads for this!
             if top: self.debug('GET DRIVE INFO USING THREADS!!!')
             pool = ThreadPoolExecutor(max_workers=self.num_threads)
-            pool_set_here = True
+
         else:
             if top: self.debug('GET DRIVE INFO SINGLE THREAD')
-            pool = None
-            pool_set_here = False
+            #pool = None
 
         if already_cached is None and self.use_threadpool :
             already_cached = set()
@@ -1758,6 +1757,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.warning(f'sleepingx{self.num_threads} {dynamicsleep}s, change sleep {old_sleeptime} -> {self._sleep_time} then continuing')
         
         self.sleep( dynamicsleep )
+
+    def reset_sleep_time(self,new_sleep_time = 0.5):
+        self._sleep_time = new_sleep_time
         
     def sleep(self,val=None):
         '''a serious effort has gone into avoiding spamming rate limits.

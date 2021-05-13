@@ -97,6 +97,10 @@ class Analysis(Component):
         '''Syncs All Variable Tables To The Cloud'''
         with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
             with self.drive.rate_limit_manager(self.gsync_results,6,filename=filename, meta_tags = meta_tags):
+                
+                old_sleep = gdrive._sleep_time
+                gdrive.reset_sleep_time( max(old_sleep,2.5) )                
+                
                 gpath = gdrive.sync_path(self.local_sync_path)
                 
                 self.debug(f'saving as gsheets {gpath}')
@@ -150,7 +154,8 @@ class Analysis(Component):
 
                 #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
                 self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))            
-          
+
+                gdrive.reset_sleep_time( old_sleep )            
 
 #WIP
 # class Report(Analysis):

@@ -608,7 +608,10 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         '''
         with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
             with gdrive.rate_limit_manager( self.save_gsheets,6,dataframe,filename=filename,*args,**kwargs) as tdrive:
-
+                
+                old_sleep = tdrive._sleep_time
+                tdrive.reset_sleep_time( max(old_sleep,2.5) )
+                
                 gpath = tdrive.sync_path(self.local_sync_path)
                 self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
                 parent_id = gdrive.get_gpath_id(gpath)
@@ -630,6 +633,8 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
                     #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
                     self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
+
+                tdrive.reset_sleep_time( old_sleep )
 
             
         
