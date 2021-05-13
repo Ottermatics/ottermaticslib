@@ -227,7 +227,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
 
 
-class DBConnection(LoggingMixin, metaclass=SingletonMeta):
+class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
     to get the active instance use DBConnection.instance(**non_default_connection_args)
     

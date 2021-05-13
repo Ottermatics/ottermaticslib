@@ -166,6 +166,7 @@ class ClientInfoMixin(LoggingMixin):
         
     def gsync(self,force=False):
         '''Changes drive context to this component then syncs it according to the filepath mode'''
+        self.info(f"Beginning Gsync to {self.cloud_sync_path}...")
         try:
             with self.drive.context(filepath_root = self.local_sync_path, sync_root = self.cloud_sync_path) as cdrive:
                 cdrive.sync(force=force)

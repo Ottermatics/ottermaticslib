@@ -1,47 +1,35 @@
-SQLAlchemyThe Database Toolkit for Python
-homefeaturesbloglibrarycommunitydownload
-Release: 1.3.24 LEGACY VERSION | Release Date: March 30, 2021
-SQLAlchemy 1.3 Documentation
-Search terms: 
-search...
- 
-Contents | Index | Download as ZIP file
+"""Mapping a polymorphic-valued vertical table as a dictionary.
 
-Source code for examples.vertical.dictlike
-"""Mapping a vertical table as a dictionary.
+Builds upon the dictlike.py example to also add differently typed
+columns to the "fact" table, e.g.::
 
-This example illustrates accessing and modifying a "vertical" (or
-"properties", or pivoted) table via a dict-like interface.  These are tables
-that store free-form object properties as rows instead of columns.  For
-example, instead of::
-
-  # A regular ("horizontal") table has columns for 'species' and 'size'
-  Table('animal', metadata,
-        Column('id', Integer, primary_key=True),
-        Column('species', Unicode),
-        Column('size', Unicode))
-
-A vertical table models this as two tables: one table for the base or parent
-entity, and another related table holding key/value pairs::
-
-  Table('animal', metadata,
-        Column('id', Integer, primary_key=True))
-
-  # The properties table will have one row for a 'species' value, and
-  # another row for the 'size' value.
   Table('properties', metadata
-        Column('animal_id', Integer, ForeignKey('animal.id'),
+        Column('owner_id', Integer, ForeignKey('owner.id'),
                primary_key=True),
         Column('key', UnicodeText),
-        Column('value', UnicodeText))
+        Column('type', Unicode(16)),
+        Column('int_value', Integer),
+        Column('char_value', UnicodeText),
+        Column('bool_value', Boolean),
+        Column('decimal_value', Numeric(10,2)))
 
-Because the key/value pairs in a vertical scheme are not fixed in advance,
-accessing them like a Python dict can be very convenient.  The example below
-can be used with many common vertical schemas as-is or with minor adaptations.
+For any given properties row, the value of the 'type' column will point to the
+'_value' column active for that row.
+
+This example approach uses exactly the same dict mapping approach as the
+'dictlike' example.  It only differs in the mapping for vertical rows.  Here,
+we'll use a @hybrid_property to build a smart '.value' attribute that wraps up
+reading and writing those various '_value' columns and keeps the '.type' up to
+date.
 
 """
-from __future__ import unicode_literals
 
+from sqlalchemy import event
+from sqlalchemy import literal_column
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm.interfaces import PropComparator
+
+from ottermatics.data import *
 
 class ProxiedDictMixin(object):
     """Adds obj[key] access to a mapped class.
@@ -70,6 +58,89 @@ class ProxiedDictMixin(object):
     def __delitem__(self, key):
         del self._proxied[key]
 
+class PolymorphicVerticalProperty(object):
+    """A key/value pair with polymorphic value storage.
+
+    The class which is mapped should indicate typing information
+    within the "info" dictionary of mapped Column objects; see
+    the NumericEntry mapping below for an example.
+
+    """
+
+    def __init__(self, key, value=None):
+        self.key = key
+        self.value = value
+
+    @hybrid_property
+    def value(self):
+        fieldname, discriminator = self.type_map[self.type]
+        if fieldname is None:
+            return None
+        else:
+            return getattr(self, fieldname)
+
+    @value.setter
+    def value(self, value):
+        py_type = type(value)
+        fieldname, discriminator = self.type_map[py_type]
+
+        self.type = discriminator
+        if fieldname is not None:
+            setattr(self, fieldname, value)
+
+    @value.deleter
+    def value(self):
+        self._set_value(None)
+
+    @value.comparator
+    class value(PropComparator):
+        """A comparator for .value, builds a polymorphic comparison via
+        CASE."""
+
+        def __init__(self, cls):
+            self.cls = cls
+
+        def _case(self):
+            pairs = set(self.cls.type_map.values())
+            whens = [
+                (
+                    literal_column("'%s'" % discriminator),
+                    cast(getattr(self.cls, attribute), String),
+                )
+                for attribute, discriminator in pairs
+                if attribute is not None
+            ]
+            return case(whens, self.cls.type, null())
+
+        def __eq__(self, other):
+            return self._case() == cast(other, String)
+
+        def __ne__(self, other):
+            return self._case() != cast(other, String)
+
+    def __repr__(self):
+        return "<%s %r=%r>" % (self.__class__.__name__, self.key, self.value)
+
+
+@event.listens_for(
+    PolymorphicVerticalProperty, "mapper_configured", propagate=True
+)
+def on_new_class(mapper, cls_):
+    """Look for Column objects with type info in them, and work up
+    a lookup table."""
+
+    info_dict = {}
+    info_dict[type(None)] = (None, "none")
+    info_dict["none"] = (None, "none")
+
+    for k in mapper.c.keys():
+        col = mapper.c[k]
+        if "type" in col.info:
+            python_type, discriminator = col.info["type"]
+            info_dict[python_type] = (k, discriminator)
+            info_dict[discriminator] = (k, discriminator)
+    cls_.type_map = info_dict
+
 
 if __name__ == "__main__":
     from sqlalchemy import (
@@ -79,6 +150,12 @@ if __name__ == "__main__":
         ForeignKey,
         UnicodeText,
         and_,
+        or_,
+        String,
+        Boolean,
+        cast,
+        null,
+        case,
         create_engine,
     )
     from sqlalchemy.orm import relationship, Session
@@ -88,115 +165,113 @@ if __name__ == "__main__":
 
     Base = declarative_base()
 
-    class AnimalFact(Base):
-        """A fact about an animal."""
+    #Polymorphic or just numeric?
+    class NumericEntry(PolymorphicVerticalProperty, Base):
+        """A numeric value with key name"""
 
-        __tablename__ = "animal_fact"
+        __tablename__ = "numeric_entries"
 
-        animal_id = Column(ForeignKey("animal.id"), primary_key=True)
+        tabulation_id = Column(ForeignKey("tabulation.id"), primary_key=True)
         key = Column(Unicode(64), primary_key=True)
-        value = Column(UnicodeText)
+        value = Column(Numeric)
+        #type = Column(Unicode(16))
 
-    class Animal(ProxiedDictMixin, Base):
-        """an Animal"""
+        # add information about storage for different types
+        # in the info dictionary of Columns
+        # int_value = Column(Integer, info={"type": (int, "integer")})
+        # char_value = Column(UnicodeText, info={"type": (str, "string")})
+        # boolean_value = Column(Boolean, info={"type": (bool, "boolean")})
 
-        __tablename__ = "animal"
+    class TabulationResult(ProxiedDictMixin, Base):
+        """an TabulationResult"""
+
+        __tablename__ = "tabulation"
 
         id = Column(Integer, primary_key=True)
         name = Column(Unicode(100))
 
         facts = relationship(
-            "AnimalFact", collection_class=attribute_mapped_collection("key")
+            "NumericEntry", collection_class=attribute_mapped_collection("key")
         )
 
         _proxied = association_proxy(
             "facts",
             "value",
-            creator=lambda key, value: AnimalFact(key=key, value=value),
+            creator=lambda key, value: NumericEntry(key=key, value=value),
         )
 
         def __init__(self, name):
             self.name = name
 
         def __repr__(self):
-            return "Animal(%r)" % self.name
+            return "Tabulation(%r)" % self.name
 
         @classmethod
         def with_characteristic(self, key, value):
             return self.facts.any(key=key, value=value)
 
-    engine = create_engine("sqlite://")
+    #engine = create_engine("sqlite://", echo=True)
+    db = DBConnection(database_name='report_test',host='localhost',user='postgres',passd='***REMOVED***')
+    engine = db.engine
+
     Base.metadata.create_all(engine)
+    session = Session(engine)
 
-    session = Session(bind=engine)
-
-    stoat = Animal("stoat")
-    stoat["color"] = "reddish"
-    stoat["cuteness"] = "somewhat"
-
-    # dict-like assignment transparently creates entries in the
-    # stoat.facts collection:
-    print(stoat.facts["color"])
+    stoat = TabulationResult("stoat")
+    stoat["color"] = 19.1
+    stoat["cuteness"] = 7
+    stoat["weasel-like"] = 43
 
     session.add(stoat)
     session.commit()
 
-    critter = session.query(Animal).filter(Animal.name == "stoat").one()
-    print(critter["color"])
-    print(critter["cuteness"])
+    # critter = session.query(TabulationResult).filter(TabulationResult.name == "stoat").one()
+    # print(critter["color"])
+    # print(critter["cuteness"])
 
-    critter["cuteness"] = "very"
+    # print("changing cuteness value and type:")
+    # critter["cuteness"] = "very cute"
 
-    print("changing cuteness:")
+    # session.commit()
 
-    marten = Animal("marten")
-    marten["color"] = "brown"
-    marten["cuteness"] = "somewhat"
+    marten = TabulationResult("marten")
+    marten["cuteness"] = 5123
+    marten["weasel-like"] = 123
+    marten["poisonous"] = 124
     session.add(marten)
 
-    shrew = Animal("shrew")
-    shrew["cuteness"] = "somewhat"
-    shrew["poisonous-part"] = "saliva"
+    shrew = TabulationResult("shrew")
+    shrew["cuteness"] = 5
+    shrew["weasel-like"] = 32
+    shrew["poisonous"] = 12
+
     session.add(shrew)
+    session.commit()
 
-    loris = Animal("slow loris")
-    loris["cuteness"] = "fairly"
-    loris["poisonous-part"] = "elbows"
-    session.add(loris)
+    # q = session.query(TabulationResult).filter(
+    #     TabulationResult.facts.any(
+    #         and_(NumericEntry.key == "weasel-like", NumericEntry.value == True)
+    #     )
+    # )
+    # print("weasel-like animals", q.all())
 
-    q = session.query(Animal).filter(
-        Animal.facts.any(
-            and_(AnimalFact.key == "color", AnimalFact.value == "reddish")
-        )
-    )
-    print("reddish animals", q.all())
+    # q = session.query(TabulationResult).filter(
+    #     TabulationResult.with_characteristic("weasel-like", True)
+    # )
+    # print("weasel-like animals again", q.all())
 
-    q = session.query(Animal).filter(
-        Animal.with_characteristic("color", "brown")
-    )
-    print("brown animals", q.all())
+    # q = session.query(TabulationResult).filter(
+    #     TabulationResult.with_characteristic("poisonous", False)
+    # )
+    # print("animals with poisonous=False", q.all())
 
-    q = session.query(Animal).filter(
-        ~Animal.with_characteristic("poisonous-part", "elbows")
-    )
-    print("animals without poisonous-part == elbows", q.all())
+    # q = session.query(TabulationResult).filter(
+    #     or_(
+    #         TabulationResult.with_characteristic("poisonous", False),
+    #         ~TabulationResult.facts.any(NumericEntry.key == "poisonous"),
+    #     )
+    # )
+    # print("non-poisonous animals", q.all())
 
-    q = session.query(Animal).filter(Animal.facts.any(value="somewhat"))
-    print('any animal with any .value of "somewhat"', q.all())
-© Copyright 2007-2021, the SQLAlchemy authors and contributors.
-flambé! the dragon and The Alchemist image designs created and generously donated by Rotem Yaari.
-
-Created using Sphinx 4.0.0.
-SQLAlchemy Sponsors
-
-AD
-
-Microsoft Azure
-Code in Node.js, Java, Python, and other open-source languages.
-Python
-Website content copyright © by SQLAlchemy authors and contributors. SQLAlchemy and its documentation are licensed under the MIT license.
-
-SQLAlchemy is a trademark of Michael Bayer. mike(&)zzzcomputing.com All rights reserved.
-
-Website generation by zeekofile, with huge thanks to the Blogofile project.
-
+    # q = session.query(TabulationResult).filter(TabulationResult.facts.any(NumericEntry.value == 5))
+    # print("any animal with a .value of 5", q.all())

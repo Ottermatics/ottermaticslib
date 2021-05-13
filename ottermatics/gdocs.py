@@ -732,7 +732,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         if protect: self.protected_ids.add(parent_id)
 
-        if pool is None and self.use_threadpool:
+        if pool is None: #and self.use_threadpool: #always get with threads!
             if top: self.debug('GET DRIVE INFO USING THREADS!!!')
             pool = ThreadPoolExecutor(max_workers=self.num_threads)
             pool_set_here = True
@@ -1030,11 +1030,11 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 self.debug(f'updating {filepath} -> {syncpath}')
                 fid = self.get_gpath_id(syncpath)
                 self.upload_or_update_file(parent_id,file_path=filepath, file_id = fid)
-                self.cache_directory(parent_id)
+                #self.cache_directory(parent_id)
             else:
                 self.debug(f'uploading {filepath} -> {syncpath}')
                 self.upload_or_update_file(par_id,file_path=filepath)    
-                self.cache_directory(parent_id)
+                #self.cache_directory(parent_id)
 
         except Exception as e:
             self.error(e,'Error Syncing Path ')    
@@ -1064,11 +1064,15 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         if 'teamDriveId' not in input_args:
             input_args['teamDriveId'] = self.sync_root_id
         
-        self.debug(f'creating file w/ args: {input_args}')
+        if isinstance( content, (str,bytes)):
+            self.debug(f'creating file w/ content: {file_path} {input_args}')
+
+        elif file_path:
+            self.info(f'creating file: {file_path}')
 
         self.sleep()
         file = self.gdrive.CreateFile(input_args)
-        self.ensure_item_http(file)
+        #self.ensure_item_http(file)
         self.sleep()
 
         with self.rate_limit_manager(self.create_file,2,input_args,file_path,content):
@@ -1079,7 +1083,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if content is not None:
                     
                     gfile_path = file_path #Direct conversion, we have to input correctly
-                    if isinstance( content, (str,unicode)):
+                    if isinstance( content, (str,bytes)):
                         self.debug(f'{action} file with content string {input_args} -> {gfile_path}')
                         file.SetContentString(content)
                         self.sleep()
@@ -1785,6 +1789,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         else:
             time.sleep( self._sleep_time )
 
+    def reset_sleep_time(self,new_sleep_time = 0.25):
+        self._sleep_time = new_sleep_time
+
     @property
     def min_sleep_time(self):
         #not going too fast is important since rate limits will result in incompete searches and PyDrive doesn't make those accessible
@@ -1821,18 +1828,21 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #INPUT Methods
     @contextmanager
     def context(self, filepath_root, sync_root):
+
         old_filepath = self.filepath_root 
         old_syncroot = self.sync_root
         
         try:
             if self.filepath_root == filepath_root and self.sync_root == sync_root:
-                self.debug(f'Alread in context {filepath_root} -> {sync_root}')
+                self.debug(f'Already in context {filepath_root} -> {sync_root}')
                 yield self #no work to do
 
             else:
+                self.debug(f'Creating Context {filepath_root} -> {sync_root}')
                 self.filepath_root = filepath_root
                 self.sync_root = sync_root
-                self.initalize()
+                if self.full_sync_root not in self.item_paths:
+                    self.initalize()
                 yield self
         
         except Exception as e:
@@ -1959,7 +1969,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         
     @sync_root.setter
     def sync_root(self,sync_root):
-        
+
+        self.debug(f"setting sync root w/ {sync_root}")
+
         if self._sync_root is not None: 
             do_reinitalize = True #We already initalize with previous input, do it again!
         else:
@@ -2095,6 +2107,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self._use_threadpool = False
         self._max_num_threads = 1
         self.time_fuzz = 6
+        self._max_num_threads = 4
 
         self.net_lock = threading.RLock()
         if self.gauth is None: self.authoirze_google_integrations()
