@@ -738,14 +738,16 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         else:
             if top: self.debug('GET DRIVE INFO SINGLE THREAD')
-            #pool = None
+            pool = None #the second time
 
-        if already_cached is None and self.use_threadpool :
+        if already_cached is None:# and self.use_threadpool : 
             already_cached = set()
 
         try:
             #This caches it for us through seach_item(), and hopefully removes  duplicates
             items = list(self.all_in_folder(parent_id))
+            
+            ttl -= 1
             for item in items:
                 self.sleep()
                 if stop_when_found is not None and item.id == stop_when_found:
@@ -758,25 +760,27 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
                 if item.is_folder: #if it had contents it was already cached!!
                     
-                    if recursive and not stop: 
-                        ttl -= 1
-                        if ttl == 0:
-                            if pool is not None:
-                                if item.id not in already_cached and item.id not in self.item_nodes:
-                                    self.sleep()
-                                    already_cached.add(item.id)
-                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=False,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
-                            else:
-                                self.sync_folder_contents_locally(item.id,recursive=False,ttl=ttl,protect=protect, top=False)
+                    if recursive and not stop:
+                        if item.id not in already_cached and item.id not in self.item_nodes:
+                            already_cached.add(item.id)                        
+                            
+                            if ttl <= 0:
+                                recursive = False
+                            elif ttl > 0:
+                                recursive = True
 
-                        elif ttl > 0:
-                            if pool is not None:
-                                if item.id not in already_cached and item.id not in self.item_nodes:
-                                    self.sleep()
-                                    already_cached.add(item.id)
-                                    pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
-                            else:                        
-                                self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect, top=False)
+                            if pool is not None:                                    
+                                self.sleep()
+                                pool.submit(self.sync_folder_contents_locally,item.id,recursive=recursive,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
+                            else:
+                                self.sync_folder_contents_locally(item.id,recursive=recursive,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
+
+                            
+                                # if pool is not None:
+                                #     self.sleep()
+                                #     pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
+                                # else:                  
+                                #     self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
                 
 
         except Exception as e:
@@ -1028,12 +1032,12 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             if syncpath in self.item_paths:
                 self.debug(f'updating {filepath} -> {syncpath}')
                 fid = self.get_gpath_id(syncpath)
-                self.upload_or_update_file(parent_id,file_path=filepath, file_id = fid)
-                self.cache_directory(parent_id)
+                self.upload_or_update_file(par_id,file_path=filepath, file_id = fid)
+                self.cache_directory(par_id)
             else:
                 self.debug(f'uploading {filepath} -> {syncpath}')
                 self.upload_or_update_file(par_id,file_path=filepath)    
-                self.cache_directory(parent_id)
+                self.cache_directory(par_id)
 
         except Exception as e:
             self.error(e,'Error Syncing Path ')    

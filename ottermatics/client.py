@@ -141,6 +141,12 @@ class ClientInfoMixin(LoggingMixin):
         start_date = self._created_datetime.date()
         return os.path.join(self.report_path,self.filename,'{}'.format(start_date).replace('-','_'))        
 
+    def cleanup_local_dir(self):
+        '''remove all items from local_sync_path'''
+        def cleanup_issue(func,path,exc):
+            self.info(f'issue cleaning up {path}:\n{exc}')
+        
+        shutil.rmtree( self.local_sync_path, ignore_errors=False, onerror=cleanup_issue)
 
     #Sync Convenicne Functions
     @property
