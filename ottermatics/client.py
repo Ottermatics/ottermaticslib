@@ -143,6 +143,7 @@ class ClientInfoMixin(LoggingMixin):
 
     def cleanup_local_dir(self):
         '''remove all items from local_sync_path'''
+        self.info(f"cleaning working directory {self.local_sync_path}")
         def cleanup_issue(func,path,exc):
             self.info(f'issue cleaning up {path}:\n{exc}')
         
