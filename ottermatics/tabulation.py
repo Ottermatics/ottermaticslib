@@ -194,14 +194,14 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
         #Cached Dataframes
         self._dataframe = None
-        self._variable_dataframe= None
-        self._static_dataframe= None
-        self._static_data_dict= None
-        self._variable_data_dict= None
-        self._toplevel_static= None
-        self._otherstatic_tables= None
-        self._variable_tables= None
-        self._joined_dataframe= None        
+        self._variable_dataframe = None
+        self._static_dataframe = None
+        self._static_data_dict = None
+        self._variable_data_dict = None
+        self._toplevel_static = None
+        self._otherstatic_tables = None
+        self._variable_tables = None
+        self._joined_dataframe = None    
 
     @property
     def TABLE(self):
@@ -214,28 +214,33 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     def dataframe(self):
         if self._dataframe is None or self._anything_changed:
             self._dataframe = pandas.DataFrame(data = self.TABLE, columns = self.data_label,copy=True)
+
         return self._dataframe
 
     @property
     def variable_dataframe(self):
         if self._variable_dataframe is None or self._anything_changed:
+
             vals = list(zip(*list((self.variable_data_dict.values()))))
             cols = list((self.variable_data_dict.keys()))
             if vals:
                 self._variable_dataframe = pandas.DataFrame(data = vals, columns=cols, copy = True)
             else:
                 self._variable_dataframe = None
+
         return self._variable_dataframe
 
     @property
     def static_dataframe(self):
         if self._static_dataframe is None or self._anything_changed:
+
             vals = [list((self.static_data_dict.values()))]
             cols = list((self.static_data_dict.keys()))
             if vals:
                 self._static_dataframe = pandas.DataFrame(data = vals, columns=cols, copy = True)
             else:
                 self._static_dataframe = None
+
         return self._static_dataframe
 
     @property
@@ -271,6 +276,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             df_list = self.split_dataframe_by_colmum(out_df,self.max_col_width_static)
 
             self._toplevel_static = {'conf':self,'dfs':  df_list }
+
         return self._toplevel_static
 
     @property
@@ -304,9 +310,10 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
     @property
     def joined_dataframe(self):
+        '''this is a high level data frame with all data that changes in the system'''
         if self._joined_dataframe is None or self._anything_changed:
             if self.variable_tables:
-                self._joined_dataframe = pandas.concat([ vt['df'] for vt in self.variable_tables],axis=1)
+                self._joined_dataframe = pandas.concat([ vt['df'] for vt in list(reversed(self.variable_tables))],axis=1)
             else:
                 self._joined_dataframe = None
         return self._joined_dataframe
@@ -484,7 +491,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
 
     def save_to_worksheet(self,worksheet:pygsheets.Worksheet):
-        '''Saves to a gsheets via pygsheets'''
+        '''Saves to a gsheets via pygsheets adds static and regular data'''
 
         title = self.identity.replace('_',' ').title()
 
@@ -558,6 +565,8 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         :param meta_tags: a dictionary with headers being column names, and the value as the item to fill that column'''
         if dataframe is None:
             dataframe = self.dataframe
+        
+        self.info('saving gsheets...')
 
         if meta_tags is not None and type(meta_tags) is dict:
             for tag,value in meta_tags.items():
@@ -582,7 +591,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             if type(filename) is str and not filename.endswith('.csv'):
                 filename += '.csv'
             filepath = os.path.join(self.config_path_daily,filename)
-            dataframe.to_csv(path_or_buf=filepath,*args,**kwargs)
+            dataframe.to_csv(path_or_buf=filepath,index=False,*args,**kwargs)
 
     def save_excel(self,dataframe,filename=None,*args,**kwargs):
         if self.TABLE:
@@ -593,49 +602,41 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             filepath = os.path.join(self.config_path_daily,filename)
             dataframe.to_excel(path_or_buf=filepath,*args,**kwargs)
 
-    def save_gsheets(self,dataframe,filename=None,retry=True,ttl=3,*args,**kwargs):
+    def save_gsheets(self,dataframe,filename=None,index=False,*args,**kwargs):
         '''A function to save the table to google sheets
         :param filename: the filepath on google drive - be careful!
         '''
-        self.od = od = OtterDrive()
-        try:
-            gpath, pth_id = self.enable_cloud_sync()
-            self.info(f'saving as gsheets in dir {self.config_path_daily} -> {gpath}')
+        with self.drive.context(filepath_root=self.local_sync_path, sync_root=self.cloud_sync_path) as gdrive:
+            with gdrive.rate_limit_manager( self.save_gsheets,6,dataframe,filename=filename,*args,**kwargs) as tdrive:
+                
+                old_sleep = tdrive._sleep_time
+                tdrive.reset_sleep_time( max(old_sleep,2.5) )
+                
+                gpath = tdrive.sync_path(self.local_sync_path)
+                self.info(f'saving as gsheets in dir {self.local_sync_path} -> {gpath}')
+                parent_id = gdrive.get_gpath_id(gpath)
+                #TODO: delete old file if exists
+                tdrive.sleep(2*(1+tdrive.time_fuzz*random.random()))
+                if tdrive and tdrive.gsheets:
+                    sht = tdrive.gsheets.create(filename,folder=parent_id)
+                    
+                    tdrive.sleep(2*(1+tdrive.time_fuzz*random.random()))
+                    tdrive.cache_directory(parent_id)
 
-            sht = od.gsheets.create(filename,folder=pth_id)
+                    wk = sht.sheet1
+
+                    wk.rows = dataframe.shape[0]
+                    gdrive.sleep(2*(1+tdrive.time_fuzz*random.random()))
+
+                    wk.set_dataframe(dataframe,start='A1',fit=True)
+                    gdrive.sleep(2*(1+tdrive.time_fuzz*random.random()))
+
+                    #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
+                    self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
+
+                tdrive.reset_sleep_time( old_sleep )
+
             
-            od.cache_directory(pth_id)
-
-            wk = sht.sheet1
-            wk.set_dataframe(dataframe,start='A1')
-
-            #TODO: add in dataframe dict with schema sheename: {dataframe,**other_args}
-            self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))
-
-        except Exception as e:
-            ttl -= 1
-            
-            if retry and ttl > 0:
-                self.warning(f'encountered error saving gsheets, retrying')
-                self.od.sleep()
-                self.save_gsheets(dataframe,filename,retry=True,ttl=ttl)
-            
-            else:
-                self.error(e,'error saving gsheets')
-
-            
-            
-
-    def enable_cloud_sync(self):
-        '''Ensure configuration's daily path is created'''
-        self.info('enabling cloud sync')
-        self.od = od = OtterDrive()
-        filepath = self.config_path_daily
-        gpath = od.sync_path(filepath)
-
-        od.ensure_g_path_get_id(gpath)
-        pth_id = od.folder_cache[gpath]
-        return gpath, pth_id
         
     @property
     def store_level(self):

@@ -6,6 +6,7 @@ from sqlalchemy.orm import backref
 from sqlalchemy.orm import scoped_session
 from sqlalchemy_utils import *
 
+import ray
 import functools
 from twisted.internet import defer, reactor, threads, task
 from twisted.python import context
@@ -15,10 +16,13 @@ import logging
 import numpy
 import time
 import signal
-
+import functools
+import time
 from urllib.request import urlopen
 from psycopg2.extensions import register_adapter, AsIs
 from os import sys
+
+import cachetools
 
 from ottermatics.patterns import Singleton, SingletonMeta, singleton_meta_object
 from ottermatics.logging import LoggingMixin, set_all_loggers_to, is_ec2_instance
@@ -53,6 +57,53 @@ register_adapter(numpy.ndarray, addapt_numpy_array)
 
 DataBase = declarative_base()
 
+#TODO: Get this ray remote decorator working, issues with structure reliability
+# @ray.remote
+# class RemoteFunctionCache():
+
+#     def __init__(self, func, maxsize=1024):
+#         self.func = cachetools.cached(cachetools.LRUCache(maxsize=maxsize))(func)
+
+#     def call(self, key, *args, **kwargs):     
+#         return self.func(key,*args, **kwargs) 
+
+# class CachingMaybeRemoteFunc:
+#     _cache = None
+
+#     def __init__(self, func,maxsize=1024):
+#         self.func = cachetools.cached(cachetools.LRUCache(maxsize=maxsize))(func)
+
+#     @property
+#     def cache(self):
+#         if self._cache is not None:
+#             return self._cache
+
+#         elif ray.is_initialized():
+#             self._cache = RemoteFunctionCache.remote(self.func,maxsize=maxsize)
+        
+#         return self._cache #will be None when not using ray
+
+#     def select_call(self,key,*args, **kwargs):
+#         if self.cache is not None:
+#             log.info(f'getting with remote {key}')
+#             obj = self.cache.call.remote(key, *args, **kwargs)
+#             return obj.get()
+
+#         else:
+#             log.info(f'getting local {key}')      
+#             return self.func(key, *args, **kwargs) 
+
+#     def __call__(self, key, *args, **kwargs):
+#         log.info(f'__call__ {key}')
+#         out = self.select_call( key, *args, **kwargs )
+#         log.info(f'got value for {key}: {out}')
+#         return out
+
+
+# def ray_cache(func):
+#     return CachingMaybeRemoteFunc(func)     
+      
+
 
 #@singleton_meta_object
 class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
@@ -66,34 +117,26 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     alt_path = None
     cache_class = diskcache.Cache
     timeout = 1.0
-    cache_init_kwargs = None
-    #cache_class = diskcache.FanoutCache
-    # def __init__(self,**kwargs):
-    #     '''Takes a path and size limit to create for the cache on startup,
-    #     first initalize it cannot be chagned
-    #     :param alt_path: a different name than the formatted name of the class
-    #     :param size_limit: the size of that the cache should respect in bytes'''
-
-    #     self.info('initalizing disk cache')
-    #     if 'size_limit' in kwargs:
-    #         self.size_limit = kwargs['size_limit']
-
-    #     if 'alt_path' in kwargs:
-    #         self.alt_path = kwargs['alt_path']            
+    cache_init_kwargs = None        
 
     last_expire = None
     _current_keys = None
     expire_threshold = 60.0
 
+    retries = 3
+    sleep_time = 0.1
+
     def __init__(self,**kwargs):
         if kwargs:
             self.cache_init_kwargs = kwargs
+        self.info(f'Created DiskCacheStore In {self.cache_root}')
 
     @property
     def cache_root(self):
+        #TODO: CHECK CACHE IS NOT SYNCED TO DROPBOX
         if self.alt_path is not None:
-            return os.path.join( 'cache' , self.alt_path)
-        return os.path.join( 'cache' , '{}'.format(type(self).__name__).lower())
+            return os.path.join(client_path(skip_wsl=False), 'cache' , self.alt_path)
+        return os.path.join(client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower())
     
     @property
     def cache(self):
@@ -104,43 +147,46 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         return self._cache
 
 
-    def __getstate__(self):
-        d = self.__dict__.copy()
-        d['_cache'] = None #don't pickle file objects!
-        return d
-
-    def set(self,key,data,retry=True,ttl=2,**kwargs):
+    def set(self,key=None,data=None,retry=True,ttl=None,**kwargs):
         '''Passes default arguments to set the key:data relationship
         :param expire: time in seconds to expire the data
         '''
+        if ttl is None: ttl = self.retries #onstart
         try:        
             with self.cache as ch:
                 ch.set(key,data,retry=retry,**kwargs)
+
         except Exception as e:
             ttl -= 1
             if ttl > 0:
-                return self.set(key,data,retry=True,ttl=ttl)
+                time.sleep(self.sleep_time*(self.retries - ttl))
+                return self.set(key=key,data=data,retry=True,ttl=ttl)
             else:
                 self.error(e,'Issue Getting Item From Cache')            
 
-    def get(self,key,on_missing=None,retry=True,ttl=2):
+    #@ray_cache
+    def get(self,key=None,on_missing=None,retry=True,ttl=None):
         '''Helper method to get an item, return None it doesn't exist and warn.
         :param on_missing: a callback to use if the data is missing, which will set the data at the key, and return it'''
+        if ttl is None: ttl = self.retries #onstart
+
         try:
             with self.cache as ch:
                 if key in ch:
-                    return self.cache.get(key,retry=retry)
+                    return ch.get(key,retry=retry)
                 else:
                     if on_missing is not None:
                         data = on_missing()
-                        self.set(key,data)
+                        self.set(key=key,data=data)
                         return data
                     self.warning('key {} not in cache'.format(key))
             return None
+
         except Exception as e:
             ttl -= 1
             if ttl > 0:
-                return self.get(key,on_missing,retry=True,ttl=ttl)
+                time.sleep(self.sleep_time*(self.retries - ttl))
+                return self.get(key=key,on_missing=on_missing,retry=True,ttl=ttl)
             else:
                 self.error(e,'Issue Getting Item From Cache')
 
@@ -167,12 +213,25 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
     @property
     def identity(self):
-        return '{}:{}'.format(self.__class__.__name__.lower(), self.cache_root)
+        return '{}'.format(self.__class__.__name__.lower())
+
+    def __getstate__(self):
+        d = self.__dict__.copy()
+        d['_cache'] = None #don't pickle file objects!
+        return d
+
+    def __setstate__(self,d):
+        for key,val in d.items():
+            self.__dict__[key] = val
+        self.cache #create cache
+
 
 
 class DBConnection(LoggingMixin, metaclass=SingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
-    to get the active instance use DBConnection.instance(**non_default_connection_args)'''
+    to get the active instance use DBConnection.instance(**non_default_connection_args)
+    
+    TODO: Make Threadsafe W/ ThreadPoolExecutor!'''
 
     _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}"
     pool_size=20

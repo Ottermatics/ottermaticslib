@@ -1,5 +1,7 @@
 import numpy, functools
 
+from ottermatics.logging import LoggingMixin, logging
+
 class inst_vectorize(numpy.vectorize):
     def __get__(self, obj, objtype):
         return functools.partial(self.__call__, obj)
@@ -97,7 +99,7 @@ class InputSingletonMeta(type):
         keyarg['args'] = args
         key = frozenset(keyarg.items())
         if key not in cls._instances:
-            #print(f'creating new {keyarg}')
+            #print(f'creating new {key}')
             cls._instances[key] = super(InputSingletonMeta, cls).__call__(*args,
                                                                 **kwargs)
         return cls._instances[key]
@@ -159,16 +161,22 @@ def _indent(printer):
     printer.level -= 1
 
 
-class _Printer:
+class _Printer(LoggingMixin):
+
+    log_level = logging.WARNING
+
     def __init__(self):
         self.level = 0
 
     def indent(self):
         return _indent(self)
 
-    def print(self, msg):
+    def print(self, msg, warning=False):
         indent = "    " * self.level
-        print(indent + msg)
+        if warning:
+            self.warning(indent+msg)
+        else:
+            self.debug(indent+msg)
 
 
 _printer = _Printer()
@@ -231,7 +239,7 @@ def _inspect_func_serialization(base_obj, depth, parent, failure_set):
     if not found:
         _printer.print(
             f"WARNING: Did not find non-serializable object in {base_obj}. "
-            "This may be an oversight.")
+            "This may be an oversight.",warning=True)
     return found
 
 
@@ -270,7 +278,7 @@ def _inspect_generic_serialization(base_obj, depth, parent, failure_set):
     if not found:
         _printer.print(
             f"WARNING: Did not find non-serializable object in {base_obj}. "
-            "This may be an oversight.")
+            "This may be an oversight.",warning=True)
     return found
 
 
@@ -302,9 +310,9 @@ def inspect_serializability(
         top_level = True
         _failure_set = set()
         declaration = f"Checking Serializability of {base_obj}"
-        print("=" * min(len(declaration), 80))
-        print(declaration)
-        print("=" * min(len(declaration), 80))
+        _printer.print("=" * min(len(declaration), 80))
+        _printer.print(declaration)
+        _printer.print("=" * min(len(declaration), 80))
 
         if name is None:
             name = str(base_obj)
@@ -315,7 +323,7 @@ def inspect_serializability(
         return True, _failure_set
     except Exception as e:
         _printer.print(f"{colorama.Fore.RED}!!! FAIL{colorama.Fore.RESET} "
-                       f"serialization: {e}")
+                       f"serialization: {e}",warning=True)
         found = True
         try:
             if depth == 0:
@@ -343,20 +351,20 @@ def inspect_serializability(
     if top_level:
         print("=" * min(len(declaration), 80))
         if not _failure_set:
-            print("Nothing failed the inspect_serialization test, though "
-                  "serialization did not succeed.")
+            _printer.print("Nothing failed the inspect_serialization test, though "
+                  "serialization did not succeed.",warning=True)
         else:
             fail_vars = f"\n\n\t{colorama.Style.BRIGHT}" + "\n".join(
                 str(k)
                 for k in _failure_set) + f"{colorama.Style.RESET_ALL}\n\n"
-            print(f"Variable: {fail_vars}was found to be non-serializable. "
+            _printer.print(f"Variable: {fail_vars}was found to be non-serializable. "
                   "There may be multiple other undetected variables that were "
-                  "non-serializable. ")
-            print("Consider either removing the "
+                  "non-serializable. ",warning=True)
+            _printer.print("Consider either removing the "
                   "instantiation/imports of these variables or moving the "
-                  "instantiation into the scope of the function/class. ")
-        print("If you have any suggestions on how to improve "
+                  "instantiation into the scope of the function/class. ",warning=True)
+        _printer.print("If you have any suggestions on how to improve "
               "this error message, please reach out to the "
-              "Ray developers on github.com/ray-project/ray/issues/")
-        print("=" * min(len(declaration), 80))
+              "Ray developers on github.com/ray-project/ray/issues/",warning=True)
+        _printer.print("=" * min(len(declaration), 80))
     return not found, _failure_set    

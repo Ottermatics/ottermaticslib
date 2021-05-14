@@ -3,6 +3,7 @@
 virtualenv
 wheel
 
+methodtools==0.4.2
 attrs
 graypy
 

@@ -4,6 +4,7 @@ import pathlib
 from platform import system,uname
 from ottermatics.logging import LoggingMixin
 import logging
+import tempfile
 
 '''
 This locations system is designed to work with dropbox, there are workaroudn for linux
@@ -41,7 +42,7 @@ def in_wsl() -> bool:
     https://github.com/microsoft/WSL/issues/4071#issuecomment-496715404
     """
 
-    return  system() in ('Linux', 'Darwin') and 'Microsoft' in uname().release
+    return  system().lower() in ('linux', 'darwin') and 'microsoft' in uname().release.lower()
 
 def wsl_home():
     if in_wsl():
@@ -93,28 +94,30 @@ def dropbox_home():
         data = f.read().split()
     return os.path.split(str(base64.b64decode(data[1]),encoding='utf-8'))[0]
 
-def ottermatics_dropbox():
+def ottermatics_dropbox(skip_wsl = False):
+    if not skip_wsl and in_wsl():
+        return os.path.join(tempfile.gettempdir(),'otterlib')
     company_dropbox_home = dropbox_home()
     return company_dropbox_home
 
 def user_home():
     return dropbox_home()
 
-def ottermatics_folder():
-    return str(os.path.abspath(os.path.join(os.sep,ottermatics_dropbox(),'Ottermatics')))
+def ottermatics_folder(skip_wsl =False):
+    return str(os.path.abspath(os.path.join(os.sep,ottermatics_dropbox(skip_wsl =skip_wsl),'Ottermatics')))
 
-def ottermatics_projects():
-    return str(os.path.abspath(os.path.join(os.sep,ottermatics_dropbox(),'Projects')))
+def ottermatics_projects(skip_wsl =False):
+    return str(os.path.abspath(os.path.join(os.sep,ottermatics_dropbox(skip_wsl =skip_wsl),'Projects')))
 
-def ottermatics_project(project_name):
-    return str(os.path.abspath(os.path.join(os.sep,ottermatics_projects(),project_name)))
+def ottermatics_project(project_name,skip_wsl = False):
+    return str(os.path.abspath(os.path.join(os.sep,ottermatics_projects(skip_wsl =skip_wsl),project_name)))
 
 def in_dropbox_dir(input_path=None):
     '''Checks if the current path is in the projects folder'''
     if input_path is None:
         input_path = current_diectory()     
 
-    parent_path = os.path.abspath( ottermatics_dropbox() )
+    parent_path = os.path.abspath( ottermatics_dropbox(skip_wsl =True) )
     child_path = os.path.abspath( input_path )
     return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])    
 
@@ -123,18 +126,18 @@ def in_otter_dir(input_path=None):
     if input_path is None:
         input_path = current_diectory() 
 
-    parent_path = os.path.abspath( ottermatics_folder() )
+    parent_path = os.path.abspath( ottermatics_folder(skip_wsl =True) )
     child_path = os.path.abspath( input_path )
     return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])    
 
 def creds_folder():
     if '.creds_home' in os.listdir( os.path.expanduser('~')):
         return os.path.realpath(os.path.expanduser(os.path.join('~','.creds_home')))    
-    return str(os.path.abspath(os.path.join(os.sep,ottermatics_folder(),'.creds')))
+    return str(os.path.abspath(os.path.join(os.sep,ottermatics_folder(skip_wsl =True),'.creds')))
 
 def ottermatics_clients():
-    return list([ path for path in os.listdir( ottermatics_projects() ) \
-                if os.path.isdir(os.path.join(ottermatics_projects(),path)) ] )
+    return list([ path for path in os.listdir( ottermatics_projects(skip_wsl =True) ) \
+                if os.path.isdir(os.path.join(ottermatics_projects(skip_wsl =True),path)) ] )
 
 def google_api_token(): #Depricated now we use service accounts
     credfile = SERIVCE_CREDS_FILE
@@ -145,7 +148,7 @@ def in_client_dir(input_path=None):
     if input_path is None:
         input_path = current_diectory()
 
-    parent_path = os.path.abspath( ottermatics_projects() )
+    parent_path = os.path.abspath( ottermatics_projects(skip_wsl =True) )
     child_path = os.path.abspath( input_path )
     return os.path.commonpath([parent_path]) == os.path.commonpath([parent_path, child_path])
 
@@ -154,13 +157,13 @@ def client_dir_name():
     :returns: the client folder name in projects, otherwise none'''
     if not in_client_dir():
         return None
-    current_rel_path  = os.path.relpath(current_diectory(), ottermatics_projects())
+    current_rel_path  = os.path.relpath(current_diectory(), ottermatics_projects(skip_wsl =True))
     return pathlib.Path(current_rel_path).parts[0]
 
-def client_path():
+def client_path(skip_wsl=True):
     if not in_client_dir():
         return None
-    return ottermatics_project( client_dir_name() )
+    return ottermatics_project( client_dir_name(),skip_wsl=skip_wsl)
 
 def main_cli():
     '''
@@ -178,6 +181,8 @@ def main_cli():
     #parser.add_argument('--capitalize',action='store_true')
 
     args = parser.parse_args()
+
+    #TODO: raise error or handle in WSL (we dont want to use the /mnt/c/ filesystem due to poor performance)
 
     log.info('Checking For Folder `{}` In {}'.format(args.project_name,ottermatics_projects()))
 
