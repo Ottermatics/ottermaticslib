@@ -105,6 +105,10 @@ class ClientInfoMixin(LoggingMixin):
         return out
 
     @property
+    def full_cloud_sync_path(self):
+        return os.path.join(self.drive.shared_drive, self.cloud_sync_path)
+
+    @property
     def rel_report_path(self):
         if self.rel_report_mode == 'default':
             return self.report_path
@@ -137,6 +141,13 @@ class ClientInfoMixin(LoggingMixin):
         start_date = self._created_datetime.date()
         return os.path.join(self.report_path,self.filename,'{}'.format(start_date).replace('-','_'))        
 
+    def cleanup_local_dir(self):
+        '''remove all items from local_sync_path'''
+        self.info(f"cleaning working directory {self.local_sync_path}")
+        def cleanup_issue(func,path,exc):
+            self.info(f'issue cleaning up {path}:\n{exc}')
+        
+        shutil.rmtree( self.local_sync_path, ignore_errors=False, onerror=cleanup_issue)
 
     #Sync Convenicne Functions
     @property
@@ -151,15 +162,22 @@ class ClientInfoMixin(LoggingMixin):
 
     def enable_cloud_sync(self,**kwargs):
         '''Ensure configuration's daily path is created'''
-        self.info('enabling cloud sync')
+        self.debug('enabling cloud sync')
         self._drive = OtterDrive(**kwargs)
         self._drive_init_args = kwargs #self.drive.initial_args
+        #Setup Context
+        #with self.drive.context(filepath_root = self.local_sync_path, sync_root = self.cloud_sync_path) as cdrive:
+        #    pass
+        if self.full_cloud_sync_path not in self.drive.folder_paths:
+            self.drive.ensure_g_path_get_id(self.cloud_sync_path)
         
     def gsync(self,force=False):
         '''Changes drive context to this component then syncs it according to the filepath mode'''
         try:
             with self.drive.context(filepath_root = self.local_sync_path, sync_root = self.cloud_sync_path) as cdrive:
                 cdrive.sync(force=force)
+                if cdrive.duplicates_exist:
+                    cdrive.remove_duplicates() #clean haus
 
         except Exception as e:
             self.error(e, 'issue syncing config')

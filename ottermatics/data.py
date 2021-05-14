@@ -129,12 +129,14 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     def __init__(self,**kwargs):
         if kwargs:
             self.cache_init_kwargs = kwargs
+        self.info(f'Created DiskCacheStore In {self.cache_root}')
 
     @property
     def cache_root(self):
+        #TODO: CHECK CACHE IS NOT SYNCED TO DROPBOX
         if self.alt_path is not None:
-            return os.path.join( 'cache' , self.alt_path)
-        return os.path.join( 'cache' , '{}'.format(type(self).__name__).lower())
+            return os.path.join(client_path(skip_wsl=False), 'cache' , self.alt_path)
+        return os.path.join(client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower())
     
     @property
     def cache(self):
@@ -144,11 +146,6 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
                                             size_limit=self.size_limit,** self.cache_init_kwargs)
         return self._cache
 
-
-    def __getstate__(self):
-        d = self.__dict__.copy()
-        d['_cache'] = None #don't pickle file objects!
-        return d
 
     def set(self,key=None,data=None,retry=True,ttl=None,**kwargs):
         '''Passes default arguments to set the key:data relationship
@@ -216,7 +213,18 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
     @property
     def identity(self):
-        return '{}:{}'.format(self.__class__.__name__.lower(), self.cache_root)
+        return '{}'.format(self.__class__.__name__.lower())
+
+    def __getstate__(self):
+        d = self.__dict__.copy()
+        d['_cache'] = None #don't pickle file objects!
+        return d
+
+    def __setstate__(self,d):
+        for key,val in d.items():
+            self.__dict__[key] = val
+        self.cache #create cache
+
 
 
 class DBConnection(LoggingMixin, metaclass=SingletonMeta):

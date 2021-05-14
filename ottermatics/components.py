@@ -89,6 +89,7 @@ class ComponentIterator(Component):
     _components = []
 
     shuffle_mode = False
+    _shuffled = None
 
     @property
     def component_list(self):
@@ -115,20 +116,23 @@ class ComponentIterator(Component):
     #Wrappers for current component
     @property
     def data_row(self):
-        return self.current_component.data_row
+        return super(ComponentIterator,self).data_row + self.current_component.data_row
 
     @property
     def data_label(self):
-        return self.current_component.data_label
+        return super(ComponentIterator,self).data_label + self.current_component.data_label
 
     @property
     def plot_variables(self):    
-        return self.current_component.plot_variables
+        return super(ComponentIterator,self).plot_variables + self.current_component.plot_variables
 
     #Magicz
+    #@functools.cached_property
     def _item_generator(self):
         if self.shuffle_mode:
-            return random.shuffle(self.component_list)
+            if self._shuffled is None:
+                self._shuffled = random.sample(self.component_list,len(self.component_list))
+            return self._shuffled
         return self.component_list
 
     def __getitem__(self,index):
