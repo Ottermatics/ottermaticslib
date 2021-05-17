@@ -80,6 +80,26 @@ class SingletonMeta(type):
         else:
             return isinstance(instance.__class__, mcs)
 
+
+
+
+
+
+
+# class MetaRegistry(type):
+    
+#     REGISTRY = {}
+
+#     def __new__(meta, name, bases, class_dict):
+#         cls = type.__new__(meta, name, bases, class_dict)
+#         if name not in registry:
+#             meta.register_class(cls)
+#         return cls
+
+#     def register_class(target_class):
+#         REGISTRY[target_class.__name__] = target_class        
+
+
 class InputSingletonMeta(type):
     """Metaclass for singletons. Any instantiation of a Singleton class yields
     the exact same object, for the same given input, e.g.:
@@ -153,6 +173,7 @@ import ray.cloudpickle as cp
 import colorama
 from contextlib import contextmanager
 
+flatten = lambda t: [item for sublist in t for item in sublist]
 
 @contextmanager
 def _indent(printer):

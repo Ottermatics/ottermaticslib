@@ -13,6 +13,7 @@ ottermatics/logging.py
 ottermatics/patterns.py
 ottermatics/plotting.py
 ottermatics/process.py
+ottermatics/reporting.py
 ottermatics/solid_materials.py
 ottermatics/tabulation.py
 ottermatics/thermodynamics.py
