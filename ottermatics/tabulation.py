@@ -23,11 +23,14 @@ pandas.set_option('use_inf_as_na', True)
 
 #Type Checking
 NUMERIC_TYPES = (float,int)
-STR_TYPES = (str)
+STR_TYPES = (str,)
 TABLE_TYPES = (int,float,str)
 
 def NUMERIC_VALIDATOR():
     return attr.validators.instance_of(NUMERIC_TYPES)
+
+def STR_VALIDATOR():
+    return attr.validators.instance_of(STR_TYPES)
 
 
 
@@ -358,6 +361,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                         yield 3, col, label
 
     #Properties & Attribues
+    #TODO: Switch to dict based recording, that way the data frame can sort out sparsity of data for intermittent vars
     @property
     def data_row(self):
         '''method that returns collects valid tabiable attributes immediately from this config
@@ -433,8 +437,15 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         class_dict = self.__class__.__dict__
         tabulated_properties = [obj.desc for k,obj in class_dict.items() if isinstance(obj,table_property)]
         return tabulated_properties       
-                
+
+    @classmethod
+    def cls_all_property_labels(cls):
+        return [obj.label for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]               
     
+    @classmethod
+    def cls_all_attrs_fields(cls):
+        return attr.fields_dict(cls)
+
     #Clearance Methods
     def recursive_data_structure(self,levels_to_descend = -1, parent_level=0):
         '''Returns the static and variable data from each configuration to grab defined by the

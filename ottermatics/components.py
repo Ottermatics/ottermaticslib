@@ -4,17 +4,21 @@ import attr
 from ottermatics.logging import LoggingMixin, log
 from ottermatics.tabulation import TabulationMixin
 from ottermatics.configuration import otterize, Configuration
+from ottermatics.patterns import SingletonMeta, flatten
+
 
 import numpy
 import functools
 import itertools
 import datetime
 import pandas
-import os
+import os,sys
 import inspect
 import pathlib
 import random
 import matplotlib.pyplot as plt
+
+
 
 @otterize
 class Component(TabulationMixin):
@@ -80,6 +84,13 @@ class Component(TabulationMixin):
         except Exception as e:
             self.error(e,'issue plotting {}'.format(plot_tile))
 
+    @classmethod
+    def component_subclasses(cls):
+        #We find any components in ottermatics and will exclude them
+        OTTER_ITEMS = set(list(flatten([inspect.getmembers( mod, inspect.isclass ) for mkey,mod in sys.modules.items() if 'ottermatics' in mkey])))
+        COMP_CLASS = [modcls for mkey,modcls in OTTER_ITEMS if type(modcls) is type and issubclass(modcls, Component)]
+        return {scls.__name__:scls for scls in cls.__subclasses__() if scls not in COMP_CLASS}
+
 @otterize
 class ComponentIterator(Component):
     '''An object to loop through a list of components as the system is evaluated,
@@ -87,7 +98,6 @@ class ComponentIterator(Component):
     iterates through each component and pipes data_row and data_label to this objects table'''
 
     _components = []
-
     shuffle_mode = False
     _shuffled = None
 

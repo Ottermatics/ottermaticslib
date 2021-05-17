@@ -5,12 +5,13 @@ wheel
 
 methodtools==0.4.2
 attrs
-graypy
+arrow
 
 #Filesystem
 watchdog
 watchgod
 dropbox
+diskcache
 
 #GUI
 #kivy
@@ -35,6 +36,7 @@ Twisted
 aioice
 aiohttp
 treq
+service-identity
 
 #Database
 #psycopg2 
@@ -64,5 +66,5 @@ ray[tune]
 #pillow
 #av
 #cv
-graypy
+#graypy
 

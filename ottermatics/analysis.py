@@ -1,6 +1,8 @@
 import attr
-from ottermatics.configuration import otterize
+from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component, ComponentIterator
+from ottermatics.patterns import SingletonMeta
+
 import datetime
 import os 
 
@@ -156,6 +158,9 @@ class Analysis(Component):
                 self.info('gsheet saved -> {}'.format(os.path.join(gpath,filename)))            
 
                 gdrive.reset_sleep_time( old_sleep )            
+
+
+
 
 #WIP
 # class Report(Analysis):
