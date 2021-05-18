@@ -63,12 +63,24 @@ class MappedDictMixin:
         del self._proxied[key]
 
 
-class DBReflectedComponent(DataBase):
-    
+class DBRegistry(DataBase):
+    '''DBRegistry represents an abstract interface to register tables of a component type'''
     __abstract__ = True
-    default_args = {'keep_existing':True, 'autoload': False}
 
-    _mapped_component = None #to reference later
+    id = Column( Integer, primary_key = True)
+    tablename = Column(String(DEFAULT_STRING_LENGTH))
+    active = Column(Boolean(), default=True )
+    _cls_tabble_mapping = None
+    registry_component = None
+
+    default_args = {'keep_existing':True, 'autoload': False}
+    attr_table_prefix = ''
+    table_prefix = ''
+
+    @property
+    @classmethod
+    def mapping(cls):
+        return self._cls_tabble_mapping
 
     @classmethod
     def db_columns(cls):
@@ -86,7 +98,6 @@ class DBReflectedComponent(DataBase):
     def dynamic_columns(cls):
         if cls._mapped_component is None:
             return []
-
         return set.difference(cls.all_fields(), cls.db_columns())
 
     @classmethod
@@ -115,7 +126,8 @@ class DBReflectedComponent(DataBase):
 
     @classmethod
     def dict_attr(this_class,comp_cls, target_table_id):
-        default_attr = {'__tablename__': f'component_dict_{comp_cls.__name__.lower()}' ,
+        name = comp_cls.__name__.lower()
+        default_attr = {'__tablename__': f'{this_class.attr_table_prefix}_{name}' ,
                         'component_id': Column(ForeignKey( target_table_id ), primary_key=True),
                         'key': Column(Unicode(64), primary_key=True), 
                         'value': Column(Numeric),
@@ -125,13 +137,13 @@ class DBReflectedComponent(DataBase):
         return default_attr
 
     @classmethod
-    def default_attr(this_class,comp_cls):
+    def default_attr(this_class,comp_cls,analysis_results_id):
         name = comp_cls.__name__.lower()
-        default_attr = {'__tablename__': f'component_table_{name}' ,
+        default_attr = {'__tablename__': f'{this_class.table_prefix}{name}' ,
                         'id': Column(Integer, primary_key=True),
-                        'result_id': Column(Integer), #TODO: Add results  foreign key
-                        'analysis_id': Column(Integer), #TODO: Add analysis foregn key
-                        '__table_args__': (UniqueConstraint( 'result_id','analysis_id', name=f'component_table_{name}_uc' ),       this_class.default_args),
+                        'result_id': Column(Integer, ForeignKey(analysis_results_id)),
+                        'analysis_id': Column(Integer, ForeignKey('analysis_registry.id')),
+                        '__table_args__': (UniqueConstraint( 'result_id','analysis_id', name=f'{this_class.table_prefix}{name}_uc' ),       this_class.default_args),
                         '__abstract__': False,
                         '_mapped_component': comp_cls
                         }
@@ -159,6 +171,7 @@ class DBReflectedComponent(DataBase):
         comp_attr = this_class.component_attr(comp_cls)
         if not dict_type:
             return {comp_attr['__tablename__']: type(f'DB_{comp_cls.__name__}',(this_class,), comp_attr) }
+
         else:
             dict_attr = this_class.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" )
             dict_db = type(f'DB_{comp_cls.__name__}_Dict',(DataBase,), dict_attr)
@@ -168,90 +181,49 @@ class DBReflectedComponent(DataBase):
             comp_attr['_proxied']  = association_proxy( "dict_values", "value",
                                                         creator=lambda key, value: dict_db(key=key, value=value),
         )
-            comp_db = type(f'DB_{comp_cls.__name__}',(this_class,), comp_attr)
+            comp_db = type(f'DB_{comp_cls.__name__}',(MappedDictMixin,DataBase), comp_attr)
         
             return {comp_attr['__tablename__']: comp_db,
-                    dict_attr['__tablename__']: dict_db }
+                    dict_attr['__tablename__']: dict_db }         
 
+    @classmethod
+    def registered_component_classes(cls):
+        if cls.registry_component is not None and issubclass(cls.registry_component, Component):
+            return cls.registry_component.component_subclasses()
 
+        elif not type(cls.registry_component) is type:
+            log.warning(f'Registered Component Class {cls.registry_component} not a class')
 
+        elif not issubclass(cls.registry_component, Component):
+            log.warning(f'Registered Component Class {cls.registry_component} not a component')
 
-class AnalysisRegistry( DataBase ):
+        else:
+            log.warning(f'Invalid Registered Component Class {cls.registry_component}, ensure its a Component class')
+
+    @classmethod
+    def ensure_analysis_tables(this_cls,db):
+        for cls_name, cls in this_cls.registered_component_classes().items():
+            for table_name, compdb in this_cls.db_component_dict( cls, dict_type=True ):
+                if compdb.__tablename__ not in db.engine.table_names():
+                    log.info(f'creating tables {table_name}')
+                    compdb.__table__.create(db.engine, checkfirst=True)
+
+                else:
+                    log.info(f'table exists already {db_component_type_dict}')         
+
+                #if cls.table_prefix and table_name.startswith(cls.table_prefix):
+                cls.mappping[table_name] = cls  
+
+class AnalysisRegistry( DBRegistry  ):
 
     __tablename__ = 'analysis_registry'
+    table_prefix = 'analysis_table_'
+    attr_table_prefix = 'analysis_attr_'
+    registry_component = Analysis
 
-    id = Column( Integer, primary_key = True)
-    tablename = Column(String(DEFAULT_STRING_LENGTH))
-    analysisname = Column(String(DEFAULT_STRING_LENGTH))
-    active = Column(Boolean(), default=True )
-
-    _analysis_cls_table_mapping = None
-
-    @classmethod
-    def analyses(cls):
-        return Analysis.component_subclasses()
-
-    @classmethod
-    def ensure_analysis_tables(cls,db):
-        analyses = cls.analyses()
-        cls._component_cls_table_mapping = {}
-
-        for cls_name, cls in analyses.items():
-            
-            #TODO: Add special hadler for meta analysis creation
-            db_component_type_dict = DBReflectedComponent.db_component_dict( cls, dict_type=True )
-            component_tables = [compdb.__table__ for compdb in db_component_type_dict.values() \
-                                    if compdb.__tablename__ not in db.engine.table_names()]
-
-            if component_tables:
-                log.info(f'creating tables {component_tables}')
-                for comptab in component_tables:
-                    comptab.create(db.engine, checkfirst=True)
-            else:
-                log.info(f'table exists already {db_component_type_dict}')        
-
-
-
-class ComponentRegistry( DataBase ):
+class ComponentRegistry( DBRegistry ):
 
     __tablename__ = 'component_registry'
-
-    id = Column( Integer, primary_key = True)
-    tablename = Column( String(DEFAULT_STRING_LENGTH) )
-    componentname = Column( String(DEFAULT_STRING_LENGTH) )
-    active = Column( Boolean(), default=True )
-
-    _component_cls_table_mapping = None
-
-    @classmethod
-    def components(cls):
-        comps = Component.component_subclasses()
-        comp_subclasses = set(comps)
-        analy_subclasses = set(Analysis.component_subclasses())
-        comp_keys = set.difference(comp_subclasses,analy_subclasses)
-        
-        return {ckey:comps[ckey] for ckey in comp_keys}
-
-    @classmethod
-    def ensure_component_tables(cls,db):
-        components = cls.components()
-        cls._component_cls_table_mapping = {}
-
-        for cls_name, cls in components.items():
-            
-            #Create the class
-            db_component_type_dict = DBReflectedComponent.db_component_dict( cls, dict_type=True )
-            component_tables = [compdb.__table__ for compdb in db_component_type_dict.values() \
-                                    if compdb.__tablename__ not in db.engine.table_names()]
-
-            if component_tables:
-                log.info(f'creating tables {component_tables}')
-                for comptab in component_tables:
-                    comptab.create(db.engine, checkfirst=True)
-            else:
-                log.info(f'table exists already {db_component_type_dict}')
-
-
-
-
-
+    table_prefix = 'component_table_'
+    attr_table_prefix = 'component_attr_'
+    registry_component = Component
