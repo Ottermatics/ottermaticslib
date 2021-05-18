@@ -44,29 +44,24 @@ class TestAnalysis(Analysis):
         return random.random() * self.internal_component.val
 
 
-#1) Ensure exists Reflect The Database
-db = DBConnection('reports',host='localhost',user='postgres',passd='***REMOVED***')
-db.ensure_database_exists()
-#db.engine.echo = True
+if __name__ == '__main__':
+    import logging
+    log = logging.getLogger()
+    log.setLevel(logging.DEBUG)
+    logging.basicConfig( level = logging.DEBUG)
+    #1) Ensure exists Reflect The Database
+    db = DBConnection('reports',host='localhost',user='postgres',passd='***REMOVED***')
+    db.ensure_database_exists()
+    #db.engine.echo = True
 
-DataBase.metadata.bind = db.engine
-DataBase.metadata.drop_all()
-DataBase.metadata.reflect( db.engine, autoload=True, keep_existing = True )
+    DataBase.metadata.bind = db.engine
+    DataBase.metadata.drop_all()
 
-#2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
-AnalysisRegistry.__table__.create(db.engine, checkfirst=True)
-ComponentRegistry.__table__.create(db.engine, checkfirst=True)
+    tables_unmapped =db.engine.table_names() 
+    print('Tables:', tables_unmapped)
+    DataBase.metadata.drop_all(tables = tables_unmapped)
 
-AnalysisRegistry.ensure_analysis_tables(db)
-ComponentRegistry.ensure_component_tables(db)
+    DataBase.metadata.reflect( db.engine, autoload=False, keep_existing = True )
 
-
-#3) For each component and analysis map create tables or map them if they dont exist.
-# - use a registry approach (singleton?) to map the {component: db_class} pairs
-
-
-
-
-
-
-#4) When an an an analysis is solved, if configured for reporting, on post processing the results will be added to the database 
+    rr = ResultsRegistry(db)
+    rr.initalize()

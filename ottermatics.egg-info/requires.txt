@@ -20,6 +20,7 @@ Twisted
 aioice
 aiohttp
 treq
+service-identity
 sqlalchemy
 sqlalchemy_utils
 psycopg2

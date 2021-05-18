@@ -17,6 +17,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.ext.associationproxy import association_proxy
 
+from collections import OrderedDict
+
 DEFAULT_STRING_LENGTH = 256
 
 '''A Module in which we reflect changing schema in components or other tabulationmixin instances
@@ -65,22 +67,41 @@ class MappedDictMixin:
 
 class DBRegistry(DataBase):
     '''DBRegistry represents an abstract interface to register tables of a component type'''
+
     __abstract__ = True
 
     id = Column( Integer, primary_key = True)
     tablename = Column(String(DEFAULT_STRING_LENGTH))
+    attrtable = Column(String(DEFAULT_STRING_LENGTH))
+    classname = Column(String(DEFAULT_STRING_LENGTH))
+    mro_inheritance = Column(String(1200))
     active = Column(Boolean(), default=True )
+
     _cls_tabble_mapping = None
     registry_component = None
 
-    default_args = {'keep_existing':True, 'autoload': False}
+    default_args = { 'keep_existing':True , 'autoload': False }
     attr_table_prefix = ''
     table_prefix = ''
 
-    @property
+    def __init__(self,mapped_class):
+        self.classname == mapped_class.__name__
+        
+        name = mapped_class.__name__.lower()
+        self.tablename = f'{self.table_prefix}{name}'
+        self.attrtable = f'{self.attr_table_prefix}{name}'     
+
+        distinct =mapped_class.mro()
+        if mapped_class in distinct:
+            distinct.remove(mapped_class)
+        comp_inx = distinct.index(Component)
+
+        self.mro_inheritance = '.'.join([cls.__name__ for cls in distinct[0:comp_inx+1]])
+
+
     @classmethod
     def mapping(cls):
-        return self._cls_tabble_mapping
+        return cls._cls_tabble_mapping
 
     @classmethod
     def db_columns(cls):
@@ -125,39 +146,48 @@ class DBRegistry(DataBase):
 
 
     @classmethod
-    def dict_attr(this_class,comp_cls, target_table_id):
+    def dict_attr(this_class,comp_cls, target_table):
+        log.debug(f'dict_attr: {this_class}|{comp_cls} {target_table}')
         name = comp_cls.__name__.lower()
-        default_attr = {'__tablename__': f'{this_class.attr_table_prefix}_{name}' ,
-                        'component_id': Column(ForeignKey( target_table_id ), primary_key=True),
+        dict_attr = {'__tablename__': f'{this_class.attr_table_prefix}{name}' ,
+                        'id': Column(Integer, primary_key=True),
+                        'component_id': Column(Integer,ForeignKey( f'{target_table}.id')),
                         'key': Column(Unicode(64), primary_key=True), 
                         'value': Column(Numeric),
                         '__table_args__': this_class.default_args,
                         '__abstract__': False
                         }
-        return default_attr
+        return dict_attr
 
     @classmethod
-    def default_attr(this_class,comp_cls,analysis_results_id):
+    def comp_attr(this_class,comp_cls,analysis_tablename=None):
+        log.debug(f'comp_attr: {this_class}|{comp_cls} {analysis_tablename}')
         name = comp_cls.__name__.lower()
-        default_attr = {'__tablename__': f'{this_class.table_prefix}{name}' ,
-                        'id': Column(Integer, primary_key=True),
-                        'result_id': Column(Integer, ForeignKey(analysis_results_id)),
-                        'analysis_id': Column(Integer, ForeignKey('analysis_registry.id')),
-                        '__table_args__': (UniqueConstraint( 'result_id','analysis_id', name=f'{this_class.table_prefix}{name}_uc' ),       this_class.default_args),
+        tblname = f'{this_class.table_prefix}{name}'
+
+        comp_attr = {'__tablename__': tblname ,
+                        'id' :  Column(Integer, primary_key=True),
+                        '__table_args__': this_class.default_args,
                         '__abstract__': False,
                         '_mapped_component': comp_cls
                         }
-        return default_attr
+
+        if isinstance(analysis_tablename,str): #its a compnent
+            log.debug(f'comp_attr - adding FK {this_class}|{comp_cls} {analysis_tablename}.id')
+            comp_attr['result_id'] = Column(Integer, ForeignKey(f'{analysis_tablename}.id'))
+
+        return comp_attr
 
     @classmethod
-    def component_attr(this_class,comp_cls):
+    def component_attrs(this_class,comp_cls):
         # #TODO: assign key values as attribute dict
         # #TODO: check if class has a __tablename__ and if it does use that with, ensure component_table_ on front
+        log.debug(f'component_attrs: {this_class}|{comp_cls}')
 
-        component_attr = { key.lower(): this_class.validator_to_column(field) for key,field in attr.fields_dict(comp_cls).items() if this_class.filter_by_validators(field) and not key.lower() == 'name'}
+        component_attrs = { key.lower(): this_class.validator_to_column(field) for key,field in attr.fields_dict(comp_cls).items() if this_class.filter_by_validators(field) and not key.lower() == 'name'}
 
-        component_attr.update(this_class.default_attr(comp_cls))
-        return component_attr
+        component_attrs.update( this_class.comp_attr(comp_cls) )
+        return component_attrs
 
     @classmethod
     def db_component_dict(this_class,comp_cls,dict_type = False):
@@ -165,26 +195,35 @@ class DBRegistry(DataBase):
         
         this method represents the dynamic creation of SQLA typing and attributes via __dict__'''
 
+        log.debug(f'db_component_dict: {this_class}|{comp_cls} dict: {dict_type}')
         assert isinstance(comp_cls, type)
         assert Component in comp_cls.mro()
 
-        comp_attr = this_class.component_attr(comp_cls)
+        comp_attr = this_class.component_attrs(comp_cls)
         if not dict_type:
             return {comp_attr['__tablename__']: type(f'DB_{comp_cls.__name__}',(this_class,), comp_attr) }
 
         else:
             dict_attr = this_class.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" )
-            dict_db = type(f'DB_{comp_cls.__name__}_Dict',(DataBase,), dict_attr)
+            dict_name = f'DB_{comp_cls.__name__}_Dict'
+            dict_db = type(dict_name,(DataBase,), dict_attr)
 
             dict_col = attribute_mapped_collection("key")
             comp_attr['dict_values']  = relationship( dict_db.__name__, collection_class = dict_col )
             comp_attr['_proxied']  = association_proxy( "dict_values", "value",
-                                                        creator=lambda key, value: dict_db(key=key, value=value),
-        )
-            comp_db = type(f'DB_{comp_cls.__name__}',(MappedDictMixin,DataBase), comp_attr)
-        
-            return {comp_attr['__tablename__']: comp_db,
-                    dict_attr['__tablename__']: dict_db }         
+                                                        creator=lambda key, value: dict_db(key=key, value=value))
+            comp_name = f'DB_{comp_cls.__name__}'
+            comp_db = type(comp_name,(MappedDictMixin,DataBase), comp_attr)
+
+            globals()[comp_name] = comp_db
+            globals()[dict_name] = dict_db
+
+            out = OrderedDict()
+            out[comp_attr['__tablename__']] = comp_db
+            out[dict_attr['__tablename__']] = dict_db
+
+            return out
+                    
 
     @classmethod
     def registered_component_classes(cls):
@@ -202,17 +241,25 @@ class DBRegistry(DataBase):
 
     @classmethod
     def ensure_analysis_tables(this_cls,db):
+        log.debug(f'ensure_analysis_tables: {this_cls}|{db}')
         for cls_name, cls in this_cls.registered_component_classes().items():
-            for table_name, compdb in this_cls.db_component_dict( cls, dict_type=True ):
-                if compdb.__tablename__ not in db.engine.table_names():
+            to_create = []
+            for table_name, compdb in this_cls.db_component_dict( cls, dict_type=True ).items():
+                if not db.engine.has_table(compdb.__tablename__):
                     log.info(f'creating tables {table_name}')
-                    compdb.__table__.create(db.engine, checkfirst=True)
-
+                    to_create.append(compdb.__table__)
+                    compdb.__table__.create(db.engine)
+                    
                 else:
-                    log.info(f'table exists already {db_component_type_dict}')         
+                    log.info(f'table exists already {table_name}')         
 
-                #if cls.table_prefix and table_name.startswith(cls.table_prefix):
-                cls.mappping[table_name] = cls  
+                this_cls._cls_tabble_mapping[cls] = compdb.__table__
+            
+            #this_cls.metadata.create_all(db.engine,tables = to_create)
+            with db.session_scope() as sesh:
+                for tbl in to_create:
+                    #tbl = this_cls(cls)
+                    sesh.add(tbl)
 
 class AnalysisRegistry( DBRegistry  ):
 
@@ -220,6 +267,7 @@ class AnalysisRegistry( DBRegistry  ):
     table_prefix = 'analysis_table_'
     attr_table_prefix = 'analysis_attr_'
     registry_component = Analysis
+    _cls_tabble_mapping = {} #this will be class based
 
 class ComponentRegistry( DBRegistry ):
 
@@ -227,3 +275,50 @@ class ComponentRegistry( DBRegistry ):
     table_prefix = 'component_table_'
     attr_table_prefix = 'component_attr_'
     registry_component = Component
+    _cls_tabble_mapping = {}#this will be class based
+
+@otterize
+class ResultsRegistry( Configuration ):
+
+    analysis_registry = AnalysisRegistry
+    component_registry = ComponentRegistry
+
+    components = None
+    analyses = None
+
+    initalized = False
+    
+    #inputs
+    db = attr.ib( ) #required input is a database connector
+
+    def initalize(self):
+        #1) Ensure & Load Config & Analysis Tables
+
+        #2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
+        self.analysis_registry.__table__.create(self.db.engine, checkfirst=True)
+        self.component_registry.__table__.create(self.db.engine, checkfirst=True)
+
+        #self.analysis_registry.ensure_analysis_tables(self.db)
+        #self.component_registry.ensure_component_tables(self.db)
+
+        #3) For each component and analysis map create tables or map them if they dont exist.
+        # - use a registry approach (singleton?) to map the {component: db_class} pairs
+
+        #4) When an an an analysis is solved, if configured for reporting, on post processing the results will be added to the database 
+
+    def register_analysis(self,analysis):
+        if self.initalized:
+            if analysis._solved and isinstance(analysis, Analysis):
+                pass
+                #1) Identify & Ensure The Analysis Table
+                #2) Ensure Component Tables For The Analysis
+                #3) For each result, add it to the DB
+
+            if not analysis._solved:
+                self.warning(f"Warning analysis {analysis} not solved")
+
+            if not isinstance(analysis, Analysis):
+                self.warning(f"Warning analysis {analysis} is not type Analysis {type(analysis)}")
+                
+        else:
+                self.warning(f"Results Registry Not Initalized")
