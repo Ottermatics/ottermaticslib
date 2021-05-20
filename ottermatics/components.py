@@ -91,6 +91,46 @@ class Component(TabulationMixin):
         COMP_CLASS = [modcls for mkey,modcls in OTTER_ITEMS if type(modcls) is type and issubclass(modcls, Component)]
         return {scls.__name__:scls for scls in cls.__subclasses__() if scls not in COMP_CLASS}
 
+
+    #Configuration Information
+    @property
+    def internal_components(self):
+        '''go through all attributes determining which are configuration objects
+        we skip any configuration that start with an underscore (private variable)'''
+        return {k:v for k,v in self.store.items() \
+                if isinstance(v,Component) and not k.startswith('_')}
+
+
+    def go_through_components(self,level = 0,levels_to_descend = -1, parent_level=0):
+        '''A generator that will go through all internal configurations up to a certain level
+        if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
+        only go through this configuration
+        
+        :return: level,config'''
+
+        should_yield_level = lambda level: all([level>=parent_level, \
+                                              any([levels_to_descend < 0, level <= levels_to_descend])])
+
+        if should_yield_level(level):
+            yield level,self
+
+        level += 1
+        for comp in self.internal_components.values():
+            for level,icomp in comp.go_through_components(level,levels_to_descend,parent_level):
+                yield level,icomp
+
+    @property
+    def all_internal_components(self):
+        return list([comp for lvl, comp in self.go_through_components() if not self is comp ])
+
+    @property
+    def unique_internal_components_classes(self):
+
+        return list(set([ comp.__class__ for lvl, comp in self.go_through_components() \
+                                                        if not self.__class__ is comp.__class__ ]))
+
+
+
 @otterize
 class ComponentIterator(Component):
     '''An object to loop through a list of components as the system is evaluated,

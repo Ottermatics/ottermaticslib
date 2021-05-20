@@ -103,7 +103,9 @@ class Configuration(LoggingMixin):
     @property
     def identity(self):
         '''A customizeable property that will be in the log by default'''
-        return '{}-{}'.format(self.classname,self.name).lower()
+        if not self.name:
+            return self.classname.lower()
+        return f'{self.classname}-{self.name}'.lower()
 
     @property
     def classname(self):
