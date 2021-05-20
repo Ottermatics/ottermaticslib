@@ -73,7 +73,7 @@ class AttrBase(DataBase):
     value = Column(Numeric)
 
     def __init__(self,key=None,value=None):
-        log.info(f'creating attr {self}, {key}={value}')
+        log.debug(f'creating attr {self}, {key}={value}')
 
         if key is not None and value is not None:
             if isinstance(value,(float,int)):
@@ -126,7 +126,7 @@ class TableBase( MappedDictMixin, DataBase ):
     attr_class = AttrBase 
 
     def __init__(self,**kwargs):
-        log.info(f'creating TB {self}, {kwargs}')
+        log.debug(f'creating TB {self}, {kwargs}')
         table = self.__class__.__table__
         cols = self.dbi_columns
 
@@ -138,7 +138,7 @@ class TableBase( MappedDictMixin, DataBase ):
                     col = table.columns[key]                
                     ctype = type(col.type)
 
-                    log.info(f'{self} setting {key}|{col}|{ctype}')
+                    log.debug(f'{self} setting {key}|{col}|{ctype}')
 
                     in_stypes = ctype in self.check_types 
                     if in_stypes:
@@ -377,9 +377,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     def check_or_create_db_type(self,tablename,type_tuple):
         if self.db.engine.has_table(tablename):                
             
-            
             cls_name,ttype,attr_dict = type_tuple
-            
             
             remove = set(['__table_args__'])
             for key,item in attr_dict.items():
@@ -388,10 +386,10 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             
             for rkey in remove:
                 if rkey in attr_dict:
-                    self.info(f'removing {rkey}')
+                    self.debug(f'removing {rkey}')
                     attr_dict.pop(rkey)
                 else:
-                    self.info(f'couldnt find {rkey}')
+                    self.debug(f'couldnt find {rkey}')
 
             attr_dict['__table__'] = self.base.metadata.tables[tablename]
             attr_dict['__table_args__'] = {'autoload':True}
@@ -406,7 +404,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
         else:
             cls_db = type(*type_tuple)
-            self.info(f'creating table type {cls_db.__name__} -> {cls_db.__tablename__}')
+            self.debug(f'creating table type {cls_db.__name__} -> {cls_db.__tablename__}')
 
             setattr(self,cls_db.__name__,cls_db)
             return cls_db    
@@ -471,7 +469,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     def ensure_analysis(self,analysis):
         '''pass a class or instance to create the tables, passing an instance also ensures its internal components are
         tabulated'''
-        self.debug(f'ensure-analysis: {analysis}')
+        self.info(f'ensure-analysis: {analysis}')
         analysis_cls = self.get_analysis_class( analysis )
 
         db_component_type_dict = self.ensure_component_table(analysis_cls)    
@@ -499,6 +497,8 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
     def upload_analysis(self,analysis):
         #TODO: Implment Index Based Merging Scheme, Right now we're assuming last values carry over
+        self.info(f'upload analysis: {analysis}')
+
         class AvoidDuplicateAbortUpload(Exception): pass
 
         try:        
@@ -560,7 +560,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                             cmp_result.analysis = main_result
                             #if dbclass.__tablename__ in main_result.__dict__:
                             #comps = main_result.__dict__[dbclass.__tablename__]
-                            self.info(f'adding to: {main_result} <- {cmp_result}')
+                            self.debug(f'adding to: {main_result} <- {cmp_result}')
                             #comps.append( cmp_result )
                             #else:
                             #    self.info(f"{dbclass.__tablename__} not in {main_result}")
@@ -571,7 +571,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                             cmp_result.analysis = main_result
                             #if dbclass.__tablename__ in main_result.__dict__:
                             #comps = main_result.__dict__[dbclass.__tablename__]
-                            self.info(f'adding to: {main_result} <- {cmp_result}')
+                            self.debug(f'adding to: {main_result} <- {cmp_result}')
                             #comps.append( cmp_result )
                             #else:
                             #    self.info(f"{dbclass.__tablename__} not in {main_result}")            
