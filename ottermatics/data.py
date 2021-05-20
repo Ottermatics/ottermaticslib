@@ -20,6 +20,7 @@ import functools
 import time
 from urllib.request import urlopen
 from psycopg2.extensions import register_adapter, AsIs
+import psycopg2
 from os import sys
 
 import cachetools
@@ -54,6 +55,14 @@ register_adapter(numpy.int64, addapt_numpy_int64)
 register_adapter(numpy.float32, addapt_numpy_float32)
 register_adapter(numpy.int32, addapt_numpy_int32)
 register_adapter(numpy.ndarray, addapt_numpy_array)
+
+#This handles nans (which present as floats)!
+def nan_to_null(f):
+    if not numpy.isnan(f):
+        return psycopg2.extensions.Float(f)
+    return AsIs('NULL')
+
+register_adapter(float, nan_to_null)
 
 DataBase = declarative_base()
 

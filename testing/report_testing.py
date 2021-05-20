@@ -4,7 +4,7 @@ from ottermatics.configuration import otterize
 from ottermatics.tabulation import table_property
 from ottermatics.components import Component
 from ottermatics.analysis import Analysis
-
+from logging import *
 #tests scripts
 
 @otterize
@@ -22,7 +22,7 @@ class TestComponent(Component):
 
     @table_property
     def synthetic_val(self):
-        if word == 'schfiftyfive':
+        if self.word == 'schfiftyfive':
             return 55
         return random.random() * self.val
 
@@ -30,9 +30,11 @@ class TestComponent(Component):
 class TestAnalysis(Analysis):
 
     internal_component = attr.ib(factory=TestComponent)
-    some_random_value = attr.ib(default='hey now',validator=STR_VALIDATOR())
+    some_random_value = attr.ib(default=10,validator=NUMERIC_VALIDATOR())
     other_rand_val = attr.ib(default=1E6,validator=NUMERIC_VALIDATOR())
     
+    mode = 'iterator'
+    iterator = attr.ib(factory = lambda: list(range(10)))
     has_random_properties = True
 
     @table_property
@@ -43,30 +45,45 @@ class TestAnalysis(Analysis):
     def rand_val(self):
         return random.random() * self.internal_component.val
 
+    def evaluate(self, item ):
+        self.some_random_value = item
 
-#1) Ensure exists Reflect The Database
-db = DBConnection('reports',host='localhost',user='postgres',passd='***REMOVED***')
-db.ensure_database_exists()
-#db.engine.echo = True
-
-DataBase.metadata.bind = db.engine
-DataBase.metadata.drop_all()
-DataBase.metadata.reflect( db.engine, autoload=True, keep_existing = True )
-
-#2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
-AnalysisRegistry.__table__.create(db.engine, checkfirst=True)
-ComponentRegistry.__table__.create(db.engine, checkfirst=True)
-
-AnalysisRegistry.ensure_analysis_tables(db)
-ComponentRegistry.ensure_component_tables(db)
+    @table_property
+    def random_none(self):
+        val = random.random()
+        if val > 0.6:
+            return None
+        return val
 
 
-#3) For each component and analysis map create tables or map them if they dont exist.
-# - use a registry approach (singleton?) to map the {component: db_class} pairs
+if __name__ == '__main__':
+    log = logging.getLogger()
+    DEBUG = False
+    if DEBUG:
+        log.setLevel(logging.DEBUG)
+        logging.basicConfig( level = logging.DEBUG)
+        set_all_loggers_to( logging.DEBUG)
+
+    analysis = TestAnalysis()
+    tc = analysis.internal_component
+
+    #1) Ensure exists Reflect The Database
+    db = DBConnection('reports',host='localhost',user='postgres',passd='***REMOVED***')
+    db.ensure_database_exists()
+    #db.engine.echo = True
+
+    rr = ResultsRegistry(db=db)
+    # rr.ensure_all_tables()
+    # rr.base.metadata.drop_all()
+    # rr.initalize()
 
 
+    #2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
+    analysis.solve()
+    rr.ensure_analysis(analysis)
+    rr.upload_analysis(analysis)
 
+    #3) For each component and analysis map create tables or map them if they dont exist.
+    # - use a registry approach (singleton?) to map the {component: db_class} pairs
 
-
-
-#4) When an an an analysis is solved, if configured for reporting, on post processing the results will be added to the database 
+    #4) When an an an analysis is solved, if configured for reporting, on post processing the results will be added to the database 

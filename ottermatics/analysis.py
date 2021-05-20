@@ -5,6 +5,7 @@ from ottermatics.patterns import SingletonMeta
 
 import datetime
 import os 
+from uuid import uuid4
 
 import random
 
@@ -29,7 +30,8 @@ class Analysis(Component):
     '''
 
     iterator = None
-    _solved = False
+    _solved = False #this is used
+    _uploaded = False #this is used by reporting system
     
     modes = ['default','iterator']
     mode = 'default'
@@ -38,15 +40,30 @@ class Analysis(Component):
     namepath_mode = 'both'
     namepath_root = 'reports/'
 
+    run_id = attr.ib(default=None) #this gets logged!
+
+    @property
+    def solved(self):
+        return self._solved
+
+    @property
+    def uploaded(self):
+        if not self.solved:
+            return False
+        return self._uploaded
+
     @property
     def _report_path(self):
         '''Add some name options that work into ClientInfoMixin'''
-        if self.namepath_mode == 'both' and self.mode == 'iterator' and self.component_iterator is not None:
+
+        if self.namepath_mode == 'both' and self.mode == 'iterator' and isinstance(self.component_iterator,Component):
             return os.path.join( self.namepath_root, f'{self.name}', f'{self.component_iterator.name}' )
-        elif self.namepath_mode == 'iterator' and self.mode == 'iterator'  and self.component_iterator is not None:
+        elif self.namepath_mode == 'iterator' and self.mode == 'iterator' and isinstance(self.component_iterator,Component):
             return os.path.join( self.namepath_root, f'{self.component_iterator.name}' )
         else:
-            return os.path.join( self.namepath_root, f'{self.name}' )
+            if self.name != 'default':
+                return os.path.join( self.namepath_root, f'{self.classname.lower()}_{self.name}' )
+            return os.path.join( self.namepath_root, f'{self.classname.lower()}' )
 
     @property
     def component_iterator(self)-> ComponentIterator: 
@@ -60,6 +77,7 @@ class Analysis(Component):
 
         if not self._solved:
             #with alive_bar(len(locations)) as bar:
+            self.run_id = str(uuid4())
             if self.mode=='iterator' and self.component_iterator is not None:
                 output = []
                 for item in self.component_iterator:
@@ -93,7 +111,7 @@ class Analysis(Component):
     def reset_analysis(self):
         self.reset_data()
         self._solved = False
-
+        self.run_id = None
 
     def gsync_results(self,filename='Analysis', meta_tags = None):
         '''Syncs All Variable Tables To The Cloud'''

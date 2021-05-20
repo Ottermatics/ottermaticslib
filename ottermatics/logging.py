@@ -50,8 +50,10 @@ def is_ec2_instance():
 try:
     logging.getLogger('parso.cache').disabled=True
     logging.getLogger('parso.cache.pickle').disabled=True
-except:
-    log.warning('could not diable parso')
+    logging.getLogger('parso.python.diff').disabled=True
+
+except Exception as e:
+    log.warning(f'could not diable parso {e}')
 # def installGELFLogger():
 #     '''Installs GELF Logger'''
 #     # self.gelf = graypy.GELFTLSHandler(GELF_HOST,GELF_PORT, validate=True,\

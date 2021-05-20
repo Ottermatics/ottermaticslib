@@ -547,7 +547,6 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     @property
     def use_threadpool(self):
-        #TODO: add a try fail to determine if in ray worker, if we are use 1
         if self.is_ray_context:
             return False
         return self._use_threadpool
@@ -578,7 +577,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
         self.debug(f'Initalizing from {self.filepath_root}')
 
-        #did_read = self.read()
+        #did_read = self.read() #READ FS HERE
         #if not did_read:
 
         self.thread_time_multiplier = 1.0
