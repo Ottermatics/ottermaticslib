@@ -110,7 +110,7 @@ if __name__ == '__main__':
 
 
     #1) Ensure exists Reflect The Database
-    db = DBConnection('reports',host='localhost',user='postgres',passd='Keavin#11235813')
+    db = DBConnection('reports',host='localhost',user='postgres',passd='dumbpass')
     db.ensure_database_exists()
     #db.engine.echo = True
 
