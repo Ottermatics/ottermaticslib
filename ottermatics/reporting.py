@@ -17,6 +17,9 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.sql.sqltypes import BOOLEAN, NUMERIC, VARCHAR, INTEGER, INT
+
+from sqlalchemy.sql import func
 
 DEFAULT_STRING_LENGTH = 256
 
@@ -100,14 +103,22 @@ class TableBase( MappedDictMixin, DataBase ):
                     String: (str,),
                     Integer: (int,),
                     Numeric: (float,int),
-                    Boolean: (bool,)
+                    Boolean: (bool,),
+                    BOOLEAN: (bool,),
+                    INTEGER: (int,),
+                    NUMERIC: (float,int),
+                    VARCHAR: (str,)                    
                   }
 
     store_type = {
                     String:  str,
                     Integer: int,
                     Numeric: float,
-                    Boolean: bool
+                    Boolean: bool,
+                    BOOLEAN: bool,
+                    INTEGER: int,
+                    NUMERIC: float,
+                    VARCHAR: str,
                   }                  
 
     ignore_keys = ('id','index')
@@ -126,6 +137,8 @@ class TableBase( MappedDictMixin, DataBase ):
                     
                     col = table.columns[key]                
                     ctype = type(col.type)
+
+                    log.info(f'{self} setting {key}|{col}|{ctype}')
 
                     in_stypes = ctype in self.check_types 
                     if in_stypes:
@@ -209,7 +222,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
     def __on_init__(self):
         self.base.metadata.bind = self.db.engine
-        self.base.metadata.reflect( self.db.engine, autoload=True, keep_existing = True , schema = self.schema)
+        self.base.metadata.reflect( self.db.engine, autoload=True, keep_existing = True )
 
         self._component_cls_table_mapping = {}
         self.initalize()
@@ -304,15 +317,19 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                         }
 
         if results_table is not None:
+            tbl_name = f'{results_table}_{table_abrv}{name}'
+            backref_name = f'db_comp_{name}'
             root_obj,_ = self.mapped_tables[results_table]
             default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}' 
             default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'))
-            default_attr['analysis'] = relationship(root_obj.__name__, backref=backref('components', lazy='noload'))
+            
+            default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload')) 
 
         else: #its an analysis
-            default_attr['created'] = Column(DateTime, default=datetime.datetime.utcnow)
-            default_attr['active'] = Column(Boolean(), default = True)
+            default_attr['created'] = Column(DateTime, server_default=func.now())
+            default_attr['active'] = Column(Boolean(), server_default = 't')
             default_attr['run_id'] = Column(String(36)) #corresponds to uuid set in analysis
+            #default_attr['components'] = relationship(TableBase, back_populates= "analysis")
 
         return default_attr
 
@@ -328,7 +345,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         component_attr.update(self.default_attr(comp_cls,results_table=results_table))
         return component_attr
 
-    def db_component_dict(self,comp_cls,dict_type = False,results_table=None):
+    def db_component_dict(self,comp_cls,results_table=None):
         '''returns the nessicary table types to make for reflection of input component class
         
         this method represents the dynamic creation of SQLA typing and attributes via __dict__'''
@@ -337,37 +354,62 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         assert Component in comp_cls.mro()
 
         comp_attr = self.component_attr(comp_cls,results_table=results_table)
+        tablename = comp_attr['__tablename__']
+
         if results_table:
             comp_cls_name = f'DB_{results_table}_{comp_cls.__name__}'
 
         else:
             comp_cls_name = f'DB_{comp_cls.__name__}'
 
-        if not dict_type:
-            comp_db =  type(comp_cls_name,(self.base,), comp_attr)
-            setattr(self,comp_cls_name,comp_db)
-            return {comp_attr['__tablename__']: comp_db}
+        dict_attr = self.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" , results_table=results_table)
+        dict_name = f'{comp_cls_name}_Dict'
+        dict_db_tup = (dict_name,(AttrBase,), dict_attr)
+
+        dict_db = self.check_or_create_db_type(dict_attr['__tablename__'], dict_db_tup)
+        
+        comp_attr['attr_class'] = dict_db
+        comp_db_tup = (comp_cls_name,(TableBase,), comp_attr)
+        comp_db = self.check_or_create_db_type(comp_attr['__tablename__'], comp_db_tup)
+
+        return {comp_attr['__tablename__']:comp_db, dict_attr['__tablename__']: dict_db}
+
+    def check_or_create_db_type(self,tablename,type_tuple):
+        if self.db.engine.has_table(tablename):                
+            
+            
+            cls_name,ttype,attr_dict = type_tuple
+            
+            
+            remove = set(['__table_args__'])
+            for key,item in attr_dict.items():
+                if issubclass( type(item), Column ):
+                    remove.add(key)
+            
+            for rkey in remove:
+                if rkey in attr_dict:
+                    self.info(f'removing {rkey}')
+                    attr_dict.pop(rkey)
+                else:
+                    self.info(f'couldnt find {rkey}')
+
+            attr_dict['__table__'] = self.base.metadata.tables[tablename]
+            attr_dict['__table_args__'] = {'autoload':True}
+
+            self.debug(f'making type: {cls_name,self.base,attr_dict}')
+            cls_db = type(cls_name,ttype,attr_dict)
+            
+            self.debug(f'mapped existing table to type {tablename} -> {cls_db.__name__}')
+            setattr(self,cls_db.__name__,cls_db)
+            
+            return cls_db    
 
         else:
-            dict_attr = self.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" , results_table=results_table)
-            dict_name = f'{comp_cls_name}_Dict'
-            dict_db = type(dict_name,(AttrBase,), dict_attr)
-            setattr(self,dict_name,dict_db)
+            cls_db = type(*type_tuple)
+            self.info(f'creating table type {cls_db.__name__} -> {cls_db.__tablename__}')
 
-            #def makeit(key,value):
-            #    #if you can make it here, you can make it anywhere!
-            #    log.debug(f'makingit {dict_db} {key,value}')
-            #    return dict_db(key,value)
-
-            #dict_col = attribute_mapped_collection("key")
-            #comp_attr['dict_values']  = relationship( dict_name, collection_class = dict_col )
-            #comp_attr['_proxied']  = association_proxy( "dict_values", "value", creator=dict_db)
-            comp_attr['attr_class'] = dict_db
-            comp_db = type(comp_cls_name,(TableBase,), comp_attr)
-            
-            setattr(self,comp_cls_name,comp_db)
-            return { comp_attr['__tablename__']: comp_db,
-                     dict_attr['__tablename__']: dict_db }
+            setattr(self,cls_db.__name__,cls_db)
+            return cls_db    
 
     def map_component(self,dbcomponent,component):
         self.debug(f'mapping {dbcomponent},{component} -> {dbcomponent.__tablename__}')
@@ -399,30 +441,28 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     def ensure_component_tables(self,results_table=None):
         for cls_name, cls in self.components.items():
             self.debug(f'ensure-comp-tables: {cls}')
-            self.ensure_component_table(cls,dict_type=True, results_table=results_table)
+            self.ensure_component_table(cls, results_table=results_table)
 
     def ensure_component_tables_in_analysis(self,analysis,results_table=None):
         assert isinstance(analysis,Analysis)
         for cls in analysis.unique_internal_components_classes:
             self.debug(f'ensure-analyinst-tables: {cls}')
-            self.ensure_component_table(cls,dict_type=True, results_table=results_table)                
-
-    # def ensure_analysis_tables(self,dict_type=True):
-    #     for cls_name, cls in  self.analyses.items():
-    #         self.ensure_component_table(cls,dict_type=dict_type, results_table=None)
+            self.ensure_component_table(cls, results_table=results_table)                
 
 
-    def ensure_component_table(self, component_cls,dict_type=True, results_table=None):
+
+    def ensure_component_table(self, component_cls, results_table=None):
         self.debug(f'ensure-comp-table: {component_cls}')
-        db_component_type_dict = self.db_component_dict( component_cls, dict_type=dict_type, results_table=results_table )
         
-        for compdb in db_component_type_dict.values():
-            if not  self.db.engine.has_table(compdb.__tablename__ ):
-                self.info(f'creating tables {compdb.__tablename__}')
+        db_component_type_dict = self.db_component_dict( component_cls, results_table=results_table )
+        for comp_tbl, compdb in db_component_type_dict.items():
+
+            if not  self.db.engine.has_table(comp_tbl ):
+                self.info(f'creating tables {comp_tbl}')
                 compdb.__table__.create(self.db.engine, checkfirst=True)
+
             else:
-                self.debug(f'table exists already {db_component_type_dict}')
-                compdb.__table__ = self.base.metadata.tables[compdb.__tablename__]
+                self.debug(f'table exists already {comp_tbl}')
 
             if not compdb.__name__.endswith('Dict'): self.map_component(compdb, component_cls ) 
 
@@ -434,7 +474,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         self.debug(f'ensure-analysis: {analysis}')
         analysis_cls = self.get_analysis_class( analysis )
 
-        db_component_type_dict = self.ensure_component_table(analysis_cls,dict_type=True)    
+        db_component_type_dict = self.ensure_component_table(analysis_cls)    
 
         #return primary table name
         out = [dbckey for dbckey in db_component_type_dict.keys() if dbckey.startswith(self.analysis_table_abrv)]
@@ -517,18 +557,35 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                             data_dict = next(generator)
                             last_values[dbclass] = data_dict
                             cmp_result = dbclass(**data_dict)
-                            main_result.components.append( cmp_result )
+                            cmp_result.analysis = main_result
+                            #if dbclass.__tablename__ in main_result.__dict__:
+                            #comps = main_result.__dict__[dbclass.__tablename__]
+                            self.info(f'adding to: {main_result} <- {cmp_result}')
+                            #comps.append( cmp_result )
+                            #else:
+                            #    self.info(f"{dbclass.__tablename__} not in {main_result}")
                         
                         except StopIteration:
                             data_dict = last_values[dbclass] 
                             cmp_result = dbclass(**data_dict)
-                            main_result.components.append( cmp_result )             
+                            cmp_result.analysis = main_result
+                            #if dbclass.__tablename__ in main_result.__dict__:
+                            #comps = main_result.__dict__[dbclass.__tablename__]
+                            self.info(f'adding to: {main_result} <- {cmp_result}')
+                            #comps.append( cmp_result )
+                            #else:
+                            #    self.info(f"{dbclass.__tablename__} not in {main_result}")            
 
                         else:
                             any_succeeded = True #here's ur fricken evidence ur honor
                     
-                    if not any_succeeded: raise AvoidDuplicateAbortUpload() #the scoped session rolls back anything created this time :)
-                inx += 1
+                    #the scoped session rolls back anything created this time :)
+                    if not any_succeeded: raise AvoidDuplicateAbortUpload() 
+                
+                inx += 1 #index += 1 is done at end of analysis so we should model that
+
+        except AvoidDuplicateAbortUpload:
+            pass #this is fine
 
         except Exception as e:
             self.error(e,'Issue Uploading Data')

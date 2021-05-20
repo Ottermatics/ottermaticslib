@@ -14,9 +14,7 @@ class TestComponent(Component):
     name = attr.ib(default='test', validator=STR_VALIDATOR())
     word = attr.ib(default='bird', validator=STR_VALIDATOR())
     val = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
-    #ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
-    #wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
-    #more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
+
 
     has_random_properties = True
 
@@ -26,9 +24,52 @@ class TestComponent(Component):
             return 55
         return random.random() * self.val
 
+    @table_property
+    def surpise_val(self):
+        return 13
+
+@otterize
+class OtherComponent(Component):
+
+    arg1 = attr.ib(default='mmmm', validator=STR_VALIDATOR())
+    arg2 = attr.ib(default='word', validator=STR_VALIDATOR())
+    argnum = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
+    ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
+    wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
+    more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
+
+    has_random_properties = True
+
+    @table_property
+    def random_val(self):
+        return self.argnum * random.random() / random.random()
+
+    @table_property
+    def new_val(self):
+        return self.argnum * random.random() 
+
+@otterize
+class SupriseComponent(Component):
+
+    arg3 = attr.ib(default='mmmm', validator=STR_VALIDATOR())
+    arg4 = attr.ib(default='word', validator=STR_VALIDATOR())
+    argque = attr.ib(default=-999, validator=NUMERIC_VALIDATOR())
+    #ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
+    #wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
+    #more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
+
+    has_random_properties = True
+
+    @table_property
+    def negative_random_val(self):
+        return self.argque * random.random() / random.random()        
+
+
 @otterize
 class TestAnalysis(Analysis):
 
+    surprise = attr.ib(factory=SupriseComponent)
+    other_cocomponent = attr.ib(factory=OtherComponent)
     internal_component = attr.ib(factory=TestComponent)
     some_random_value = attr.ib(default=10,validator=NUMERIC_VALIDATOR())
     other_rand_val = attr.ib(default=1E6,validator=NUMERIC_VALIDATOR())
@@ -67,6 +108,7 @@ if __name__ == '__main__':
     analysis = TestAnalysis()
     tc = analysis.internal_component
 
+
     #1) Ensure exists Reflect The Database
     db = DBConnection('reports',host='localhost',user='postgres',passd='Keavin#11235813')
     db.ensure_database_exists()
@@ -77,13 +119,33 @@ if __name__ == '__main__':
     # rr.base.metadata.drop_all()
     # rr.initalize()
 
+    md = rr.base.metadata
+    for key,tbl in md.tables.items():
+        print(key,list(tbl.columns.keys()))
+        print('#'*80+'\n')
 
     #2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
     analysis.solve()
     rr.ensure_analysis(analysis)
+
+    md = rr.base.metadata
+    for key,tbl in md.tables.items():
+        print(key,list(tbl.columns.keys()))
+        print('#'*80+'\n')
+
     rr.upload_analysis(analysis)
 
     #3) For each component and analysis map create tables or map them if they dont exist.
     # - use a registry approach (singleton?) to map the {component: db_class} pairs
 
     #4) When an an an analysis is solved, if configured for reporting, on post processing the results will be added to the database 
+
+
+ 
+
+    # analysis = TestAnalysis()
+
+    # #2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
+    # analysis.solve()
+    # rr.ensure_analysis(analysis)
+    # rr.upload_analysis(analysis)
