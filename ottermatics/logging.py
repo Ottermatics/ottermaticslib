@@ -82,13 +82,15 @@ def set_all_loggers_to(level,set_stdout=False,all_loggers=False):
     if set_stdout: installSTDLogger()
 
     logging.basicConfig(level = LOG_LEVEL) #basic config
-    #log = logging.getLogger()
-    #log.setLevel(LOG_LEVEL)# Set Root Logger
+    
+    log = logging.getLogger()
+    log.setLevel(LOG_LEVEL)# Set Root Logger
 
-    #log.setLevel(level) #root
+    log.setLevel(level) #root
+
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
     for logger in loggers:
-        if logger.__class__.__name__.lower().startswith('otterlog'):
+        if logger.__class__.__name__.lower().startswith('otter'):
             logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
             logger.setLevel(LOG_LEVEL)
         elif all_loggers:

@@ -173,6 +173,23 @@ import ray.cloudpickle as cp
 import colorama
 from contextlib import contextmanager
 
+def recursive_python_module_line_counter(curpath=None):
+    total_lines = 0
+    if curpath is None or not isinstance(curpath, str):
+        curpath = os.path.realpath(os.curdir)
+        
+    print(f'Getting Python Lines In {curpath}')
+    for dirpath, dirs, fils in os.walk(curpath):
+        for fil in fils:
+            if fil.endswith('.py'):
+                filpath = os.path.join(dirpath,fil)
+                with open(filpath,'r') as fp:
+                    lines = len(str(fp.read()).split('\n'))
+                    total_lines += lines
+                    print(f'{filpath}: {lines} / {total_lines}')
+
+    print(f'Total Lines {total_lines}')
+
 def flat2gen(alist):
   for item in alist:
     if isinstance(item, list):

@@ -137,9 +137,11 @@ class ComponentIterator(Component):
     
     iterates through each component and pipes data_row and data_label to this objects table'''
 
+    _iterated_component_type = None #provides interface for tabulation & data reflection
     _components = []
     shuffle_mode = False
     _shuffled = None
+
 
     @property
     def component_list(self):
@@ -165,6 +167,13 @@ class ComponentIterator(Component):
 
     #Wrappers for current component
     @property
+    def data_dict(self):
+        base = super(ComponentIterator,self).data_dict
+        base.update(self.current_component.data_dict)
+        return base
+
+
+    @property
     def data_row(self):
         return super(ComponentIterator,self).data_row + self.current_component.data_row
 
@@ -175,6 +184,23 @@ class ComponentIterator(Component):
     @property
     def plot_variables(self):    
         return super(ComponentIterator,self).plot_variables + self.current_component.plot_variables
+
+    @classmethod
+    def cls_all_property_labels(cls):
+        these_properties =  [obj.label.lower() for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]
+        if cls._iterated_component_type is not None and issubclass(cls._iterated_component_type,Component ):
+            iterated_properties = cls._iterated_component_type.cls_all_property_labels()
+            these_properties = list(set( iterated_properties + these_properties))
+        return these_properties
+    
+    @classmethod
+    def cls_all_attrs_fields(cls):
+        these_properties =  attr.fields_dict(cls)
+        if cls._iterated_component_type is not None and issubclass(cls._iterated_component_type,Component ):
+            iterated_properties = attr.fields_dict(cls._iterated_component_type)
+            these_properties = list(set( iterated_properties + these_properties))
+        return these_properties        
+
 
     #Magicz
     #@functools.cached_property

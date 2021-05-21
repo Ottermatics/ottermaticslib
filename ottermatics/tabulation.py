@@ -393,7 +393,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         out = self.attr_dict
         out.update(self.table_dict )
         out['index'] = self.index
-        return {k:v if v is not None else numpy.nan for k,v in out.items() if isinstance(v,TABLE_TYPES)}
+        return {k.lower():v if v is not None else numpy.nan for k,v in out.items() if isinstance(v,TABLE_TYPES)}
 
     @property
     def data_row(self):
@@ -414,7 +414,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         '''Checks columns for ones that only contain numeric types or haven't been explicitly skipped'''
         if self.joined_dataframe is not None:
             check_type = lambda key: all([ isinstance(v, NUMERIC_TYPES) for v in self.joined_dataframe[key] ])
-            return [ var.title() for var in self.joined_dataframe.columns 
+            return [ var.lower() for var in self.joined_dataframe.columns 
                                  if var.lower() not in self.skip_plot_vars and check_type(var)]
         return []
 
@@ -436,7 +436,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     def attr_labels(self) -> list:
         '''Returns formated attr label if the value is numeric'''
         if self._attr_labels is None:
-            attr_labels = list([k for k,v in attr.fields_dict(self.__class__).items() if k not in self.skip_attr])
+            attr_labels = list([k.lower() for k,v in attr.fields_dict(self.__class__).items() if k not in self.skip_attr])
             self._attr_labels = attr_labels                                            
         return self._attr_labels
 
@@ -452,13 +452,13 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     @property
     def attr_dict(self) -> list:
         '''Returns formated attr data if the value is numeric'''
-        return {k: self.store[k] for k in self.attr_raw_keys if k not in self.skip_attr }
+        return {k.lower(): self.store[k] for k in self.attr_raw_keys if k not in self.skip_attr }
 
     @property
     def table_dict(self):
         class_dict = self.__class__.__dict__
         #We use __get__ to emulate the property, we could call regularly from self but this is more straightforward
-        return { k: obj.__get__(self) for k,obj in class_dict.items() if isinstance(obj,table_property)}
+        return { k.lower(): obj.__get__(self) for k,obj in class_dict.items() if isinstance(obj,table_property)}
 
     @property
     def table_properties(self):
@@ -470,7 +470,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     @property
     def table_properties_labels(self):
         class_dict = self.__class__.__dict__
-        tabulated_properties = [obj.label for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        tabulated_properties = [obj.label.lower() for k,obj in class_dict.items() if isinstance(obj,table_property)]
         return tabulated_properties   
 
     @property

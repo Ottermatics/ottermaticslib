@@ -44,6 +44,7 @@ service-identity
 sqlalchemy
 sqlalchemy_utils
 psycopg2
+sqlalchemy-batch-inserts==0.0.4
 
 #Documetnation
 sphinx==3.2.1

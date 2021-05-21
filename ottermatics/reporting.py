@@ -12,14 +12,17 @@ from ottermatics.analysis import *
 import attr
 import random
 
-from sqlalchemy import Integer, ForeignKey, String, Column, Table,Boolean, MetaData, Unicode, UnicodeText
+from sqlalchemy import  ForeignKey,  Column, Table, MetaData, Unicode, UnicodeText
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.collections import attribute_mapped_collection
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.sql.sqltypes import BOOLEAN, NUMERIC, VARCHAR, INTEGER, INT
+from sqlalchemy.sql.sqltypes import BOOLEAN, NUMERIC, VARCHAR, INTEGER, INT, Integer,String,Boolean,Numeric
 
 from sqlalchemy.sql import func
+
+
+ReportBase = declarative_base()
 
 DEFAULT_STRING_LENGTH = 256
 
@@ -36,7 +39,12 @@ At the time of creation attributes with ottermatics validators will be created a
 
 '''
 
-log  = logging.getLogger('otter-report')
+log  = logging.getLogger('otterlib-report')
+
+
+#TODO: make new sqalchemy base, dont mixin other bases into our special fancy db
+
+#These Mixins & Base Table Classes Help Us By Defining Common Bases For tables
 
 class MappedDictMixin:
     """Adds obj[key] access to a mapped class.
@@ -65,14 +73,14 @@ class MappedDictMixin:
     def __delitem__(self, key):
         del self._proxied[key]
 
-class AttrBase(DataBase):
+
+class AttrBase(ReportBase):
     __abstract__ = True
     id = Column(Integer(), primary_key=True)
-
     key = Column(Unicode(64), nullable=True)
     value = Column(Numeric)
 
-    def __init__(self,key=None,value=None):
+    def __init__(self,report_id,key=None,value=None):
         log.debug(f'creating attr {self}, {key}={value}')
 
         if key is not None and value is not None:
@@ -96,41 +104,41 @@ class AttrBase(DataBase):
         return results    
 
 
-class TableBase( MappedDictMixin, DataBase ):
+class TableBase( MappedDictMixin, ReportBase ):
     __abstract__ = True
 
     check_types = {
                     String: (str,),
                     Integer: (int,),
                     Numeric: (float,int),
-                    Boolean: (bool,),
-                    BOOLEAN: (bool,),
-                    INTEGER: (int,),
-                    NUMERIC: (float,int),
-                    VARCHAR: (str,)                    
+                    Boolean: (bool,)               
                   }
 
     store_type = {
                     String:  str,
                     Integer: int,
                     Numeric: float,
-                    Boolean: bool,
-                    BOOLEAN: bool,
-                    INTEGER: int,
-                    NUMERIC: float,
-                    VARCHAR: str,
+                    Boolean: bool
                   }                  
 
     ignore_keys = ('id','index')
 
     attr_class = AttrBase 
 
-    def __init__(self,**kwargs):
-        log.debug(f'creating TB {self}, {kwargs}')
+    def __init__(self,report_id,**kwargs):
+
+        self.report_id = report_id
+
+        log.debug(f'creating TB id:{report_id} obj:{self}, {kwargs}')
         table = self.__class__.__table__
         cols = self.dbi_columns
+        
 
         for key, val in kwargs.items():
+            
+            key = key.lower()
+            vtype = type(val)            
+            
             if key not in self.ignore_keys: #we will try to store the data
                 
                 if key in cols: #we will map the data to the column
@@ -138,26 +146,37 @@ class TableBase( MappedDictMixin, DataBase ):
                     col = table.columns[key]                
                     ctype = type(col.type)
 
-                    log.debug(f'{self} setting {key}|{col}|{ctype}')
 
-                    in_stypes = ctype in self.check_types 
+                    log.debug(f'{self} setting {key}|{col}|{ctype}|{vtype}')
+
+                    in_stypes = any([issubclass(ctype,check_type) for check_type in self.check_types])
+
                     if in_stypes:
-                        in_type = type(val) in self.check_types[ ctype ]
+                        
+                        use_ctype = ctype
+                        if not ctype in self.check_types:
+                            valids = list(filter( lambda ct: issubclass(ctype,ct), list(self.check_types.keys()) ))
+
+                            if valids:
+                                if len(valids) > 1:
+                                    self.warning('more than one type matched for!!! {ctype}->{valids} ')          
+                                use_ctype = valids[0]
+
+                        in_type = isinstance(val, self.check_types[ use_ctype ])
                     else:
                         in_type = False
 
                     if in_stypes and in_type:
-                        #log.debug(f'adding kv: {key}={val}')
-                        #if key.lower() in self.__dict__:
-                        log.debug(f'adding kv: {key}={val}')
+                        #log.debug(f'adding col: {key}={val}')
                         setattr(self, key, self.store_type[ctype](val) )
                     else:
-                        log.debug(f'{key}={val} {ctype}  col-valid:{in_stypes}  valid-type:{in_type} col:{col}')
+                        log.debug(f'{key}={val} {vtype}=>{ctype}? col-valid:{in_stypes} valid-type:{in_type} col:{col}')
                         
-                elif type(val) in (float,int): #dynamic mapping
+                elif isinstance(val,(float,int)): #dynamic mapping
                     if not numpy.isnan(val):
-                        log.debug(f'adding dynamic kv: {key}={val}')
-                        self[key] = float(val)
+                        self._proxied = self.attr_class( report_id, key=key, val=val)
+                else:
+                    log.debug(f'{key} not found for columns {cols}')           
 
     @declared_attr
     def dict_values(cls):
@@ -165,7 +184,7 @@ class TableBase( MappedDictMixin, DataBase ):
 
     @declared_attr
     def _proxied(cls):
-        return association_proxy( "dict_values", "value", creator= cls.attr_class)       
+        return association_proxy( "dict_values", "value")       
 
     @property
     def dbi_columns(self):
@@ -200,8 +219,42 @@ class TableBase( MappedDictMixin, DataBase ):
         return results
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 class ReportingMixin:
     '''Add to an analysis component'''
+
+    _report_db = None
+
+    @property
+    def report_db(self):
+        if self._report_db is not None:
+            return self._report_db
+        else:
+            self.warning('no report db connection set!')
+
+        #else: #this is alot, lets be more careful
+        #    self.warning('autogenerating database...')
+        #    report_db = DBConnection(database_name='reports')
+        #    report_db.ensure_database_exists()
+
+    @report_db.setter
+    def report_db(self,inputval:DBConnection):
+        if isinstance(inputval, DBConnection):
+            self._report_db = inputval
+        else:
+            self.warning(f'Got bad value {inputval} of type {type(inputval)}')
 
     def report_data(self):
         if self.report_db and self.solved:
@@ -220,6 +273,10 @@ class ReportingMixin:
             self.warning('No Report Database Initated')    
 
 
+
+
+
+
 @otterize
 class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     '''An instance to manage the various database mappings to this live code repository'''
@@ -228,7 +285,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     
     db = attr.ib()
     name = attr.ib(default='')
-    base = attr.ib(default=DataBase) #,factory=declarative_base) #slot for sqlalchemy base
+    base = attr.ib(default=ReportBase) #,factory=declarative_base) #slot for sqlalchemy base
 
     _component_cls_table_mapping = None
     
@@ -240,6 +297,9 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     component_attr_abrv = 'comp_attr_'    
 
     def __on_init__(self):
+        self.info('creating registry and ensuring db exists!')
+        self.db.ensure_database_exists(create_meta = False)
+
         self.base.metadata.bind = self.db.engine
         self.base.metadata.reflect( self.db.engine, autoload=True, keep_existing = True )
 
@@ -310,13 +370,17 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         name = comp_cls.__name__.lower()
 
         default_attr = {'__tablename__': f'{table_abrv}{name}' ,
-                        'component_id': Column(Integer,ForeignKey( target_table_id )),
+                        'result_id': Column(Integer,ForeignKey( target_table_id )),
                         '__table_args__': self.default_args,
                         '__abstract__': False
                         }
         
         if results_table is not None:
-            default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}' 
+            default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}'
+            root_obj,_ = self.mapped_tables[results_table]
+            backref_name = f'db_comp_attr_{name}'
+            default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'))
+            default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload'))
                     
         return default_attr
 
@@ -341,7 +405,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             root_obj,_ = self.mapped_tables[results_table]
             default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}' 
             default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'))
-            
             default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload')) 
 
         else: #its an analysis
@@ -358,7 +421,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
         component_attr = { key.lower(): self.validator_to_column(field) for key,field in attr.fields_dict(comp_cls).items() if self.filter_by_validators(field)}
 
-        component_attr.update({ k: Column(k.lower(), Numeric(),nullable=True) \
+        component_attr.update({ k.lower(): Column(k.lower(), Numeric(),nullable=True) \
                                 for k,obj in comp_cls.__dict__.items() if isinstance(obj,table_property)})
 
         component_attr.update(self.default_attr(comp_cls,results_table=results_table))
@@ -552,54 +615,65 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             inx = 0
             main_result = None
 
-
+            rows = []
+            others = []
+            proxied = []
             while any_succeeded and inx < analysis.index:
                 any_succeeded = False #guilty until proven innocent!!
-                
-                with self.db.session_scope() as sesh: #saftey context!
-                    try:
-                        data_dict = next(main_gen)
-                        last_values[adbcls] = data_dict
-                        main_result = adbcls(**data_dict)
 
+                try:
+                    data_dict = next(main_gen)
+                    last_values[adbcls] = data_dict
+                    main_result = adbcls(**data_dict)
+
+                except StopIteration:
+                    data_dict = last_values[adbcls]
+                    main_result = adbcls(**data_dict)  
+
+                else:
+                    any_succeeded = True #here's ur fricken evidence ur honor
+
+                with self.db.session_scope() as sesh:
+                    sesh.add(main_result)
+                    
+                    sesh.commit()
+                    result_id = int(main_result.id)
+
+                rows.append(main_result)
+                
+                for dbclass, generator in data_gens.items():
+                    try:
+                        data_dict = next(generator)
+                        last_values[dbclass] = data_dict
+                        data_dict['result_id'] = result_id
+                        cmp_result = dbclass(result_id,**data_dict)
+                        cmp_result.analysis = main_result
+
+                        others.append(cmp_result)
+                        self.debug(f'adding to: {main_result} <- {cmp_result}')
+                    
                     except StopIteration:
-                        data_dict = last_values[adbcls]
-                        main_result = adbcls(**data_dict)  
+                        data_dict = last_values[dbclass] 
+                        
+                        data_dict['result_id'] = result_id
+                        cmp_result = dbclass(result_id,**data_dict)
+
+                        cmp_result.analysis = main_result
+                        others.append(cmp_result)
+                        self.debug(f'adding to: {main_result} <- {cmp_result}')   
 
                     else:
                         any_succeeded = True #here's ur fricken evidence ur honor
-                    finally:
-                        sesh.add(main_result)
+                
+                #the scoped session rolls back anything created this time :)
+                if not any_succeeded: raise AvoidDuplicateAbortUpload() 
+                
+                if len(others) > 25:
+                    comp_tables = list(filter(lambda obj: isinstance(obj, TableBase), objects ))
+                    proxied = flatten([cmp._proxied for cmp in comp_tables])
                     
-                    for dbclass, generator in data_gens.items():
-                        try:
-                            data_dict = next(generator)
-                            last_values[dbclass] = data_dict
-                            cmp_result = dbclass(**data_dict)
-                            cmp_result.analysis = main_result
-                            #if dbclass.__tablename__ in main_result.__dict__:
-                            #comps = main_result.__dict__[dbclass.__tablename__]
-                            self.debug(f'adding to: {main_result} <- {cmp_result}')
-                            #comps.append( cmp_result )
-                            #else:
-                            #    self.info(f"{dbclass.__tablename__} not in {main_result}")
-                        
-                        except StopIteration:
-                            data_dict = last_values[dbclass] 
-                            cmp_result = dbclass(**data_dict)
-                            cmp_result.analysis = main_result
-                            #if dbclass.__tablename__ in main_result.__dict__:
-                            #comps = main_result.__dict__[dbclass.__tablename__]
-                            self.debug(f'adding to: {main_result} <- {cmp_result}')
-                            #comps.append( cmp_result )
-                            #else:
-                            #    self.info(f"{dbclass.__tablename__} not in {main_result}")            
-
-                        else:
-                            any_succeeded = True #here's ur fricken evidence ur honor
-                    
-                    #the scoped session rolls back anything created this time :)
-                    if not any_succeeded: raise AvoidDuplicateAbortUpload() 
+                    others = self.bulk_insert_object(others)
+                    proxied = self.bulk_insert_object(proxied)
                 
                 inx += 1 #index += 1 is done at end of analysis so we should model that
 
@@ -608,16 +682,31 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
         except Exception as e:
             self.error(e,'Issue Uploading Data')
-            
 
+        if rows:
+            rows = self.bulk_insert_object(rows)
+        
+        if others:
+            others = self.bulk_insert_object(others)
 
+    def bulk_insert_object(self,objects):
+        nrow = len(objects)
+        dt_start = time.time()
+
+        with self.db.session_scope() as sesh:
+            sesh.bulk_save_objects(objects)
+        dt_end = time.time()
+        dt = dt_end - dt_start
+        self.info(f'uploading {nrow} results @ {nrow/dt} in {dt}s')
+        return []
+        
 
 
 
 
 #These items are registry related for the dynamic mapping
 
-class MappedItem(DataBase):
+class MappedItem(ReportBase):
     __abstract__ = True
 
     _mapped_component = None

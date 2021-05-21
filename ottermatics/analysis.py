@@ -43,27 +43,6 @@ class Analysis(Component):
 
     run_id = attr.ib(default=None) #this gets logged!
 
-    _report_db = None
-
-    @property
-    def report_db(self):
-        if self._report_db is not None:
-            return self._report_db
-        else:
-            self.warning('no report db connection set!')
-
-        #else: #this is alot, lets be more careful
-        #    self.warning('autogenerating database...')
-        #    report_db = DBConnection(database_name='reports')
-        #    report_db.ensure_database_exists()
-
-    @report_db.setter
-    def report_db(self,inputval:DBConnection):
-        if isinstance(inputval, DBConnection):
-            self._report_db = inputval
-        else:
-            self.warning(f'Got bad value {inputval} of type {type(inputval)}')
-
     @property
     def solved(self):
         return self._solved
@@ -141,7 +120,7 @@ class Analysis(Component):
             with self.drive.rate_limit_manager(self.gsync_results,6,filename=filename, meta_tags = meta_tags):
                 
                 old_sleep = gdrive._sleep_time
-                gdrive.reset_sleep_time( max(old_sleep,2.5) )                
+                gdrive.reset_sleep_time( max(old_sleep,1.0) )                
                 
                 gpath = gdrive.sync_path(self.local_sync_path)
                 
