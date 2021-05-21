@@ -80,8 +80,10 @@ class AttrBase(ReportBase):
     key = Column(Unicode(64), nullable=True)
     value = Column(Numeric)
 
-    def __init__(self,report_id,key=None,value=None):
-        log.debug(f'creating attr {self}, {key}={value}')
+    def __init__(self,result_id_in,key=None,value=None):
+        log.debug(f'creating attr rid:{result_id_in} {self}, {key}={value}')
+        
+        self.result_id = result_id_in
 
         if key is not None and value is not None:
             if isinstance(value,(float,int)):
@@ -123,17 +125,21 @@ class TableBase( MappedDictMixin, ReportBase ):
 
     ignore_keys = ('id','index')
 
-    attr_class = AttrBase 
+    attr_class = AttrBase
 
-    def __init__(self,report_id,**kwargs):
+    attr_store = None
 
-        self.report_id = report_id
+    def __init__(self,result_id_in,**kwargs):
+        
+        self.attr_store = {}
+        if 'result_id_in' in self.__dict__:
+            self.result_id_in = result_id_in
 
-        log.debug(f'creating TB id:{report_id} obj:{self}, {kwargs}')
+        log.debug(f'creating TB id:{result_id_in} obj:{self}, {kwargs}')
         table = self.__class__.__table__
         cols = self.dbi_columns
         
-
+        
         for key, val in kwargs.items():
             
             key = key.lower()
@@ -145,7 +151,6 @@ class TableBase( MappedDictMixin, ReportBase ):
                     
                     col = table.columns[key]                
                     ctype = type(col.type)
-
 
                     log.debug(f'{self} setting {key}|{col}|{ctype}|{vtype}')
 
@@ -161,20 +166,25 @@ class TableBase( MappedDictMixin, ReportBase ):
                                 if len(valids) > 1:
                                     self.warning('more than one type matched for!!! {ctype}->{valids} ')          
                                 use_ctype = valids[0]
+                            #log.debug(f'getting registered type {use_ctype} for {ctype}')
 
                         in_type = isinstance(val, self.check_types[ use_ctype ])
+
                     else:
                         in_type = False
 
                     if in_stypes and in_type:
-                        #log.debug(f'adding col: {key}={val}')
-                        setattr(self, key, self.store_type[ctype](val) )
+
+                        setattr(self, key, self.store_type[use_ctype](val) )
                     else:
-                        log.debug(f'{key}={val} {vtype}=>{ctype}? col-valid:{in_stypes} valid-type:{in_type} col:{col}')
+                        log.debug(f'{key}={val} {vtype}=>{use_ctype}? col-valid:{in_stypes} valid-type:{in_type} col:{col}')
                         
                 elif isinstance(val,(float,int)): #dynamic mapping
                     if not numpy.isnan(val):
-                        self._proxied = self.attr_class( report_id, key=key, val=val)
+                        atobj = self.attr_class( result_id_in, key=key, value=val)
+                        self.attr_store[key] = atobj
+                        self[key] = atobj
+
                 else:
                     log.debug(f'{key} not found for columns {cols}')           
 
@@ -217,8 +227,6 @@ class TableBase( MappedDictMixin, ReportBase ):
         with rr.db.session_scope() as sesh:
             results = list( sesh.query(cls).all())
         return results
-
-
 
 
 
@@ -370,7 +378,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         name = comp_cls.__name__.lower()
 
         default_attr = {'__tablename__': f'{table_abrv}{name}' ,
-                        'result_id': Column(Integer,ForeignKey( target_table_id )),
+                        'comp_id': Column(Integer,ForeignKey( target_table_id )),
                         '__table_args__': self.default_args,
                         '__abstract__': False
                         }
@@ -396,7 +404,8 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                         'id': Column(Integer, primary_key=True),
                         '__table_args__': self.default_args,
                         '__abstract__': False,
-                        '_mapped_component': comp_cls
+                        '_mapped_component': comp_cls,
+                        'attr_store': None
                         }
 
         if results_table is not None:
@@ -405,7 +414,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             root_obj,_ = self.mapped_tables[results_table]
             default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}' 
             default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'))
-            default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload')) 
+            default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload'))
 
         else: #its an analysis
             default_attr['created'] = Column(DateTime, server_default=func.now())
@@ -624,11 +633,11 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                 try:
                     data_dict = next(main_gen)
                     last_values[adbcls] = data_dict
-                    main_result = adbcls(**data_dict)
+                    main_result = adbcls(None,**data_dict)
 
                 except StopIteration:
                     data_dict = last_values[adbcls]
-                    main_result = adbcls(**data_dict)  
+                    main_result = adbcls(None,**data_dict)  
 
                 else:
                     any_succeeded = True #here's ur fricken evidence ur honor
@@ -669,9 +678,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                 if not any_succeeded: raise AvoidDuplicateAbortUpload() 
                 
                 if len(others) > 25:
-                    comp_tables = list(filter(lambda obj: isinstance(obj, TableBase), objects ))
-                    proxied = flatten([cmp._proxied for cmp in comp_tables])
-                    
                     others = self.bulk_insert_object(others)
                     proxied = self.bulk_insert_object(proxied)
                 
@@ -686,7 +692,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         if rows:
             rows = self.bulk_insert_object(rows)
         
-        if others:
+        if others:         
             others = self.bulk_insert_object(others)
 
     def bulk_insert_object(self,objects):
@@ -694,7 +700,17 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         dt_start = time.time()
 
         with self.db.session_scope() as sesh:
-            sesh.bulk_save_objects(objects)
+               
+            sesh.bulk_save_objects(objects,return_defaults = True)
+
+            comp_tables = list(filter(lambda obj: isinstance(obj, TableBase), objects ))
+            proxied = flatten([list(cmp.attr_store.values()) for cmp in comp_tables])
+            for cmp in comp_tables:
+                for key, attr in cmp.attr_store.items():
+                    attr.comp_id = cmp.id
+
+            sesh.bulk_save_objects(proxied)
+
         dt_end = time.time()
         dt = dt_end - dt_start
         self.info(f'uploading {nrow} results @ {nrow/dt} in {dt}s')
