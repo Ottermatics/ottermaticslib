@@ -2,6 +2,9 @@ import attr
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component, ComponentIterator
 from ottermatics.patterns import SingletonMeta
+from ottermatics.data import DBConnection
+from ottermatics.reporting import ResultsRegistry
+
 
 import datetime
 import os 
@@ -41,6 +44,27 @@ class Analysis(Component):
     namepath_root = 'reports/'
 
     run_id = attr.ib(default=None) #this gets logged!
+
+    _report_db = None
+
+    @property
+    def report_db(self):
+        if self._report_db is not None:
+            return self._report_db
+        else:
+            self.warning('no report db connection set!')
+
+        #else: #this is alot, lets be more careful
+        #    self.warning('autogenerating database...')
+        #    report_db = DBConnection(database_name='reports')
+        #    report_db.ensure_database_exists()
+
+    @report_db.setter
+    def report_db(self,inputval:DBConnection):
+        if isinstance(inputval, DBConnection):
+            self._report_db = inputval
+        else:
+            self.warning(f'Got bad value {inputval} of type {type(inputval)}')
 
     @property
     def solved(self):
@@ -107,6 +131,22 @@ class Analysis(Component):
     def post_process(self):
         '''override me!'''
         pass
+
+    def report_data(self):
+        if self.report_db and self.solved:
+            try:
+                rr = ResultsRegistry(self.report_db)
+                rr.ensure_analysis(self)
+                rr.upload_analysis(self)
+
+            except Exception as e:
+                self.error(e, 'Issue Reporting Data')
+        elif not self.solved:
+            self.warning('Analysis Not Solved, Cannot Upload')
+
+        elif not self.report_db:
+            self.warning('No Report Database Initated')
+
 
     def reset_analysis(self):
         self.reset_data()

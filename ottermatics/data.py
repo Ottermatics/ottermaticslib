@@ -236,7 +236,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
 
 
-class DBConnection(LoggingMixin):
+class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
     to get the active instance use DBConnection.instance(**non_default_connection_args)
     
@@ -259,6 +259,8 @@ class DBConnection(LoggingMixin):
     scopefunc = None
     session_factory = None
     Session = None
+
+    connect_args={'connect_timeout': 5}
 
     def __init__(self,database_name=None,host=None,user=None,passd=None,**kwargs):
         '''On the Singleton DBconnection.instance(): __init__(*args,**kwargs) will get called, technically you 
@@ -307,7 +309,7 @@ class DBConnection(LoggingMixin):
         self.connection_string = self._connection_template.format(host=self.host,user=self.user,passd=self.passd,
                                                                     port=self.port,database=self.dbname)
                                                                     
-        self.engine = create_engine(self.connection_string,pool_size=self.pool_size, max_overflow=self.max_overflow)
+        self.engine = create_engine(self.connection_string,pool_size=self.pool_size, max_overflow=self.max_overflow, connect_args= {'connect_timeout': 5})
         self.engine.echo = self.echo
 
         self.scopefunc = functools.partial(context.get, "uuid")
@@ -385,8 +387,9 @@ class DBConnection(LoggingMixin):
 
     def ensure_database_exists(self):
         '''Check if database exists, if not create it and tables'''
+        self.info(f"checking database existinence... {self.engine}")
         if not database_exists(self.connection_string):
-            self.info("Creating Database")
+            self.info("doesn't exist, creating database!")
             create_database(self.connection_string)
             DataBase.metadata.create_all(self.engine) 
             
