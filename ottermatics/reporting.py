@@ -183,7 +183,7 @@ class TableBase( MappedDictMixin, ReportBase ):
                     if not numpy.isnan(val):
                         atobj = self.attr_class( result_id_in, key=key, value=val)
                         self.attr_store[key] = atobj
-                        self[key] = atobj
+                        #self[key] = atobj #dont use orm for upload!
 
                 else:
                     log.debug(f'{key} not found for columns {cols}')           
@@ -264,13 +264,13 @@ class ReportingMixin:
         else:
             self.warning(f'Got bad value {inputval} of type {type(inputval)}')
 
-    def report_data(self):
+    def report_data(self, use_thread = False):
         if self.report_db and self.solved:
             try:
                 assert isinstance(self,Analysis)
                 rr = ResultsRegistry(self.report_db)
                 rr.ensure_analysis(self)
-                rr.upload_analysis(self)
+                return rr.upload_analysis(self,use_thread=use_thread)
 
             except Exception as e:
                 self.error(e, 'Issue Reporting Data')
@@ -586,8 +586,17 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             analysis_cls = analysis
         return analysis_cls                 
 
-    def upload_analysis(self,analysis):
+    def upload_analysis(self,analysis,use_thread = False):
         #TODO: Implment Index Based Merging Scheme, Right now we're assuming last values carry over
+
+        if use_thread:
+            thread = Thread(worker = self._upload_analysis, args=(analysis,) )
+            thread.start()
+            return thread
+
+        return self._upload_analysis(analysis)
+
+    def _upload_analysis(self,analysis):
         self.info(f'upload analysis: {analysis}')
 
         class AvoidDuplicateAbortUpload(Exception): pass
