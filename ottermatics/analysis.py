@@ -3,8 +3,6 @@ from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component, ComponentIterator
 from ottermatics.patterns import SingletonMeta
 from ottermatics.data import DBConnection
-from ottermatics.reporting import ResultsRegistry
-
 
 import datetime
 import os 
@@ -131,22 +129,6 @@ class Analysis(Component):
     def post_process(self):
         '''override me!'''
         pass
-
-    def report_data(self):
-        if self.report_db and self.solved:
-            try:
-                rr = ResultsRegistry(self.report_db)
-                rr.ensure_analysis(self)
-                rr.upload_analysis(self)
-
-            except Exception as e:
-                self.error(e, 'Issue Reporting Data')
-        elif not self.solved:
-            self.warning('Analysis Not Solved, Cannot Upload')
-
-        elif not self.report_db:
-            self.warning('No Report Database Initated')
-
 
     def reset_analysis(self):
         self.reset_data()

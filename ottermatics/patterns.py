@@ -173,7 +173,15 @@ import ray.cloudpickle as cp
 import colorama
 from contextlib import contextmanager
 
-flatten = lambda t: [item for sublist in t for item in sublist]
+def flat2gen(alist):
+  for item in alist:
+    if isinstance(item, list):
+      for subitem in item: yield subitem
+    else:
+      yield item
+
+def flatten(alist):
+    return list(flat2gen(alist))
 
 @contextmanager
 def _indent(printer):
