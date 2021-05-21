@@ -200,6 +200,25 @@ class TableBase( MappedDictMixin, DataBase ):
         return results
 
 
+class ReportingMixin:
+    '''Add to an analysis component'''
+
+    def report_data(self):
+        if self.report_db and self.solved:
+            try:
+                assert isinstance(self,Analysis)
+                rr = ResultsRegistry(self.report_db)
+                rr.ensure_analysis(self)
+                rr.upload_analysis(self)
+
+            except Exception as e:
+                self.error(e, 'Issue Reporting Data')
+        elif not self.solved:
+            self.warning('Analysis Not Solved, Cannot Upload')
+
+        elif not self.report_db:
+            self.warning('No Report Database Initated')    
+
 
 @otterize
 class ResultsRegistry(Configuration,metaclass = SingletonMeta):
