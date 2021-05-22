@@ -20,6 +20,7 @@ import functools
 import time
 from urllib.request import urlopen
 from psycopg2.extensions import register_adapter, AsIs
+import psycopg2
 from os import sys
 
 import cachetools
@@ -27,6 +28,8 @@ import cachetools
 from ottermatics.patterns import Singleton, SingletonMeta, singleton_meta_object
 from ottermatics.logging import LoggingMixin, set_all_loggers_to, is_ec2_instance
 from ottermatics.tabulation import * #This should be considered a module of data
+
+from sqlalchemy_batch_inserts import enable_batch_inserting 
 
 from contextlib import contextmanager
 
@@ -54,6 +57,14 @@ register_adapter(numpy.int64, addapt_numpy_int64)
 register_adapter(numpy.float32, addapt_numpy_float32)
 register_adapter(numpy.int32, addapt_numpy_int32)
 register_adapter(numpy.ndarray, addapt_numpy_array)
+
+#This handles nans (which present as floats)!
+def nan_to_null(f):
+    if not numpy.isnan(f):
+        return psycopg2.extensions.Float(f)
+    return AsIs('NULL')
+
+register_adapter(float, nan_to_null)
 
 DataBase = declarative_base()
 
@@ -227,7 +238,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
 
 
-class DBConnection(LoggingMixin, metaclass=SingletonMeta):
+class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
     to get the active instance use DBConnection.instance(**non_default_connection_args)
     
@@ -250,6 +261,10 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
     scopefunc = None
     session_factory = None
     Session = None
+
+    _batchmode = False
+
+    connect_args={'connect_timeout': 5}
 
     def __init__(self,database_name=None,host=None,user=None,passd=None,**kwargs):
         '''On the Singleton DBconnection.instance(): __init__(*args,**kwargs) will get called, technically you 
@@ -287,6 +302,9 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
             self.info("Getting DB port arg")
             self.port = kwargs['port'] 
 
+        if 'batchmode' in kwargs:
+           self._batchmode = True #kwargs['batchmode']
+
         self.resetLog()
         self.configure()
     
@@ -297,8 +315,11 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
         self.info('Configuring...')
         self.connection_string = self._connection_template.format(host=self.host,user=self.user,passd=self.passd,
                                                                     port=self.port,database=self.dbname)
-                                                                    
-        self.engine = create_engine(self.connection_string,pool_size=self.pool_size, max_overflow=self.max_overflow)
+        extra_args = {}
+        if self._batchmode:
+            extra_args['executemany_mode'] = "values"
+
+        self.engine = create_engine(self.connection_string,pool_size=self.pool_size, max_overflow=self.max_overflow, connect_args= {'connect_timeout': 5}, **extra_args)
         self.engine.echo = self.echo
 
         self.scopefunc = functools.partial(context.get, "uuid")
@@ -313,6 +334,9 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
             self.configure()
         session = self.Session()
         try:
+            if self._batchmode:
+               enable_batch_inserting(session)
+
             yield session
             session.commit()
         except:
@@ -374,12 +398,13 @@ class DBConnection(LoggingMixin, metaclass=SingletonMeta):
             except Exception as e:
                 self.error(e)
 
-    def ensure_database_exists(self):
+    def ensure_database_exists(self, create_meta = True):
         '''Check if database exists, if not create it and tables'''
+        self.info(f"checking database existinence... {self.engine}")
         if not database_exists(self.connection_string):
-            self.info("Creating Database")
+            self.info("doesn't exist, creating database!")
             create_database(self.connection_string)
-            DataBase.metadata.create_all(self.engine) 
+            if create_meta: DataBase.metadata.create_all(self.engine) 
             
 
     def cleanup_sessions(self):

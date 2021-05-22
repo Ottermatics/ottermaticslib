@@ -5,12 +5,13 @@ wheel
 
 methodtools==0.4.2
 attrs
-graypy
+arrow
 
 #Filesystem
 watchdog
 watchgod
 dropbox
+diskcache
 
 #GUI
 #kivy
@@ -35,6 +36,7 @@ Twisted
 aioice
 aiohttp
 treq
+service-identity
 
 #Database
 #psycopg2 
@@ -42,6 +44,7 @@ treq
 sqlalchemy
 sqlalchemy_utils
 psycopg2
+sqlalchemy-batch-inserts==0.0.4
 
 #Documetnation
 sphinx==3.2.1
@@ -64,5 +67,5 @@ ray[tune]
 #pillow
 #av
 #cv
-graypy
+#graypy
 

@@ -80,6 +80,26 @@ class SingletonMeta(type):
         else:
             return isinstance(instance.__class__, mcs)
 
+
+
+
+
+
+
+# class MetaRegistry(type):
+    
+#     REGISTRY = {}
+
+#     def __new__(meta, name, bases, class_dict):
+#         cls = type.__new__(meta, name, bases, class_dict)
+#         if name not in registry:
+#             meta.register_class(cls)
+#         return cls
+
+#     def register_class(target_class):
+#         REGISTRY[target_class.__name__] = target_class        
+
+
 class InputSingletonMeta(type):
     """Metaclass for singletons. Any instantiation of a Singleton class yields
     the exact same object, for the same given input, e.g.:
@@ -153,6 +173,32 @@ import ray.cloudpickle as cp
 import colorama
 from contextlib import contextmanager
 
+def recursive_python_module_line_counter(curpath=None):
+    total_lines = 0
+    if curpath is None or not isinstance(curpath, str):
+        curpath = os.path.realpath(os.curdir)
+        
+    print(f'Getting Python Lines In {curpath}')
+    for dirpath, dirs, fils in os.walk(curpath):
+        for fil in fils:
+            if fil.endswith('.py'):
+                filpath = os.path.join(dirpath,fil)
+                with open(filpath,'r') as fp:
+                    lines = len(str(fp.read()).split('\n'))
+                    total_lines += lines
+                    print(f'{filpath}: {lines} / {total_lines}')
+
+    print(f'Total Lines {total_lines}')
+
+def flat2gen(alist):
+  for item in alist:
+    if isinstance(item, (list,tuple)):
+      for subitem in item: yield subitem
+    else:
+      yield item
+
+def flatten(alist):
+    return list(flat2gen(alist))
 
 @contextmanager
 def _indent(printer):

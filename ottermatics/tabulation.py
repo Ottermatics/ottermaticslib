@@ -23,13 +23,18 @@ pandas.set_option('use_inf_as_na', True)
 
 #Type Checking
 NUMERIC_TYPES = (float,int)
-STR_TYPES = (str)
-TABLE_TYPES = (int,float,str)
+STR_TYPES = (str,)
+TABLE_TYPES = (int,float,str,type(None))
 
 def NUMERIC_VALIDATOR():
     return attr.validators.instance_of(NUMERIC_TYPES)
 
+def STR_VALIDATOR():
+    return attr.validators.instance_of(STR_TYPES)
 
+ATTR_VALIDATOR_TYPES = (attr.validators._AndValidator,attr.validators._InstanceOfValidator,attr.validators._MatchesReValidator,attr.validators._ProvidesValidator,attr.validators._OptionalValidator,attr.validators._InValidator,attr.validators._IsCallableValidator,attr.validators._DeepIterable,attr.validators._DeepMapping)
+
+TAB_VALIDATOR_TYPE = attr.validators._InstanceOfValidator #our validators shoudl require a type i think, at least for tabulation
 
 class table_property:
     """Emulate PyProperty_Type() in Objects/descrobject.c
@@ -165,7 +170,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         
         This should capture all changes but save data'''
         if self.anything_changed or not self.TABLE:
-            self.TABLE.append(self.data_row)
+            self.TABLE.append(self.data_dict)
             self.debug('saving data {}'.format(self.index))
 
             if index is not None: #only set this after we check if anything changed
@@ -191,8 +196,10 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         self._cls_attrs = None
         self._attr_labels = None
         self._table = None
+        self.reset_meta()
 
         #Cached Dataframes
+    def reset_meta(self):
         self._dataframe = None
         self._variable_dataframe = None
         self._static_dataframe = None
@@ -213,7 +220,8 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     @property
     def dataframe(self):
         if self._dataframe is None or self._anything_changed:
-            self._dataframe = pandas.DataFrame(data = self.TABLE, columns = self.data_label,copy=True)
+            #self._dataframe = pandas.DataFrame(data = self.TABLE, columns = self.data_label,copy=True)
+            self._dataframe = pandas.DataFrame(data = self.TABLE, copy=True)
 
         return self._dataframe
 
@@ -317,6 +325,26 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             else:
                 self._joined_dataframe = None
         return self._joined_dataframe
+
+    @property
+    def complete_dataframe(self):
+        '''this is a high level data frame with all data in the system'''
+        #FIXME: join all dataframes
+        if self._joined_dataframe is None or self._anything_changed:
+
+            rds = self.recursive_data_structure()
+            if rds:
+                dataframes = []
+                stat_dataframes = []
+                for lvl, comps in rds.items():
+                    for comp in comps:
+                        dataframes.append(comp['conf'].dataframe)
+                self._joined_dataframe = pandas.concat(dataframes,join='outer',axis=1)
+                        
+            else:
+                self._joined_dataframe = None
+
+        return self._joined_dataframe    
         
 
     def split_dataframe_by_colmum(self,df,max_columns=10):
@@ -329,7 +357,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
         return dat_chunks
 
-    def cleanup_dataframe(self,df,badwords=('index','min','max')):
+    def cleanup_dataframe(self,df,badwords=('min','max')):
         tl_df = self.static_dataframe
         to_drop = [cl for cl in tl_df.columns if any([bw in cl.lower() for bw in badwords])]
         out_df = tl_df.drop(columns=to_drop)        
@@ -349,8 +377,11 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         if len(self.TABLE) <= 1:
             yield 1,self.TABLE[0],self.data_label
         else:
-            for col,label in zip(zip(*self.TABLE),self.data_label):
-                col = numpy.array(col).flatten().tolist()
+
+            for label in set.union(*[set(tuple(row.keys())) for row in self.TABLE]):
+                #col = numpy.array(col).flatten().tolist()
+                col = [row[label] if label in row else None for row in self.TABLE]
+
                 if all([isinstance(cvar,TABLE_TYPES) for cvar in col]): #do a type check
                     if len(set(col)) <= 1: #All Values Are Similar
                         yield 2, col[0], label #Can assume that first value is equal to all
@@ -358,6 +389,14 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                         yield 3, col, label
 
     #Properties & Attribues
+    #TODO: Switch to dict based recording, that way the data frame can sort out sparsity of data for intermittent vars
+    @property
+    def data_dict(self):
+        out = self.attr_dict
+        out.update(self.table_dict )
+        out['index'] = self.index
+        return {k.lower():v if v is not None else numpy.nan for k,v in out.items() if isinstance(v,TABLE_TYPES)}
+
     @property
     def data_row(self):
         '''method that returns collects valid tabiable attributes immediately from this config
@@ -377,7 +416,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         '''Checks columns for ones that only contain numeric types or haven't been explicitly skipped'''
         if self.joined_dataframe is not None:
             check_type = lambda key: all([ isinstance(v, NUMERIC_TYPES) for v in self.joined_dataframe[key] ])
-            return [ var.title() for var in self.joined_dataframe.columns 
+            return [ var.lower() for var in self.joined_dataframe.columns 
                                  if var.lower() not in self.skip_plot_vars and check_type(var)]
         return []
 
@@ -399,21 +438,29 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     def attr_labels(self) -> list:
         '''Returns formated attr label if the value is numeric'''
         if self._attr_labels is None:
-            _attr_labels = list([k for k,v in attr.fields_dict(self.__class__).items() \
-                                                if k not in self.skip_attr])
-            self._attr_labels = _attr_labels                                            
+            attr_labels = list([k.lower() for k,v in attr.fields_dict(self.__class__).items() if k not in self.skip_attr])
+            self._attr_labels = attr_labels                                            
         return self._attr_labels
 
     @property
     def attr_row(self) -> list:
         '''Returns formated attr data if the value is numeric'''
-        return list([self.store[k] for k in self.attr_raw_keys \
-                                            if k not in self.skip_attr])
+        return list([self.store[k] for k in self.attr_raw_keys if k not in self.skip_attr])
+
     @property
     def attr_raw_keys(self) -> list:
         return [k for k in attr.fields_dict(self.__class__).keys()]
 
+    @property
+    def attr_dict(self) -> list:
+        '''Returns formated attr data if the value is numeric'''
+        return {k.lower(): self.store[k] for k in self.attr_raw_keys if k not in self.skip_attr }
 
+    @property
+    def table_dict(self):
+        class_dict = self.__class__.__dict__
+        #We use __get__ to emulate the property, we could call regularly from self but this is more straightforward
+        return { k.lower(): obj.__get__(self) for k,obj in class_dict.items() if isinstance(obj,table_property)}
 
     @property
     def table_properties(self):
@@ -425,16 +472,33 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     @property
     def table_properties_labels(self):
         class_dict = self.__class__.__dict__
-        tabulated_properties = [obj.label for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        tabulated_properties = [obj.label.lower() for k,obj in class_dict.items() if isinstance(obj,table_property)]
         return tabulated_properties   
+
+    @property
+    def table_properties_keys(self):
+        class_dict = self.__class__.__dict__
+        tabulated_properties = [k for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        return tabulated_properties           
 
     @property
     def table_properties_description(self):
         class_dict = self.__class__.__dict__
         tabulated_properties = [obj.desc for k,obj in class_dict.items() if isinstance(obj,table_property)]
         return tabulated_properties       
-                
+
+    @classmethod
+    def cls_all_property_labels(cls):
+        return [obj.label for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]
+
+    @classmethod
+    def cls_all_property_keys(cls):
+        return [k for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]                       
     
+    @classmethod
+    def cls_all_attrs_fields(cls):
+        return attr.fields_dict(cls)
+
     #Clearance Methods
     def recursive_data_structure(self,levels_to_descend = -1, parent_level=0):
         '''Returns the static and variable data from each configuration to grab defined by the
@@ -775,215 +839,3 @@ if __name__ == '__main__':
     unittest.main()        
 
 
-
-
-# #Properties to register certian class functions
-# class OtterCacheProp(functools.cached_property):
-
-#     def __getstate__(self):
-#         attributes = self.__dict__.copy()
-#         attr_out = {}
-#         for key,att in attributes.items():
-#             #print('GS:',key,att)
-#             if key not in ('_val_props','_stat_prop','_avg_prop'):
-#                 attr_out[key] = att
-#         return attr_out
-
-# class OtterProp(property):
-#     '''We cant modify property code sooo we have OtterProps!'''
-
-#     stats_labels = ['min','avg','std','max']
-
-#     @classmethod
-#     def stats_return(cls,value):
-#         '''we run stats on a vectorized input, and return the value
-#         If the value is a numeric type we will just return it in a list'''
-#         # if isinstance(value,NUMERIC_TYPES):
-#         #     return [value]
-#         if isinstance(value,numpy.ndarray):
-#             max =  numpy.nanmax(value)
-#             min =  numpy.nanmin(value)
-#             avg =  numpy.nanmean(value)
-#             std =  numpy.nanstd(value)
-#             return [min,avg,max,std]
-#         else:
-#             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
-#             return [None] #is sacreed
-
-#     @classmethod
-#     def create_stats_label(cls,value,title):
-#         # if isinstance(value,NUMERIC_TYPES):
-#         #     return [title]
-#         if isinstance(value,numpy.ndarray):
-#             max =  '{} max'.format(title)
-#             min =  '{} min'.format(title)
-#             avg =  '{} avg'.format(title)
-#             std =  '{} std'.format(title)
-#             return [min,avg,max,std]
-#         else:
-#             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
-#             return [None] #is sacreed
-
-#     @classmethod
-#     def avg_return(cls,value):
-#         '''we run stats on a vectorized input, and return the value
-#         If the value is a numeric type we will just return it in a list'''
-#         if isinstance(value,NUMERIC_TYPES):
-#             return value
-#         elif isinstance(value,numpy.ndarray):
-#             avg =  numpy.nanmean(value)
-#             return avg
-#         else:
-#             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
-#             return None #is sacreed
-
-#     @classmethod
-#     def create_avg_label(cls,value,title):
-#         if isinstance(value,NUMERIC_TYPES):
-#             return title
-#         elif isinstance(value,numpy.ndarray):
-#             avg =  '{} avg'.format(title)
-#             return avg
-#         else:
-#             log.warning('OtterProp: unknown type in stats method {}{}'.format(value,type(value)))
-#             return None
-
-#     def __getstate__(self):
-#         attributes = self.__dict__.copy()
-#         attr_out = {}
-#         for key,att in attributes.items():
-#             #print('GS:',key,att)
-#             if key not in ('_val_props','_stat_prop','_avg_prop'):
-#                 attr_out[key] = att
-#         return attr_out
-
-    #def __reduce__(self):
-    #    return (self.__class__, 
-
-# def table_property(f=None,**meta):
-#     '''A decorator that wraps a function like a regular property
-#     The output will be tabulized for use in the ottermatics table methods
-#     values must be single valued (str, float, int) 
-    
-#     _val_prop is the key variable set, otterize looks it up
-#     :param random: set this to true if you walways want it a property to refreshh even if underlying data
-#     hasn't changed
-#     :param title: the name the field will have in a table     
-#     :param desc: some information about the field'''
-#     if f is not None:
-#         prop =  OtterProp(f)
-#         prop._val_prop = {'func':f}
-#         return prop
-#     else:
-#         def wrapper(f):
-#             prop =  OtterProp(f)
-#             prop._val_prop = {'func':f,**meta}
-#             return prop
-#         return wrapper
-
-# def table_stats_property(f=None,**meta):
-#     '''A decorator that wraps a function like a regular property
-#     The output must be a numpy array or list of number which can be 
-#     tabulized into columns like average, min, max and std for use in the ottermatics table methods
-    
-#     _stat_prop is the key variable set, otterize looks it up
-#     :param random: set this to true if you walways want it a property to refreshh even if underlying data
-#     hasn't changed
-#     :param title: the name the field will have in a table
-#     :param desc: some information about the field'''
-#     if f is not None:  
-#         prop =  OtterProp(f)
-#         prop._stat_prop = {'func':f}
-#         return prop
-#     else:
-#         def wrapper(f):
-#             prop =  OtterProp(f)
-#             prop._stat_prop = {'func':f,**meta}
-#             return prop
-#         return wrapper
-
-# def table_avg_property(f=None,**meta):
-#     '''A decorator that caches and wraps a function like a regular property
-#     The output must be a numpy array or list of number which can be 
-#     tabulized into columns like based on the array average for use in the ottermatics table methods
-    
-#     _stat_prop is the key variable set, otterize looks it up
-#     :param random: set this to true if you walways want it a property to refreshh even if underlying data
-#     hasn't changed
-#     :param title: the name the field will have in a table
-#     :param desc: some information about the field'''
-#     if f is not None:  
-#         prop =  OtterProp(f)
-#         prop._avg_prop = {'func':f}
-#         return prop
-#     else:
-#         def wrapper(f):
-#             prop =  OtterProp(f)
-#             prop._avg_prop = {'func':f,**meta}
-#             return prop
-#         return wrapper           
-
-# def table_cached_property(f=None,**meta):
-#     '''A decorator that caches and wraps a function like a regular property
-#     The output will be tabulized for use in the ottermatics table methods
-#     values must be single valued (str, float, int)
-    
-#     _val_prop is the key variable set, otterize looks it up
-#     :param random: set this to true if you walways want it a property to refreshh even if underlying data
-#     hasn't changed
-#     :param title: the name the field will have in a table
-#     :param desc: some information about the field'''
-#     if f is not None:
-#         prop =  OtterCacheProp(f)
-#         prop._val_prop = {'func':f}
-#         return prop
-#     else:
-#         def wrapper(f):
-#             prop =  OtterCacheProp(f)
-#             prop._val_prop = {'func':f,**meta}
-#             return prop
-#         return wrapper
-
-# def table_cached_stats_property(f=None,**meta):
-#     '''A decorator that caches and wraps a function like a regular property
-#     The output must be a numpy array or list of number which can be 
-#     tabulized into columns like average, min, max and std for use in the ottermatics table methods
-    
-#     _stat_prop is the key variable set, otterize looks it up
-#     :param random: se
-#     t this to true if you walways want it a property to refreshh even if underlying data
-#     hasn't changed
-#     :param title: the name the field will have in a table
-#     :param desc: some information about the field'''
-#     if f is not None:  
-#         prop =  OtterCacheProp(f)
-#         prop._avg_prop = {'func':f}
-#         return prop
-#     else:
-#         def wrapper(f):
-#             prop =  OtterCacheProp(f)
-#             prop._avg_prop = {'func':f,**meta}
-#             return prop
-#         return wrapper
-
-
-# def table_cached_avg_property(f=None,**meta):
-#     '''A decorator that caches and wraps a function like a regular property
-#     The output must be a numpy array or list of number which can be 
-#     tabulized into columns like based on the array average for use in the ottermatics table methods
-    
-#     _stat_prop is the key variable set, otterize looks it up
-#     :param random: set this to true if you walways want it a property to refreshh even if underlying data
-#     hasn't changed
-#     :param title: the name the field will have in a table
-#     :param desc: some information about the field'''
-#     if f is not None:  
-#         prop =  OtterCacheProp(f)
-#         prop._stat_prop = {'func':f}
-#         return prop
-#     else:
-#         def wrapper(f):
-#             prop =  OtterCacheProp(f)
-#             prop._stat_prop = {'func':f,**meta}
-#             return prop
-#         return wrapper                  

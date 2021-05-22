@@ -1,10 +1,12 @@
 virtualenv
 wheel
+methodtools==0.4.2
 attrs
-graypy
+arrow
 watchdog
 watchgod
 dropbox
+diskcache
 dearpygui
 numpy
 scipy
@@ -31,4 +33,3 @@ boto3
 deco
 ray==1.0.0
 ray[tune]
-graypy

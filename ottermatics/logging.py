@@ -9,7 +9,7 @@ import traceback
 import json
 import sys,os
 import uuid
-import graypy
+#import graypy
 import socket
 from urllib.request import urlopen
 
@@ -50,8 +50,10 @@ def is_ec2_instance():
 try:
     logging.getLogger('parso.cache').disabled=True
     logging.getLogger('parso.cache.pickle').disabled=True
-except:
-    log.warning('could not diable parso')
+    logging.getLogger('parso.python.diff').disabled=True
+
+except Exception as e:
+    log.warning(f'could not diable parso {e}')
 # def installGELFLogger():
 #     '''Installs GELF Logger'''
 #     # self.gelf = graypy.GELFTLSHandler(GELF_HOST,GELF_PORT, validate=True,\
@@ -80,13 +82,15 @@ def set_all_loggers_to(level,set_stdout=False,all_loggers=False):
     if set_stdout: installSTDLogger()
 
     logging.basicConfig(level = LOG_LEVEL) #basic config
-    #log = logging.getLogger()
-    #log.setLevel(LOG_LEVEL)# Set Root Logger
+    
+    log = logging.getLogger()
+    log.setLevel(LOG_LEVEL)# Set Root Logger
 
-    #log.setLevel(level) #root
+    log.setLevel(level) #root
+
     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
     for logger in loggers:
-        if logger.__class__.__name__.lower().startswith('otterlog'):
+        if logger.__class__.__name__.lower().startswith('otter'):
             logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
             logger.setLevel(LOG_LEVEL)
         elif all_loggers:
