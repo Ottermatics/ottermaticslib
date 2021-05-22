@@ -482,7 +482,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         return tabulated_properties           
 
     @property
-    def table_properties_description(self):d
+    def table_properties_description(self):
         class_dict = self.__class__.__dict__
         tabulated_properties = [obj.desc for k,obj in class_dict.items() if isinstance(obj,table_property)]
         return tabulated_properties       

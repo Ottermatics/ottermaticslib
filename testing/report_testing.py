@@ -7,6 +7,8 @@ from ottermatics.analysis import Analysis
 from logging import *
 #tests scripts
 
+suprise = True
+
 @otterize
 class TestComponent(Component):
     blank = attr.ib(default=None, validator=None) #no validator
@@ -24,9 +26,10 @@ class TestComponent(Component):
             return 55
         return random.random() * self.val
 
-    @table_property
-    def surpise_val(self):
-        return 13
+    if suprise:
+        @table_property
+        def surpise_val(self):
+            return 13
 
 @otterize
 class OtherComponent(Component):
@@ -34,9 +37,11 @@ class OtherComponent(Component):
     arg1 = attr.ib(default='mmmm', validator=STR_VALIDATOR())
     arg2 = attr.ib(default='word', validator=STR_VALIDATOR())
     argnum = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
-    ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
-    wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
-    more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
+
+    if suprise:
+        ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
+        wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
+        more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
 
     has_random_properties = True
 
@@ -44,31 +49,35 @@ class OtherComponent(Component):
     def random_val(self):
         return self.argnum * random.random() / random.random()
 
-    @table_property
-    def new_val(self):
-        return self.argnum * random.random() 
+    if suprise:
+        @table_property
+        def new_val(self):
+            return self.argnum * random.random() 
 
-@otterize
-class SupriseComponent(Component):
+if suprise:
+    @otterize
+    class SupriseComponent(Component):
 
-    arg3 = attr.ib(default='mmmm', validator=STR_VALIDATOR())
-    arg4 = attr.ib(default='word', validator=STR_VALIDATOR())
-    argque = attr.ib(default=-999, validator=NUMERIC_VALIDATOR())
-    #ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
-    #wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
-    #more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
+        arg3 = attr.ib(default='mmmm', validator=STR_VALIDATOR())
+        arg4 = attr.ib(default='word', validator=STR_VALIDATOR())
+        argque = attr.ib(default=-999, validator=NUMERIC_VALIDATOR())
+        #ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
+        #wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
+        #more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
 
-    has_random_properties = True
+        has_random_properties = True
 
-    @table_property
-    def negative_random_val(self):
-        return self.argque * random.random() / random.random()        
+        @table_property
+        def negative_random_val(self):
+            return self.argque * random.random() / random.random()        
 
 
 @otterize
 class TestAnalysis(Analysis):
 
-    surprise = attr.ib(factory=SupriseComponent)
+    if suprise: 
+        surprise = attr.ib(factory=SupriseComponent)
+
     other_cocomponent = attr.ib(factory=OtherComponent)
     internal_component = attr.ib(factory=TestComponent)
     some_random_value = attr.ib(default=10,validator=NUMERIC_VALIDATOR())
