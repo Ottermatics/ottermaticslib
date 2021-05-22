@@ -29,7 +29,7 @@ from ottermatics.patterns import Singleton, SingletonMeta, singleton_meta_object
 from ottermatics.logging import LoggingMixin, set_all_loggers_to, is_ec2_instance
 from ottermatics.tabulation import * #This should be considered a module of data
 
-#from sqlalchemy_batch_inserts import enable_batch_inserting #doesnt work well
+from sqlalchemy_batch_inserts import enable_batch_inserting 
 
 from contextlib import contextmanager
 
@@ -302,8 +302,8 @@ class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
             self.info("Getting DB port arg")
             self.port = kwargs['port'] 
 
-        #if 'batchmode' in kwargs:
-        #    self._batchmode = False #kwargs['batchmode']
+        if 'batchmode' in kwargs:
+           self._batchmode = True #kwargs['batchmode']
 
         self.resetLog()
         self.configure()
@@ -334,8 +334,8 @@ class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
             self.configure()
         session = self.Session()
         try:
-            #if self._batchmode:
-            #    enable_batch_inserting(session)
+            if self._batchmode:
+               enable_batch_inserting(session)
 
             yield session
             session.commit()

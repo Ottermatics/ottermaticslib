@@ -8,7 +8,7 @@ from logging import *
 #tests scripts
 
 #suprise the db and add more columns to test dynamic creation
-suprise = True
+suprise = False
 
 @otterize
 class TestComponent(Component):

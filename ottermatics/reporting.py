@@ -151,7 +151,7 @@ class TableBase( MappedDictMixin, ReportBase ):
         if 'result_id_in' in self.__dict__:
             self.result_id_in = result_id_in
 
-        log.debug(f'creating TB id:{result_id_in} obj:{self}, {kwargs}')
+        log.debug(f'creating TB id:{result_id_in} obj:{self}')
         table = self.__class__.__table__
         cols = self.dbi_columns
         
@@ -201,8 +201,8 @@ class TableBase( MappedDictMixin, ReportBase ):
                         self.attr_store[key] = atobj
                         #self[key] = atobj #dont use orm for upload!
 
-                else:
-                    log.debug(f'{key} not found for columns {cols}')           
+                #else:
+                #    log.debug(f'{key} not found for columns {cols}')           
 
     #these are breaking the analysis table creation since we can't make the attr_class before initiation when @declared_attr is made
     # @declared_attr
@@ -516,10 +516,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             comp_db_tup = (comp_cls_name,(TableBase,), comp_attr)
             comp_db = self.check_or_create_db_type(comp_attr['__tablename__'], comp_db_tup)
 
-        self.info(f'{comp_attr["__tablename__"]} internals: {comp_db.__dict__}')
-        
-        self.info(f'{dict_attr["__tablename__"]} internals: {dict_db.__dict__}')
-
         return {comp_attr['__tablename__']:comp_db, dict_attr['__tablename__']: dict_db}
 
     def check_or_create_db_type(self,tablename,type_tuple):
@@ -669,6 +665,8 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         return self._upload_analysis(analysis)
 
     def _upload_analysis(self,analysis):
+        '''the general method here we're using is to precompute the analysis row id, then batch the inserts after
+        forcing the correct primary key'''
         self.info(f'upload analysis: {analysis}')
 
         class AvoidDuplicateAbortUpload(Exception): pass
@@ -729,8 +727,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                     main_attrs = list(main_result.attr_store.values())
                     for item in main_attrs:
                         item.result_id = result_id
-                    sesh.add_all(main_attrs)
-
                     
                 
                 others = []
@@ -757,10 +753,10 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                     raise AvoidDuplicateAbortUpload() 
                 
                 with self.db.session_scope() as sesh:
-                    for item in others:
-                        
-                        sesh.add(item)
-                        sesh.add_all(list(item.attr_store.values()))
+
+                    add_list = main_attrs + others + flatten([list(item.attr_store.values()) for item in others ])
+
+                    sesh.add_all(add_list)
 
                 
                 inx += 1 #index += 1 is done at end of analysis so we should model that

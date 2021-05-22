@@ -195,6 +195,17 @@ class ComponentIterator(Component):
             iterated_properties = cls._iterated_component_type.cls_all_property_labels()
             these_properties = list(set( iterated_properties + these_properties))
         return these_properties
+
+    @classmethod
+    def cls_all_property_keys(cls):
+        these_properties =  [k for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]
+        if cls._iterated_component_type is not None and \
+            type(cls._iterated_component_type) is type and \
+            issubclass(cls._iterated_component_type,Component ):
+
+            iterated_properties = cls._iterated_component_type.cls_all_property_keys()
+            these_properties = list(set( iterated_properties + these_properties))
+        return these_properties        
     
     @classmethod
     def cls_all_attrs_fields(cls):
