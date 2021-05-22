@@ -60,7 +60,7 @@ register_adapter(numpy.ndarray, addapt_numpy_array)
 
 #This handles nans (which present as floats)!
 def nan_to_null(f):
-    if not numpy.isnan(f):
+    if not numpy.isnan(f) and not numpy.isinf(f):
         return psycopg2.extensions.Float(f)
     return AsIs('NULL')
 

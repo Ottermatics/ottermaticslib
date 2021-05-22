@@ -5,6 +5,8 @@ from ottermatics.tabulation import table_property
 from ottermatics.components import Component
 from ottermatics.analysis import Analysis
 from logging import *
+
+import numpy
 #tests scripts
 
 #suprise the db and add more columns to test dynamic creation
@@ -26,6 +28,14 @@ class TestComponent(Component):
         if self.word == 'schfiftyfive':
             return 55
         return random.random() * self.val
+
+    @table_property
+    def nan_val(self):
+        return numpy.nan
+
+    @table_property
+    def inf_val(self):
+        return numpy.inf       
 
     if suprise:
         @table_property
