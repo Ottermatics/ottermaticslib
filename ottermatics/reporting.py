@@ -23,6 +23,10 @@ from sqlalchemy.sql import func
 
 from threading import Thread
 
+from sqlalchemy.sql.expression import Insert
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.compiler import compiles
+
 #TODO: add schema info
 ReportBase = declarative_base( )
 
@@ -43,6 +47,15 @@ At the time of creation attributes with ottermatics validators will be created a
 
 log  = logging.getLogger('otterlib-report')
 
+
+#ignore duplicates
+@compiles(Insert, 'postgresql')
+def ignore_duplicates(insert, compiler, **kw):
+    s = compiler.visit_insert(insert, **kw)
+    ignore = insert.kwargs.get('postgresql_ignore_duplicates', False)
+    return s if not ignore else s + ' ON CONFLICT DO NOTHING'
+
+Insert.argument_for('postgresql', 'ignore_duplicates', None)
 
 #TODO: make new sqalchemy base, dont mixin other bases into our special fancy db
 
@@ -75,15 +88,16 @@ class MappedDictMixin:
     def __delitem__(self, key):
         del self._proxied[key]
 
+#TODO: Bases for AttrTable, CompTable, AnalysisTable
 
 class AttrBase(ReportBase):
     __abstract__ = True
-    id = Column(Integer(), primary_key=True)
-    key = Column(Unicode(64), nullable=True)
+    #id = Column(Integer(), primary_key=True)
+    key = Column(Unicode(64), nullable=False, primary_key=True)
     value = Column(Numeric)
 
     def __init__(self,result_id_in,key=None,value=None):
-        log.debug(f'creating attr rid:{result_id_in} {self}, {key}={value}')
+        #log.debug(f'creating attr rid:{result_id_in} {self}, {key}={value}')
         
         self.result_id = result_id_in
 
@@ -105,7 +119,7 @@ class AttrBase(ReportBase):
         rr = ResultsRegistry()
         with rr.db.session_scope() as sesh:
             results = list( sesh.query(cls).all())
-        return results    
+        return results  
 
 
 class TableBase( MappedDictMixin, ReportBase ):
@@ -127,7 +141,7 @@ class TableBase( MappedDictMixin, ReportBase ):
 
     ignore_keys = ('id','index')
 
-    attr_class = AttrBase
+    attr_class = None
 
     attr_store = None
 
@@ -154,7 +168,7 @@ class TableBase( MappedDictMixin, ReportBase ):
                     col = table.columns[key]                
                     ctype = type(col.type)
 
-                    log.debug(f'{self} setting {key}|{col}|{ctype}|{vtype}')
+                    #log.debug(f'{self} setting {key}|{col}|{ctype}|{vtype}')
 
                     in_stypes = any([issubclass(ctype,check_type) for check_type in self.check_types])
 
@@ -190,13 +204,15 @@ class TableBase( MappedDictMixin, ReportBase ):
                 else:
                     log.debug(f'{key} not found for columns {cols}')           
 
-    @declared_attr
-    def dict_values(cls):
-        return relationship( cls.attr_class.__name__, collection_class = attribute_mapped_collection("key") )
+    #these are breaking the analysis table creation since we can't make the attr_class before initiation when @declared_attr is made
+    # @declared_attr
+    # def dict_values(cls):
+    #     if cls.attr_class:
+    #         return relationship( cls.attr_class.__name__, collection_class = attribute_mapped_collection("key") )
 
-    @declared_attr
-    def _proxied(cls):
-        return association_proxy( "dict_values", "value")       
+    # @declared_attr
+    # def _proxied(cls):
+    #     return association_proxy( "dict_values", "value")       
 
     @property
     def dbi_columns(self):
@@ -283,8 +299,6 @@ class ReportingMixin:
 
         elif not self.report_db:
             self.warning('No Report Database Initated')    
-
-
 
 
 
@@ -378,25 +392,32 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         return Column(Numeric,default=attr_obj.default, nullable=True)   
 
 
-    def dict_attr(self,comp_cls, target_table_id, results_table = None):
+    def dict_attr(self,comp_cls, target_table_id, results_table = None, is_analysis=False):
         '''we make the default entries for a components attribues table'''
 
+        #this modulelates names for componets / analysis tables
         table_abrv = self.component_attr_abrv
         if issubclass(comp_cls, Analysis): table_abrv = self.analysis_attr_abrv
         name = comp_cls.__name__.lower()
 
         default_attr = {'__tablename__': f'{table_abrv}{name}' ,
-                        'comp_id': Column(Integer,ForeignKey( target_table_id )),
+                        #'comp_id': Column(Integer,ForeignKey( target_table_id )),
                         '__table_args__': self.default_args,
                         '__abstract__': False
                         }
         
-        if results_table is not None:
+        if results_table is not None and not is_analysis: #analysis won't be mapped
             default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}'
-            root_obj,_ = self.mapped_tables[results_table]
+            root_obj,_ = self.mapped_tables[results_table]#analysis won't be mapped
             backref_name = f'db_comp_attr_{name}'
-            default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'))
+            default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'),primary_key=True)
             default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload'))
+        
+        elif issubclass(comp_cls, Analysis) and is_analysis:
+            default_attr['__tablename__'] = f'{table_abrv}{name}'
+            backref_name = f'db_comp_attr_{name}'
+            default_attr['result_id'] = Column(Integer, ForeignKey(target_table_id),primary_key=True)
+            #default_attr['analysis'] = relationship(comp_cls.__name__,backref = backref(backref_name,lazy='noload'))
                     
         return default_attr
 
@@ -409,7 +430,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         name = comp_cls.__name__.lower()
         #TODO: Add mapping __init__ method
         default_attr = {'__tablename__': f'{table_abrv}{name}' ,
-                        'id': Column(Integer, primary_key=True),
+                        #'id': Column(Integer, primary_key=True),
                         '__table_args__': self.default_args,
                         '__abstract__': False,
                         '_mapped_component': comp_cls,
@@ -421,18 +442,19 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             backref_name = f'db_comp_{name}'
             root_obj,_ = self.mapped_tables[results_table]
             default_attr['__tablename__'] = f'{results_table}_{table_abrv}{name}' 
-            default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id'))
+            default_attr['result_id'] = Column(Integer, ForeignKey(f'{results_table}.id') ,primary_key=True)
             default_attr['analysis'] = relationship(root_obj.__name__,backref = backref(backref_name,lazy='noload'))
 
         else: #its an analysis
             default_attr['created'] = Column(DateTime, server_default=func.now())
             default_attr['active'] = Column(Boolean(), server_default = 't')
             default_attr['run_id'] = Column(String(36)) #corresponds to uuid set in analysis
+            default_attr['id']: Column(Integer, primary_key=True)
             #default_attr['components'] = relationship(TableBase, back_populates= "analysis")
 
         return default_attr
 
-    #These use keys of table_property or attr and lower()so no spaces or capitals
+    #These use keys of table_property or attr and lower() so no spaces or capitals
     def all_possible_component_fields(self,cls):
         all_table_fields = set([ attr.lower() for attr in cls.cls_all_property_keys() ])
         all_attr_fields = set([ attr.lower() for attr in cls.cls_all_attrs_fields().keys() ])
@@ -451,7 +473,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         component_attr.update(self.default_attr(comp_cls,results_table=results_table))
         return component_attr
 
-    def db_component_dict(self,comp_cls,results_table=None):
+    def db_component_dict(self,comp_cls,results_table=None,is_analysis=False):
         '''returns the nessicary table types to make for reflection of input component class
         
         this method represents the dynamic creation of SQLA typing and attributes via __dict__'''
@@ -468,22 +490,42 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         else:
             comp_cls_name = f'DB_{comp_cls.__name__}'
 
-        dict_attr = self.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" , results_table=results_table)
-        dict_name = f'{comp_cls_name}_Dict'
-        dict_db_tup = (dict_name,(AttrBase,), dict_attr)
+        if is_analysis: results_table = comp_attr['__tablename__'] #pass reference for id!
 
-        dict_db = self.check_or_create_db_type(dict_attr['__tablename__'], dict_db_tup)
+        if is_analysis: #We create the analysis first
+            if 'id' not in comp_attr:
+                comp_attr['id']= Column(Integer, primary_key=True)
+
+            comp_db_tup = (comp_cls_name,(TableBase,), comp_attr)
+            comp_db = self.check_or_create_db_type(comp_attr['__tablename__'], comp_db_tup)
+
+            dict_attr = self.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" , results_table=results_table,is_analysis=is_analysis)
+            dict_name = f'{comp_cls_name}_Dict'
+            dict_db_tup = (dict_name,(AttrBase,), dict_attr)
+            dict_db = self.check_or_create_db_type(dict_attr['__tablename__'], dict_db_tup)
+            
+            comp_db.attr_class = dict_db #This delayed monkey patch is fine since we wont be able to try any init's with this class until 
+
+        else:
+            dict_attr = self.dict_attr(comp_cls, f"{comp_attr['__tablename__']}.id" , results_table=results_table)
+            dict_name = f'{comp_cls_name}_Dict'
+            dict_db_tup = (dict_name,(AttrBase,), dict_attr)
+            dict_db = self.check_or_create_db_type(dict_attr['__tablename__'], dict_db_tup)
+            
+            comp_attr['attr_class'] = dict_db
+            comp_db_tup = (comp_cls_name,(TableBase,), comp_attr)
+            comp_db = self.check_or_create_db_type(comp_attr['__tablename__'], comp_db_tup)
+
+        self.info(f'{comp_attr["__tablename__"]} internals: {comp_db.__dict__}')
         
-        comp_attr['attr_class'] = dict_db
-        comp_db_tup = (comp_cls_name,(TableBase,), comp_attr)
-        comp_db = self.check_or_create_db_type(comp_attr['__tablename__'], comp_db_tup)
+        self.info(f'{dict_attr["__tablename__"]} internals: {dict_db.__dict__}')
 
         return {comp_attr['__tablename__']:comp_db, dict_attr['__tablename__']: dict_db}
 
     def check_or_create_db_type(self,tablename,type_tuple):
+        cls_name,ttype,attr_dict = type_tuple
+        
         if self.db.engine.has_table(tablename):                
-            
-            cls_name,ttype,attr_dict = type_tuple
             
             remove = set(['__table_args__'])
             for key,item in attr_dict.items():
@@ -492,7 +534,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             
             for rkey in remove:
                 if rkey in attr_dict:
-                    self.debug(f'removing {rkey}')
+                    #self.debug(f'removing {rkey}')
                     attr_dict.pop(rkey)
                 else:
                     self.debug(f'couldnt find {rkey}')
@@ -509,8 +551,10 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             return cls_db    
 
         else:
+            self.info(f'creating class {cls_name} with properties {attr_dict}')
             cls_db = type(*type_tuple)
-            self.debug(f'creating table type {cls_db.__name__} -> {cls_db.__tablename__}')
+            self.debug(f'created table type {cls_db.__name__} -> {cls_db.__tablename__}')
+            
 
             setattr(self,cls_db.__name__,cls_db)
             return cls_db    
@@ -519,18 +563,25 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         self.debug(f'mapping {dbcomponent},{component} -> {dbcomponent.__tablename__}')
         #add to internal mapping
         self._component_cls_table_mapping[dbcomponent.__tablename__] = (dbcomponent,component)
+        
+        tablenames = self.db.engine.table_names()
+        atables = AnalysisRegistry.tablenames(self.db)
+        ctables = ComponentRegistry.tablenames(self.db)
 
+        self.info(f'comparing {tablenames} | {atables} | {ctables}')
         #create record of components and analyses
         if isinstance(component,Analysis) or issubclass(component,Analysis):
             if isinstance(component,Analysis): component = component.__class__
-            if dbcomponent.__tablename__ not in AnalysisRegistry.tablenames():
+            if dbcomponent.__tablename__ not in atables:
+                self.info(f'adding analysis record { dbcomponent.__tablename__}')
                 with self.db.session_scope() as sesh:
                     rec = AnalysisRegistry(dbcomponent,component)
                     sesh.add( rec )
 
         elif isinstance(component,Component) or issubclass(component,Component):
             if isinstance(component,Component): component = component.__class__
-            if dbcomponent.__tablename__ not in ComponentRegistry.tablenames():
+            if dbcomponent.__tablename__ not in ctables:
+                self.info(f'adding comonent record { dbcomponent.__tablename__}')
                 with self.db.session_scope() as sesh:
                     rec = ComponentRegistry(dbcomponent,component)
                     sesh.add( rec )  
@@ -557,8 +608,12 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
     def ensure_component_table(self, component_cls, results_table=None):
         self.debug(f'ensure-comp-table: {component_cls}')
+
+        is_analysis = False
+        if issubclass(component_cls, Analysis): is_analysis = True
         
-        db_component_type_dict = self.db_component_dict( component_cls, results_table=results_table )
+        self.info(f'ensuring component {component_cls} analysis?:{is_analysis}')
+        db_component_type_dict = self.db_component_dict( component_cls, results_table=results_table ,is_analysis=is_analysis )
         for comp_tbl, compdb in db_component_type_dict.items():
 
             if not  self.db.engine.has_table(comp_tbl ):
@@ -568,6 +623,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             else:
                 self.debug(f'table exists already {comp_tbl}')
 
+        for comp_tbl, compdb in db_component_type_dict.items():
             if not compdb.__name__.endswith('Dict'): self.map_component(compdb, component_cls ) 
 
         return db_component_type_dict
@@ -649,9 +705,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             inx = 0
             main_result = None
 
-            rows = []
-            others = []
-            proxied = []
             while any_succeeded and inx < analysis.index:
                 any_succeeded = False #guilty until proven innocent!!
 
@@ -673,38 +726,42 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
                     sesh.commit()
                     result_id = int(main_result.id)
 
-                rows.append(main_result)
+                    main_attrs = list(main_result.attr_store.values())
+                    for item in main_attrs:
+                        item.result_id = result_id
+                    sesh.add_all(main_attrs)
+
+                    
                 
+                others = []
                 for dbclass, generator in data_gens.items():
                     try:
                         data_dict = next(generator)
                         last_values[dbclass] = data_dict
                         data_dict['result_id'] = result_id
                         cmp_result = dbclass(result_id,**data_dict)
-                        cmp_result.analysis = main_result
-
                         others.append(cmp_result)
-                        self.debug(f'adding to: {main_result} <- {cmp_result}')
                     
                     except StopIteration:
                         data_dict = last_values[dbclass] 
                         
                         data_dict['result_id'] = result_id
                         cmp_result = dbclass(result_id,**data_dict)
-
-                        cmp_result.analysis = main_result
                         others.append(cmp_result)
-                        self.debug(f'adding to: {main_result} <- {cmp_result}')   
 
                     else:
                         any_succeeded = True #here's ur fricken evidence ur honor
                 
                 #the scoped session rolls back anything created this time :)
-                if not any_succeeded: raise AvoidDuplicateAbortUpload() 
+                if not any_succeeded: 
+                    raise AvoidDuplicateAbortUpload() 
                 
-                if len(others) > 25:
-                    others = self.bulk_insert_object(others)
-                    proxied = self.bulk_insert_object(proxied)
+                with self.db.session_scope() as sesh:
+                    for item in others:
+                        
+                        sesh.add(item)
+                        sesh.add_all(list(item.attr_store.values()))
+
                 
                 inx += 1 #index += 1 is done at end of analysis so we should model that
 
@@ -713,35 +770,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
         except Exception as e:
             self.error(e,'Issue Uploading Data')
-
-        if rows:
-            rows = self.bulk_insert_object(rows)
-        
-        if others:         
-            others = self.bulk_insert_object(others)
-
-    def bulk_insert_object(self,objects):
-        nrow = len(objects)
-        dt_start = time.time()
-
-        with self.db.session_scope() as sesh:
-               
-            sesh.bulk_save_objects(objects,return_defaults = True)
-
-            comp_tables = list(filter(lambda obj: isinstance(obj, TableBase), objects ))
-            proxied = flatten([list(cmp.attr_store.values()) for cmp in comp_tables])
-            for cmp in comp_tables:
-                for key, attr in cmp.attr_store.items():
-                    attr.comp_id = cmp.id
-
-            sesh.bulk_save_objects(proxied)
-
-        dt_end = time.time()
-        dt = dt_end - dt_start
-        self.info(f'uploading {nrow} results @ {nrow/dt} in {dt}s')
-        return []
-        
-
 
 
 
@@ -763,6 +791,7 @@ class MappedItem(ReportBase):
     def __init__(self,tablerep, mapped_class):
         self.classname = mapped_class.__name__
         self.tablename = tablerep.__tablename__
+
         if issubclass(mapped_class,Analysis):
             self.attrtable = f'anly_attr_{tablerep.__tablename__}'
         else:
@@ -796,9 +825,9 @@ class MappedItem(ReportBase):
         return set.difference(cls.all_fields(), cls.db_columns())
 
     @classmethod
-    def tablenames(cls):
-        rr = ResultsRegistry()
-        with rr.db.session_scope() as sesh:
+    def tablenames(cls,db):
+        #rr = ResultsRegistry()
+        with db.session_scope() as sesh:
             results = list( sesh.query(cls.tablename).all())
         return flatten(results)
 

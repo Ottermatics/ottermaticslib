@@ -192,7 +192,7 @@ def recursive_python_module_line_counter(curpath=None):
 
 def flat2gen(alist):
   for item in alist:
-    if isinstance(item, list):
+    if isinstance(item, (list,tuple)):
       for subitem in item: yield subitem
     else:
       yield item

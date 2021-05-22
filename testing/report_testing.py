@@ -7,6 +7,7 @@ from ottermatics.analysis import Analysis
 from logging import *
 #tests scripts
 
+#suprise the db and add more columns to test dynamic creation
 suprise = True
 
 @otterize
@@ -78,10 +79,10 @@ class TestAnalysis(Analysis):
     if suprise: 
         surprise = attr.ib(factory=SupriseComponent)
 
-    other_cocomponent = attr.ib(factory=OtherComponent)
-    internal_component = attr.ib(factory=TestComponent)
-    some_random_value = attr.ib(default=10,validator=NUMERIC_VALIDATOR())
-    other_rand_val = attr.ib(default=1E6,validator=NUMERIC_VALIDATOR())
+    other_cocomponent = attr.ib( factory= OtherComponent )
+    internal_component = attr.ib( factory= TestComponent )
+    some_random_value = attr.ib( default=10, validator= NUMERIC_VALIDATOR() )
+    other_rand_val = attr.ib( default=1E6, validator= NUMERIC_VALIDATOR() )
     
     mode = 'iterator'
     iterator = attr.ib(factory = lambda: list(range(10)))
@@ -104,6 +105,11 @@ class TestAnalysis(Analysis):
         if val > 0.6:
             return None
         return val
+
+    if suprise:
+        @table_property
+        def suprise(self):
+            return random.random() * self.internal_component.val        
 
 
 if __name__ == '__main__':
