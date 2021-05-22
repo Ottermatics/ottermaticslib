@@ -547,7 +547,6 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             return cls_db    
 
         else:
-            self.info(f'creating class {cls_name} with properties {attr_dict}')
             cls_db = type(*type_tuple)
             self.debug(f'created table type {cls_db.__name__} -> {cls_db.__tablename__}')
             
