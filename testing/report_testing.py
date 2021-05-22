@@ -122,7 +122,8 @@ if __name__ == '__main__':
     #2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table. 
     analysis.solve()
     rr.ensure_analysis(analysis)
-    rr.upload_analysis(analysis)
+    thread = rr.upload_analysis(analysis, use_thread=True)
+    thread.join()
 
     #3) For each component and analysis map create tables or map them if they dont exist.
     # - use a registry approach (singleton?) to map the {component: db_class} pairs

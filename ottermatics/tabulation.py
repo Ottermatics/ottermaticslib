@@ -32,7 +32,9 @@ def NUMERIC_VALIDATOR():
 def STR_VALIDATOR():
     return attr.validators.instance_of(STR_TYPES)
 
+ATTR_VALIDATOR_TYPES = (attr.validators._AndValidator,attr.validators._InstanceOfValidator,attr.validators._MatchesReValidator,attr.validators._ProvidesValidator,attr.validators._OptionalValidator,attr.validators._InValidator,attr.validators._IsCallableValidator,attr.validators._DeepIterable,attr.validators._DeepMapping)
 
+TAB_VALIDATOR_TYPE = attr.validators._InstanceOfValidator #our validators shoudl require a type i think, at least for tabulation
 
 class table_property:
     """Emulate PyProperty_Type() in Objects/descrobject.c
@@ -474,14 +476,24 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         return tabulated_properties   
 
     @property
-    def table_properties_description(self):
+    def table_properties_keys(self):
+        class_dict = self.__class__.__dict__
+        tabulated_properties = [k for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        return tabulated_properties           
+
+    @property
+    def table_properties_description(self):d
         class_dict = self.__class__.__dict__
         tabulated_properties = [obj.desc for k,obj in class_dict.items() if isinstance(obj,table_property)]
         return tabulated_properties       
 
     @classmethod
     def cls_all_property_labels(cls):
-        return [obj.label for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]               
+        return [obj.label for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]
+
+    @classmethod
+    def cls_all_property_keys(cls):
+        return [k for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]                       
     
     @classmethod
     def cls_all_attrs_fields(cls):

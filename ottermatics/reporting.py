@@ -21,8 +21,10 @@ from sqlalchemy.sql.sqltypes import BOOLEAN, NUMERIC, VARCHAR, INTEGER, INT, Int
 
 from sqlalchemy.sql import func
 
+from threading import Thread
 
-ReportBase = declarative_base()
+#TODO: add schema info
+ReportBase = declarative_base( )
 
 DEFAULT_STRING_LENGTH = 256
 
@@ -265,15 +267,17 @@ class ReportingMixin:
             self.warning(f'Got bad value {inputval} of type {type(inputval)}')
 
     def report_data(self, use_thread = False):
+
         if self.report_db and self.solved:
             try:
-                assert isinstance(self,Analysis)
-                rr = ResultsRegistry(self.report_db)
-                rr.ensure_analysis(self)
-                return rr.upload_analysis(self,use_thread=use_thread)
+                assert isinstance( self, Analysis )
+                rr = ResultsRegistry( self.report_db )
+                rr.ensure_analysis( self )
+                return rr.upload_analysis( self, use_thread = use_thread )
 
             except Exception as e:
                 self.error(e, 'Issue Reporting Data')
+
         elif not self.solved:
             self.warning('Analysis Not Solved, Cannot Upload')
 
@@ -351,6 +355,10 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
     def filter_by_validators(self,attr_obj):
         if not attr_obj.validator:
             return False
+        
+        if not isinstance(attr_obj.validator,TAB_VALIDATOR_TYPE):
+            return False
+
         valtype = type(attr_obj.validator.type)
         if not valtype:
             return False
@@ -424,14 +432,21 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
 
         return default_attr
 
+    #These use keys of table_property or attr and lower()so no spaces or capitals
+    def all_possible_component_fields(self,cls):
+        all_table_fields = set([ attr.lower() for attr in cls.cls_all_property_keys() ])
+        all_attr_fields = set([ attr.lower() for attr in cls.cls_all_attrs_fields().keys() ])
+        all_fields = set.union(all_table_fields,all_attr_fields)
+        return set(list(all_fields))
+
     def component_attr(self,comp_cls, results_table = None):
         # #TODO: assign key values as attribute dict
         # #TODO: check if class has a __tablename__ and if it does use that with, ensure component_table_ on front
 
-        component_attr = { key.lower(): self.validator_to_column(field) for key,field in attr.fields_dict(comp_cls).items() if self.filter_by_validators(field)}
+        component_attr = { key.lower(): self.validator_to_column(field) for key,field in comp_cls.cls_all_attrs_fields().items() if self.filter_by_validators(field)}
 
         component_attr.update({ k.lower(): Column(k.lower(), Numeric(),nullable=True) \
-                                for k,obj in comp_cls.__dict__.items() if isinstance(obj,table_property)})
+                                for k in comp_cls.cls_all_property_keys() })
 
         component_attr.update(self.default_attr(comp_cls,results_table=results_table))
         return component_attr
@@ -586,11 +601,12 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
             analysis_cls = analysis
         return analysis_cls                 
 
-    def upload_analysis(self,analysis,use_thread = False):
-        #TODO: Implment Index Based Merging Scheme, Right now we're assuming last values carry over
+    def upload_analysis(self,analysis, use_thread = False):
+        '''a wrapper for upload analysis with a thread selection context,
+        :returns: a thread reference, which you can join after setting other work.'''
 
         if use_thread:
-            thread = Thread(worker = self._upload_analysis, args=(analysis,) )
+            thread = Thread(target = self._upload_analysis, args=(analysis,) )
             thread.start()
             return thread
 

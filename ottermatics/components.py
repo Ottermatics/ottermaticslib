@@ -2,7 +2,7 @@ from contextlib import contextmanager
 import attr
 
 from ottermatics.logging import LoggingMixin, log
-from ottermatics.tabulation import TabulationMixin
+from ottermatics.tabulation import TabulationMixin, table_property
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.patterns import SingletonMeta, flatten
 
@@ -188,19 +188,30 @@ class ComponentIterator(Component):
     @classmethod
     def cls_all_property_labels(cls):
         these_properties =  [obj.label.lower() for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]
-        if cls._iterated_component_type is not None and issubclass(cls._iterated_component_type,Component ):
+        if cls._iterated_component_type is not None and \
+            type(cls._iterated_component_type) is type and \
+            issubclass(cls._iterated_component_type,Component ):
+
             iterated_properties = cls._iterated_component_type.cls_all_property_labels()
             these_properties = list(set( iterated_properties + these_properties))
         return these_properties
     
     @classmethod
     def cls_all_attrs_fields(cls):
-        these_properties =  attr.fields_dict(cls)
+        these_properties =  attr.fields_dict(cls) #dictonary
         if cls._iterated_component_type is not None and issubclass(cls._iterated_component_type,Component ):
             iterated_properties = attr.fields_dict(cls._iterated_component_type)
-            these_properties = list(set( iterated_properties + these_properties))
+            these_properties.update(iterated_properties)
         return these_properties        
 
+    #these are the methods we're overrideing
+    # @classmethod
+    # def cls_all_property_labels(cls):
+    #     return [obj.label for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]               
+    
+    # @classmethod
+    # def cls_all_attrs_fields(cls):
+    #     return attr.fields_dict(cls)
 
     #Magicz
     #@functools.cached_property
