@@ -563,7 +563,7 @@ class ResultsRegistry(Configuration,metaclass = SingletonMeta):
         atables = AnalysisRegistry.tablenames(self.db)
         ctables = ComponentRegistry.tablenames(self.db)
 
-        self.info(f'comparing {tablenames} | {atables} | {ctables}')
+        self.debug(f'comparing {tablenames} | {atables} | {ctables}')
         #create record of components and analyses
         if isinstance(component,Analysis) or issubclass(component,Analysis):
             if isinstance(component,Analysis): component = component.__class__
