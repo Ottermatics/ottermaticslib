@@ -1469,8 +1469,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         This one is good for a cold entry of a path
         
         This method can create duplicates when used in parallel contexts'''
-        # if gpath.startswith(self.shared_drive):
-        #     gpath = gpath.replace(self.shared_drive,'')
+        if gpath.startswith(self.shared_drive):
+            gpath = gpath.replace(self.shared_drive,'') #gpath no have groot, we later add it into the path
 
         if gpath.startswith('/'):
             gpath = gpath.replace('/','',1)
@@ -1478,15 +1478,21 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         if '..' in gpath or 'mnt' in gpath: #guard on wsl
             return self.sync_root_id
 
+        # if gpath == self.shared_drive:
+        #     return self.sync_root_id
+
         self.debug('ensuring path {}'.format(gpath))
-        parent_id = self.target_folder_id
+        if self.target_folder_id is not None:
+            parent_id = self.target_folder_id
+        else:
+            parent_id = self.sync_root_id
 
         if gpath in self.folder_paths:
             parent_id =  self.get_gpath_id(gpath)
             self.cache_directory(parent_id)
-            return parent_id       
+            return parent_id
 
-        current_pos = self.shared_drive
+        current_pos = self.shared_drive 
         for sub in gpath.split(os.sep):
             if sub == '..':
                 continue
@@ -1514,6 +1520,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         if parent_id is not None:                
             return parent_id
+
         elif not any([fol.startswith('.') for fol in current_pos.split(os.sep)]):
             self.warning(f'Failed To get Gpath {gpath} Trying again ')
             return self.ensure_g_path_get_id(gpath)
