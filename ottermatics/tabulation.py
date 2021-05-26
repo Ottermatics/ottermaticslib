@@ -454,7 +454,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     @property
     def attr_dict(self) -> list:
         '''Returns formated attr data if the value is numeric'''
-        return {k.lower(): self.store[k] for k in self.attr_raw_keys if k not in self.skip_attr }
+        return {k.lower(): self.store[k] for k in self.attr_raw_keys if k in self.store and k not in self.skip_attr  }
 
     @property
     def table_dict(self):
