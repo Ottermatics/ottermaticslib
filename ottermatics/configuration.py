@@ -45,7 +45,9 @@ def property_changed(instance, variable, value):
 #This one should wrap all configuraitons to track changes, and special methods
 #TODO: Make this accept arguments in appication
 def otterize(cls,*args,**kwargs):
-    '''Wrap all Configurations with this decorator'''
+    '''Wrap all Configurations with this decorator
+    
+    It might be nice to use all the attrs magic methods but hash requires frozen for automation, not clear what the best config is'''
     acls = attr.s(cls, on_setattr= property_changed, eq=False,repr=False,hash=False,frozen=False, *args,**kwargs)
     return acls                                        
 
