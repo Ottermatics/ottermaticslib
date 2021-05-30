@@ -550,8 +550,8 @@ if __name__ == '__main__':
 
             self.st.add_constraint('A',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
             self.st.add_constraint('E',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
-            for node in self.st.nodes:
-                self.st.frame.DefineSupport(node,SupportDZ=True,SupportRZ=True)
+            # for node in self.st.nodes:
+            #     self.st.frame.DefineSupport(node,SupportDZ=True,SupportRZ=True)
                 
             self.st.frame.AddNodeLoad('F','FY',-1000)
             self.st.frame.AddNodeLoad('G','FY',-2000)
