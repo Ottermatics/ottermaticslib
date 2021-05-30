@@ -5,10 +5,12 @@ import shapely
 import pandas
 from shapely.geometry import Polygon, Point
 
-from ottermatics.tabulation import TABLE_TYPES, NUMERIC_VALIDATOR
+from ottermatics.tabulation import TABLE_TYPES, NUMERIC_VALIDATOR, table_property
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component
+from ottermatics.analysis import Analysis
 from ottermatics.solid_materials import *
+
 
 import sectionproperties
 import sectionproperties.pre.sections as sections
@@ -23,8 +25,9 @@ SECTIONS = {k:v for k,v in filter( lambda kv: issubclass(kv[1],sectionproperties
 
 nonetype = type(None)
 
+#TODO: Make analysis, where each load case is a row
 @otterize
-class Structure(Component):
+class Structure(Analysis):
     '''A integration between sectionproperties and PyNite, with a focus on ease of use
 
     Right now we just need an integration between Sections+Materials and Members, to find, CG, and inertial components
@@ -69,6 +72,10 @@ class Structure(Component):
         return beam
 
     def add_member_with(self,name,node1,node2,E, G, Iy, Ix, J, A):
+        '''a way to add specific beam properties to calculate stress,
+        This way will currently not caluclate resulatant beam load.
+        #TOOD: Add in a mock section_properties for our own stress calcs
+        '''
         assert node1 in self.nodes 
         assert node2 in self.nodes
         
@@ -100,13 +107,17 @@ class Structure(Component):
         out = {}
         for case in self.frame.LoadCombos:
             rows = []
-            for node in st.nodes.values():
-                row = { 'dx':node.DX[case],'dy':node.DY[case],'dz':node.DZ[case], 'rx': node.RX[case],'ry':node.RY[case],'rz':node.RZ[case],'rxfx':node.RxnFX[case],'rxfy':node.RxnFY[case],'rxfz':node.RxnFZ[case],'rxmx':node.RxnMX[case],'rxmy':node.RxnMY[case],'rxmz':node.RxnMZ[case]}
+            for node in self.nodes.values():
+                row = {'name':node.Name, 'dx':node.DX[case],'dy':node.DY[case],'dz':node.DZ[case], 'rx': node.RX[case],'ry':node.RY[case],'rz':node.RZ[case],'rxfx':node.RxnFX[case],'rxfy':node.RxnFY[case],'rxfz':node.RxnFZ[case],'rxmx':node.RxnMX[case],'rxmy':node.RxnMY[case],'rxmz':node.RxnMZ[case]}
                 rows.append(row)
             
             out[case] = pandas.DataFrame(rows)
         return out
         
+
+
+
+
 
 
 
@@ -129,8 +140,10 @@ class Beam(Component):
     _section_properties = None
     _ITensor = None    
 
+    min_stress_xy = None #set to true or false
+
     def __on_init__(self):
-        self._skip_attr = ['mesh_size']
+        self._skip_attr = ['mesh_size','in_Iy','in_Ix','in_J','in_A']
 
         self.debug('determining section properties...')
         if self.section is not None:
@@ -141,11 +154,11 @@ class Beam(Component):
         else:
             assert all([val is not None for val in (self.in_Iy,self.in_Ix,self.in_J,self.in_A)])
 
-    @property
+    @table_property
     def L(self):
         return self.length
 
-    @property
+    @table_property
     def length(self):
         if self._L is None:
             self._L = self.member.L()
@@ -171,11 +184,11 @@ class Beam(Component):
     def P2(self):
         return numpy.array([self.n2.X,self.n2.Y,self.n2.Z])
 
-    @functools.cached_property
+    @table_property
     def E(self):
         return self.material.E
 
-    @functools.cached_property
+    @table_property
     def G(self):
         return self.material.G        
 
@@ -189,29 +202,29 @@ class Beam(Component):
         return self._ITensor
             
 
-    @property
+    @table_property
     def Iy(self):
         if self.in_Iy is None:
             self.in_Iy = self.ITensor[1,1]
         return self.in_Iy
 
-    @property
+    @table_property
     def Ix(self):
         if self.in_Ix is None:
             self.in_Ix = self.ITensor[0,0]
         return self.in_Ix
 
-    @functools.cached_property
+    @table_property
     def Ixy(self):
         return self.ITensor[0,1]
 
-    @property
+    @table_property
     def J(self):
         if self.in_J is None:
             self.in_J = self._section_properties.get_j()
         return self.in_J
 
-    @property
+    @table_property
     def A(self):
         if self.in_A is None:
             self.in_A = self._section_properties.get_area()
@@ -220,6 +233,10 @@ class Beam(Component):
     @functools.cached_property
     def Vol(self):
         return self.A * self.L
+
+    @functools.cached_property
+    def section_mass(self):
+        return self.material.density * self.A
 
     @functools.cached_property
     def mass(self):
@@ -243,10 +260,49 @@ class Beam(Component):
     def show_mesh(self):
         return self._section_properties.plot_mesh()
 
+    @table_property
+    def max_von_mises(self):
+        '''The worst of the worst cases, after adjusting the beem orientation for best loading'''
+        return numpy.nanmax([self.max_von_mises_by_case])
 
-    def von_mises_stress_l(self,reverse_xy=False):
+    @property
+    def max_von_mises_by_case(self):
+        '''Gathers max vonmises stress info per case'''
+        cmprv = {}
+        for rxy in [True,False]:
+            new = []
+            out = self.von_mises_stress_l(rxy)
+            for cmbo,vm_stress_vec in out.items():
+                new.append(numpy.nanmax( vm_stress_vec ))
+
+            cmprv[rxy] = numpy.array(new)
+
+        vt = numpy.nanmax( cmprv[True] )
+        vf = numpy.nanmax( cmprv[False] )
+
+        #We choose the case with the 
+        if vf < vt:
+            self.min_stress_xy = False
+            return vf 
+
+        self.min_stress_xy = True
+        return vt
+
+
+    #TODO: Breakout other stress vectors
+    def von_mises_stress_l(self,reverse_xy=None):
+        '''Max von-mises stress'''
+
+        if reverse_xy is None:
+            if self.min_stress_xy is not None:
+                reverse_xy = self.min_stress_xy
+            else:
+                reverse_xy = False
+        
+
         out = {}
         for combo in self.structure.frame.LoadCombos:
+
             rows = []
             for i in numpy.linspace(0,1,11):
                 inp  = dict(N=self.member.Axial(i,combo),
@@ -268,41 +324,67 @@ class Beam(Component):
         
         return out
 
-    def stress_info(self,reverse_xy=False):
+    def stress_info(self,reverse_xy=None):
+        '''Max profile stress info along beam for each type'''
+
+        if reverse_xy is None:
+            if self.min_stress_xy is not None:
+                reverse_xy = self.min_stress_xy
+            else:
+                reverse_xy = False
+
         out = {}
         for combo in self.structure.frame.LoadCombos:
+
             rows = []
             for i in numpy.linspace(0,1,11):
-                inp  = dict(N=self.member.Axial(i,combo),
-                            Vx=self.member.Shear('Fz' if not reverse_xy else 'Fy' ,i,combo),
-                            Vy=self.member.Shear('Fy' if not reverse_xy else 'Fz' ,i,combo),
-                            Mxx=self.member.Moment('Mz' if not reverse_xy else 'My',i,combo), 
-                            Myy=self.member.Moment( 'My' if not reverse_xy else 'Mz',i,combo), 
-                            M11=0, 
-                            M22=0, 
-                            Mzz=self.member.Torsion(i,combo) )
-                
-                sol = self._section_properties.calculate_stress(**inp)
+                sol = self.get_stress_at(i,combo,reverse_xy)
                 mat_stresses = sol.get_stress()
-                oout = {'x':i}
+                oout = {'x':x}
                 for stresses in mat_stresses:
                     vals = {sn+'_'+stresses['Material']:numpy.nanmax(stress) for sn,stress in stresses.items() if 
                     isinstance(stress,numpy.ndarray)}
                     oout.update(vals)
-
-                rows.append( oout )
-
             out[combo] = pandas.DataFrame(rows)
         
         return out
 
+    def get_stress_at(self,x,combo,reverse_xy=None):
+        '''gets stress at x, for load case combo'''
+        
+        if reverse_xy is None:
+            if self.min_stress_xy is not None:
+                reverse_xy = self.min_stress_xy
+            else:
+                reverse_xy = False        
+
+        inp  = dict(N=self.member.Axial(x,combo),
+                    Vx=self.member.Shear('Fz' if not reverse_xy else 'Fy' ,x,combo),
+                    Vy=self.member.Shear('Fy' if not reverse_xy else 'Fz' ,x,combo),
+                    Mxx=self.member.Moment('Mz' if not reverse_xy else 'My',x,combo), 
+                    Myy=self.member.Moment( 'My' if not reverse_xy else 'Mz',x,combo), 
+                    M11=0, 
+                    M22=0, 
+                    Mzz=self.member.Torsion(x,combo) )
+        
+        return self._section_properties.calculate_stress(**inp)
 
 
+
+    @property
     def results(self):
+        '''Min and max stress and deflection dataframes per case'''
         rows = []
         for combo in self.structure.frame.LoadCombos:
             mem = self.member
-            row = dict( max_axial = mem.MaxAxial(combo),
+            row = dict( case = combo,
+                        Iy = self.Iy,
+                        Ix = self.Ix,
+                        A = self.A,
+                        E = self.E,
+                        J = self.J,
+                        G = self.G,
+                        max_axial = mem.MaxAxial(combo),
                         min_axial = mem.MinAxial(combo),
                         max_my = mem.MaxMoment('My',combo),
                         min_my = mem.MinMoment('My',combo),
@@ -324,7 +406,227 @@ class Beam(Component):
 
         return pandas.DataFrame(rows)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
+
+    import unittest
+    from matplotlib.pylab import *
+
+    class test_cantilever(unittest.TestCase):
+        #tests the first example here
+        #https://www.engineeringtoolbox.com/cantilever-beams-d_1848.html
+
+        def setUp(self):
+
+            self.st = Structure(name = 'cantilever_beam')
+            self.st.add_node('wall',0,0,0)
+            self.st.add_node('free',0,5,0)
+
+            self.ibeam = sections.ISection(0.3072,0.1243,0.0121,0.008,0.0089,4)
+            self.bm = self.st.add_member('mem','wall','free',material = ANSI_4130(), section = self.ibeam )
+
+            self.st.add_constraint('wall',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
+            self.st.frame.AddNodeLoad('free','FX',3000)
+
+            self.st.analyze(check_statics=True)
+
+        def test_beam(self):
+
+            self.subtest_assert_near(self.bm.A, 53.4/(100**2))
+            self.subtest_assert_near(self.bm.Ix, 8196/(100**4))
+            self.subtest_assert_near(self.bm.Iy, 388.8/(100**4))
+            self.subtest_assert_near(self.bm.section_mass , 41.9)
+
+            self.subtest_assert_near(self.bm.max_von_mises , 27.4E6 )
+            self.subtest_assert_near(float(self.bm.results['min_deflection_y']) , -0.0076 )
+            self.subtest_assert_near(float(self.bm.results['max_shear_y']) , 3000 )
+            self.subtest_assert_near(float(self.bm.results['max_shear_y']) , 3000 )
+
+            df = self.st.node_dataframes['Combo 1']
+
+            dfw = df[df['name']=='wall']
+            dff = df[df['name']=='free']
+
+            self.subtest_assert_near(float(dfw['rxfx']), -3000)
+            self.subtest_assert_near(float(dfw['rxmz']), 15000)
+            self.subtest_assert_near(float(dfw['dx']), 0)
+            
+            self.subtest_assert_near(float(dff['dx']), 0.0076)
+            self.subtest_assert_near(float(dff['rxfx']), 0)
+            self.subtest_assert_near(float(dff['rxmz']), 0)
+
+            stress_obj = self.bm.get_stress_at(0,'Combo 1')
+            stress_obj.plot_stress_vm()
+
+
+        def subtest_assert_near( self, value, truth, pct=0.025):
+            with self.subTest():
+                self.assertAlmostEqual( value, truth, delta = abs(truth*pct))
+
+
+    class test_truss(unittest.TestCase):
+        #Match this example, no beam stresses
+        #https://engineeringlibrary.org/reference/trusses-air-force-stress-manual
+
+        def setUp(self):
+
+            self.st = Structure(name = 'truss')
+            self.st.add_node('A',0,0,0)
+            self.st.add_node('B',15,30* sqrt(3) / 2,0)
+            self.st.add_node('C',45,30* sqrt(3) / 2,0)
+            self.st.add_node('D',75,30* sqrt(3) / 2,0)
+            self.st.add_node('E',90,0,0)
+            self.st.add_node('F',60,0,0)
+            self.st.add_node('G',30,0,0)
+
+            pairs = set()
+            Lmin = 30 * sqrt(3) / 2
+            Lmax = 30.1
+
+            for n1 in self.st.nodes.values():
+                for n2 in self.st.nodes.values():
+                    
+                    L = numpy.sqrt((n1.X - n2.X)**2.0 + (n1.Y - n2.Y)**2.0 + (n1.Z - n2.Z)**2.0)
+
+                    if L >= Lmin and L <= Lmax and (n1.Name,n2.Name) not in pairs and (n2.Name,n1.Name) not in pairs:
+                        #print(f'adding {(n1.Name,n2.Name)}')
+                        pairs.add((n1.Name,n2.Name))
+                    
+                    elif (n1.Name,n2.Name) in pairs or (n2.Name,n1.Name) in pairs:
+                        pass
+                        #print(f'skipping {(n1.Name,n2.Name)}, already in pairs')
+
+            self.beam = sections.RectangularSection(0.5,0.5)
+            
+
+            constrained = ('A','E')
+            for n1,n2 in pairs:
+                bkey = f'{n1}_{n2}'
+                self.bm = self.st.add_member(bkey,n1,n2,material = ANSI_4130(), section = self.beam )
+                
+
+                # if n1 not in constrained:
+                #     print(f'releasing {bkey}')
+                #     self.st.frame.DefineReleases(bkey, Rzi=True)
+
+                # if n2 not in constrained:
+                #     print(f'releasing {bkey} J')
+                #     self.st.frame.DefineReleases(bkey, Rzj=True)
+
+
+
+            self.st.add_constraint('A',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
+            self.st.add_constraint('E',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
+            for node in self.st.nodes:
+                self.st.frame.DefineSupport(node,SupportDZ=True,SupportRZ=True)
+                
+            self.st.frame.AddNodeLoad('F','FY',-1000)
+            self.st.frame.AddNodeLoad('G','FY',-2000)
+
+            self.st.analyze(check_statics=True)
+
+            print(self.st.node_dataframes)
+
+        def test_reactions(self):
+
+            df = self.st.node_dataframes['Combo 1']
+
+            dfa = df[df['name']=='A']
+            dfe = df[df['name']=='E']
+
+            self.subtest_assert_near(float(dfa['rxfy']), 1667)
+            self.subtest_assert_near(float(dfe['rxfy']), 1333)
+            
+            self.subtest_member('A','B','max_axial',1925)
+            self.subtest_member('A','G','max_axial',-926)
+            self.subtest_member('B','C','max_axial',1925)
+            self.subtest_member('B','G','max_axial',-1925)
+            self.subtest_member('C','D','max_axial',1541)
+            self.subtest_member('F','G','max_axial',-1734)
+            self.subtest_member('C','F','max_axial',382)
+            self.subtest_member('C','G','max_axial',-382)
+            self.subtest_member('C','G','max_axial',1541)
+            self.subtest_member('D','F','max_axial',-1541)
+            self.subtest_member('E','F','max_axial',-770)
+            
+            #Visualization.RenderModel( self.st.frame )
+
+        def subtest_member(self,nodea,nodeb,result_key,truth,pct=0.025):
+            key_1 = f'{nodea}_{nodeb}'
+            key_2 = f'{nodeb}_{nodea}'
+            
+            if key_1 in self.st.beams:
+                key = key_1
+            elif key_2 in self.st.beams:
+                key = key_2
+            else:
+                raise
+
+            value = self.get_member_result(nodea,nodeb,result_key)
+            dopasst = abs(value-truth) <= abs(truth)*pct
+
+            if not dopasst:
+                print(f'fails {key} {result_key}| {value:3.5f} == {truth:3.5f}?')
+            self.subtest_assert_near(value,truth,pct=pct)
+
+
+        def subtest_assert_near( self, value, truth, pct=0.025):
+            with self.subTest():
+                self.assertAlmostEqual( value, truth, delta = abs(truth*pct))
+            
+        
+        def get_member_result(self,nodea,nodeb,result_key):
+            key_1 = f'{nodea}_{nodeb}'
+            key_2 = f'{nodeb}_{nodea}'
+
+            if key_1 in self.st.beams:
+                mem = self.st.beams[key_1]
+                if result_key in mem.results:
+                    return float(mem.results[result_key])
+            
+            elif key_2 in self.st.beams:
+                mem = self.st.beams[key_2]
+                if result_key in mem.results:
+                    return float(mem.results[result_key])
+                
+            return numpy.nan #shouod fail, nan is not comparable
+
+            
+
+    unittest.main()
 
 
     # tst = Structure(name = 'tetst')
@@ -347,39 +649,6 @@ if __name__ == '__main__':
 
     #Result Checked Against
     #https://www.engineeringtoolbox.com/cantilever-beams-d_1848.html
-
-    st = Structure(name = 'cantilever_beam')
-    st.add_node('wall',0,0,0)
-    st.add_node('free',0,5,0)
-
-    ibeam = sections.ISection(0.3072,0.1243,0.0121,0.008,0.0089,4)
-    #ibeam = sections.RectangularSection(1,0.2)
-    bm = st.add_member('mem','wall','free',material = Aluminum(), section = ibeam )
-
-
-    #bm = st.add_member_with('top','wall','free',E=200E9,G=75E9,Ix=8196,Iy=8196,J=8196,A=0.053)
-
-    st.add_constraint('wall',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
-    st.frame.AddNodeLoad('free','FY',3000)
-
-    # st.frame.DefineReleases('mem', False, False, False, False, True, True, \
-    #                         False, False, False, False, True, True)
-
-    st.analyze(check_statics=True)
-
-    print(bm.results())
-    #st.visulize()
-
-
-
-
-
-
-
-
-
-
-
 
 
 
