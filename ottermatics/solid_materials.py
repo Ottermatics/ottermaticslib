@@ -1,8 +1,12 @@
 from ottermatics.configuration import Configuration, otterize
 from ottermatics.patterns import inst_vectorize
 
+import matplotlib
+import random
 import attr
 import numpy
+
+from sectionproperties.pre.pre import Material
 
 ALL_MATERIALS = []
 METALS = []
@@ -10,19 +14,25 @@ PLASTICS = []
 CERAMICS = []
 
 
+CMAP = matplotlib.cm.get_cmap('viridis')
+def random_color():
+    return CMAP(random.randint(0,255))
+
+
 @otterize
-class SolidMaterial(Configuration):
+class SolidMaterial(Configuration,Material):
     '''A class to hold physical properties of solid structural materials'''
     name = attr.ib(default='solid material')
+    color = attr.ib(factory=random_color)
 
     #Structural Properties
     density = attr.ib(default=1.0)
-    modulus_of_elasticity = attr.ib(default=1E8) #Pa
-    tensile_strength_yield = attr.ib(default=1E6) #Pa
+    elastic_modulus  = attr.ib(default=1E8) #Pa
+    yield_strength  = attr.ib(default=1E6) #Pa
     tensile_strength_ultimate = attr.ib(default=2E6) #Pa
     hardness = attr.ib(default=10) #rockwell
     izod = attr.ib(default=100)
-    poisson_ratio = attr.ib(default=0.30)
+    poissons_ratio = attr.ib(default=0.30)
 
     #Thermal Properties
     melting_point = attr.ib(default=1000+273) #K
@@ -42,19 +52,23 @@ class SolidMaterial(Configuration):
 
     @property
     def E(self):
-        return self.modulus_of_elasticity
+        return self.elastic_modulus 
 
     @property
     def G(self):
+        return self.shear_modulus
+
+    @property
+    def shear_modulus(self):
         '''Shear Modulus'''
-        return self.E / (2.0*(1+self.poisson_ratio))
+        return self.E / (2.0*(1+self.poissons_ratio))
 
     @property
     def rho(self):
         return self.density
     @property
     def yield_stress(self):
-        return self.tensile_strength_yield
+        return self.yield_strength 
     @property
     def ultimate_stress(self):
         return self.tensile_strength_ultimate
@@ -79,10 +93,10 @@ class SS_316(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=8000.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=193E9) #Pa
-    tensile_strength_yield = attr.ib(default=240E6) #Pa
+    elastic_modulus  = attr.ib(default=193E9) #Pa
+    yield_strength  = attr.ib(default=240E6) #Pa
     tensile_strength_ultimate = attr.ib(default=550E6) #Pa
-    poisson_ratio = attr.ib(default=0.30)
+    poissons_ratio = attr.ib(default=0.30)
 
     #Thermal Properties
     melting_point = attr.ib(default=1370+273) #K
@@ -104,10 +118,10 @@ class ANSI_4130(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=7872.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=205E9) #Pa
-    tensile_strength_yield = attr.ib(default=460E6) #Pa
+    elastic_modulus  = attr.ib(default=205E9) #Pa
+    yield_strength  = attr.ib(default=460E6) #Pa
     tensile_strength_ultimate = attr.ib(default=560E6) #Pa
-    poisson_ratio = attr.ib(default=0.28)
+    poissons_ratio = attr.ib(default=0.28)
 
     #Thermal Properties
     melting_point = attr.ib(default=1432+273) #K
@@ -129,10 +143,10 @@ class ANSI_4340(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=7872.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=192E9) #Pa
-    tensile_strength_yield = attr.ib(default=470E6) #Pa
+    elastic_modulus  = attr.ib(default=192E9) #Pa
+    yield_strength  = attr.ib(default=470E6) #Pa
     tensile_strength_ultimate = attr.ib(default=745E6) #Pa
-    poisson_ratio = attr.ib(default=0.28)
+    poissons_ratio = attr.ib(default=0.28)
 
     #Thermal Properties
     melting_point = attr.ib(default=1427+273) #K
@@ -155,10 +169,10 @@ class Aluminum(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=2680.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=70.3E9) #Pa
-    tensile_strength_yield = attr.ib(default=86E6) #Pa
+    elastic_modulus  = attr.ib(default=70.3E9) #Pa
+    yield_strength  = attr.ib(default=86E6) #Pa
     tensile_strength_ultimate = attr.ib(default=193E6) #Pa
-    poisson_ratio = attr.ib(default=0.33)
+    poissons_ratio = attr.ib(default=0.33)
 
     #Thermal Properties
     melting_point = attr.ib(default=607+273) #K
@@ -180,10 +194,10 @@ class DrySoil(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=1600.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=70.3E9) #Pa
-    tensile_strength_yield = attr.ib(default=0.0) #Pa
+    elastic_modulus  = attr.ib(default=70.3E9) #Pa
+    yield_strength  = attr.ib(default=0.0) #Pa
     tensile_strength_ultimate = attr.ib(default=0.0) #Pa
-    poisson_ratio = attr.ib(default=0.33)
+    poissons_ratio = attr.ib(default=0.33)
 
     #Thermal Properties
     melting_point = attr.ib(default=1550+273) #K
@@ -204,10 +218,10 @@ class WetSoil(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=2080.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=70.3E9) #Pa
-    tensile_strength_yield = attr.ib(default=0.0) #Pa
+    elastic_modulus  = attr.ib(default=70.3E9) #Pa
+    yield_strength  = attr.ib(default=0.0) #Pa
     tensile_strength_ultimate = attr.ib(default=0.0) #Pa
-    poisson_ratio = attr.ib(default=0.33)
+    poissons_ratio = attr.ib(default=0.33)
 
     #Thermal Properties
     melting_point = attr.ib(default=1550+273) #K
@@ -229,10 +243,10 @@ class Rubber(SolidMaterial):
 
     #Structural Properties
     density = attr.ib(default=1100.0) #kg/m3
-    modulus_of_elasticity = attr.ib(default=0.1E9) #Pa
-    tensile_strength_yield = attr.ib(default=0.248E6) #Pa
+    elastic_modulus  = attr.ib(default=0.1E9) #Pa
+    yield_strength  = attr.ib(default=0.248E6) #Pa
     tensile_strength_ultimate = attr.ib(default=0.5E6) #Pa
-    poisson_ratio = attr.ib(default=0.33)
+    poissons_ratio = attr.ib(default=0.33)
 
     #Thermal Properties
     melting_point = attr.ib(default=600+273) #K
@@ -254,10 +268,10 @@ class Rubber(SolidMaterial):
 
 #     #Structural Properties
 #     density = attr.ib(default=2700.0) #kg/m3
-#     modulus_of_elasticity = attr.ib(default=192E9) #Pa
+#     elastic_modulus  = attr.ib(default=192E9) #Pa
 #     tensile_strength_yield = attr.ib(default=470E6) #Pa
 #     tensile_strength_ultimate = attr.ib(default=745E6) #Pa
-#     poisson_ratio = attr.ib(default=0.28)
+#     poissons_ratio = attr.ib(default=0.28)
 
 #     #Thermal Properties
 #     melting_point = attr.ib(default=1427+273) #K
@@ -279,10 +293,10 @@ class Rubber(SolidMaterial):
 
 #     #Structural Properties
 #     density = attr.ib(default=2700.0) #kg/m3
-#     modulus_of_elasticity = attr.ib(default=192E9) #Pa
+#     elastic_modulus  = attr.ib(default=192E9) #Pa
 #     tensile_strength_yield = attr.ib(default=470E6) #Pa
 #     tensile_strength_ultimate = attr.ib(default=745E6) #Pa
-#     poisson_ratio = attr.ib(default=0.28)
+#     poissons_ratio = attr.ib(default=0.28)
 
 #     #Thermal Properties
 #     melting_point = attr.ib(default=1427+273) #K
@@ -296,3 +310,9 @@ class Rubber(SolidMaterial):
 
 #     #Economic Properties
 #     cost_per_kg = attr.ib(default=1.90) #dollar per kg            
+
+
+
+
+
+ALL_MATERIALS = [mat for k,mat in locals().items() if type(mat) is type and issubclass(mat,SolidMaterial)]

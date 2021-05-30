@@ -23,11 +23,15 @@ pandas.set_option('use_inf_as_na', True)
 
 #Type Checking
 NUMERIC_TYPES = (float,int)
+NUMERIC_NAN_TYPES = (float,int,type(None))
 STR_TYPES = (str,)
 TABLE_TYPES = (int,float,str,type(None))
 
 def NUMERIC_VALIDATOR():
     return attr.validators.instance_of(NUMERIC_TYPES)
+
+def NUMERIC_NAN_VALIDATOR():
+    return attr.validators.instance_of(NUMERIC_NAN_TYPES)
 
 def STR_VALIDATOR():
     return attr.validators.instance_of(STR_TYPES)

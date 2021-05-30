@@ -8,6 +8,7 @@ watchgod
 dropbox
 diskcache
 dearpygui
+vtk
 numpy
 scipy
 matplotlib
@@ -16,13 +17,17 @@ qtconsole
 pandas
 scikit-learn
 croniter
+sectionproperties==1.0.8
+PyNiteFEA==0.0.30
 Twisted
 aioice
 aiohttp
 treq
+service-identity
 sqlalchemy
 sqlalchemy_utils
 psycopg2
+sqlalchemy-batch-inserts==0.0.4
 sphinx==3.2.1
 pygsheets
 pydrive2==1.8.1

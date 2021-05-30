@@ -15,6 +15,7 @@ ottermatics/plotting.py
 ottermatics/process.py
 ottermatics/reporting.py
 ottermatics/solid_materials.py
+ottermatics/structure.py
 ottermatics/tabulation.py
 ottermatics/thermodynamics.py
 ottermatics.egg-info/PKG-INFO
