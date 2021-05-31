@@ -189,6 +189,54 @@ class Aluminum(SolidMaterial):
 
 
 @otterize
+class CarbonFiber(SolidMaterial):
+    name = attr.ib(default='carbon fiber')
+
+    #Structural Properties
+    density = attr.ib(default=1600.0) #kg/m3
+    elastic_modulus  = attr.ib(default=140E9) #Pa
+    yield_strength  = attr.ib(default=686E6) #Pa
+    tensile_strength_ultimate = attr.ib(default=919E6) #Pa
+    poissons_ratio = attr.ib(default=0.33)
+
+    #Thermal Properties
+    melting_point = attr.ib(default=300+273) #K
+    maxium_service_temp = attr.ib(default=150+273) #K
+    thermal_conductivity = attr.ib(default=250) #W/mK
+    specific_heat = attr.ib(default=1100) #J/kgK
+    thermal_expansion = attr.ib(default = 14.1E-6) #m/mK
+ 
+    #Electrical Properties
+    electrical_resistitivity = attr.ib(default=10000) #ohm-m
+
+    #Economic Properties
+    cost_per_kg = attr.ib(default=1.90) #dollar per kg    
+
+@otterize
+class Concrete(SolidMaterial):
+    name = attr.ib(default='concrete')
+
+    #Structural Properties
+    density = attr.ib(default=2000.0) #kg/m3
+    elastic_modulus  = attr.ib(default=2.92E9) #Pa
+    yield_strength  = attr.ib(default=57.9E6) #Pa
+    tensile_strength_ultimate = attr.ib(default=0.910E6) #Pa
+    poissons_ratio = attr.ib(default=0.26)
+
+    #Thermal Properties
+    melting_point = attr.ib(default=3000+273) #K
+    maxium_service_temp = attr.ib(default=3000+273) #K
+    thermal_conductivity = attr.ib(default=0.5) #W/mK
+    specific_heat = attr.ib(default=736) #J/kgK
+    thermal_expansion = attr.ib(default = 16.41E-6) #m/mK
+ 
+    #Electrical Properties
+    electrical_resistitivity = attr.ib(default=1E6) #ohm-m
+
+    #Economic Properties
+    cost_per_kg = attr.ib(default=95.44/1000.0) #dollar per kg  
+
+@otterize
 class DrySoil(SolidMaterial):
     name = attr.ib(default='dry soil')
 
@@ -207,7 +255,7 @@ class DrySoil(SolidMaterial):
     thermal_expansion = attr.ib(default = 16.41E-6) #m/mK
  
     #Electrical Properties
-    electrical_resistitivity = attr.ib(default=940.0) #ohm-m
+    electrical_resistitivity = attr.ib(default=1E6) #ohm-m
 
     #Economic Properties
     cost_per_kg = attr.ib(default=44.78/1000.0) #dollar per kg        
@@ -234,7 +282,31 @@ class WetSoil(SolidMaterial):
     electrical_resistitivity = attr.ib(default=940.0) #ohm-m
 
     #Economic Properties
-    cost_per_kg = attr.ib(default=34.44/1000.0) #dollar per kg   
+    cost_per_kg = attr.ib(default=34.44/1000.0) #dollar per kg  
+
+@otterize
+class Rock(SolidMaterial):
+    name = attr.ib(default='wet soil')
+
+    #Structural Properties
+    density = attr.ib(default=2600.0) #kg/m3
+    elastic_modulus  = attr.ib(default=67E9) #Pa
+    yield_strength  = attr.ib(default=13E6) #Pa
+    tensile_strength_ultimate = attr.ib(default=13E6) #Pa
+    poissons_ratio = attr.ib(default=0.26)
+
+    #Thermal Properties
+    melting_point = attr.ib(default=3000) #K
+    maxium_service_temp = attr.ib(default=3000) #K
+    thermal_conductivity = attr.ib(default=1.0) #W/mK
+    specific_heat = attr.ib(default=2000) #J/kgK
+    thermal_expansion = attr.ib(default = 16.41E-6) #m/mK
+ 
+    #Electrical Properties
+    electrical_resistitivity = attr.ib(default=1E6) #ohm-m
+
+    #Economic Properties
+    cost_per_kg = attr.ib(default=95.44/1000.0) #dollar per kg        
 
 
 @otterize
@@ -315,4 +387,4 @@ class Rubber(SolidMaterial):
 
 
 
-ALL_MATERIALS = [mat for k,mat in locals().items() if type(mat) is type and issubclass(mat,SolidMaterial)]
+ALL_MATERIALS = [mat for mat in locals() if type(mat) is type and issubclass(mat,SolidMaterial)]

@@ -10,7 +10,7 @@ from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component
 from ottermatics.analysis import Analysis
 from ottermatics.solid_materials import *
-
+import ottermatics.geometry as ottgeo
 
 import sectionproperties
 import sectionproperties.pre.sections as sections
@@ -20,6 +20,29 @@ import PyNite as pynite
 from PyNite import Visualization
 
 SECTIONS = {k:v for k,v in filter( lambda kv: issubclass(kv[1],sectionproperties.pre.sections.Geometry) if type(kv[1])  is type else False , sections.__dict__.items()) }
+
+
+
+
+
+
+def rotation_matrix_from_vectors(vec1, vec2):
+    """ Find the rotation matrix that aligns vec1 to vec2
+    :param vec1: A 3d "source" vector
+    :param vec2: A 3d "destination" vector
+    :return mat: A transform matrix (3x3) which when applied to vec1, aligns it with vec2.
+    """
+    a, b = (vec1 / numpy.linalg.norm(vec1)).reshape(3), (vec2 / numpy.linalg.norm(vec2)).reshape(3)
+    v = numpy.cross(a, b)
+    if any(v): #if not all zeros then 
+        c = numpy.dot(a, b)
+        s = numpy.linalg.norm(v)
+        kmat = numpy.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+        return numpy.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+
+    else:
+        return numpy.eye(3) #cross of all zeros only occurs on identical directions
+
 
 
 
@@ -41,6 +64,7 @@ class Structure(Analysis):
     def __on_init__(self):
         self.frame = pynite.FEModel3D()
         self._beams = {} #this is for us!
+        self.info('created structure...')
 
     @property
     def nodes(self):
@@ -57,14 +81,15 @@ class Structure(Analysis):
     def add_node(self,name,x,y,z):
         self.frame.AddNode(name,x,y,z)
 
-    def add_constraint(self,node,con_DX=False, con_DY=False, con_DZ=False, con_RX=False, con_RY=False, con_RZ=False):
-        self.frame.DefineSupport(node,con_DX, con_DY, con_DZ, con_RX, con_RY, con_RZ)
+    def add_constraint(self,node,**kwargs):
+        '''takes supportDZ / RZ in kwargs for D/R + X/Y/X '''
+        self.frame.DefineSupport(node,**kwargs)
 
-    def add_member(self,name,node1,node2,section,material):
+    def add_member(self,name,node1,node2,section,material,**kwargs):
         assert node1 in self.nodes 
         assert node2 in self.nodes
         
-        B = beam = Beam(self,name,material,section)
+        B = beam = Beam(self,name,material,section,**kwargs)
         self._beams[name] = beam
 
         self.frame.AddMember(name, node1, node2, B.E, B.G, B.Iy, B.Ix, B.J, B.A)
@@ -113,10 +138,19 @@ class Structure(Analysis):
             
             out[case] = pandas.DataFrame(rows)
         return out
-        
 
+    @property
+    def INERTIA(self):
+        '''Combines all the mass moments of inerita from the internal beams (and other future items!) into one for the sturcture with the parallel axis theorm'''
+        cg = self.cog
+        I = numpy.zeros((3,3))
 
+        for name,beam in self.beams.items():
+            self.debug(f'adding {name} inertia...')
+            I += beam.INERTIA 
 
+        return I
+         
 
 
 
@@ -127,7 +161,7 @@ class Beam(Component):
     structure = attr.ib() #parent structure, will be in its _beams
     name = attr.ib()
     material = attr.ib(validator=attr.validators.instance_of(SolidMaterial))
-    section = attr.ib(validator=attr.validators.instance_of((sectionproperties.pre.sections.Geometry,type(None))))
+    section = attr.ib(validator=attr.validators.instance_of((sectionproperties.pre.sections.Geometry,ottgeo.Profile2D,type(None))))
 
     mesh_size = attr.ib(default=3)
 
@@ -145,14 +179,61 @@ class Beam(Component):
     def __on_init__(self):
         self._skip_attr = ['mesh_size','in_Iy','in_Ix','in_J','in_A']
 
-        self.debug('determining section properties...')
-        if self.section is not None:
+        self.info('determining section properties...')
+        if isinstance(self.section,sectionproperties.pre.sections.Geometry) :
             self._mesh = self.section.create_mesh([self.mesh_size])
             self._section_properties = CrossSection(self.section, self._mesh) #no material here
             self._section_properties.calculate_geometric_properties()
             self._section_properties.calculate_warping_properties()
+
+        elif isinstance(self.section,ottgeo.Profile2D):
+            self._section_properties = self.section
+
         else:
             assert all([val is not None for val in (self.in_Iy,self.in_Ix,self.in_J,self.in_A)])
+
+    def apply_pt_load(self,gFx,gFy,gFz,x,case='Case 1'):
+        '''add a force in a global orientation'''
+
+        Fvec = numpy.array([gFx,gFy,gFz])
+
+        self.info(f'adding force vector {Fvec}')
+
+        Floc = self.RotationMatrix.T.dot(Fvec)
+        Flx = Floc[0]
+        Fly = Floc[1]
+        Flz = Floc[2]
+
+        for Fkey,Fval in [('Fx',Flx),('Fy',Fly),('Fz',Flz)]:
+            if Fval:
+                self.info(f'adding {Fkey}={Fval}')
+                self.structure.frame.AddMemberPtLoad(self.member.Name, Fkey, Fval, x)
+
+
+    def apply_distributed_load(self,gFx,gFy,gFz,start_factor=1,end_factor=1,case='Case 1'):
+        '''add forces in global vector'''
+        Fvec = numpy.array([gFx,gFy,gFz])
+        
+        self.info(f'adding force distribution {Fvec}')
+
+        Floc = self.RotationMatrix.T.dot(Fvec)
+        Flx = Floc[0]
+        Fly = Floc[1]
+        Flz = Floc[2]
+
+        for Fkey,Fval in [('Fx',Flx),('Fy',Fly),('Fz',Flz)]:
+            if Fval:
+                self.info(f'adding dist {Fkey}={Fval}')
+                self.structure.frame.AddMemberDistLoad(self.member.Name, Fkey, Fval*start_factor,Fval*end_factor,case=case)
+
+    def apply_gravity_force_distribution(self,sv=1,ev=1,case='Case 1'):
+        #TODO: ensure that integral of sv, ev is 1, and all positive
+        total_weight = self.mass * 9.81
+        self.apply_distributed_load(0,0,-total_weight,case=case)
+
+    def apply_gravity_force(self,x=0.5,case='Case 1'):
+        total_weight = self.mass * 9.81
+        self.apply_pt_load(0,0,-total_weight,x,case)
 
     @table_property
     def L(self):
@@ -190,7 +271,7 @@ class Beam(Component):
 
     @table_property
     def G(self):
-        return self.material.G        
+        return self.material.G      
 
     @functools.cached_property
     def ITensor(self):
@@ -204,19 +285,19 @@ class Beam(Component):
 
     @table_property
     def Iy(self):
-        if self.in_Iy is None:
+        if self.reverse_xy:
+            self.in_Iy = self.ITensor[0,0]
+        else:
             self.in_Iy = self.ITensor[1,1]
         return self.in_Iy
 
     @table_property
     def Ix(self):
-        if self.in_Ix is None:
+        if self.reverse_xy:
+            self.in_Ix = self.ITensor[1,1]
+        else:
             self.in_Ix = self.ITensor[0,0]
         return self.in_Ix
-
-    @table_property
-    def Ixy(self):
-        return self.ITensor[0,1]
 
     @table_property
     def J(self):
@@ -229,6 +310,49 @@ class Beam(Component):
         if self.in_A is None:
             self.in_A = self._section_properties.get_area()
         return self.in_A      
+
+    @table_property
+    def Ixy(self):
+        return self.ITensor[0,1]
+
+
+    @table_property
+    def Imx(self):
+        return self.material.density * self.Ix
+
+    @table_property
+    def Imy(self):
+        return self.material.density * self.Iy
+
+    @table_property
+    def Imxy(self):
+        return self.material.density * self.Ixy
+
+    @table_property
+    def Jm(self):
+        return self.material.density * self.J
+
+    @property
+    def LOCAL_INERTIA(self):
+        '''the mass inertia tensor in local frame'''
+        I_l = self.mass * self.L**2.0 / 12.0
+        return numpy.array([[I_l+self.Imx, self.Imxy,    0.0 ],
+                            [ self.Imxy, I_l + self.Imy, 0.0 ],
+                            [ 0.0      , 0.0           , self.Jm]
+                            ])
+
+    @property
+    def INERTIA(self):
+        '''the mass inertia tensor in global structure frame'''
+        return self.RotationMatrix.dot( self.LOCAL_INERTIA ) + self.CG_RELATIVE_INERTIA
+
+
+    @property
+    def CG_RELATIVE_INERTIA(self):
+        '''the mass inertia tensor in global frame'''
+        dcg = (self.cog - self.structure.cog)
+        return self.mass * numpy.eye(3) * dcg * dcg.T
+
 
     @functools.cached_property
     def Vol(self):
@@ -252,7 +376,24 @@ class Beam(Component):
 
     @functools.cached_property
     def centroid3d(self):
-        return (self.P2 -self.P1) / 2.0 + self.P1
+        return self.L_vec / 2.0 + self.P1
+
+    @functools.cached_property
+    def n_vec(self):
+        return self.L_vec / self.L
+    
+    @functools.cached_property
+    def L_vec(self):
+        return (self.P2 -self.P1)
+
+    @property
+    def cog(self):
+        return self.centroid3d
+
+    @functools.cached_property
+    def RotationMatrix(self):
+        n_o = [1,0,0] #n_vec is along Z, so we must tranlate from the along axis which is z
+        return rotation_matrix_from_vectors(n_o,self.n_vec)
 
     def section_results(self):
         return self._section_properties.display_results()
@@ -288,16 +429,20 @@ class Beam(Component):
         self.min_stress_xy = True
         return vt
 
+    @property
+    def reverse_xy(self):
+        if self.min_stress_xy is not None:
+            reverse_xy = self.min_stress_xy
+        else:
+            reverse_xy = False
+        return reverse_xy
 
     #TODO: Breakout other stress vectors
     def von_mises_stress_l(self,reverse_xy=None):
         '''Max von-mises stress'''
 
         if reverse_xy is None:
-            if self.min_stress_xy is not None:
-                reverse_xy = self.min_stress_xy
-            else:
-                reverse_xy = False
+            reverse_xy = self.reverse_xy
         
 
         out = {}
@@ -305,16 +450,7 @@ class Beam(Component):
 
             rows = []
             for i in numpy.linspace(0,1,11):
-                inp  = dict(N=self.member.Axial(i,combo),
-                            Vx=self.member.Shear('Fz' if not reverse_xy else 'Fy' ,i,combo),
-                            Vy=self.member.Shear('Fy' if not reverse_xy else 'Fz' ,i,combo),
-                            Mxx=self.member.Moment('Mz' if not reverse_xy else 'My',i,combo), 
-                            Myy=self.member.Moment( 'My' if not reverse_xy else 'Mz',i,combo), 
-                            M11=0, 
-                            M22=0, 
-                            Mzz=self.member.Torsion(i,combo) )
-                
-                sol = self._section_properties.calculate_stress(**inp)
+                sol = self.get_stress_at(i,combo,reverse_xy)
                 mat_stresses = sol.get_stress()
 
                 max_vm =  numpy.nanmax([numpy.nanmax(stresses['sig_vm']) for stresses in mat_stresses])
@@ -328,10 +464,7 @@ class Beam(Component):
         '''Max profile stress info along beam for each type'''
 
         if reverse_xy is None:
-            if self.min_stress_xy is not None:
-                reverse_xy = self.min_stress_xy
-            else:
-                reverse_xy = False
+            reverse_xy = self.reverse_xy
 
         out = {}
         for combo in self.structure.frame.LoadCombos:
@@ -349,14 +482,11 @@ class Beam(Component):
         
         return out
 
-    def get_stress_at(self,x,combo,reverse_xy=None):
+    def get_stress_at(self,x,combo='Combo 1',reverse_xy=None):
         '''gets stress at x, for load case combo'''
         
         if reverse_xy is None:
-            if self.min_stress_xy is not None:
-                reverse_xy = self.min_stress_xy
-            else:
-                reverse_xy = False        
+            reverse_xy = self.reverse_xy        
 
         inp  = dict(N=self.member.Axial(x,combo),
                     Vx=self.member.Shear('Fz' if not reverse_xy else 'Fy' ,x,combo),
@@ -438,8 +568,6 @@ class Beam(Component):
 
 
 
-
-
 if __name__ == '__main__':
 
     import unittest
@@ -458,7 +586,7 @@ if __name__ == '__main__':
             self.ibeam = sections.ISection(0.3072,0.1243,0.0121,0.008,0.0089,4)
             self.bm = self.st.add_member('mem','wall','free',material = ANSI_4130(), section = self.ibeam )
 
-            self.st.add_constraint('wall',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
+            self.st.add_constraint('wall',SupportDX=True, SupportDY=True, SupportDZ=True, SupportRY=True,SupportRX=True,SupportRZ=True)
             self.st.frame.AddNodeLoad('free','FX',3000)
 
             self.st.analyze(check_statics=True)
@@ -548,8 +676,8 @@ if __name__ == '__main__':
 
 
 
-            self.st.add_constraint('A',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
-            self.st.add_constraint('E',con_DX=True, con_DY=True, con_DZ=True, con_RY=True,con_RX=True,con_RZ=True)
+            self.st.add_constraint('A',SupportDX=True, SupportDY=True, SupportDZ=True, SupportRY=False,SupportRX=False,SupportRZ=True)
+            self.st.add_constraint('E',SupportDX=False, SupportDY=True, SupportDZ=True, SupportRY=False,SupportRX=False,SupportRZ=False)
             # for node in self.st.nodes:
             #     self.st.frame.DefineSupport(node,SupportDZ=True,SupportRZ=True)
                 
@@ -708,7 +836,7 @@ if __name__ == '__main__':
 #         rect = self.box_extents
 
 #         if m is None:
-#             m = np.zeros((y.size, x.size), dtype=bool)
+#             m = numpy.zeros((y.size, x.size), dtype=bool)
                 
 #         if not shp.intersects(rect):
 #             m[:] = False

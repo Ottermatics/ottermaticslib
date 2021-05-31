@@ -12,7 +12,7 @@ import pandas
 import os
 import inspect
 import pathlib
-
+import copy
 import matplotlib.pyplot as plt
 
 
@@ -184,6 +184,16 @@ class Configuration(LoggingMixin):
         '''lets pretend we're not playing with fire'''
         return self.__dict__
 
+    def __copy__(self):
+        newone = type(self)()
+        newone.__dict__.update(self.__dict__)
 
+        for name,item in self.__dict__.items():
+            if isinstance(item,Configuration):
+                newone.__dict__[name] = copy.copy(item)
+            if isinstance(item,(tuple,list,dict)):
+                newone.__dict__[name] = copy.copy(item)
+
+        return newone
 
 
