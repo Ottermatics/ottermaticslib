@@ -414,3 +414,38 @@ def inspect_serializability(
               "Ray developers on github.com/ray-project/ray/issues/",warning=True)
         _printer.print("=" * min(len(declaration), 80))
     return not found, _failure_set    
+
+
+import pickle
+
+def pickle_trick(obj, max_depth=10):
+    output = {}
+
+    if max_depth <= 0:
+        return output
+
+    try:
+        pickle.dumps(obj)
+    except (pickle.PicklingError, TypeError) as e:
+        failing_children = []
+        
+        if isinstance(obj, (list,tuple)):
+            for it in obj:
+                result = pickle_trick(v, max_depth=max_depth - 1)
+                if result:
+                    failing_children.append(result)        
+
+        elif hasattr(obj, "__dict__"):
+            for k, v in obj.__dict__.items():
+                result = pickle_trick(v, max_depth=max_depth - 1)
+                if result:
+                    failing_children.append(result)
+
+        output = {
+            "fail": obj, 
+            "err": e, 
+            "depth": max_depth, 
+            "failing_children": failing_children
+        }
+
+    return output

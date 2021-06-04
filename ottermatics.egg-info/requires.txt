@@ -8,6 +8,7 @@ watchgod
 dropbox
 diskcache
 dearpygui
+pyqt5
 vtk
 numpy
 scipy
@@ -19,6 +20,8 @@ scikit-learn
 croniter
 sectionproperties==1.0.8
 PyNiteFEA==0.0.30
+slycot==0.4.0
+control
 Twisted
 aioice
 aiohttp

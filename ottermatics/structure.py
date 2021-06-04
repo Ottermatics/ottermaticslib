@@ -10,6 +10,7 @@ from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component
 from ottermatics.analysis import Analysis
 from ottermatics.solid_materials import *
+from ottermatics.common import *
 import ottermatics.geometry as ottgeo
 
 import sectionproperties
@@ -48,7 +49,7 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 nonetype = type(None)
 
-#TODO: Make analysis, where each load case is a row
+#TODO: Make analysis, where each load case is a row, but how sytactically? 
 @otterize
 class Structure(Analysis):
     '''A integration between sectionproperties and PyNite, with a focus on ease of use
@@ -64,7 +65,7 @@ class Structure(Analysis):
     def __on_init__(self):
         self.frame = pynite.FEModel3D()
         self._beams = {} #this is for us!
-        self.info('created structure...')
+        self.debug('created structure...')
 
     @property
     def nodes(self):
@@ -117,7 +118,7 @@ class Structure(Analysis):
 
     @property
     def cog(self):
-        XM = sum([bm.mass * bm.centroid3d for bm in self.beams.values()])
+        XM = numpy.sum([bm.mass * bm.centroid3d for bm in self.beams.values()],axis=0)
         return XM / self.mass
 
     @property
@@ -151,6 +152,42 @@ class Structure(Analysis):
 
         return I
          
+    @property
+    def Fg(self):
+        '''force of gravity'''
+        return numpy.array([ 0, 0, -self.mass * g ])
+
+    def __getstate__(self):
+        self.info('removing meshs')
+        
+        self.data_row
+        data = self.__dict__.copy()
+        
+        new_beams = {}
+        if data['_beams']:
+            for bname,beam in data['_beams'].items():
+                new_beams[bname] = beam.__getstate__()
+            data['_beams'] = new_beams
+
+        return data
+
+
+    def __setstate__(self,data):
+        self.__dict__ = data
+        self.debug('setting mesh')
+        self.data_row
+        
+        if self._beams:
+            new_beams = {}
+            for bname,beam in self._beams.items():
+                new_beam = Beam(self,bname, material=beam['material'], section=beam['section'])
+                new_beam.__setstate__(beam)
+                new_beams[bname] = new_beam
+            self._beams = new_beams
+
+
+
+
 
 
 
@@ -177,36 +214,46 @@ class Beam(Component):
     min_stress_xy = None #set to true or false
 
     def __on_init__(self):
+        self.info('initalizing...')
         self._skip_attr = ['mesh_size','in_Iy','in_Ix','in_J','in_A']
 
-        self.info('determining section properties...')
-        if isinstance(self.section,sectionproperties.pre.sections.Geometry) :
-            self._mesh = self.section.create_mesh([self.mesh_size])
-            self._section_properties = CrossSection(self.section, self._mesh) #no material here
+        self.update_section(self.section)
+
+    def update_section(self,section):
+        self.section = section
+        
+        self.debug(f'determining {section} properties...')
+        if isinstance( self.section,sectionproperties.pre.sections.Geometry) :
+            self.debug(f'determining mesh {section} properties...')
+            mesh =  self.section.create_mesh([self.mesh_size])
+            self._section_properties = CrossSection( self.section, mesh) #no material here
             self._section_properties.calculate_geometric_properties()
             self._section_properties.calculate_warping_properties()
 
         elif isinstance(self.section,ottgeo.Profile2D):
-            self._section_properties = self.section
+            self.debug(f'determining profile {section} properties...')
+            self._section_properties =  self.section
 
         else:
-            assert all([val is not None for val in (self.in_Iy,self.in_Ix,self.in_J,self.in_A)])
+            self.debug(f'checking input values')
+            assert all([val is not None for val in (self.in_Iy,self.in_Ix,self.in_J,self.in_A)])  
+
 
     def apply_pt_load(self,gFx,gFy,gFz,x,case='Case 1'):
         '''add a force in a global orientation'''
 
         Fvec = numpy.array([gFx,gFy,gFz])
 
-        self.info(f'adding force vector {Fvec}')
+        self.debug(f'adding pt load {Fvec}')
 
-        Floc = self.RotationMatrix.T.dot(Fvec)
+        Floc = self.ReverseRotationMatrix.dot(Fvec)
         Flx = Floc[0]
         Fly = Floc[1]
         Flz = Floc[2]
 
         for Fkey,Fval in [('Fx',Flx),('Fy',Fly),('Fz',Flz)]:
             if Fval:
-                self.info(f'adding {Fkey}={Fval}')
+                self.debug(f'adding {Fkey}={Fval}')
                 self.structure.frame.AddMemberPtLoad(self.member.Name, Fkey, Fval, x)
 
 
@@ -214,16 +261,16 @@ class Beam(Component):
         '''add forces in global vector'''
         Fvec = numpy.array([gFx,gFy,gFz])
         
-        self.info(f'adding force distribution {Fvec}')
+        self.debug(f'adding force distribution {Fvec}')
 
-        Floc = self.RotationMatrix.T.dot(Fvec)
+        Floc = self.ReverseRotationMatrix.dot(Fvec)
         Flx = Floc[0]
         Fly = Floc[1]
         Flz = Floc[2]
 
         for Fkey,Fval in [('Fx',Flx),('Fy',Fly),('Fz',Flz)]:
             if Fval:
-                self.info(f'adding dist {Fkey}={Fval}')
+                self.debug(f'adding dist {Fkey}={Fval}')
                 self.structure.frame.AddMemberDistLoad(self.member.Name, Fkey, Fval*start_factor,Fval*end_factor,case=case)
 
     def apply_gravity_force_distribution(self,sv=1,ev=1,case='Case 1'):
@@ -241,27 +288,25 @@ class Beam(Component):
 
     @table_property
     def length(self):
-        if self._L is None:
-            self._L = self.member.L()
-        return self._L
+        return self.member.L()
 
     @property
     def member(self):
         return self.structure.members[self.name]
 
-    @functools.cached_property
+    @property
     def n1(self):
         return self.member.iNode
 
-    @functools.cached_property
+    @property
     def n2(self):
         return self.member.jNode
 
-    @functools.cached_property
+    @property
     def P1(self):
         return numpy.array([self.n1.X,self.n1.Y,self.n1.Z])
 
-    @functools.cached_property
+    @property
     def P2(self):
         return numpy.array([self.n2.X,self.n2.Y,self.n2.Z])
 
@@ -273,13 +318,12 @@ class Beam(Component):
     def G(self):
         return self.material.G      
 
-    @functools.cached_property
+    @property
     def ITensor(self):
-        if self._ITensor is None:
-            (ixx_c, iyy_c, ixy_c) = self._section_properties.get_ic()
-            _ITensor = [[ixx_c, ixy_c],
-                        [ixy_c, iyy_c]]
-            self._ITensor = numpy.array(_ITensor)
+        (ixx_c, iyy_c, ixy_c) = self._section_properties.get_ic()
+        _ITensor = [[ixx_c, ixy_c],
+                    [ixy_c, iyy_c]]
+        self._ITensor = numpy.array(_ITensor)
         return self._ITensor
             
 
@@ -301,15 +345,18 @@ class Beam(Component):
 
     @table_property
     def J(self):
-        if self.in_J is None:
-            self.in_J = self._section_properties.get_j()
-        return self.in_J
+        return self._section_properties.get_j()
 
     @table_property
     def A(self):
-        if self.in_A is None:
-            self.in_A = self._section_properties.get_area()
-        return self.in_A      
+        return self._section_properties.get_area()
+
+    @property
+    def Ao(self):
+        '''outside area, over ride for hallow sections'''
+        if isinstance(self.section,ottgeo.Profile2D):
+            return self.section.Ao
+        return self.A      
 
     @table_property
     def Ixy(self):
@@ -332,12 +379,16 @@ class Beam(Component):
     def Jm(self):
         return self.material.density * self.J
 
+    @table_property
+    def Imz(self):
+        return self.mass * self.L**2.0 / 12.0
+
     @property
     def LOCAL_INERTIA(self):
         '''the mass inertia tensor in local frame'''
-        I_l = self.mass * self.L**2.0 / 12.0
-        return numpy.array([[I_l+self.Imx, self.Imxy,    0.0 ],
-                            [ self.Imxy, I_l + self.Imy, 0.0 ],
+        
+        return numpy.array([[self.Imz+self.Imx, self.Imxy,    0.0 ],
+                            [ self.Imxy, self.Imz + self.Imy, 0.0 ],
                             [ 0.0      , 0.0           , self.Jm]
                             ])
 
@@ -354,35 +405,39 @@ class Beam(Component):
         return self.mass * numpy.eye(3) * dcg * dcg.T
 
 
-    @functools.cached_property
+    @property
     def Vol(self):
         return self.A * self.L
 
-    @functools.cached_property
+    @property
+    def Vol_outside(self):
+        return self.Ao * self.L               
+
+    @property
     def section_mass(self):
         return self.material.density * self.A
 
-    @functools.cached_property
+    @property
     def mass(self):
         return self.material.density * self.Vol
 
-    @functools.cached_property
+    @property
     def cost(self):
         return self.mass * self.material.cost_per_kg
 
-    @functools.cached_property
+    @property
     def centroid2d(self):
         return self._section_properties.get_c()
 
-    @functools.cached_property
+    @property
     def centroid3d(self):
         return self.L_vec / 2.0 + self.P1
 
-    @functools.cached_property
+    @property
     def n_vec(self):
         return self.L_vec / self.L
     
-    @functools.cached_property
+    @property
     def L_vec(self):
         return (self.P2 -self.P1)
 
@@ -390,10 +445,15 @@ class Beam(Component):
     def cog(self):
         return self.centroid3d
 
-    @functools.cached_property
+    @property
     def RotationMatrix(self):
         n_o = [1,0,0] #n_vec is along Z, so we must tranlate from the along axis which is z
         return rotation_matrix_from_vectors(n_o,self.n_vec)
+
+    @property
+    def ReverseRotationMatrix(self):
+        return self.RotationMatrix.T
+
 
     def section_results(self):
         return self._section_properties.display_results()
@@ -417,17 +477,17 @@ class Beam(Component):
                 new.append(numpy.nanmax( vm_stress_vec ))
 
             cmprv[rxy] = numpy.array(new)
+        if cmprv[True] and cmprv[False]:
+            vt = numpy.nanmax( cmprv[True] )
+            vf = numpy.nanmax( cmprv[False] )
 
-        vt = numpy.nanmax( cmprv[True] )
-        vf = numpy.nanmax( cmprv[False] )
+            #We choose the case with the 
+            if vf < vt:
+                self.min_stress_xy = False
+                return vf 
 
-        #We choose the case with the 
-        if vf < vt:
-            self.min_stress_xy = False
-            return vf 
-
-        self.min_stress_xy = True
-        return vt
+            self.min_stress_xy = True
+            return vt
 
     @property
     def reverse_xy(self):
@@ -449,7 +509,7 @@ class Beam(Component):
         for combo in self.structure.frame.LoadCombos:
 
             rows = []
-            for i in numpy.linspace(0,1,11):
+            for i in numpy.linspace(0,1,3):
                 sol = self.get_stress_at(i,combo,reverse_xy)
                 mat_stresses = sol.get_stress()
 
@@ -470,7 +530,7 @@ class Beam(Component):
         for combo in self.structure.frame.LoadCombos:
 
             rows = []
-            for i in numpy.linspace(0,1,11):
+            for i in numpy.linspace(0,1,3):
                 sol = self.get_stress_at(i,combo,reverse_xy)
                 mat_stresses = sol.get_stress()
                 oout = {'x':x}
@@ -499,7 +559,10 @@ class Beam(Component):
         
         return self._section_properties.calculate_stress(**inp)
 
-
+    @property
+    def Fg(self):
+        '''force of gravity'''
+        return numpy.array([ 0, 0, -self.mass * g ])
 
     @property
     def results(self):
@@ -537,9 +600,25 @@ class Beam(Component):
         return pandas.DataFrame(rows)
 
 
+    def __getstate__(self):
+        self.data_row
+        self.info('removing mesh')
+        data = self.__dict__.copy()
+        #data['_mesh'] = None
+        data.pop('_section_properties')#data['_section_properties'].mesh = None
+
+        #self.info(f'setting {data}')
+        return data
 
 
+    def __setstate__(self,data):
+        self.__dict__ = data
+        self.info('getting mesh')
+        #self.data_row
 
+        #data = self.__dict__.copy()
+        #data['_section_properties'].mesh = None
+        #return data
 
 
 

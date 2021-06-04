@@ -16,6 +16,11 @@ class Profile2D(Configuration):
         return 0
 
     @property
+    def Ao(self):
+        '''outside area, over ride for hallow sections'''
+        return self.A
+
+    @property
     def Ixx(self):
         return 0
 
@@ -46,7 +51,11 @@ class Profile2D(Configuration):
         self.info('mock section, no mesh to plot')
 
     def calculate_stress(self,N,Vx,Vy,Mxx,Myy,M11,M22,Mzz):
-        #TODO: Implement stress object
+        #TODO: Implement stress object, make fake mesh, and mock?
+        sigma_n = N/self.A
+        sigma_bx = self.Myy * self.max_y / self.Ixx
+        sigma_by = self.Mxx * self.max_x / self.Iyy
+
         return None
 
     def calculate_geometric_properties(self):
@@ -64,7 +73,7 @@ class Rectangle(Profile2D):
 
     @property
     def A(self):
-        return self.h * self.b
+        return self.h * self.b        
 
     @property
     def Ixx(self):
@@ -132,6 +141,11 @@ class HollowCircle(Profile2D):
     @property
     def di(self):
         return self.d - self.t * 2
+
+    @property
+    def Ao(self):
+        '''outside area, over ride for hallow sections'''
+        return (self.d**2.0) / 4.0 * numpy.pi     
 
     @property
     def A(self):
