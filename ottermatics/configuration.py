@@ -32,6 +32,8 @@ python syntax througout our application code. The concept of the 'otterize' deco
 Configuration class at the moment is sacred, they are nessicary together because the otterize
 handles runtime meta operatoins, while Configuration is more like a normal class. All you need to know
 how to do is use the 3rd party attr's libray. Sorry if you dont like it!
+
+This should allow alot more functionalty and standardization options than just pure subclassing as otterize can be significantly expanded
 '''
 
 
@@ -41,6 +43,7 @@ def property_changed(instance, variable, value):
     return value
 
 #This one should wrap all configuraitons to track changes, and special methods
+#TODO: Make this accept arguments in appication
 def otterize(cls,*args,**kwargs):
     '''Wrap all Configurations with this decorator with the following behavior
     1) we use the callback when any property changes
