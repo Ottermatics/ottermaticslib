@@ -17,12 +17,12 @@ def parse_requirements(filename):
 install_reqs = parse_requirements('requirements.txt')
 
 setup(name='ottermatics',
-      version='0.5',
+      version='0.6',
       description='The Ottermatic\'s Python Lib!',
       url='https://github.com/SoundsSerious/ottermaticslib',
-      author='Olly',
+      author='kevin russell',
       packages=["ottermatics"],
-      author_email='olly@ottermatics.com',
+      author_email='kevin@ottermatics.com',
       license='MIT',
       entry_points={
             'console_scripts': [

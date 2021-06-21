@@ -45,8 +45,6 @@ def rotation_matrix_from_vectors(vec1, vec2):
         return numpy.eye(3) #cross of all zeros only occurs on identical directions
 
 
-
-
 nonetype = type(None)
 
 #TODO: Make analysis, where each load case is a row, but how sytactically? 
@@ -90,10 +88,10 @@ class Structure(Analysis):
         assert node1 in self.nodes 
         assert node2 in self.nodes
         
-        B = beam = Beam(self,name,material,section,**kwargs)
-        self._beams[name] = beam
+        B = beam = Beam( self, name, material, section, **kwargs )
+        self._beams[ name ] = beam
 
-        self.frame.AddMember(name, node1, node2, B.E, B.G, B.Iy, B.Ix, B.J, B.A)
+        self.frame.AddMember( name, node1, node2, B.E, B.G, B.Iy, B.Ix, B.J, B.A )
 
         return beam
 
@@ -148,7 +146,7 @@ class Structure(Analysis):
 
         for name,beam in self.beams.items():
             self.debug(f'adding {name} inertia...')
-            I += beam.INERTIA 
+            I += beam.GLOBAL_INERTIA 
 
         return I
          
@@ -275,10 +273,12 @@ class Beam(Component):
 
     def apply_gravity_force_distribution(self,sv=1,ev=1,case='Case 1'):
         #TODO: ensure that integral of sv, ev is 1, and all positive
+        #FIXME: Ensure that this is the correct orientation
         total_weight = self.mass * 9.81
         self.apply_distributed_load(0,0,-total_weight,case=case)
 
     def apply_gravity_force(self,x=0.5,case='Case 1'):
+        #FIXME: Ensure that this is the correct orientation
         total_weight = self.mass * 9.81
         self.apply_pt_load(0,0,-total_weight,x,case)
 
@@ -384,18 +384,33 @@ class Beam(Component):
         return self.mass * self.L**2.0 / 12.0
 
     @property
+    def Iz(self):
+        '''Outside area inertia on z'''
+        return self.A * self.L**2.0 / 12.0
+
+    @property
+    def Izo(self):
+        '''Outside area inertia on z'''
+        return self.Ao * self.L**2.0 / 12.0
+
+    @property
     def LOCAL_INERTIA(self):
         '''the mass inertia tensor in local frame'''
-        
-        return numpy.array([[self.Imz+self.Imx, self.Imxy,    0.0 ],
-                            [ self.Imxy, self.Imz + self.Imy, 0.0 ],
-                            [ 0.0      , 0.0           , self.Jm]
-                            ])
+        return numpy.array([[self.Imz+self.Imx, self.Imxy          , 0.0 ],
+                            [ self.Imxy       , self.Imz + self.Imy, 0.0 ],
+                            [ 0.0             , 0.0                , self.Jm]
+                            ])                  
 
     @property
     def INERTIA(self):
         '''the mass inertia tensor in global structure frame'''
-        return self.RotationMatrix.dot( self.LOCAL_INERTIA ) + self.CG_RELATIVE_INERTIA
+        #TODO: include rotation from beam uv vector frame? is it ok already?
+        return self.RotationMatrix.dot( self.LOCAL_INERTIA ) 
+        
+    @property
+    def GLOBAL_INERTIA(self):
+        '''Returns the rotated inertia matrix with structure relative parallal axis contribution'''
+        return self.INERTIA + self.CG_RELATIVE_INERTIA
 
 
     @property
@@ -447,11 +462,13 @@ class Beam(Component):
 
     @property
     def RotationMatrix(self):
+        #FIXME: Ensure that this is the correct orientation
         n_o = [1,0,0] #n_vec is along Z, so we must tranlate from the along axis which is z
         return rotation_matrix_from_vectors(n_o,self.n_vec)
 
     @property
     def ReverseRotationMatrix(self):
+        #FIXME: Ensure that this is the correct orientation
         return self.RotationMatrix.T
 
 

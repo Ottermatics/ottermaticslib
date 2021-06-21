@@ -213,7 +213,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
     @property
     def current_keys(self):
-        has_new_keys = self.expire()
+        has_new_keys = self.expire() #will be updated locally max every 60s
         if has_new_keys or self._current_keys is None:
             self._current_keys =  set(list(self.cache))
 
@@ -241,10 +241,11 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
     to get the active instance use DBConnection.instance(**non_default_connection_args)
-    
-    TODO: Make Threadsafe W/ ThreadPoolExecutor!'''
+    '''
+    #TODO: Make Threadsafe W/ ThreadPoolExecutor!
 
-    _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}"
+    _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}" #we love postgres!
+
     pool_size=20
     max_overflow=0
     echo=False

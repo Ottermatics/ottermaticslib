@@ -21,7 +21,7 @@ croniter
 sectionproperties==1.0.8
 PyNiteFEA==0.0.30
 slycot==0.4.0
-control
+control==0.9.0
 Twisted
 aioice
 aiohttp

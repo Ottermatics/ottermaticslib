@@ -37,7 +37,7 @@ class Component(TabulationMixin):
         self.reset_table()
         self._stored_plots = []
         self.index = 0
-        for config in self.internal_configurations.values():
+        for config in self.internal_components.values():
             config.reset_data()                   
 
     #Plotting & Report Methods:
@@ -128,6 +128,14 @@ class Component(TabulationMixin):
 
         return list(set([ comp.__class__ for lvl, comp in self.go_through_components() \
                                                         if not self.__class__ is comp.__class__ ]))
+
+
+
+
+
+
+
+
 
 
 

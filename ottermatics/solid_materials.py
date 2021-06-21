@@ -5,6 +5,8 @@ import matplotlib
 import random
 import attr
 import numpy
+import inspect
+import sys
 
 from sectionproperties.pre.pre import Material
 
@@ -387,4 +389,4 @@ class Rubber(SolidMaterial):
 
 
 
-ALL_MATERIALS = [mat for mat in locals() if type(mat) is type and issubclass(mat,SolidMaterial)]
+ALL_MATERIALS = [mat for name,mat in inspect.getmembers(sys.modules[__name__]) if inspect.isclass(mat) and issubclass(mat,SolidMaterial) and mat is not SolidMaterial ]

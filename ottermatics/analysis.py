@@ -101,6 +101,8 @@ class Analysis(Component):
                 self.save_data()
                 self._solved = True
                 return output
+            
+            #TODO: Add a ODE simulation analysis strategy
 
         else:
             raise Exception('Analysis Already Solved')            

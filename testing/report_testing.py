@@ -21,7 +21,7 @@ class TestComponent(Component):
     val = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
 
 
-    has_random_properties = True
+    always_save_data = True
 
     @table_property
     def synthetic_val(self):
@@ -54,7 +54,7 @@ class OtherComponent(Component):
         wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
         more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
 
-    has_random_properties = True
+    always_save_data = True
 
     @table_property
     def random_val(self):
@@ -76,7 +76,7 @@ if suprise:
         #wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
         #more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
 
-        has_random_properties = True
+        always_save_data = True
 
         @table_property
         def negative_random_val(self):
@@ -96,7 +96,7 @@ class TestAnalysis(Analysis):
     
     mode = 'iterator'
     iterator = attr.ib(factory = lambda: list(range(10)))
-    has_random_properties = True
+    always_save_data = True
 
     @table_property
     def internal_val(self):
