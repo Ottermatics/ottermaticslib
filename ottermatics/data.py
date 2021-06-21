@@ -140,14 +140,16 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     def __init__(self,**kwargs):
         if kwargs:
             self.cache_init_kwargs = kwargs
+        else:
+            self.cache_init_kwargs = {}
         self.info(f'Created DiskCacheStore In {self.cache_root}')
 
     @property
     def cache_root(self):
         #TODO: CHECK CACHE IS NOT SYNCED TO DROPBOX
         if self.alt_path is not None:
-            return os.path.join(client_path(skip_wsl=False), 'cache' , self.alt_path)
-        return os.path.join(client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower())
+            return os.path.join( client_path(skip_wsl=False) , 'cache' , self.alt_path)
+        return os.path.join( client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower() )
     
     @property
     def cache(self):
@@ -163,6 +165,8 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         :param expire: time in seconds to expire the data
         '''
         if ttl is None: ttl = self.retries #onstart
+        self.last_expire = None
+        
         try:        
             with self.cache as ch:
                 ch.set(key,data,retry=retry,**kwargs)
