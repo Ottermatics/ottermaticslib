@@ -154,7 +154,9 @@ class ClientInfoMixin(LoggingMixin):
     def drive(self):
         '''wrapper for private OtterDrive Instance'''
         if self._drive is None:
-            raise GCloudNotEnabled('use self.enable_cloud_sync(...) to configure an OtterDrive')
+            #raise GCloudNotEnabled('use self.enable_cloud_sync(...) to configure an OtterDrive')
+            self.warning('use self.enable_cloud_sync(...) to configure an OtterDrive')
+            
         return self._drive
     
     def ensure_path(self,path):

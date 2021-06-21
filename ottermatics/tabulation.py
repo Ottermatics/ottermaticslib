@@ -23,11 +23,15 @@ pandas.set_option('use_inf_as_na', True)
 
 #Type Checking
 NUMERIC_TYPES = (float,int)
+NUMERIC_NAN_TYPES = (float,int,type(None))
 STR_TYPES = (str,)
 TABLE_TYPES = (int,float,str,type(None))
 
 def NUMERIC_VALIDATOR():
     return attr.validators.instance_of(NUMERIC_TYPES)
+
+def NUMERIC_NAN_VALIDATOR():
+    return attr.validators.instance_of(NUMERIC_NAN_TYPES)
 
 def STR_VALIDATOR():
     return attr.validators.instance_of(STR_TYPES)
@@ -127,7 +131,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     index = 0 #Not an attr on purpose, we want pandas to provide the index
 
     #yours to implement
-    has_random_properties = False
+    always_save_data = False
     skip_plot_vars = []
     _skip_attr = None
     
@@ -163,30 +167,40 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     _joined_dataframe= None
 
     #Data Tabulation - Intelligent Lookups
-    def save_data(self,index=None):
+    def save_data(self,index=None,saved=None, force = False):
         '''We'll save data for this object and any other internal configuration if 
         anything changed or if the table is empty This should result in at least one row of data, 
         or minimal number of rows to track changes
-        
         This should capture all changes but save data'''
-        if self.anything_changed or not self.TABLE:
+
+        if saved is None:
+            saved = set()
+        
+
+        if self.anything_changed or not self.TABLE or force:
             self.TABLE.append(self.data_dict)
             self.debug('saving data {}'.format(self.index))
+            saved.add(self)    
 
             if index is not None: #only set this after we check if anything changed
                 self.index = index
             else:
                 self.index += 1
             
-        for config in self.internal_configurations.values():
-            config.save_data(index)
+            
+        for config in self.internal_components.values():
+            if config not in saved:
+                config.save_data(index, saved=saved)
+            else:
+                self.debug(f'skipping saved config {config.identity}')
+
         self._anything_changed = False
 
     @property
     def anything_changed(self):
         '''use the on_setattr method to determine if anything changed, 
         also assume that stat_tab could change without input changes'''
-        if self._anything_changed or self.has_random_properties:
+        if self._anything_changed or self.always_save_data:
             return True
         return False        
 
@@ -744,7 +758,7 @@ if __name__ == '__main__':
 
         attrs_prop = attr.ib(1.0)
         attrs_str = attr.ib('hey now')
-        has_random_properties = True
+        always_save_data = True
 
         @table_property
         def test_one(self):

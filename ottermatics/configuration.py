@@ -12,7 +12,7 @@ import pandas
 import os
 import inspect
 import pathlib
-
+import copy
 import matplotlib.pyplot as plt
 
 
@@ -45,10 +45,11 @@ def property_changed(instance, variable, value):
 #This one should wrap all configuraitons to track changes, and special methods
 #TODO: Make this accept arguments in appication
 def otterize(cls,*args,**kwargs):
-    '''Wrap all Configurations with this decorator
-    
-    It might be nice to use all the attrs magic methods but hash requires frozen for automation, not clear what the best config is'''
-    acls = attr.s(cls, on_setattr= property_changed, eq=False,repr=False,hash=False,frozen=False, *args,**kwargs)
+    '''Wrap all Configurations with this decorator with the following behavior
+    1) we use the callback when any property changes
+    2) repr is default
+    3) hash is by object identity'''
+    acls = attr.s(cls, on_setattr= property_changed, repr=False,eq=False, *args,**kwargs)
     return acls                                        
 
     
@@ -189,6 +190,16 @@ class Configuration(LoggingMixin):
         '''lets pretend we're not playing with fire'''
         return self.__dict__
 
+    def __copy__(self):
+        newone = type(self)()
+        newone.__dict__.update(self.__dict__)
 
+        for name,item in self.__dict__.items():
+            if isinstance(item,Configuration):
+                newone.__dict__[name] = copy.copy(item)
+            if isinstance(item,(tuple,list,dict)):
+                newone.__dict__[name] = copy.copy(item)
+
+        return newone
 
 

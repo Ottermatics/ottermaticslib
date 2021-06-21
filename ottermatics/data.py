@@ -140,14 +140,16 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
     def __init__(self,**kwargs):
         if kwargs:
             self.cache_init_kwargs = kwargs
+        else:
+            self.cache_init_kwargs = {}
         self.info(f'Created DiskCacheStore In {self.cache_root}')
 
     @property
     def cache_root(self):
         #TODO: CHECK CACHE IS NOT SYNCED TO DROPBOX
         if self.alt_path is not None:
-            return os.path.join(client_path(skip_wsl=False), 'cache' , self.alt_path)
-        return os.path.join(client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower())
+            return os.path.join( client_path(skip_wsl=False) , 'cache' , self.alt_path)
+        return os.path.join( client_path(skip_wsl=False), 'cache' , '{}'.format(type(self).__name__).lower() )
     
     @property
     def cache(self):
@@ -163,6 +165,8 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         :param expire: time in seconds to expire the data
         '''
         if ttl is None: ttl = self.retries #onstart
+        self.last_expire = None
+        
         try:        
             with self.cache as ch:
                 ch.set(key,data,retry=retry,**kwargs)
@@ -213,7 +217,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 
     @property
     def current_keys(self):
-        has_new_keys = self.expire()
+        has_new_keys = self.expire() #will be updated locally max every 60s
         if has_new_keys or self._current_keys is None:
             self._current_keys =  set(list(self.cache))
 
@@ -241,10 +245,11 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
 class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
     '''A database singleton that is thread safe and pickleable (serializable)
     to get the active instance use DBConnection.instance(**non_default_connection_args)
-    
-    TODO: Make Threadsafe W/ ThreadPoolExecutor!'''
+    '''
+    #TODO: Make Threadsafe W/ ThreadPoolExecutor!
 
-    _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}"
+    _connection_template =  "postgresql://{user}:{passd}@{host}:{port}/{database}" #we love postgres!
+
     pool_size=20
     max_overflow=0
     echo=False

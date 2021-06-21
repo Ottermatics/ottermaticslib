@@ -17,7 +17,8 @@ diskcache
 #kivy
 #kivy-garden
 dearpygui
-#pyqt5
+pyqt5
+vtk
 
 #Science
 numpy
@@ -29,6 +30,11 @@ pandas
 scikit-learn
 croniter
 
+#Engineering
+sectionproperties==1.0.8
+PyNiteFEA==0.0.30
+slycot==0.4.0
+control==0.9.0
 
 #Networkign
 Twisted
