@@ -107,12 +107,14 @@ class FileNode(LoggingMixin):
     @property
     def parents(self):
         #with self.filesystem as fs:
-        return [self.drive.item_nodes[key] for key in list(self._drive._filesystem.predecessors(self))]
+        nodes = self.drive.item_nodes
+        return [ nodes[key] for key in list(self._drive._filesystem.predecessors(self)) if key in nodes ]
 
     @property
     def contents(self):
         #with self.filesystem as fs:
-        return [self.drive.item_nodes[key] for key in list(self._drive._filesystem.neighbors(self))]   
+        nodes = self.drive.item_nodes
+        return [ nodes[key] for key in list(self._drive._filesystem.neighbors(self)) if key in nodes ]   
 
     @property
     def listed_parents(self):
@@ -417,6 +419,28 @@ days_since_2020 = lambda item: (item.createdDate.timestamp() - default_timestamp
 content_size = lambda item: len(item.contents)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #FIXME: Implement Thread Saftey To Prevent Rare Segmentation Faults
 
 #@Singleton
@@ -608,10 +632,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 self._target_folder_id = self.sync_root_id
         
         #cache when we dont have that info
-        if self.target_folder_id not in node_ids:
-            self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6))
-        else:
-            self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=2)#light refresh
+        #if self.target_folder_id not in node_ids:
+            #self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6))
+        #else:
+        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=100) #always fully refresh the target folder
 
         self.status_message('Otterdrive Ready!')
         self.thread_time_multiplier = 1.0
@@ -1105,7 +1129,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 file.FetchMetadata(fields='permissions,labels,mimeType')
                 self.sleep()
 
-                self.debug(f'uploaded {file_path}')
+                self.info(f'uploaded {file_path}')
                 self.cache_item(file)
 
             elif self.dry_run:
