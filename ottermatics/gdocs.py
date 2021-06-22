@@ -784,7 +784,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 if item.is_folder: #if it had contents it was already cached!!
                     
                     if recursive and not stop:
-                        if item.id not in already_cached and item.id not in self.item_nodes:
+                        if item.id not in already_cached:
                             already_cached.add(item.id)                        
                             
                             if ttl <= 0:
@@ -799,11 +799,6 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                                 self.sync_folder_contents_locally(item.id,recursive=recursive,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
 
                             
-                                # if pool is not None:
-                                #     self.sleep()
-                                #     pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
-                                # else:                  
-                                #     self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
                 
 
         except Exception as e:
