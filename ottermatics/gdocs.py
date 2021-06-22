@@ -757,6 +757,17 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         stop = False
         result = None
 
+        #create uniform recursive object
+        if top:
+            init_val = bool(recursive)
+            class token:
+                recursive = init_val
+            obj = token()
+            obj.recursive = recursive
+        else:
+            obj = recursive
+
+
         if stop_when_found is not None:
             self.info(f'Stopping When Found: returning id of {stop_when_found}')
 
@@ -784,14 +795,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     self.info(f"Found {stop_when_found}")
                     stop = True
                     result = self.item_nodes[parent_id]
-                    recursive = False
+                    obj.recursive = False
                     if pool is not None: 
                         pool.shutdown(wait=False) #force shutdown
                         pool = None
                 else:
                     self.info(f'searching sync {par_path}...')
             
-            if recursive and ttl > 0:
+            if obj.recursive and ttl > 0:
                 ttl -= 1
                 for item in items:
                     self.sleep()
@@ -802,7 +813,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                             self.info(f"Found {stop_when_found}")
                             stop = True
                             result = item
-                            recursive = False
+                            obj.recursive = False
                             if pool is not None: 
                                 pool.shutdown(wait=False) #force shutdown
                                 pool = None
@@ -811,23 +822,23 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                             #TODO: handle duplicates
 
                     if item.is_folder: #if it had contents it was already cached!!
-                        if recursive and not stop:
+                        if obj.recursive and not stop:
                             if item.id not in already_cached:
                                 already_cached.add(item.id)                        
                                 
                                 #recursive covers next, but will sync the directory contents, keeping the sync level global
                                 if ttl <= 0:
-                                    recursive = False
-                                elif ttl > 0:
-                                    recursive = True
+                                    obj.recursive = False
+                                #elif ttl > 0:
+                                #    obj.recursive = True
 
                                 if pool is not None:                                    
                                     self.sleep()
                                     if ttl >= 0:
-                                        pool.submit(self.sync_folder_contents_locally,item.id,recursive=recursive,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
+                                        pool.submit(self.sync_folder_contents_locally,item.id,recursive=obj,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
                                 else:
                                     if ttl >= 0:
-                                        self.sync_folder_contents_locally(item.id,recursive=recursive,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
+                                        self.sync_folder_contents_locally(item.id,recursive=obj,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
 
         except Exception as e:
             self.error(e,'Issue Syncing Locally')
