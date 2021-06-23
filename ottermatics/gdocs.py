@@ -2193,6 +2193,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self.info(f'saving  {self.fs_cache_filename}!')
             with open(self.fs_cache_filename,'wb') as fp:
                 fp.write(pickle.dumps(self))
+            #BUG: Cannot pickle io.BufferedReader
 
         except Exception as e:
             self.error( e , 'Issue Saving File System' )

@@ -40,6 +40,9 @@ ATTR_VALIDATOR_TYPES = (attr.validators._AndValidator,attr.validators._InstanceO
 
 TAB_VALIDATOR_TYPE = attr.validators._InstanceOfValidator #our validators shoudl require a type i think, at least for tabulation
 
+
+#TOOD: add at iterated cache option to table property. this provides dynamic programming like performance benefits
+#TODO: add a vector_property with interface like vector_property(split_cols = 'x','y','z) for vectors
 class table_property:
     """Emulate PyProperty_Type() in Objects/descrobject.c
     
@@ -714,7 +717,6 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
                 tdrive.reset_sleep_time( old_sleep )
 
-            
         
     @property
     def store_level(self):
