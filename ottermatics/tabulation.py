@@ -168,6 +168,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     _otherstatic_tables= None
     _variable_tables= None
     _joined_dataframe= None
+    _complete_dataframe = None
     __table_properties = None #hot caching of table properties from all user subclasses
 
     #Data Tabulation - Intelligent Lookups
@@ -348,7 +349,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     def complete_dataframe(self):
         '''this is a high level data frame with all data in the system'''
         #FIXME: join all dataframes
-        if self._joined_dataframe is None or self._anything_changed:
+        if self._complete_dataframe is None or self._anything_changed:
 
             rds = self.recursive_data_structure()
             if rds:
@@ -357,12 +358,12 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 for lvl, comps in rds.items():
                     for comp in comps:
                         dataframes.append(comp['conf'].dataframe)
-                self._joined_dataframe = pandas.concat(dataframes,join='outer',axis=1)
+                self._complete_dataframe = pandas.concat(dataframes,join='outer',axis=1)
                         
             else:
-                self._joined_dataframe = None
+                self._complete_dataframe = None
 
-        return self._joined_dataframe    
+        return self._complete_dataframe    
         
 
     def split_dataframe_by_colmum(self,df,max_columns=10):
@@ -491,8 +492,10 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 #Remove anything not in the user code
                 if issubclass(mrv,TabulationMixin) and 'ottermatics' not in mrv.__module__:
                     for k,obj in mrv.__dict__.items():
-                        if isinstance(obj,table_property): 
-                            self.__table_properties[ k ] = obj                       
+                        if k not in self.__table_properties and isinstance(obj,table_property):  #Precedent
+                            prop = getattr( self.__class__, k , None) #Assumes our instance has assumed this table propertie
+                            if prop and isinstance(prop,table_property):
+                                self.__table_properties[ k ] = prop                     
         
         return self.__table_properties
 
@@ -511,8 +514,10 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             #Remove anything not in the user code
             if issubclass(mrv,TabulationMixin) and 'ottermatics' not in mrv.__module__:
                 for k,obj in mrv.__dict__.items():
-                    if isinstance(obj,table_property): 
-                        __table_properties[ k ] = obj                       
+                    if k not in __table_properties and isinstance(obj,table_property):  #Precedent
+                        prop = getattr( cls, k , None) #Assumes our instance has assumed this table propertie
+                        if prop and isinstance(prop,table_property):
+                            __table_properties[ k ] = prop
         
         return __table_properties 
 
@@ -580,7 +585,6 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         return output
 
     #Multi-Component Table Combination Methods
-
 
     #Saving & Data Acces Methods
     def get_field_from_table(self,field,check_type=None,check_value:Callable = None):

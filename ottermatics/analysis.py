@@ -43,10 +43,10 @@ class Analysis(Component):
 
     run_id = attr.ib(default=None) #this gets logged!
 
-    #FIXME: Is it ok to override dataframe? its a super set so should be ok...
-    @property
-    def dataframe(self):
-        return self.joined_dataframe
+    # #FIXME: Is it ok to override dataframe? its a super set so should be ok...
+    # @property
+    # def dataframe(self):
+    #     return self.complete_dataframe
 
     @property
     def solved(self):
@@ -194,8 +194,8 @@ class Analysis(Component):
 
     def plot(self,x,y,kind='line', **kwargs):
         '''
-
-
+        A wrapper for pandas dataframe.plot
+        :param grid: set True if input is not False
         '''
 
         #TODO: Add a default x iterator for what is iterated in analysis!
@@ -205,14 +205,14 @@ class Analysis(Component):
 
         if isinstance(y,(list,tuple)):
             old_y = set(y)
-            y = list([yval for yval in y if yval in self.columns])
+            y = list([yval for yval in y if yval in self.dataframe.columns])
             rmv_y = set.difference(old_y,set(y))
             if rmv_y:
                 self.warning(f'parameters not found: {rmv_y}')
 
         if self.solved and y:
-            df = self.joined_dataframe
-            df.plot(x=x,y=y, kind=kind, **kwargs)
+            df = self.dataframe
+            return df.plot(x=x,y=y, kind=kind, **kwargs)
         elif y:
             self.warning('not solved yet!')
         elif self.solved:
