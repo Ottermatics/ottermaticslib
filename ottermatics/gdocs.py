@@ -107,12 +107,14 @@ class FileNode(LoggingMixin):
     @property
     def parents(self):
         #with self.filesystem as fs:
-        return [self.drive.item_nodes[key] for key in list(self._drive._filesystem.predecessors(self))]
+        nodes = self.drive.item_nodes
+        return [ nodes[key] for key in list(self._drive._filesystem.predecessors(self)) if key in nodes ]
 
     @property
     def contents(self):
         #with self.filesystem as fs:
-        return [self.drive.item_nodes[key] for key in list(self._drive._filesystem.neighbors(self))]   
+        nodes = self.drive.item_nodes
+        return [ nodes[key] for key in list(self._drive._filesystem.neighbors(self)) if key in nodes ]   
 
     @property
     def listed_parents(self):
@@ -417,6 +419,28 @@ days_since_2020 = lambda item: (item.createdDate.timestamp() - default_timestamp
 content_size = lambda item: len(item.contents)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #FIXME: Implement Thread Saftey To Prevent Rare Segmentation Faults
 
 #@Singleton
@@ -457,9 +481,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     call_count = 0 #updated every sleep()
     max_sleep_time = 5.0
-    _sleep_time = 0.5
-    time_fuzz = 2.0 #base * ( 1+ rand(0,time_fuzz))
-    _absolute_min_sleep = 0.2
+    _sleep_time = 0.25
+    time_fuzz = 1.0 #base * ( 1+ rand(0,time_fuzz))
+    _absolute_min_sleep = 0.1
     thread_time_multiplier = 1.0
 
     #Default is most permissive
@@ -468,7 +492,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     #Thread Pool
     _use_threadpool = True
-    _max_num_threads = 8
+    _max_num_threads = 10
 
     #defaults
     default_shared_drive = 'shared:OTTERBOX'
@@ -490,7 +514,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     #attributes to keep after a pickle read
     keep_keys = ['_filesystem','protected_ids','protected_filenames','_creds_file','_shared_drives','_shared_drive','_sync_root_id']
 
-    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 8, use_threadpool=True, explict_input_only=False):
+    def __init__(self,shared_drive = None, sync_root=None, filepath_root=None, creds_path = None, dry_run=False, num_workers = 10, use_threadpool=True, explict_input_only=False):
         '''
         :param shared_drive: share drive to use as a root directory
         :param sync_root: the relative directory from shared_drive root to the place where sync occurs
@@ -503,12 +527,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         self.info(f'starting with input share={shared_drive}, filepath={filepath_root}, sync_root={sync_root}')
 
-        #We're gonna use this to store graph information, aka dynamic programming
-        #self.fast_cache = ExpiringDict(max_age_seconds=5)
-
         self._use_threadpool = use_threadpool
         self._max_num_threads = num_workers
 
+        self._hot_directories = ExpiringDict(max_len=100, max_age_seconds=1)
 
         #This is to guard access across threads to the filesystem networkx, which is not threadsafe
         #TODO: load graph from disk if exists
@@ -607,16 +629,21 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             elif gpath == '':
                 self._target_folder_id = self.sync_root_id
         
+
+        node_ids = set(self.item_nodes.keys())
+
         #cache when we dont have that info
-        if self.target_folder_id not in node_ids:
-            self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6))
-        else:
-            self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=2)#light refresh
+        #if self.target_folder_id not in node_ids:
+        #    self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6))
+        #else:
+        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=10) #fully refresh the top levels
 
         self.status_message('Otterdrive Ready!')
         self.thread_time_multiplier = 1.0
 
         #self.save()
+
+           
 
     def reset_target_id(self):
         self._target_folder_id = self.ensure_g_path_get_id(self.sync_path(self.filepath_root))
@@ -720,6 +747,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self._shared_drives = output
         return output
 
+    #FIXME: This doesn't work, we don't stop anywhere with stop_when_found
     def sync_folder_contents_locally(self,parent_id,stop_when_found=None,recursive=False,ttl=1,protect=False,pool=None, already_cached = None, top=True):
         '''This function takes a parent id for a folder then caches everything to folder / file caches
         Recrusvie functionality with recursive=True and ttl > 0'''
@@ -728,6 +756,20 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self.debug( f'updating subdirecories of {parent_id}' )
         stop = False
         result = None
+
+        #create uniform recursive object
+        if top:
+            init_val = bool(recursive)
+            class token:
+                recursive = init_val
+            obj = token()
+            obj.recursive = recursive
+        else:
+            obj = recursive
+
+
+        if stop_when_found is not None:
+            self.info(f'Stopping When Found: returning id of {stop_when_found}')
 
         if protect: self.protected_ids.add(parent_id)
 
@@ -745,42 +787,58 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         try:
             #This caches it for us through seach_item(), and hopefully removes  duplicates
             items = list(self.all_in_folder(parent_id))
+
+            if parent_id in self.item_nodes:
+                par = self.item_nodes[parent_id]
+                par_path = par.absolute_path
+                if par_path == stop_when_found:
+                    self.info(f"Found {stop_when_found}")
+                    stop = True
+                    result = self.item_nodes[parent_id]
+                    obj.recursive = False
+                    if pool is not None: 
+                        pool.shutdown(wait=False) #force shutdown
+                        pool = None
+                else:
+                    self.info(f'searching sync {par_path}...')
             
-            ttl -= 1
-            for item in items:
-                self.sleep()
-                if stop_when_found is not None and item.id == stop_when_found:
-                    if not stop:
-                        stop = True
-                        result = item
-                    else: #this is a duplicate!
-                        self.warning(f'duplicate found {result.identity} vs {item.identity}')
-                        #TODO: handle duplicates
+            if obj.recursive and ttl > 0:
+                ttl -= 1
+                for item in items:
+                    self.sleep()
 
-                if item.is_folder: #if it had contents it was already cached!!
-                    
-                    if recursive and not stop:
-                        if item.id not in already_cached and item.id not in self.item_nodes:
-                            already_cached.add(item.id)                        
-                            
-                            if ttl <= 0:
-                                recursive = False
-                            elif ttl > 0:
-                                recursive = True
+                    #FIXME: This doesn't work, we don't stop anywhere
+                    if stop_when_found is not None and item.absolute_path == stop_when_found:
+                        if not stop:
+                            self.info(f"Found {stop_when_found}")
+                            stop = True
+                            result = item
+                            obj.recursive = False
+                            if pool is not None: 
+                                pool.shutdown(wait=False) #force shutdown
+                                pool = None
+                        else: #this is a duplicate!
+                            self.warning(f'duplicate found {result.identity} vs {item.identity}')
+                            #TODO: handle duplicates
 
-                            if pool is not None:                                    
-                                self.sleep()
-                                pool.submit(self.sync_folder_contents_locally,item.id,recursive=recursive,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
-                            else:
-                                self.sync_folder_contents_locally(item.id,recursive=recursive,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
+                    if item.is_folder: #if it had contents it was already cached!!
+                        if obj.recursive and not stop:
+                            if item.id not in already_cached:
+                                already_cached.add(item.id)                        
+                                
+                                #recursive covers next, but will sync the directory contents, keeping the sync level global
+                                if ttl <= 0:
+                                    obj.recursive = False
+                                #elif ttl > 0:
+                                #    obj.recursive = True
 
-                            
-                                # if pool is not None:
-                                #     self.sleep()
-                                #     pool.submit(self.sync_folder_contents_locally,item.id,recursive=True,ttl=ttl,protect=protect,pool = pool , already_cached= already_cached, top=False)
-                                # else:                  
-                                #     self.sync_folder_contents_locally(item.id,recursive=True,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
-                
+                                if pool is not None:                                    
+                                    self.sleep()
+                                    if ttl >= 0:
+                                        pool.submit(self.sync_folder_contents_locally,item.id,recursive=obj,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
+                                else:
+                                    if ttl >= 0:
+                                        self.sync_folder_contents_locally(item.id,recursive=obj,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
 
         except Exception as e:
             self.error(e,'Issue Syncing Locally')
@@ -871,7 +929,15 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     
     def cache_directory(self,folder_id):
         '''quick way to get contents of directory'''
+
+        if folder_id in self._hot_directories:
+            try:
+                return self._hot_directories[folder_id]
+            except Exception:
+                pass
+
         out = list([item for item in self.all_in_folder(folder_id)])
+        self._hot_directories[folder_id] = out
         return out
         
     @property
@@ -1105,7 +1171,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 file.FetchMetadata(fields='permissions,labels,mimeType')
                 self.sleep()
 
-                self.debug(f'uploaded {file_path}')
+                self.info(f'uploaded {file_path}')
                 self.cache_item(file)
 
             elif self.dry_run:
@@ -2116,10 +2182,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             if isinstance( item._item, pydrive2.files.GoogleDriveFile): #catch shared drives and skip
                 item._item.__dict__['attr']['auth'] = self.gauth                 
            
-
-
     @property
     def fs_cache_filename(self):
+        '''a property to provide a default local filesystem name for caching'''
         return f".otterdrive_fs_{ self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk"
 
     def save(self):
@@ -2128,6 +2193,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self.info(f'saving  {self.fs_cache_filename}!')
             with open(self.fs_cache_filename,'wb') as fp:
                 fp.write(pickle.dumps(self))
+            #BUG: Cannot pickle io.BufferedReader
 
         except Exception as e:
             self.error( e , 'Issue Saving File System' )
@@ -2140,7 +2206,14 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
             self.info(f'reading {self.fs_cache_filename}!')
             with open(self.fs_cache_filename,'rb') as fp:
                 old = pickle.loads(fp.read())
-                self.__dict__ = old.__dict__
+                #TODO: intellegently load old file system, should be mostly right but how to handle differences
+                #1) Perhaps compare file system to folders that need syncing and list the intersection
+                #2) for the items in the list audit the lowest levels up, creating directories as needed
+                #3) Maybe compare date of pickle to date of files and whats on the drive.
+
+                #Alternate Idea
+                #4) Thread Read Google Drive and Local FS in independent threads building linked graphs
+
 
         except Exception as e:
             self.error( e , 'Issue Reading File System' )

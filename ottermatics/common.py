@@ -150,6 +150,7 @@ mass_electron = 9.1093837015E-31#kg
 mass_proton = 1.67262192369E-27
 mass_neutron = 1.67492749804E-27
 r_electron = 2.8179403262E-15
+Kboltzman = 1.380649E-23 #J⋅K−1
 
 #Common Modules
 from ottermatics.configuration import *

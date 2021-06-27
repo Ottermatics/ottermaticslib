@@ -40,6 +40,9 @@ ATTR_VALIDATOR_TYPES = (attr.validators._AndValidator,attr.validators._InstanceO
 
 TAB_VALIDATOR_TYPE = attr.validators._InstanceOfValidator #our validators shoudl require a type i think, at least for tabulation
 
+
+#TOOD: add at iterated cache option to table property. this provides dynamic programming like performance benefits
+#TODO: add a vector_property with interface like vector_property(split_cols = 'x','y','z) for vectors
 class table_property:
     """Emulate PyProperty_Type() in Objects/descrobject.c
     
@@ -165,6 +168,8 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     _otherstatic_tables= None
     _variable_tables= None
     _joined_dataframe= None
+    _complete_dataframe = None
+    __table_properties = None #hot caching of table properties from all user subclasses
 
     #Data Tabulation - Intelligent Lookups
     def save_data(self,index=None,saved=None, force = False):
@@ -344,7 +349,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     def complete_dataframe(self):
         '''this is a high level data frame with all data in the system'''
         #FIXME: join all dataframes
-        if self._joined_dataframe is None or self._anything_changed:
+        if self._complete_dataframe is None or self._anything_changed:
 
             rds = self.recursive_data_structure()
             if rds:
@@ -353,12 +358,12 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 for lvl, comps in rds.items():
                     for comp in comps:
                         dataframes.append(comp['conf'].dataframe)
-                self._joined_dataframe = pandas.concat(dataframes,join='outer',axis=1)
+                self._complete_dataframe = pandas.concat(dataframes,join='outer',axis=1)
                         
             else:
-                self._joined_dataframe = None
+                self._complete_dataframe = None
 
-        return self._joined_dataframe    
+        return self._complete_dataframe    
         
 
     def split_dataframe_by_colmum(self,df,max_columns=10):
@@ -471,43 +476,89 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         return {k.lower(): self.store[k] for k in self.attr_raw_keys if k in self.store and k not in self.skip_attr  }
 
     @property
+    def class_table_propeties(self):
+        '''Combine other classes table properties into this one, in the case of subclassed table_properties'''
+        if self.__table_properties is None or self.anything_changed:
+            self.__table_properties =  {}
+            cls = self.__class__
+            for k,obj in cls.__dict__.items():
+                if isinstance(obj,table_property):
+                    self.__table_properties[ k ] = obj
+
+            mrl = cls.mro()
+            inx_comp = mrl.index( TabulationMixin ) #Ensures everything is includes Tabulation Functionality
+            mrvs = mrl[1:inx_comp] 
+            for mrv in mrvs:
+                #Remove anything not in the user code
+                if issubclass(mrv,TabulationMixin) and 'ottermatics' not in mrv.__module__:
+                    for k,obj in mrv.__dict__.items():
+                        if k not in self.__table_properties and isinstance(obj,table_property):  #Precedent
+                            prop = getattr( self.__class__, k , None) #Assumes our instance has assumed this table propertie
+                            if prop and isinstance(prop,table_property):
+                                self.__table_properties[ k ] = prop                     
+        
+        return self.__table_properties
+
+    @classmethod
+    def classmethod_table_propeties(cls):
+        '''Combine other classes table properties into this one, in the case of subclassed table_properties'''
+        __table_properties  = {}
+        for k,obj in cls.__dict__.items():
+            if isinstance(obj,table_property):
+                __table_properties[ k ] = obj
+
+        mrl = cls.mro()
+        inx_comp = mrl.index( TabulationMixin ) #Ensures everything is includes Tabulation Functionality
+        mrvs = mrl[1:inx_comp] 
+        for mrv in mrvs:
+            #Remove anything not in the user code
+            if issubclass(mrv,TabulationMixin) and 'ottermatics' not in mrv.__module__:
+                for k,obj in mrv.__dict__.items():
+                    if k not in __table_properties and isinstance(obj,table_property):  #Precedent
+                        prop = getattr( cls, k , None) #Assumes our instance has assumed this table propertie
+                        if prop and isinstance(prop,table_property):
+                            __table_properties[ k ] = prop
+        
+        return __table_properties 
+
+
+        
+
+    @property
     def table_dict(self):
-        class_dict = self.__class__.__dict__
         #We use __get__ to emulate the property, we could call regularly from self but this is more straightforward
-        return { k.lower(): obj.__get__(self) for k,obj in class_dict.items() if isinstance(obj,table_property)}
+        return { k.lower(): obj.__get__(self) for k,obj in self.class_table_propeties.items() }
 
     @property
     def table_properties(self):
-        class_dict = self.__class__.__dict__
         #We use __get__ to emulate the property, we could call regularly from self but this is more straightforward
-        tabulated_properties = [obj.__get__(self) for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        tabulated_properties = [obj.__get__(self) for k,obj in self.class_table_propeties.items()]
         return tabulated_properties
 
     @property
     def table_properties_labels(self):
         class_dict = self.__class__.__dict__
-        tabulated_properties = [obj.label.lower() for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        tabulated_properties = [obj.label.lower() for k,obj in self.class_table_propeties.items()]
         return tabulated_properties   
 
     @property
     def table_properties_keys(self):
-        class_dict = self.__class__.__dict__
-        tabulated_properties = [k for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        tabulated_properties = [k for k,obj in self.class_table_propeties.items()]
         return tabulated_properties           
 
     @property
     def table_properties_description(self):
         class_dict = self.__class__.__dict__
-        tabulated_properties = [obj.desc for k,obj in class_dict.items() if isinstance(obj,table_property)]
+        tabulated_properties = [obj.desc for k,obj in self.class_table_propeties.items()]
         return tabulated_properties       
 
     @classmethod
     def cls_all_property_labels(cls):
-        return [obj.label for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]
+        return [obj.label for k,obj in cls.classmethod_table_propeties().items() ]
 
     @classmethod
     def cls_all_property_keys(cls):
-        return [k for k,obj in cls.__dict__.items() if isinstance(obj,table_property)]                       
+        return [k for k,obj in cls.classmethod_table_propeties().items() ]                       
     
     @classmethod
     def cls_all_attrs_fields(cls):
@@ -534,7 +585,6 @@ class TabulationMixin(Configuration,ClientInfoMixin):
         return output
 
     #Multi-Component Table Combination Methods
-
 
     #Saving & Data Acces Methods
     def get_field_from_table(self,field,check_type=None,check_value:Callable = None):
@@ -714,7 +764,6 @@ class TabulationMixin(Configuration,ClientInfoMixin):
 
                 tdrive.reset_sleep_time( old_sleep )
 
-            
         
     @property
     def store_level(self):

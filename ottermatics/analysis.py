@@ -43,6 +43,11 @@ class Analysis(Component):
 
     run_id = attr.ib(default=None) #this gets logged!
 
+    # #FIXME: Is it ok to override dataframe? its a super set so should be ok...
+    # @property
+    # def dataframe(self):
+    #     return self.complete_dataframe
+
     @property
     def solved(self):
         return self._solved
@@ -180,7 +185,38 @@ class Analysis(Component):
 
                 gdrive.reset_sleep_time( old_sleep )            
 
+    @property
+    def columns(self):
+        if self.solved:
+            return list(self.joined_dataframe)
+        else:
+            return []
 
+    def plot(self,x,y,kind='line', **kwargs):
+        '''
+        A wrapper for pandas dataframe.plot
+        :param grid: set True if input is not False
+        '''
+
+        #TODO: Add a default x iterator for what is iterated in analysis!
+
+        if 'grid' not in kwargs:
+            kwargs['grid'] = True
+
+        if isinstance(y,(list,tuple)):
+            old_y = set(y)
+            y = list([yval for yval in y if yval in self.dataframe.columns])
+            rmv_y = set.difference(old_y,set(y))
+            if rmv_y:
+                self.warning(f'parameters not found: {rmv_y}')
+
+        if self.solved and y:
+            df = self.dataframe
+            return df.plot(x=x,y=y, kind=kind, **kwargs)
+        elif y:
+            self.warning('not solved yet!')
+        elif self.solved:
+            self.warning('bad input!')
 
 
 #WIP
