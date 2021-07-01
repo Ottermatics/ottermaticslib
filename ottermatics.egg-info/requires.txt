@@ -1,8 +1,9 @@
 virtualenv
 wheel
 methodtools==0.4.2
-attrs
+attrs>=20.1.0
 arrow
+pysecret
 watchdog
 watchgod
 dropbox

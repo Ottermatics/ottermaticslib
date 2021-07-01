@@ -64,6 +64,8 @@ def meta(title,desc=None,**kwargs):
     return out
 
 
+#TODO: Make A MetaClass for Configuration, and provide otterize interface there. Problem with replaceing metaclass later, as in the case of a singleton.
+
 @otterize
 class Configuration(LoggingMixin):
     '''Configuration is a pattern for storing attributes that might change frequently, and proivdes the core functionality for a host of different applications.

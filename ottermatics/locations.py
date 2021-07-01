@@ -35,6 +35,9 @@ PROJECT_FOLDER_OPTIONS = {'core': CORE_FOLDERS,
 
 SERIVCE_CREDS_FILE = 'ottermaticsgdocs_serviceid.json'
 
+#TODO: Map Client Drives (or others) as graphs in networkX, then we can compare different drive versions ect.
+#TODO: Create A Context Class To Expose drive info
+
 def in_wsl() -> bool:
     """
     WSL is thought to be the only common Linux kernel with Microsoft in the name, per Microsoft:
@@ -176,7 +179,7 @@ def main_cli():
     parser.add_argument('project_name')
     parser.add_argument('type',
                         type=str,
-                        choices=PROJECT_FOLDER_OPTIONS.keys(),
+                        choices=list(PROJECT_FOLDER_OPTIONS.keys()),
                         help='comma or space delimited list of components to add')
     #parser.add_argument('--capitalize',action='store_true')
 
@@ -184,7 +187,7 @@ def main_cli():
 
     #TODO: raise error or handle in WSL (we dont want to use the /mnt/c/ filesystem due to poor performance)
 
-    log.info('Checking For Folder `{}` In {}'.format(args.project_name,ottermatics_projects()))
+    log.info(f'Checking For Folder `{args.project_name}` In {ottermatics_projects()}')
 
     ott_projects = os.listdir(ottermatics_projects())
     lower_projects = [folder.lower() for folder in ott_projects]

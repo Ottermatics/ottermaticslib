@@ -14,7 +14,12 @@ import logging
 class GCloudNotEnabled(Exception): pass
 
 class ClientInfoMixin(LoggingMixin):
-    '''In which we provide methods to infer a client, and provide path targets for reports ect'''
+    '''In which we provide methods to infer a client, and provide path targets for reports ect
+    
+    This class exposes functionality in how to report, and where to report.
+    
+    Use report_mode for how to infer the client report path (daily vs static ect)
+    Use rel_report_mode for custom locations on where to create report'''
     stored_path = None
     stored_client_folder = None
     stored_client_name = None
@@ -35,14 +40,36 @@ class ClientInfoMixin(LoggingMixin):
     rel_report_mode = 'default'
     rel_report_modes = ['default','direct','report']
 
+    skip_wsl = False
+
+    @property
+    def is_client_configured(self):
+        return all(( self.stored_client_folder is not None,
+                     self.stored_client_name is not None))
+
+    @property
+    def is_client(self):
+        if self.is_client_configured:
+            return self.stored_client_folder != 'Ottermatics'
+        return False
+
+
+    @property
+    def is_company(self):
+        if self.is_client_configured:
+            return self.stored_client_folder == 'Ottermatics'
+        return True #Assume its company info if we're not configured        
+
     @property
     def client_name(self):
         
         if self.stored_client_name is None:
+            #TODO: Move this to secrets
             if 'CLIENT_NAME' in os.environ:
                 self.stored_client_name = os.environ['CLIENT_NAME']
 
             elif in_client_dir(): #infer from path
+                self.warning("inferring client directory")
                 self.stored_client_name = client_dir_name()
 
             else:
@@ -55,7 +82,7 @@ class ClientInfoMixin(LoggingMixin):
     @property
     def client_folder_root(self):
         if self.stored_client_folder is None:
-            self.stored_client_folder = ottermatics_project(self.client_name)
+            self.stored_client_folder = ottermatics_project(self.client_name,skip_wsl =self.skip_wsl)
         return self.stored_client_folder
 
     @property
@@ -93,6 +120,7 @@ class ClientInfoMixin(LoggingMixin):
         elif self.report_mode == 'report':
             out = self.report_path
 
+        #TODO: Move this some other place, we shouldn't be creating directories until they're needed
         self.ensure_path(out)
         return out
 
@@ -118,15 +146,18 @@ class ClientInfoMixin(LoggingMixin):
             return os.path.join(self.client_folder_root,'reports')
 
     def report_relative_path(self, input_path):
-        if os.path.commonpath([self.rel_report_path,input_path]) == os.path.commonpath([self.rel_report_path]):
-            return os.path.relpath(input_path, self.rel_report_path)
+            return self.relative_path(input_path, self.rel_report_path)
+
+    def relative_path(self, input_path, basis_path):
+        if os.path.commonpath([basis_path,input_path]) == os.path.commonpath([basis_path]):
+            return os.path.relpath(input_path, basis_path)
         else:
-            return None
+            return None            
 
     @property
     def report_path_daily(self):
         start_date = self._created_datetime.date()
-        return os.path.join(self.report_path,'{}'.format(start_date).replace('-','_'))                  
+        return os.path.join( self.report_path,f'{start_date}'.replace('-','_') )                  
 
     @property
     def config_path(self):
@@ -139,7 +170,7 @@ class ClientInfoMixin(LoggingMixin):
     @property
     def config_daily_path(self):
         start_date = self._created_datetime.date()
-        return os.path.join(self.report_path,self.filename,'{}'.format(start_date).replace('-','_'))        
+        return os.path.join(self.report_path,self.filename, f'{start_date}'.replace('-','_') )        
 
     def cleanup_local_dir(self):
         '''remove all items from local_sync_path'''
