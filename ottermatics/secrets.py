@@ -1,3 +1,4 @@
+from posix import environ
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.patterns import InputSingletonMeta
 from ottermatics.client import ClientInfoMixin
@@ -10,6 +11,9 @@ import subprocess
 import itertools
 import pathlib
 
+import uuid
+import json
+
 #load_from_env('./.creds/','env.sh',set_env=False)
 
 CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME,SLACK_WEBHOOK_NOTIFICATION = None,None,None,None,None
@@ -17,85 +21,149 @@ CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME,SLACK_WEBHOOK_NOTIFIC
 #TODO: Backwards Compatability, Here's Our Key Variables. What are our covered use cases? DB / SSH / AWS / SLACK / CLIENT / GOOGLE SERVICE ACCTS
 default_secrets = {}
 
+#Secret Handlers
+_local = None
+_env = None
+
+
+PORT = 5432
+HOST = 'localhost'
+USER = 'postgres'
+PASS = 'dumbpass'
+DB_NAME = 'dumbdb'
+
+
+#Special values
+STAGE_ENVVAR = 'DEV_ENV'
+DEFAULT_GDRIVE = "shared:OTTERBOX"
+SLACK_WEBHOOK_NOTIFICATION = None #TOOD: Make a default slack webhook!
+
+#Local Credentials
+
 @otterize
 class Secrets(Configuration, metaclass = InputSingletonMeta):
     '''Secrets handles an explicit user manage input and output of secrets
-    
-    TODO: Secrets will ensure all client .creds folders have appropriate permissions (644), and be ignored from git repos, maybe later dropbox.
 
     Security philosophy here embodies wrapping access of enviornmental variables, and keeping their source on the developers computer. Distribution can be achieved via a cloud provider.
     1) hear no evil: never interact with a external unauthorized sources, only limited input will return credentials.
     2) speak no evil: Never send or set credentials internally or externally other than an authorized source.
     3) see no evil: Only look in authorized sources (use enviornment for our local reference)    
     
-    Secrets will store an keys as a unique combo of client+location+stage, like `YourClient.analysis.default`. Stages must be specified throguh DEV_ENV    '''
+ '''
     #FIXME: Implement parent class to client secrets    
 
-    credential_key = attr.ib(default=None) #input or infer from filepath like Client.path.to.modules.stage_name
-    stage_name = attr.ib(default='default') #input or lookup from 'DEV_ENV', or resort to default, looks for creds matching stage, otherwise resorts to default
-    location = attr.ib( factory=current_diectory ) #input or infer from filepath like Client.path.to.modules.stage_name
+    credential_key = attr.ib() #What to refer to this credential as
+    credential_location = attr.ib() #Where to find the credential file
 
+    _aws_kms : pysecret.AWSSecret = None #a storage for the aws key managment object
 
-    #Secret Handlers
-    _aws = None
-    _local = None
-    _env = None
-
-
-    PORT = 5432
-    HOST = 'localhost'
-    USER = 'postgres'
-    PASS = 'dumbpass'
-    DB_NAME = 'dumbdb'
-
-    
-    #Special values
-    STAGE_ENVVAR = 'DEV_ENV'
-    DEFAULT_GDRIVE = "shared:OTTERBOX"
-    SLACK_WEBHOOK_NOTIFICATION = None #TOOD: Make a default slack webhook!
-
-    #Local Credentials
+    public_up_level = True #makes the public cred record one level up (creds are stored protected). Yes its hacky but we have deadlines
 
     def __on_init__(self):
         self.info('initalizing secrets...')
-        #1) Check if input
-        #2) Look for DEV_ENV
-        #3) use the default env
+        self._aws_kms = pysecret.AWSSecret()
+        self.stored_env_vars = set()
+
+    @property
+    def credential_dir(self):
+        return os.path.dirname(self.credential_location)
+
+    @property
+    def public_record_dir(self):
+        if self.public_up_level:
+            return os.path.dirname(self.credential_dir)
+        return self.credential_dir
+
+    @property
+    def public_credential_upload_record(self):
+        '''A file link to the public record of secrets we have for this aws kms cred key'''
+        return os.path.join(self.public_record_dir,f'{self.credential_key}.cred_upload_check.json')
+
+    def sync(self):
+        data = self.dicionary_from_bash(self.credential_location)
+        
+        if data:
+            self.set_creds_in_env(data)
+            update_cloud = lambda cdata: self._aws_kms.deploy_secret(name=self.credential_key,secret_data = cdata)
+            if self.valid_public_record:
+                self.info("checking public upload record")
+                self.update_public_record(data,update_callback=update_cloud)
+
+            else:
+                update_cloud()
+                self.update_public_record(data)
+
+        elif self.valid_public_record:
+            public_record = self.public_record
+            self.info("getting data from AWS KMS")
+            data =    {stage:{key: self._aws_kms.get_secret_value(secret_id=self.credential_key,key=key) for key,hash in pubcred.items()}  for stage,pubcred in public_record.keys() }
+            self.set_creds_in_env(data)
+
+        else:
+            self.warning('No Valid Sync Method Utilized')
+
+    @property
+    def valid_public_record(self):
+        if os.path.exists(self.public_credential_upload_record):
+            if os.path.getsize(self.public_credential_upload_record) > 16:
+                return True
+        
+        return False #Guilty until proven innocent
+
+    @property
+    def public_record(self):
+        self.info('reading public record')
+        with open(self.public_credential_upload_record,'r') as fp:
+            return json.loads(fp.read())        
+
+    def generate_public_record_from(self,data):
+        return {f'{self.credential_key}':{key:str(uuid.uuid5(uuid.NAMESPACE_DNS, val)) for key,val in data.items() } }
+
+    def update_public_record(self,data,update_callback=None):
+        '''Checks the public record, and decides if the current local creds should update the cloud config'''
+
+        public_record = self.generate_public_record_from(data)
+        if os.path.exists(self.public_credential_upload_record):
+            if not public_record == self.public_record:
+                self.info("updating public upload record")
+                with open(self.public_credential_upload_record,'w') as fp:
+                    fp.write(json.dumps(public_record))   
+                
+                if update_callback is not None:
+                    update_callback(data)          
+
+            else:
+                self.info("credentials are up to date")
+
+        else:
+            self.info("no existing record, setting public upload record")
+            with open(self.public_credential_upload_record,'w') as fp:
+                fp.write(json.dumps(public_record))
+
+        return public_record
+
 
     def set_creds_in_env(self,creds_dict):
         '''sets credentials in enviornment'''
         #TODO: Ensure all keys are uppercase
+
         for cred,value in creds_dict.items():
             self.info(f'setting cred: {cred}')
-            os.environ[cred] = value
+            self.environ[cred] = value
+            self.stored_env_vars.add(cred)
 
     def get_envvar(self,key,missing_callback=None,default=None,**kwargs):
         '''A method to check the enviornment for a variable, and uses a default or callback if it doesn't exist
         :param key: a key value to check in the enviornment
         :param missing_callback: use the callback if key not found in environment, which takes a key arg, and anyo ther kwargs passed to this function
         :param default: if no callback and no key, we'll use this default which by default is None'''
-        if key in os.environ:
-            return os.environ[key]
+        if key in self.environ:
+            return self.environ[key]
 
         elif missing_callback is not None:
             return missing_callback(key,**kwargs)
         
         return default
-
-    def set_conda_with_env(self,env_name,enviornment_dictionary):
-        '''extracts export statements from bash file and aplies them to the python env'''
-        #TODO: Create Conda Envs For Client
-        self.info("checking creds {} ".format(enviornment_dictionary))
-        for key, val in enviornment_dictionary.items():
-            self.info( 'setting {}'.format(key) )
-            subprocess.run(['conda','env','config','vars','set',f'{key.strip()}={val}'])
-
-    def bool_from(self,bool_env_canidate):
-        if bool_env_canidate.lower() in ('yes','true','y','1'):
-            return True
-        if bool_env_canidate.lower() in ('no','false','n','0'):
-            return False
-        return None
 
 
     def dicionary_from_bash(self, creds_path):
@@ -104,10 +172,11 @@ class Secrets(Configuration, metaclass = InputSingletonMeta):
         
         output = {}
         if os.path.exists(creds_path):
-
             self.debug('creds found')
             with open(creds_path,'r') as fp:
                 txt = fp.read()
+
+            os.chmod(creds_path,0o740) #Ensure correct permission
 
             lines = txt.split('\n')
             for line in lines:
@@ -122,9 +191,31 @@ class Secrets(Configuration, metaclass = InputSingletonMeta):
         return output
 
 
+    def bool_from(self,bool_env_canidate):
+        if bool_env_canidate.lower() in ('yes','true','y','1'):
+            return True
+        if bool_env_canidate.lower() in ('no','false','n','0'):
+            return False
+        return None
+
+
+    def __getitem__(self,key):
+        if key in self.envvars:
+            return os.environ[key]
+        else:
+            self.warning(f"no stored cred for {key}")
+
+    @property
+    def envvars(self):
+        return list(self.stored_env_vars)
+
     @property
     def environ(self):
+        #TODO: Expose as limited interface to env vars
         return os.environ
+
+    def __contains__(self):
+        return self.envvars
 
     def __getstate__(self):
         #Do not persist secrets other than on disk, or provided key managment service
@@ -140,7 +231,7 @@ class Secrets(Configuration, metaclass = InputSingletonMeta):
 
     @property
     def identity(self):
-        return f'secrets-{self.stage_name}'
+        return f'secrets-{self.credential_key}'
    
 
 
@@ -163,6 +254,10 @@ class Secrets(Configuration, metaclass = InputSingletonMeta):
 class ClientSecrets(Secrets,ClientInfoMixin):
     '''Automatically handles client secrets for managing application credentials between bash, env-vars, and aws secret manager
 
+    TODO: Secrets will ensure all client .creds folders have appropriate permissions (644), and be ignored from git repos, maybe later dropbox.
+    
+    Secrets will store an keys as a unique combo of client+location+stage, like `YourClient.analysis.default`. Stages must be specified throguh DEV_ENV   
+
     Client automatically creates stages and scopes for variables from knowledge about their .creds folder structures.
     '''
 
@@ -171,6 +266,7 @@ class ClientSecrets(Secrets,ClientInfoMixin):
     #super_secret_types =  ('.pem','pub') #file extensions that are too secret for us to touch ( les untouchables )
     secret_scripts = ('env.sh',)
     creds_folders = ('.creds',)
+
 
     #LOCAL FILE STRUCTURE INFUERRENCE
     def sync_local_to_cloud(self):
@@ -319,7 +415,13 @@ class ClientSecrets(Secrets,ClientInfoMixin):
         stages = list(stage_creds_package.keys())
         return stages
                 
-
+    def set_conda_with_env(self,env_name,enviornment_dictionary):
+        '''extracts export statements from bash file and aplies them to the python env'''
+        #TODO: Create Conda Envs For Client
+        self.info("checking creds {} ".format(enviornment_dictionary))
+        for key, val in enviornment_dictionary.items():
+            self.info( 'setting {}'.format(key) )
+            subprocess.run(['conda','env','config','vars','set',f'{key.strip()}={val}'])
 
 
     @property

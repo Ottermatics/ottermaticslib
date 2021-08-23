@@ -36,7 +36,7 @@ PROJECT_FOLDER_OPTIONS = {'core': CORE_FOLDERS,
 SERIVCE_CREDS_FILE = 'ottermaticsgdocs_serviceid.json'
 
 #TODO: Map Client Drives (or others) as graphs in networkX, then we can compare different drive versions ect.
-#TODO: Create A Context Class To Expose drive info
+#TODO: Create A Context Class To Expose drive info (dropbox, userenv, client, remote, ect)
 
 def in_wsl() -> bool:
     """

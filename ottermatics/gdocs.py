@@ -595,7 +595,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         return all( tests )
 
     #Initalization Methods
-    def initalize(self):
+    def initalize(self,ttl=2):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
         self.debug(f'Initalizing from {self.filepath_root}')
 
@@ -636,7 +636,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #if self.target_folder_id not in node_ids:
         #    self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6))
         #else:
-        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=10) #fully refresh the top levels
+        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=ttl) #fully refresh the top levels
 
         self.status_message('Otterdrive Ready!')
         self.thread_time_multiplier = 1.0
