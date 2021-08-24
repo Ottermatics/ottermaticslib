@@ -554,7 +554,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #Authoirize yoself foo
         self.authoirze_google_integrations()
 
-        self.info('Initalizing...')
+        self.info('Setting Up Otterdrive...')
         #These use setters via properties so order is important
         #0) Get Share Drive Info
         self.update_shared_drives()
@@ -595,10 +595,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         return all( tests )
 
     #Initalization Methods
-    def initalize(self,ttl=2):
+    def initalize(self,ttl=1,reinit=False):
         '''Initalize maps the google root and shared folders, adds protections, and find the sync target'''
-        self.debug(f'Initalizing from {self.filepath_root}')
-
+        
+        self.info(f'Initalize({ttl})')
         #did_read = self.read() #READ FS HERE
         #if not did_read:
 
@@ -608,7 +608,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         node_ids = set(self.item_nodes.keys())
 
         #First level is protected!
-        if not self.initalized:
+        if not self.initalized or reinit:
+            self.info(f'Initalizing from {self.filepath_root} -> {gpath}')
             self.sync_folder_contents_locally(self.sync_root_id, protect=True )
             target = self.sync_folder_contents_locally(self.sync_root_id,stop_when_found= gpath,recursive=True, ttl=int(5))
 
@@ -636,7 +637,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         #if self.target_folder_id not in node_ids:
         #    self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6))
         #else:
-        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=ttl) #fully refresh the top levels
+        #self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=ttl) #fully refresh the top levels
 
         self.status_message('Otterdrive Ready!')
         self.thread_time_multiplier = 1.0
@@ -647,7 +648,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def reset_target_id(self):
         self._target_folder_id = self.ensure_g_path_get_id(self.sync_path(self.filepath_root))
-        self.sync_folder_contents_locally(self.target_folder_id, recursive=True, ttl=int(1E6)) 
+        self.sync_folder_contents_locally(self.target_folder_id) 
 
     def status_message(self,header=''):
         self.debug(f'{header}:\nSharedDrive: {self.shared_drive}:{self.sync_root_id}\nTarget Folder:  {self.sync_root}:{self.target_folder_id}\nFilePath Conversion: {self.filepath_root}->{self.full_sync_root}')
@@ -759,6 +760,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         #create uniform recursive object
         if top:
+            self.info(f"sync local with args pid={parent_id}, stop={stop_when_found}, rec={recursive},ttl={ttl},protect={protect}")
             init_val = bool(recursive)
             class token:
                 recursive = init_val
@@ -807,7 +809,6 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 for item in items:
                     self.sleep()
 
-                    #FIXME: This doesn't work, we don't stop anywhere
                     if stop_when_found is not None and item.absolute_path == stop_when_found:
                         if not stop:
                             self.info(f"Found {stop_when_found}")
@@ -822,23 +823,23 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                             #TODO: handle duplicates
 
                     if item.is_folder: #if it had contents it was already cached!!
-                        if obj.recursive and not stop:
-                            if item.id not in already_cached:
-                                already_cached.add(item.id)                        
-                                
-                                #recursive covers next, but will sync the directory contents, keeping the sync level global
-                                if ttl <= 0:
-                                    obj.recursive = False
-                                #elif ttl > 0:
-                                #    obj.recursive = True
+                        #Either do not stop or ensure that the item path is in the target
+                        if stop_when_found is None or item.absolute_path in stop_when_found: 
+                            if obj.recursive and not stop:
+                                if item.id not in already_cached:
+                                    already_cached.add(item.id)                        
+                                    
+                                    #recursive covers next, but will sync the directory contents, keeping the sync level global
+                                    if ttl <= 0:
+                                        obj.recursive = False
 
-                                if pool is not None:                                    
-                                    self.sleep()
-                                    if ttl >= 0:
-                                        pool.submit(self.sync_folder_contents_locally,item.id,recursive=obj,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False)
-                                else:
-                                    if ttl >= 0:
-                                        self.sync_folder_contents_locally(item.id,recursive=obj,ttl=ttl,protect=protect, already_cached= already_cached,top=False)
+                                    if pool is not None:                                    
+                                        self.sleep()
+                                        if ttl >= 0:
+                                            pool.submit(self.sync_folder_contents_locally,item.id,recursive=obj,ttl=ttl,protect=protect, pool = pool, already_cached= already_cached, top=False,stop_when_found=stop_when_found)
+                                    else:
+                                        if ttl >= 0:
+                                            self.sync_folder_contents_locally(item.id,recursive=obj,ttl=ttl,protect=protect, already_cached= already_cached,top=False,stop_when_found=stop_when_found)
 
         except Exception as e:
             self.error(e,'Issue Syncing Locally')
@@ -1908,9 +1909,10 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                 yield self #no work to do
 
             else:
+                self.info(f"Changing Contexts {filepath_root}->{sync_root}")
                 self.filepath_root = filepath_root
                 self.sync_root = sync_root
-                self.initalize()
+                self.initalize(reinit=True)
                 yield self
         
         except Exception as e:
@@ -2037,8 +2039,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         
     @sync_root.setter
     def sync_root(self,sync_root):
-        
-        if self._sync_root is not None: 
+        self.info(f"Setting Sync Root '{sync_root}' ")
+        if self._sync_root is not None and self._sync_root != sync_root: 
             do_reinitalize = True #We already initalize with previous input, do it again!
         else:
             do_reinitalize = False
@@ -2118,8 +2120,9 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
         if self._sync_root is None: raise SyncPathNotFound(f'No sync_path found for {self._sync_root}')
 
-        if do_reinitalize:
-            self.initalize()
+        # if do_reinitalize:
+        #     self.info("Reinitalizing")
+        #     self.initalize()
 
     @property
     def sync_root_id(self):
@@ -2173,6 +2176,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         self._use_threadpool = False
         self._max_num_threads = 1
         self.time_fuzz = 6
+
+        self._hot_directories = ExpiringDict(max_len=100, max_age_seconds=1)
 
         self.net_lock = threading.RLock()
         if self.gauth is None: self.authoirze_google_integrations()
