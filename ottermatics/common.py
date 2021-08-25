@@ -39,6 +39,8 @@ def get_size(obj, seen=None):
         size += sum([get_size(i, seen) for i in obj])
     return size
 
+
+
 def bool_from_env(bool_env_canidate):
     if bool_env_canidate.lower() in ('yes','true','y','1'):
         return True
@@ -157,6 +159,7 @@ from ottermatics.configuration import *
 from ottermatics.logging import *
 from ottermatics.locations import *
 
+#TODO: Replace This CLI With one in Secrets
 def main_cli():
     import argparse
 

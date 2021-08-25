@@ -119,7 +119,7 @@ import matplotlib.pyplot as pl
 from scipy.fftpack import fft, ifft
 
 
-def autocorrelation_fft(x) :
+def autocorrelation_fft( x ) :
     xp = ifftshift((x - np.average(x))/np.std(x))
     n, = xp.shape
     xp = np.r_[xp[:n//2], np.zeros_like(xp), xp[n//2:]]
@@ -128,7 +128,7 @@ def autocorrelation_fft(x) :
     pi = ifft(p)
     return np.real(pi)[:n//2]/(np.arange(n//2)[::-1]+n//2)
 
-def autocorrelation_direct(x):
+def autocorrelation_direct( x ):
     maxdelay = int(len(x)/5)
     N = len(x)
     mean = np.average(x)
@@ -142,7 +142,7 @@ def autocorrelation_direct(x):
     return autocorrelation
 
 
-def autocorrelation_numpy(x):
+def autocorrelation_numpy( x ):
     xp = (x - np.mean(x))/np.std(x)
     result = np.correlate(xp, xp, mode='full')
     return result[int(result.size/2):]/len(xp)
@@ -155,6 +155,10 @@ def autocorrelation_numpy(x):
 #     pl.plot(t[:200], autocorrelation_numpy(x)[:200],label='numpy correlate')
 #     pl.legend()
 #     pl.show()
+
+
+
+
 
 
 #@singleton_meta_object
@@ -463,6 +467,7 @@ class DBConnection(LoggingMixin,  metaclass=InputSingletonMeta):
 
     def __getstate__(self):
         '''Remove active connection objects, they are not picklable'''
+        #TODO: Should we remove credentials? How do we distibute object
         d = self.__dict__.copy()
         d['connection_string'] = None
         d['engine'] = None
