@@ -12,7 +12,9 @@ sudo apt-get install postgresql
 sudo apt install daemonize
 sudo apt-get install libpq-dev
 sudo apt-get install net-tools
-
+sudo apt install gfortran
+apt-get install libatlas-base-dev
+sudo apt-get install -y libgeos-dev
 
 
 mkdir sw
@@ -73,5 +75,6 @@ sudo apt-get install x11-apps
 sudo apt-get install libxkbcommon-x11-0
 sudo apt-get install qt5-default
 sudo apt-get install mesa-common-dev
-
-alias ipythonqt="ipython qtconsole --style=monokai --gui-completion=droplist"
+y
+echo "alias ipythonqt='ipython qtconsole --style=monokai --gui-completion=droplist'" >> ~/.bashrc
+echo "export LIBGL_ALWAYS_INDIRECT=1" >> ~/.bashrc

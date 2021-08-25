@@ -10,6 +10,7 @@ dropbox
 diskcache
 dearpygui
 pyqt5
+pyqt5-tools
 vtk
 numpy
 scipy
@@ -40,5 +41,5 @@ networkx>=2.5.1
 expiringdict>=1.2.1
 boto3
 deco
-ray==1.0.0
+ray==1.6.0
 ray[tune]
