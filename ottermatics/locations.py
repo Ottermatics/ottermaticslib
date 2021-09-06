@@ -187,9 +187,9 @@ def main_cli():
 
     #TODO: raise error or handle in WSL (we dont want to use the /mnt/c/ filesystem due to poor performance)
 
-    log.info(f'Checking For Folder `{args.project_name}` In {ottermatics_projects()}')
+    log.info(f'Checking For Folder `{args.project_name}` In {ottermatics_projects(skip_wsl =True)}')
 
-    ott_projects = os.listdir(ottermatics_projects())
+    ott_projects = os.listdir(ottermatics_projects(skip_wsl =True))
     lower_projects = [folder.lower() for folder in ott_projects]
 
     if args.project_name.lower() in lower_projects:
@@ -198,7 +198,7 @@ def main_cli():
         index = lower_projects.index(args.project_name.lower())
         actual_folder = ott_projects[index]
 
-        project_folder = os.path.join(ottermatics_projects(),actual_folder)
+        project_folder = os.path.join(ottermatics_projects(skip_wsl =True),actual_folder)
 
         folder_contents = os.listdir(project_folder)
         folder_contents_lower = map(lambda s: s.lower(), folder_contents)
@@ -216,7 +216,7 @@ def main_cli():
 
     else: #Is A Fresh Go
         log.info('Making Project Folder: {}'.format(args.project_name))
-        project_folder = os.path.join(ottermatics_projects(),args.project_name.lower())
+        project_folder = os.path.join(ottermatics_projects(skip_wsl =True),args.project_name.lower())
         os.mkdir( project_folder )
 
         for folder_stub in PROJECT_FOLDER_OPTIONS[ args.type ]:
