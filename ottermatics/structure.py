@@ -667,7 +667,7 @@ class Beam(Component):
 if __name__ == '__main__':
 
     import unittest
-    from matplotlib.pylab import *
+    from matplotlib import pylab
 
     class test_cantilever(unittest.TestCase):
         #tests the first example here

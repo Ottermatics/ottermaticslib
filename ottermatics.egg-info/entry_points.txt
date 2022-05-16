@@ -2,4 +2,3 @@
 condaenvset = ottermatics.common:main_cli
 ollymakes = ottermatics.locations:main_cli
 otterdrive = ottermatics.gdocs:main_cli
-

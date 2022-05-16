@@ -1,5 +1,6 @@
 import os
 import pdfplumber
+import PyPDF2
 
 '''We should combine this with `Location` to categorize research across projects'''
 
@@ -27,4 +28,3 @@ for root,dirs,fils in os.walk(pdfdir):
         except Exception as e:
             print(e)
             
-pdf_data['./Triton/research/06-Geothermal-Desalination---C-Turchi.pdf']
