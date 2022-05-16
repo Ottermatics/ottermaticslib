@@ -1,6 +1,8 @@
 # ottermaticslib
 
-Documentation Coming Soon!
+Documentation:
+https://ottermatics.github.io/ottermaticslib/build/html/index.html
 
-For now...
+
+Visulization / Planning Board
 https://miro.com/app/board/o9J_lK26d9Y=/
