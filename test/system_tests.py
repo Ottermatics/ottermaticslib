@@ -11,7 +11,7 @@ run_path = '{}/../analysis/'.format(testpath)
 log.info('adding neptunya path: {}'.format(run_path))
 sys.path.append(run_path)
 
-#from matplotlib.pylab import *
+from matplotlib import pylab
 import numpy as n
 import unittest
 
