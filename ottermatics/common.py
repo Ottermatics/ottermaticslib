@@ -7,7 +7,7 @@ Created on Sat May 11 22:28:07 2019
 """
 global PORT, PASS, USER, HOST, DB_NAME, CLIENT_G_DRIVE,CLIENT_GDRIVE_SYNC,CLIENT_GMAIL,CLIENT_NAME,SLACK_WEBHOOK_NOTIFICATION
 
-from matplotlib.pylab import *
+from matplotlib import pylab
 
 import os,shutil,copy,traceback,collections,logging, subprocess
 
@@ -143,7 +143,7 @@ if SLACK_WEBHOOK_NOTIFICATION is None and 'SLACK_WEBHOOK_NOTIFICATION' in os.env
     SLACK_WEBHOOK_NOTIFICATION = os.environ['SLACK_WEBHOOK_NOTIFICATION']    
 
 #Constants
-g = gravity = 9.80665 #m/s
+g = gravity = 9.80665 #m/s2
 G_grav_constant = 6.67430E-11 #m3/kgs
 speed_of_light = 299792458 #m/s
 u_planck = 6.62607015E-34 #Js
