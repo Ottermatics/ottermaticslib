@@ -9,6 +9,7 @@ ottermatics/common.py
 ottermatics/components.py
 ottermatics/configuration.py
 ottermatics/data.py
+ottermatics/fluid_material.py
 ottermatics/gdocs.py
 ottermatics/geometry.py
 ottermatics/locations.py

@@ -144,17 +144,11 @@ class TabulationMixin(Configuration,ClientInfoMixin):
     _store_types = None
     _store_level:int = -1  
 
-    #Ultra private variables
-    _val_tab_funtions = None
-    _stat_tab_functions = None
-    _avg_tab_functions = None
-
     _table = None
     _cls_attrs = None
     _attr_labels = None 
     #_attr_keys = None
     _anything_changed = False
-    _skip_table = False #This prevents config from reportin up through internal configurations    
 
     max_col_width_static:int = 10
 
