@@ -1,0 +1,42 @@
+# The manifest for the "docsrv" service.
+# Read the full specification for the "Load Balanced Web Service" type at:
+#  https://aws.github.io/copilot-cli/docs/manifest/lb-web-service/
+
+# Your service name will be used in naming your resources like log groups, ECS services, etc.
+name: docsrv
+# The "architecture" of the service you're running.
+type: Load Balanced Web Service
+
+image:
+  # Docker build arguments.
+  # For additional overrides: https://aws.github.io/copilot-cli/docs/manifest/rd-web-service/#image-build
+  build: Dockerfile
+  # Port exposed through your container to route traffic to it.
+  port: 8080
+
+entrypoint: "twistd -n web"
+command: --listen tcp:port=8080:interface=0.0.0.0 --path /docs
+#"twistd -n web --listen tcp:port=8080:interface=0.0.0.0 --path /docs'"
+#command: -n web --listen tcp:port=8080:interface=0.0.0.0 --path /docs
+#command: -l -c "twistd -n web --listen tcp:port=8080:interface=0.0.0.0 --path /docs"
+
+# nlb:
+#   port: 8080
+  #alias: cloudsync.aws
+  # healthcheck:
+  #   port: 8080
+
+http:
+  path: '/'
+  healthcheck:
+    path: '/index.html'
+    healthy_threshold: 3
+    unhealthy_threshold: 3
+    interval: 10s
+    timeout: 2s
+
+# Number of CPU units for the task.
+cpu: 256
+memory: 512
+count: 1
+ 
