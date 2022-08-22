@@ -1,8 +1,6 @@
 import attr
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component, ComponentIterator
-from ottermatics.patterns import SingletonMeta
-from ottermatics.data import DBConnection
 
 import datetime
 import os 

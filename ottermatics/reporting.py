@@ -32,14 +32,15 @@ ReportBase = declarative_base( )
 
 DEFAULT_STRING_LENGTH = 256
 
-'''A Module in which we reflect changing schema in components or other tabulationmixin instances
-when solved by an an analysis. The goal is to preserve information from expensive analysis to be 
-analized later in google data studio.
+'''A Module in which we reflect changing schema in components or other tabulationmixin instances when solved by an an analysis. 
+
+To use, add `ReporingMixin` to any Ottermatics `Analysis` class
 
 There are two major components to this module, that follow from the working plan:
 1) Investigate the existing database and create the tables nessicary
 2) upload the data to the database in the respective tables
 3) If nessicary update or create a view for each component and analysis (hard part!)
+
 
 At the time of creation attributes with ottermatics validators will be created as columns in the component table, where as only numeric key value pairs will be added to the components Vertical Attribute Mapping table (VAM)
 
