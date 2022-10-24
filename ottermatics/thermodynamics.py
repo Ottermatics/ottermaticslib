@@ -1,10 +1,15 @@
 import attr
-from ottermatics.configuration import Configuration, otterize
+#from ottermatics.configuration import Configuration, otterize
+from ottermatics.components import Component, table_property, otterize
 
+from ottermatics.fluid_material import Water,Air,Steam
 from CoolProp.CoolProp import PropsSI
 import CoolProp.CoolProp as CP
 
 from numpy import vectorize
+
+STD_TEMP = 273 + 20
+STD_PRESSURE = 1.01325E5
 
 #Thermodynamics
 @vectorize
@@ -77,7 +82,7 @@ def fanning_friction_factor(Re,method='turbulent'):
 
 #Simple Elements
 @otterize
-class SimpleHeatExchanger(Configuration):
+class SimpleHeatExchanger(Component):
 
     Thi = attr.ib()
     mdot_h = attr.ib()
@@ -90,21 +95,21 @@ class SimpleHeatExchanger(Configuration):
     efficiency = attr.ib(default=0.8)
     name = attr.ib(default='HeatExchanger')
 
-    @property
+    @table_property
     def CmatH(self):
         return self.Cp_h * self.mdot_h
 
-    @property
+    @table_property
     def CmatC(self):
         return self.Cp_c * self.mdot_c       
 
-    @property
+    @table_property
     def Tout_ideal(self):
         numerator = self.Thi * self.CmatH + self.Tci * self.CmatC
         denominator = self.CmatC + self.CmatH
         return numerator / denominator
 
-    @property
+    @table_property
     def Qdot_ideal(self):
         '''Use Tout ideal to determine the heat flow should be the same for both'''
         v1 = self.CmatH * (self.Thi - self.Tout_ideal)
@@ -113,22 +118,22 @@ class SimpleHeatExchanger(Configuration):
             self.warning('Qdot_ideal not matching')
         return (v1+v2)/2.0
 
-    @property
+    @table_property
     def Qdot(self):
         return self.Qdot_ideal * self.efficiency
     
-    @property
+    @table_property
     def Th_out(self):
         return self.Thi - self.Qdot / self.CmatH
 
-    @property
+    @table_property
     def Tc_out(self):
         return self.Tci + self.Qdot / self.CmatC  
 
 
 #Compression
 @otterize
-class SimpleCompressor(Configuration):   
+class SimpleCompressor(Component):   
 
     pressure_ratio = attr.ib()
 
@@ -141,15 +146,15 @@ class SimpleCompressor(Configuration):
     efficiency = attr.ib(default=0.75)
     name = attr.ib(default='Compressor')
 
-    @property
+    @table_property
     def temperature_ratio(self):
         return (self.pressure_ratio**((self.gamma-1.0)/self.gamma)  - 1.0)/ self.efficiency
 
-    @property
+    @table_property
     def Tout(self):
         return self.temperature_ratio * self.Tin
 
-    @property
+    @table_property
     def power_input(self):
         return self.Cp * self.mdot * (self.Tout - self.Tin)
 
@@ -157,7 +162,7 @@ class SimpleCompressor(Configuration):
         return self.pressure_ratio * pressure_in
 
 @otterize
-class SimpleTurbine(Configuration):   
+class SimpleTurbine(Component):   
 
     Pout = attr.ib()
     
@@ -172,15 +177,70 @@ class SimpleTurbine(Configuration):
     efficiency = attr.ib(default=0.80)
     name = attr.ib(default='Turbine')
 
-    @property
+    @table_property
     def pressure_ratio(self):
         return self.Pin / self.Pout
 
-    @property
+    @table_property
     def Tout(self):
         return self.Tin * ( 1 - self.efficiency * (1.0 - (1/self.pressure_ratio)**((self.gamma-1.0)/self.gamma))  )
         #return self.Tin * self.pressure_ratio**((self.gamma-1.0)/self.gamma)/ self.efficiency 
 
-    @property
+    @table_property
     def power_output(self):
+        '''calculates power output base on temp diff (where eff applied)'''
         return  self.Cp * self.mdot * ( self.Tin - self.Tout ) 
+
+
+#Compression
+@otterize
+class SimplePump(Component):   
+
+    MFin = attr.field() #kg/s
+    pressure_ratio = attr.field() #nd
+    Tin = attr.field(default=STD_TEMP) #k
+    Pin = attr.field(default=STD_PRESSURE) #c
+
+    efficiency = attr.field(default=0.75)
+    fluid = attr.field(factory=Water)
+    name = attr.field(default='pump')
+
+    def __on_init__(self):
+        self.evaluate()
+
+    def evaluate(self):
+        self.fluid.T = self.Tin
+        self.fluid.P = self.Pin
+
+        Tsat = self.fluid.Tsat
+        if self.Tin / Tsat >= 1:
+            self.warning('infeasible: pumping vapor!')
+
+        elif (self.Tin / self.fluid.Tsat) > 0.8:
+            self.warning('pump near saturated temp')
+
+    @table_property
+    def volumetric_flow(self):
+        return self.MFin / self.fluid.density
+
+    @table_property
+    def temperature_delta(self):
+        rho = self.fluid.density
+        v = self.MFin / rho
+        p = self.Pin
+        w = v * p / self.efficiency #work done
+        cp = self.fluid.specific_heat
+        dt = w * (1-self.efficiency) / (rho*cp*v)
+        return dt
+
+    @table_property
+    def Pout(self):
+        return self.pressure_ratio * self.Pin
+
+    @table_property
+    def Tout(self):
+        return self.temperature_delta + self.Tin
+
+    @table_property
+    def power_input(self):
+        return self.volumetric_flow * self.pressure_ratio / self.efficiency

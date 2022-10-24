@@ -3,7 +3,7 @@ import attr
 
 from ottermatics.configuration import Configuration, otterize, meta, chunks, inst_vectorize
 from ottermatics.logging import LoggingMixin, log
-from ottermatics.client import ClientInfoMixin
+#from ottermatics.client import ClientInfoMixin
 from ottermatics.locations import *
 from ottermatics.gdocs import *
 
@@ -126,9 +126,9 @@ class table_property:
 
 
 
-
+#TODO: add client-mixin as a top level idea... be specific ect.
 @otterize
-class TabulationMixin(Configuration,ClientInfoMixin):
+class TabulationMixin(Configuration):
     '''In which we define a class that can enable tabulation'''
     #Super Special Tabulating Index
     index = 0 #Not an attr on purpose, we want pandas to provide the index
@@ -193,7 +193,7 @@ class TabulationMixin(Configuration,ClientInfoMixin):
             else:
                 self.debug(f'skipping saved config {config.identity}')
 
-        self._anything_changed = False
+        self._anything_changed = True
 
     @property
     def anything_changed(self):
@@ -351,7 +351,16 @@ class TabulationMixin(Configuration,ClientInfoMixin):
                 stat_dataframes = []
                 for lvl, comps in rds.items():
                     for comp in comps:
-                        dataframes.append(comp['conf'].dataframe)
+                        df = comp['conf'].dataframe
+                        nm = comp['conf'].name.lower()
+                        if nm == 'default':
+                            nm = comp['conf'].__class__.__name__.lower()
+                        nm = nm.replace(' ','_')
+                        strv=f'{nm}_'
+                        strv+='{}'
+                        df.rename(strv.format, axis=1, inplace=True)
+
+                        dataframes.append(df)
                 self._complete_dataframe = pandas.concat(dataframes,join='outer',axis=1)
                         
             else:

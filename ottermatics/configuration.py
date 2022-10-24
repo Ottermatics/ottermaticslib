@@ -39,6 +39,8 @@ This should allow alot more functionalty and standardization options than just p
 
 #Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
+    #print(f'changing variables: {variable} {value}')
+    instance.debug(f'changing variables: {variable.name} {value}')
     instance._anything_changed = True
     return value
 

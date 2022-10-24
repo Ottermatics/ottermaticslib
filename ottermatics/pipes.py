@@ -270,8 +270,8 @@ class PipeFitting(Node,PipeFlow):
 @otterize(auto_attribs=True)
 class Pump(Component):
     '''Simulates a pump with power input, max flow, and max pressure by assuming a flow characteristic'''
-    max_flow: float
-    max_pressure: float
+    max_flow: float #volumetric rate m3/s
+    max_pressure: float #Pa
     #throttle: float
 
     @property
@@ -288,7 +288,7 @@ class Pump(Component):
         return numpy.interp(current_flow, flow, dP)
 
     def power(self,current_flow):
-        '''The power used considering'''
+        '''The power used considering in watts'''
         return self.dPressure(current_flow) * current_flow
         
 
