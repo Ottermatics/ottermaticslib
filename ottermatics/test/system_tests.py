@@ -1,14 +1,15 @@
-
 import pathlib
+
 testpath = pathlib.Path(__file__).parent.absolute()
 
 import logging
 
-log = logging.getLogger('neptunya-test')
+log = logging.getLogger("neptunya-test")
 
 import sys
-run_path = '{}/../analysis/'.format(testpath)
-log.info('adding neptunya path: {}'.format(run_path))
+
+run_path = "{}/../analysis/".format(testpath)
+log.info("adding neptunya path: {}".format(run_path))
 sys.path.append(run_path)
 
 from matplotlib import pylab
@@ -16,14 +17,16 @@ import numpy as n
 import unittest
 
 
-import copy,traceback
-import random,json
+import copy, traceback
+import random, json
 import time
 
 
-log.info('testing with path: {}'.format(sys.path))
-class ImportTest( unittest.TestCase ):
-    '''We test the compilation of all included modules'''
+log.info("testing with path: {}".format(sys.path))
+
+
+class ImportTest(unittest.TestCase):
+    """We test the compilation of all included modules"""
 
     def test_import_analysis(self):
         import analysis
@@ -68,6 +71,6 @@ class ImportTest( unittest.TestCase ):
         import thermodynamics
 
 
-if __name__ == '__main__':
-    print(('\n'*10))
+if __name__ == "__main__":
+    print(("\n" * 10))
     unittest.main()

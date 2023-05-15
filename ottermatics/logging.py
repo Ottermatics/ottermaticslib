@@ -1,59 +1,233 @@
 import logging
-
-
-import datetime
 import logging
-
 import traceback
-
-import json
-import sys,os
-import uuid
-#import graypy
-import socket
-from urllib.request import urlopen
-
+import sys, os
+from pyee import EventEmitter
+from termcolor import colored
 import requests
+import json
+import uuid
+
+global log_change_emitter
+log_change_emitter = EventEmitter()
+
 
 BASIC_LOG_FMT = "[%(name)-24s]%(message)s"
 
+global LOG_LEVEL
 LOG_LEVEL = logging.INFO
 
-global SLACK_WEBHOOK_NOTIFICATION
-SLACK_WEBHOOK_NOTIFICATION = None
 
-try:
-    #This should always work unless we don't have privideges (rare assumed)
-    HOSTNAME = socket.gethostname().upper()
-except:
-    HOSTNAME = 'MASTER'
+def change_all_log_levels(new_log_level: int, check_function=None):
+    """Changes All Log Levels With pyee broadcast before reactor is running
+    :param new_log_level: int - changes unit level log level (10-msg,20-debug,30-info,40-warning,50-error,60-crit)
+    :param check_function: callable -> bool - (optional) if provided if check_function(unit) is true then the new_log_level is applied
+    """
 
-log = logging.getLogger('')
-logging.basicConfig(format=BASIC_LOG_FMT,level=LOG_LEVEL)
+    if isinstance(new_log_level, float):
+        new_log_level = int(new_log_level)  # Float Case Is Handled
 
-FILE = os.path.dirname(__file__)
-CREDS = os.path.join(FILE, 'creds')
-credfile = lambda fil: os.path.join(CREDS,fil)
+    assert (
+        isinstance(new_log_level, int)
+        and new_log_level >= 1
+        and new_log_level <= 100
+    )
 
-def is_ec2_instance():
-    """Check if an instance is running on AWS."""
-    result = False
-    meta = 'http://169.254.169.254/latest/meta-data/public-ipv4'
-    try:
-        result = urlopen(meta,timeout=5.0).status == 200
+    global LOG_LEVEL
+    LOG_LEVEL = new_log_level
+
+    log.info(f"Changing All Logging Units To Level {new_log_level}")
+    log_change_emitter.emit("change_level", new_log_level, check_function)
+    LoggingMixin.log_level = new_log_level
+
+
+class LoggingMixin(logging.Filter):
+    """Class to include easy formatting in subclasses"""
+
+    log_level = LOG_LEVEL
+    _log = None
+
+    log_on = True
+
+    log_fmt = "[%(name)-24s]%(message)s"
+
+    slack_webhook_url = None
+    # log_silo = False
+
+    @property
+    def logger(self):
+        if self._log is None:
+            inst_log_name = (
+                "otterlog_" + self.identity + "_" + str(uuid.uuid4())
+            )
+            self._log = logging.getLogger(inst_log_name)
+            self._log.setLevel(level=self.log_level)
+
+            # Apply Filter Info
+            self._log.addFilter(self)
+            self.installSTDLogger()
+            from ottermatics.env_var import EnvVariable, SLACK_WEBHOOK
+
+            # Hot Patch Class (EnvVar is logging mixin... soo... here we are)
+            if LoggingMixin.slack_webhook_url is None:
+                # Do this on the fly since we SecretVariable is a log component
+                LoggingMixin.slack_webhook_url = SLACK_WEBHOOK
+
+            # if LoggingMixin.log_errors is None:
+            #     # Do this on the fly since we SecretVariable is a log component
+            #     LoggingMixin.log_errors = SecretVariable(
+            #         "CLOUD_SYNC_LOG_ERRORS",
+            #         default=True,
+            #         obscure=False,
+            #         type_conv=parse_bool,
+            #     )
+
+            if not hasattr(self, "_f_change_log"):
+
+                def _change_log(new_level, check_function=None):
+                    if new_level != self.log_level:
+                        if check_function is None or check_function(self):
+                            msg = f"changing {self.identity} log level: {self.log_level} -> {new_level}"
+                            self.log_level = new_level
+                            self.info(msg)
+                            self._log.setLevel(new_level)
+
+                log_change_emitter.add_listener("change_level", _change_log)
+
+                self._f_change_log = _change_log
+
+        return self._log
+
+    def resetLog(self):
+        self._log = None
+
+    def installSTDLogger(self):
+        """We only want std logging to start"""
+        sh = logging.StreamHandler(sys.stdout)
+        peerlog = logging.Formatter(self.log_fmt)
+        sh.setFormatter(peerlog)
+        self._log.addHandler(sh)
+
+    def add_fields(self, record):
+        """Overwrite this to modify logging fields"""
+        pass
+
+    def filter(self, record):
+        """This acts as the interface for `logging.Filter`
+        Don't overwrite this, use `add_fields` instead."""
+        record.name = self.identity.lower()
+        self.add_fields(record)
         return True
-    except:
-        return False
-    return False   
+
+    def msg(self, *args):
+        """Writes to log... this should be for raw data or something... least priorty"""
+        if self.log_on:
+            self.logger.log(
+                1, self.message_with_identiy(self.extract_message(args), "blue")
+            )
+
+    def debug(self, *args):
+        """Writes at a low level to the log file... usually this should
+        be detailed messages about what exactly is going on"""
+        if self.log_on:
+            self.logger.debug(
+                self.message_with_identiy(self.extract_message(args), "cyan")
+            )
+
+    def info(self, *args):
+        """Writes to log but with info category, these are important typically
+        and inform about progress of process in general"""
+        if self.log_on:
+            self.logger.info(
+                self.message_with_identiy(self.extract_message(args), "white")
+            )
+
+    def warning(self, *args):
+        """Writes to log as a warning"""
+        self.logger.warning(
+            self.message_with_identiy(
+                "WARN: " + self.extract_message(args), "yellow"
+            )
+        )
+
+    def error(self, error, msg=""):
+        """Writes to log as a error"""
+        # fmt = 'ERROR: {msg!r}|{err!r}'
+        tb = error.__traceback__
+        fmt = "ERROR:{msg}->{err}"
+        tb = "\n".join(traceback.format_exception(error, value=error, tb=tb))
+        msgfmt = ("\n" + " " * 51 + "|").join(str(msg).split("\n"))
+        # tbcl = colored(tb, "red")
+        # self.logger.exception( fmt.format(msg=msgfmt,err=tbcl))
+        # self.logger.exception( msgfmt)
+        m = colored(fmt.format(msg=msgfmt, err=tb), "red")
+        self.logger.error(m)
+
+    def critical(self, *args):
+        """A routine to communicate to the root of the server network that there is an issue"""
+        msg = self.extract_message(args)
+        msg = self.message_with_identiy(msg, "magenta")
+        self.logger.critical(msg)
+
+        # FIXME: setup slack notificatinos with env var
+        self.slack_notification(self.identity.title(), msg)
+
+    def slack_notification(self, category, message):
+        from ottermatics.env_var import SLACK_WEBHOOK, HOSTNAME
+
+        if SLACK_WEBHOOK.var_name in os.environ:
+            self.info("getting slack webhook")
+            url = SLACK_WEBHOOK.secret
+        else:
+            return
+        stage = HOSTNAME.secret
+        headers = {"Content-type": "application/json"}
+        data = {
+            "text": "{category} on {stage}:\n```{message}```".format(
+                category=category.upper(), stage=stage, message=message
+            )
+        }
+        self.info(f"Slack Notification : {url}:{category},{message}")
+        slack_note = requests.post(
+            url, data=json.dumps(data).encode("ascii"), headers=headers
+        )
+
+    def message_with_identiy(self, message: str, color=None):
+        """converts to color and string via the termcolor library
+        :param message: a string convertable entity
+        :param color: a color in [grey,red,green,yellow,blue,magenta,cyan,white]
+        """
+        if color != None:
+            return colored(str(message), color)
+        return str(message)
+
+    def extract_message(self, args):
+        for arg in args:
+            if type(arg) is str:
+                return arg
+        if self.log_level < 0:
+            print(f"no string found for {args}")
+        return ""
+
+    @property
+    def identity(self):
+        return type(self).__name__
 
 
-try:
-    logging.getLogger('parso.cache').disabled=True
-    logging.getLogger('parso.cache.pickle').disabled=True
-    logging.getLogger('parso.python.diff').disabled=True
+class Log(LoggingMixin):
+    pass
 
-except Exception as e:
-    log.warning(f'could not diable parso {e}')
+
+log = Log()
+
+
+# try:
+#     logging.getLogger('parso.cache').disabled=True
+#     logging.getLogger('parso.cache.pickle').disabled=True
+#     logging.getLogger('parso.python.diff').disabled=True
+#
+# except Exception as e:
+#     log.warning(f'could not diable parso {e}')
 # def installGELFLogger():
 #     '''Installs GELF Logger'''
 #     # self.gelf = graypy.GELFTLSHandler(GELF_HOST,GELF_PORT, validate=True,\
@@ -66,151 +240,33 @@ except Exception as e:
 #     log.addHandler(gelf)
 
 
-def installSTDLogger(fmt = BASIC_LOG_FMT):
-    '''We only want std logging to start'''
-    log = logging.getLogger('')
-    sh = logging.StreamHandler(sys.stdout)
-    peerlog = logging.Formatter()
-    sh.setFormatter(peerlog)
-    log.addHandler( sh )    
-
-
-def set_all_loggers_to(level,set_stdout=False,all_loggers=False):
-    global LOG_LEVEL
-    LOG_LEVEL = level
-    
-    if set_stdout: installSTDLogger()
-
-    logging.basicConfig(level = LOG_LEVEL) #basic config
-    
-    log = logging.getLogger()
-    log.setLevel(LOG_LEVEL)# Set Root Logger
-
-    log.setLevel(level) #root
-
-    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-    for logger in loggers:
-        if logger.__class__.__name__.lower().startswith('otter'):
-            logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
-            logger.setLevel(LOG_LEVEL)
-        elif all_loggers:
-            logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
-            logger.setLevel(LOG_LEVEL)
-
-
-
-class LoggingMixin(logging.Filter):
-    '''Class to include easy formatting in subclasses'''
-    
-    log_level = 30
-    _log = None
-
-    log_on = True
-    gelf = None
-
-    log_fmt = "[%(name)-24s]%(message)s"
-    log_silo = False
-
-    @property
-    def logger(self):
-        global LOG_LEVEL
-        if self._log is None:
-            self._log = logging.getLogger('otterlog_' +self.identity)
-            self._log.setLevel(level = LOG_LEVEL)
-            
-            #Apply Filter Info
-            self._log.addFilter(self)
-
-            #Eliminate Outside Logging Interaction
-            if self.log_silo:
-                self._log.handlers = []
-                self._log.propagate = False
-                self.installSTDLogger()
-                #self.installGELFLogger()
-
-        return self._log
-
-    # def installGELFLogger(self):
-    #     '''Installs GELF Logger'''
-    #     gelf = graypy.GELFUDPHandler(host=GELF_HOST,port=12203, extra_fields=True)
-    #     self._log.addHandler(gelf)
-
-    def resetLog(self):
-        self._log = None
-
-    def installSTDLogger(self):
-        '''We only want std logging to start'''
-        sh = logging.StreamHandler(sys.stdout)
-        peerlog = logging.Formatter(self.log_fmt)
-        sh.setFormatter(peerlog)
-        self._log.addHandler( sh )            
-      
-       
-    def add_fields(self, record):
-        '''Overwrite this to modify logging fields'''
-        pass
-
-    def filter(self, record):
-        '''This acts as the interface for `logging.Filter`
-        Don't overwrite this, use `add_fields` instead.'''
-        record.name = self.identity.lower()
-        self.add_fields(record)
-        return True
-
-    def msg(self,*args):
-        '''Writes to log... this should be for raw data or something... least priorty'''
-        if self.log_on:
-            self.logger.log(0,self.extract_message(args))
-
-    def debug(self,*args):
-        '''Writes at a low level to the log file... usually this should
-        be detailed messages about what exactly is going on'''
-        if self.log_on:
-            self.logger.debug( self.extract_message(args))
-
-    def info(self,*args):
-        '''Writes to log but with info category, these are important typically
-        and inform about progress of process in general'''
-        if self.log_on:
-            self.logger.info( self.extract_message(args))
-
-    def warning(self,*args):
-        '''Writes to log as a warning'''
-        self.logger.warning(self.extract_message(args))
-
-    def error(self,error,msg=''):
-        '''Writes to log as a error'''
-        fmt = '{msg!r}|{err!r}'
-        tb = ''.join(traceback.format_exception(etype=type(error), value=error, tb=error.__traceback__))
-        self.logger.exception( fmt.format(msg=msg,err=tb))
-
-    def critical(self,*args):
-        '''A routine to communicate to the root of the server network that there is an issue'''
-        global SLACK_WEBHOOK_NOTIFICATION
-        msg = self.extract_message(args)
-        self.logger.critical(msg)
-
-        self.slack_notification(self.identity.title(),msg)        
-
-    def slack_notification(self, category, message, stage=HOSTNAME):
-        global SLACK_WEBHOOK_NOTIFICATION
-        if SLACK_WEBHOOK_NOTIFICATION is None and 'SLACK_WEBHOOK_NOTIFICATION' in os.environ:
-            self.info('getting slack webhook')
-            SLACK_WEBHOOK_NOTIFICATION = os.environ['SLACK_WEBHOOK_NOTIFICATION']
-        headers = {'Content-type': 'application/json'}
-        data = {'text':"{category} on {stage}:\n```{message}```".format(\
-                            category=category.upper(),\
-                            stage=stage,\
-                            message=message)}
-        self.info(f'Slack Notification : {SLACK_WEBHOOK_NOTIFICATION}:{category},{message}')
-        slack_note = requests.post(SLACK_WEBHOOK_NOTIFICATION,data= json.dumps(data).encode('ascii'),headers=headers) 
-
-    def extract_message(self,args):
-        for arg in args:
-            if type(arg) is str:
-                return arg
-        return ''
-
-    @property
-    def identity(self):
-        return type(self).__name__
+# def installSTDLogger(fmt = BASIC_LOG_FMT):
+#     '''We only want std logging to start'''
+#     log = logging.getLogger('')
+#     sh = logging.StreamHandler(sys.stdout)
+#     peerlog = logging.Formatter()
+#     sh.setFormatter(peerlog)
+#     log.addHandler( sh )
+#
+#
+# def set_all_loggers_to(level,set_stdout=False,all_loggers=False):
+#     global LOG_LEVEL
+#     LOG_LEVEL = level
+#
+#     if set_stdout: installSTDLogger()
+#
+#     logging.basicConfig(level = LOG_LEVEL) #basic config
+#
+#     log = logging.getLogger()
+#     log.setLevel(LOG_LEVEL)# Set Root Logger
+#
+#     log.setLevel(level) #root
+#
+#     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+#     for logger in loggers:
+#         if logger.__class__.__name__.lower().startswith('otter'):
+#             logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
+#             logger.setLevel(LOG_LEVEL)
+#         elif all_loggers:
+#             logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
+#             logger.setLevel(LOG_LEVEL)

@@ -4,5 +4,4 @@ Documentation:
 https://ottermatics.github.io/ottermaticslib/build/html/index.html
 
 
-Visulization / Planning Board
-https://miro.com/app/board/o9J_lK26d9Y=/
+Ottermaticslib is a framework for effortless tabulation and storing results for the purposes of developing complex engineering systems.
