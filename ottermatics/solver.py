@@ -41,6 +41,19 @@ class SolverMixin:
     # solver_option = attrs.field(default='root',validator=attrs.validators.in_(SOLVER_OPTIONS))
     solver_option = "root"
 
+    # Configuration Information
+    @instance_cached
+    def signals(self):
+        return {k: getattr(self, k) for k in self.signals_attributes()}
+
+    @instance_cached
+    def solvers(self):
+        return {k: getattr(self, k) for k in self.solvers_attributes()}
+
+    @instance_cached
+    def transients(self):
+        return {k: getattr(self, k) for k in self.transients_attributes()}
+
     @property
     def solved(self):
         return self._solved
@@ -58,22 +71,22 @@ class SolverMixin:
         _trans_opts = None
         if cls.transients_attributes():
             # Get Timestep
-            
+
             # timestep
             if "dt" not in kwargs:
                 pass
-            #f"transients require timestep input `dt`"
+            # f"transients require timestep input `dt`"
             dt = float(kwargs.pop("dt"))
-            
+
             # endtime
             if "endtime" not in kwargs:
                 pass
-            
-            #add data
-            _trans_opts = {"dt": None, "endtime": None}    
+
+            # add data
+            _trans_opts = {"dt": None, "endtime": None}
             _trans_opts["dt"] = dt
-            
-            #f"transients require `endtime` to specify "
+
+            # f"transients require `endtime` to specify "
             _trans_opts["endtime"] = endtime = float(kwargs.pop("endtime"))
             _trans_opts["Nrun"] = max(int(endtime / dt) + 1, 1)
 
@@ -97,6 +110,9 @@ class SolverMixin:
         # parameters input
         for k, v in kwargs.items():
             # Ensure Its a List
+            if isinstance(v,numpy.ndarray):
+                v = v.tolist()
+
             if not isinstance(v, list):
                 assert test(v), f"bad values {k}:{v}"
                 v = [v]
@@ -112,7 +128,7 @@ class SolverMixin:
         return _firsts, _input, _trans_opts
 
     @classmethod
-    def sim(cls, **kwargs):
+    def sim(cls, _cb=None, **kwargs):
         """applies a permutation of input parameters for parameters not marked as transient, creates a system instance and returns the results of run()
         :param dt: timestep in s, required for transients
         :param endtime: when to end the simulation
@@ -125,17 +141,19 @@ class SolverMixin:
 
         # Create The System
         system = cls(**_firsts)
-        return system.run(**kwargs, **trs_opts)
+        return system.run(**kwargs, **trs_opts, _cb=_cb)
 
-    def run(self, revert=True, **kwargs):
+    def run(self, revert=True, _cb=None, **kwargs):
         """applies a permutation of input parameters for parameters not marked as transient, runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. The run command additionally configures the transient parameters
 
         :param dt: timestep in s, required for transients
         :param endtime: when to end the simulation
         :param revert: will reset the values of X that were recorded at the beginning of the run.
+        :param _cb: a callback function that takes the system as an argument cb(system)
+
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
         """
-        self.info(f"running analysis: with input {kwargs}")
+        self.info(f"running system {self.identity} with input {kwargs}")
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
 
@@ -164,13 +182,15 @@ class SolverMixin:
                 if self.transients and trs_opts:
                     self._run_id = int(uuid.uuid4())
                     self.time = 0
-                    self.run_transient(dt=trs_opts["dt"], N=trs_opts["Nrun"])
+                    self.run_transient(
+                        dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb
+                    )
 
                 else:
                     # stead=y state
                     if self._run_id is None:
                         self._run_id = int(uuid.uuid4())
-                    self.evaluate()
+                    self.evaluate(_cb=_cb)
 
             if revert and revert_x:
                 self.set_system_state(**revert_x)
@@ -179,11 +199,11 @@ class SolverMixin:
         else:
             raise Exception("Analysis Already Solved")
 
-    def run_transient(self, dt, N):
+    def run_transient(self, dt, N, _cb=None):
         """integrates the time series over N points at a increment of dt"""
         for i in range(N):
             # Run The SS Timestep
-            self.evaluate()
+            self.evaluate(_cb=_cb)
             # Run Integrators
             for k, v in self.transients.items():
                 v.integrate(dt)
@@ -191,9 +211,14 @@ class SolverMixin:
             self.time = self.time + dt
 
     # Single Point Flow
-    def evaluate(self, **fields_input):
-        """Evaluates the system with overrides for fields_input"""
+    def evaluate(self, _cb=None, **fields_input):
+        """Evaluates the system with overrides for fields_input
+
+        :param _cb: an optional callback taking the system as an argument
+        """
+
         # Pre Execute Which Sets Fields And PRE Signals
+        from ottermatics.system import System
 
         if self.log_level < 20:
             self.debug(f"running with X: {self.X} & {fields_input}")
@@ -202,16 +227,23 @@ class SolverMixin:
         # Runs The Solver
         try:
             out = self.execute()
-
         except Exception as e:
             self.info(f"solver failed @ {self.X}:\n{e}")
             out = None
+
+        # Solve Each Internal System
+        for key, comp in self.internal_components.items():
+            if isinstance(comp, System):
+                comp.evaluate()
 
         # Post Execute
         self.post_execute()
 
         # Save The Data
         self.save_data()
+
+        if _cb:
+            _cb(self)
 
         return out
 

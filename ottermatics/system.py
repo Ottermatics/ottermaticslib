@@ -16,9 +16,10 @@ Component's data flow is established via `SIGNALS` that are defined:
     - target_attr: must be a locally defined slot attribute or system attribute.
 
 update description to include solver
+
 A system calculates its state upon calling `System.run()`. This executes `pre_execute()` first which will directly update any attributes based on their `SIGNAL` definition between `SLOT` components. Once convergence is reached target_attr's are updated in `post_execute()` for cyclic SIGNALS.
 
-If the system encounters a subsystem in its solver routine, the subsystem is solved and its results used as static in that iteration,ie it isn't included in the system level dependents if cyclic references are found.
+If the system encounters a subsystem in its solver routine, the subsystem is evaluated() and its results used as static in that iteration,ie it isn't included in the system level dependents if cyclic references are found.
 
 
 The solver uses the root or cobla scipy optimizer results on quick references to internal component references. Upon solving the system
@@ -32,9 +33,11 @@ from ottermatics.logging import LoggingMixin
 from ottermatics.configuration import Configuration, otterize
 from ottermatics.tabulation import TabulationMixin
 from ottermatics.solver import SolverMixin, SOLVER, TRANSIENT
+from ottermatics.plotting import PlottingMixin
 
 import copy
 import collections
+
 
 # make a module logger
 class SystemsLog(LoggingMixin):
@@ -45,17 +48,19 @@ log = SystemsLog()
 
 
 @otterize
-class System(TabulationMixin, SolverMixin):
+class System(TabulationMixin, SolverMixin, PlottingMixin):
     """A system defines SLOTS for Components, and data flow between them using SIGNALS
-    
+
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
 
     The table is made up of these system references, allowing low overhead recording of systems with many variables.
 
     When solving by default the run(revert=True) call will revert the system state to what it was before the system began.
     """
-    
+
     _anything_changed_ = False
+
+    name: str = attrs.field(default="default")
 
     # Properties!
     @system_property
@@ -65,19 +70,6 @@ class System(TabulationMixin, SolverMixin):
     @system_property
     def run_id(self) -> int:
         return self._run_id
-
-    # Configuration Information
-    @instance_cached
-    def signals(self):
-        return {k: getattr(self, k) for k in self.signals_attributes()}
-
-    @instance_cached
-    def solvers(self):
-        return {k: getattr(self, k) for k in self.solvers_attributes()}
-
-    @instance_cached
-    def transients(self):
-        return {k: getattr(self, k) for k in self.transients_attributes()}
 
     @classmethod
     def subclasses(cls, out=None):
@@ -109,13 +101,12 @@ class System(TabulationMixin, SolverMixin):
         """looks at internal components as well as flag for anything chagned."""
         if self._anything_changed_:
             return True
-        elif any([c.anything_changed for c in self.comp_references]):
+        elif any([c.anything_changed for k, c in self.comp_references.items()]):
             return True
         return False
 
-
     @_anything_changed.setter
-    def _anything_changed(self,inpt):
+    def _anything_changed(self, inpt):
         """allows default functionality with new property system"""
         self._anything_changed_ = inpt
 
@@ -123,52 +114,63 @@ class System(TabulationMixin, SolverMixin):
     def comp_references(self):
         """A cached set of recursive references to any slot component"""
         out = {}
-        for key,lvl,comp in self.go_through_configurations(parent_level=1):
+        for key, lvl, comp in self.go_through_configurations(parent_level=1):
             out[key] = comp
         return out
-    
+
     @instance_cached
     def system_references(self):
-        """gather a list of references to attributes and """
+        """gather a list of references to attributes and"""
         out = self.internal_references
-        tatr = out['attributes']
-        tprp = out['properties']
-        for key,comp in self.comp_references.items():
+        tatr = out["attributes"]
+        tprp = out["properties"]
+        for key, comp in self.comp_references.items():
             sout = comp.internal_references
-            satr = sout['attributes']
-            sprp = sout['properties']
-            for k,v in satr.items():
-                tatr[f'{key}.{k}'] = v
-            for k,v in sprp.items():
-                tprp[f'{key}.{k}'] = v
+            satr = sout["attributes"]
+            sprp = sout["properties"]
+
+            # Fill in
+            for k, v in satr.items():
+                tatr[f"{key}.{k}"] = v
+
+            for k, v in sprp.items():
+                tprp[f"{key}.{k}"] = v
 
         return out
-    
+
+    @instance_cached
+    def all_references(self) -> dict:
+        out = {}
+        out.update(**self.system_references["attributes"])
+        out.update(**self.system_references["properties"])
+        return out
+
     @solver_cached
     def data_dict(self):
         """records properties from the entire system, via system references cache"""
         out = collections.OrderedDict()
         sref = self.system_references
-        for k,v in sref['attributes'].items():
+        for k, v in sref["attributes"].items():
             out[k] = v.value()
-        for k,v in sref['properties'].items():
+        for k, v in sref["properties"].items():
             out[k] = v.value()
-        return out  
-    
+        return out
+
     @property
     def system_state(self):
         """records all attributes"""
         out = collections.OrderedDict()
         sref = self.system_references
-        for k,v in sref['attributes'].items():
-            out[k] = v.value()       
-        self.info(f'recording system state: {out}')
+        for k, v in sref["attributes"].items():
+            out[k] = v.value()
+        self.debug(f"recording system state: {out}")
         return out
-    
-    def set_system_state(self,**kwargs):
+
+    def set_system_state(self, **kwargs):
+        """accepts parital input scoped from system references"""
         sref = self.system_references
-        satr = sref['attributes']
-        self.info(f'setting system state: {kwargs}')
-        for k,v in kwargs.items():
+        satr = sref["attributes"]
+        self.debug(f"setting system state: {kwargs}")
+        for k, v in kwargs.items():
             ref = satr[k]
             ref.set_value(v)

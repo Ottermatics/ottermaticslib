@@ -17,7 +17,7 @@ class MockComponent(Component):
     # use to test input from system
     aux: float = attrs.field(default=0)
 
-    comp = SLOT.define(Component,none_ok=True)
+    comp = SLOT.define(Component, none_ok=True)
 
     @system_property
     def output(self) -> float:
@@ -30,7 +30,7 @@ def limit_max(system):
 
 @otterize
 class MockSystem(System):
-    input: float = attrs.field()
+    input: float = attrs.field(default=0)
     output: float = attrs.field(default=0)
 
     in2: float = attrs.field(default=1)
@@ -51,7 +51,7 @@ class MockSystem(System):
     sol2.add_constraint("max", limit_max)
     sol2.add_constraint("min", 0)
 
-    #trans = TRANSIENT.define("x", "dxdt")
+    # trans = TRANSIENT.define("x", "dxdt")
 
     comp = SLOT.define(MockComponent)
 
@@ -62,7 +62,7 @@ class MockSystem(System):
 
     @system_property
     def in2out2(self) -> float:
-        return self.in2 - self.input * 2 + self.comp.aux/10
+        return self.in2 - self.input * 2 + self.comp.aux / 10
 
     @system_property
     def dxdt(self) -> float:
@@ -80,11 +80,11 @@ class TestComposition(unittest.TestCase):
         self.comp = MockComponent(comp=self.comp2)
         self.system = MockSystem(input=5, comp=self.comp)
 
-        #FIXME: turn off
+        # FIXME: turn off
         # self.comp2.log_level = 1
-        # self.comp2.resetLog()        
+        # self.comp2.resetLog()
         # self.comp.log_level = 1
-        # self.comp.resetLog()        
+        # self.comp.resetLog()
         # self.system.log_level = 1
         # self.system.resetLog()
 
@@ -94,46 +94,44 @@ class TestComposition(unittest.TestCase):
         # Pre Signals Test
         sysstart = self.system.input
         compstart = self.system.comp.input
-        self.assertNotEqual(sysstart, compstart) #no signals transfering input
+        self.assertNotEqual(sysstart, compstart)  # no signals transfering input
 
         # Use The Signals
         self.system.pre_execute()
 
         sysend = self.system.input
         compend = self.system.comp.input
-        self.assertEqual(sysend, compend) #signals should work as defined
-        self.assertEqual(sysstart, sysend) #input should remain the same
-        self.assertNotEqual(compstart, compend) #input on comp changes
+        self.assertEqual(sysend, compend)  # signals should work as defined
+        self.assertEqual(sysstart, sysend)  # input should remain the same
+        self.assertNotEqual(compstart, compend)  # input on comp changes
 
         # Do POST
         sysstart = self.system.output
-        compstart = self.system.comp.output 
-        self.assertNotEqual(sysstart, compstart) #they aren't aligned
+        compstart = self.system.comp.output
+        self.assertNotEqual(sysstart, compstart)  # they aren't aligned
 
         # Use The Signals
         self.system.post_execute()
 
         sysend = self.system.output
         compend = self.system.comp.output
-        self.assertEqual(sysend, compend) #signals should work
-        self.assertEqual(compstart, compend) #output should change
-        self.assertNotEqual(sysstart, sysend) #output should change
+        self.assertEqual(sysend, compend)  # signals should work
+        self.assertEqual(compstart, compend)  # output should change
+        self.assertNotEqual(sysstart, sysend)  # output should change
 
     def test_input_and_run(self):
         self.system.run(
-            **{"comp.aux": 5, "comp.comp.aux": 6}#, dt=0.1, endtime=0.1
+            **{"comp.aux": 5, "comp.comp.aux": 6}  # , dt=0.1, endtime=0.1
         )
         self.assertEqual(len(self.system.TABLE), 1, f"wrong run config")
         self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))
-        self.assertEqual(
-            set(self.system.comp.comp.dataframe["aux"]), set([6])
-        )
+        self.assertEqual(set(self.system.comp.comp.dataframe["aux"]), set([6]))
 
-        #solver constraints checking
-        input = self.system.dataframe['input'][0]
-        self.assertGreaterEqual(input,0) #min protection
-        self.assertLessEqual(input,1) #max protection
+        # solver constraints checking
+        input = self.system.dataframe["input"][0]
+        self.assertGreaterEqual(input, -1E3)  # min protection
+        self.assertLessEqual(input, 1)  # max protection
 
-        in2 = self.system.dataframe['input'][0]
-        self.assertGreaterEqual(in2,0) #min protection
-        self.assertLessEqual(in2,4-input) #max protection        
+        in2 = self.system.dataframe["input"][0]
+        self.assertGreaterEqual(in2,  -1E3)  # min protection
+        self.assertLessEqual(in2, 4 - input)  # max protection

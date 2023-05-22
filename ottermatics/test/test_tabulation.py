@@ -10,11 +10,14 @@ import os
 import numpy
 import random
 
+# from ottermatics.logging import LoggingMixin, change_all_log_levels
+# change_all_log_levels(10)
+
 
 @otterize
 class TestConfig(Component):
-    attrs_prop:float = attr.ib(1.0)
-    attrs_str:str = attr.ib("hey now")
+    attrs_prop: float = attr.ib(1.0)
+    attrs_str: str = attr.ib("hey now")
 
     @system_property
     def test_one(self) -> int:
@@ -48,6 +51,7 @@ class Test(unittest.TestCase):
                 rfil = os.path.join(self.test_dir, fil)
                 # print('removing '+rfil)
                 # os.remove(rfil)
+        self.test_config.reset_table()
 
     def test_attrs_labels(self):
         # Default
@@ -82,9 +86,10 @@ class Test(unittest.TestCase):
                 )
             )
 
-    def test_assemble_data(self):
+    def test_assemble_data_always_save(self):
         # print(f"testing data assembly {self.test_config.always_save_data}")
         # Run before test_table_to...
+    
         self.assertFalse(self.test_config.TABLE)
         self.test_config.save_data()
 
@@ -93,13 +98,13 @@ class Test(unittest.TestCase):
 
         # Stochastic Props so this will work without input change.
         self.test_config.save_data()
-        self.assertTrue(2 in self.test_config.TABLE)
+        self.assertFalse(2 in self.test_config.TABLE)
 
     def test_assemble_data_on_input(self):
         # change this to check behavior to adjust stochastic behavior
-        self.test_config.__class__._always_save_data = False
         # print(f"testing data assembly {self.test_config.always_save_data}")
         # Run before test_table_to...
+
         self.assertFalse(self.test_config.TABLE)
         self.test_config.save_data()
 
@@ -111,10 +116,12 @@ class Test(unittest.TestCase):
         self.assertFalse(2 in self.test_config.TABLE)
 
         # Change Something
-        self.test_config.attrs_prop = 5
+        cur_val = self.test_config.attrs_prop
+        new_val = 6 + cur_val
+        self.test_config.info(f'setting attrs prop on in {cur_val } => {new_val}')
+        self.test_config.attrs_prop = new_val
         self.test_config.save_data()
         self.assertTrue(2 in self.test_config.TABLE)
-        self.test_config.__class__._always_save_data = True
 
     def file_in_format(self, fileextension, path=True):
         fille = "{}.{}".format(self.test_file_name, fileextension)
@@ -127,7 +134,9 @@ class Test(unittest.TestCase):
     def test_dataframe(self, iter=5):
         attr_in = {}
         for i in range(iter):
-            attr_in[i] = val = random.randrange(-10, 10)
+            cur_val = self.test_config.attrs_prop
+            attr_in[i] = val = cur_val + i**2.            
+            self.test_config.info(f'setting attrs prop df {cur_val } => {val}')            
             self.test_config.attrs_prop = val
             self.test_config.save_data()
 
@@ -168,8 +177,8 @@ class Test(unittest.TestCase):
 
 @otterize
 class Static(Component):
-    attrs_prop:float = attr.ib(1.0)
-    attrs_str:str = attr.ib("hey now")
+    attrs_prop: float = attr.ib(1.0)
+    attrs_str: str = attr.ib("hey now")
 
     @system_property
     def test_one(self) -> int:
@@ -192,7 +201,7 @@ class TestStatic(unittest.TestCase):
 
     def test_input(self, num=10):
         for i in range(num):
-            self.test_config.attrs_prop = random.random()
+            self.test_config.attrs_prop = i + self.test_config.attrs_prop
             self.test_config.save_data()
 
         self.assertEqual(len(self.test_config.TABLE), num)

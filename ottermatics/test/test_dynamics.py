@@ -8,6 +8,7 @@ from ottermatics.solver import SOLVER, TRANSIENT
 from ottermatics.signals import SIGNAL
 from ottermatics.slots import SLOT
 from ottermatics.properties import *
+from ottermatics.plotting import *
 
 from scipy.optimize import curve_fit, least_squares
 import numpy as np
@@ -35,7 +36,7 @@ class SpringMass(System):
     vtx = TRANSIENT.define("v", "a")
     xtx = TRANSIENT.define("x", "v")
 
-    # TODO: add friction force for v
+    pos = TRACE.define(y='x',y2=['v','a'])
 
     @system_property
     def dx(self) -> float:

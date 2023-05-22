@@ -14,13 +14,18 @@ class SLOT(attrs.Attribute):
     name: str
     accepted: SLOT_TYPES
     on_system: "System"
-    none_ok:bool
+    none_ok: bool
+
+    default_ok = True
 
     @classmethod
-    def define(cls, *component_or_systems: SLOT_TYPES,none_ok=False):
+    def define(
+        cls, *component_or_systems: SLOT_TYPES, none_ok=False, default_ok=True
+    ):
         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass
-        
+
         :param none_ok: will allow no component on that item, oterwise will fail
+        :param default_ok: will create the slot class with no input if true, which is the behavior by default
         """
         from ottermatics.components import Component
         from ottermatics.system import System
@@ -41,7 +46,12 @@ class SLOT(attrs.Attribute):
         new_slot = type(
             new_name,
             (SLOT,),
-            dict(name=new_name, accepted=component_or_systems,none_ok=none_ok),
+            dict(
+                name=new_name,
+                accepted=component_or_systems,
+                none_ok=none_ok,
+                default_ok=default_ok,
+            ),
         )
         return new_slot
 

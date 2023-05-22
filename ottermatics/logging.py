@@ -61,7 +61,7 @@ class LoggingMixin(logging.Filter):
                 "otterlog_" + self.identity + "_" + str(uuid.uuid4())
             )
             self._log = logging.getLogger(inst_log_name)
-            self._log.setLevel(level=self.log_level)
+            self._log.setLevel(level=self.__class__.log_level)
 
             # Apply Filter Info
             self._log.addFilter(self)
@@ -88,7 +88,7 @@ class LoggingMixin(logging.Filter):
                     if new_level != self.log_level:
                         if check_function is None or check_function(self):
                             msg = f"changing {self.identity} log level: {self.log_level} -> {new_level}"
-                            self.log_level = new_level
+                            self.__class__.log_level = new_level
                             self.info(msg)
                             self._log.setLevel(new_level)
 
@@ -152,14 +152,19 @@ class LoggingMixin(logging.Filter):
 
     def error(self, error, msg=""):
         """Writes to log as a error"""
+
         # fmt = 'ERROR: {msg!r}|{err!r}'
+
         tb = error.__traceback__
         fmt = "ERROR:{msg}->{err}"
+
         tb = "\n".join(traceback.format_exception(error, value=error, tb=tb))
         msgfmt = ("\n" + " " * 51 + "|").join(str(msg).split("\n"))
+
         # tbcl = colored(tb, "red")
         # self.logger.exception( fmt.format(msg=msgfmt,err=tbcl))
         # self.logger.exception( msgfmt)
+
         m = colored(fmt.format(msg=msgfmt, err=tb), "red")
         self.logger.error(m)
 

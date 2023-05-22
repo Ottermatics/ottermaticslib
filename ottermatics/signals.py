@@ -92,11 +92,10 @@ class SignalInstance:
     def apply(self):
         """sets `target` from `source`"""
         val = self.source.value()
-        if self.system.log_level < 20:
-            self.system.debug(f'applying {self.source}|{val} to {self.target}')
+        if self.system.log_level < 5:
+            self.system.debug(f"applying {self.source}|{val} to {self.target}")
         self.target.set_value(val)
 
     @property
     def mode(self) -> str:
         return self.signal.mode
-    

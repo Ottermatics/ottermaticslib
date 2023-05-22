@@ -20,19 +20,35 @@ log = ConfigLog()
 
 # Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
-    if variable in instance.attrs_fields and value != getattr(
-        instance, variable.name
-    ):
-        instance.debug(f"changing variables: {variable.name} {value}")
+    if log.log_level <= 10:
+        log.info(f"checking property changed {instance}{variable.name} {value}")
+
+    if instance._anything_changed:
+        #Bypass Check since we've already flagged for an update
+        return value
+    
+    #Check if shoudl be updated
+    cur = getattr(instance, variable.name)
+    attrs = attr.fields(instance.__class__)
+    if variable in attrs and value != cur:
+        if log.log_level <= 10:
+            instance.debug(f"changing variables: {variable.name} {value}")
         instance._anything_changed = True
+
+    elif log.log_level <= 10 and variable in attrs:
+        instance.warning(f'didnt change variables {variable.name}| {value} == {cur}')
+
+    elif log.log_level <= 10:
+        instance.critical(f'missing variable {variable.name} not in {attrs}')
+
     return value
 
 
 def signals_slots_handler(
-    cls, fields, slots=True, signals=True, solvers=True, sys=True
+    cls, fields, slots=True, signals=True, solvers=True, sys=True, plots=True
 ):
     """
-    creates attributes as per the attrs.define field_transformer use case. 
+    creates attributes as per the attrs.define field_transformer use case.
 
     Customize initalization with slots,signals,solvers and sys flags.
     """
@@ -40,11 +56,41 @@ def signals_slots_handler(
 
     for t in fields:
         if t.type is None:
-            log.warning(f'{cls.__name__}.{t.name} has no type')
+            log.warning(f"{cls.__name__}.{t.name} has no type")
 
-    out = fields
-    field_names = set([o.name for o in out])
+    out = []
+    field_names = set([o.name for o in fields])
     log.debug(f"fields: {field_names}")
+
+    # Add Important Fields
+    in_fields = {f.name: f for f in fields}
+    if "name" in in_fields:
+        name = in_fields.pop("name")
+        out.append(name)
+
+    else:
+        log.warning(f"{cls.__name__} does not have a name!")
+        name = attrs.Attribute(
+            name="name",
+            default="default",
+            validator=None,
+            repr=True,
+            eq=True,
+            eq_key=None,
+            order=True,
+            order_key=None,
+            hash=None,
+            init=True,
+            metadata=None,
+            type=str,
+            converter=None,
+            kw_only=False,
+            inherited=True,
+            on_setattr=None,
+            alias="name",
+        )
+        out.append(name)
+
     # Assert there is no time in attributes if not a transient
     assert (
         "time" not in field_names
@@ -101,10 +147,13 @@ def signals_slots_handler(
             slot.configure_for_system(slot_name, cls)
 
             log.info(f"{cls.__name__} adding SLOT {slot_name}")
+            stype = slot.accepted
 
+            if isinstance(stype, (list, tuple)):
+                stype = stype[0]
             at = attrs.Attribute(
                 name=slot_name,
-                default=None,
+                default=attrs.Factory(stype) if slot.default_ok else None,
                 validator=slot.validate_slot,
                 repr=True,
                 cmp=None,
@@ -201,12 +250,93 @@ def signals_slots_handler(
             )
             out.append(at)
 
+    if plots:
+        for pltname, plot in cls.plot_attributes().items():
+            plot.configure_for_system(pltname, cls)
+
+            log.info(f"{cls.__name__} adding PLOT {pltname}")
+
+            at = attrs.Attribute(
+                name=pltname,
+                default=plot.make_plot_factory(),
+                validator=None,
+                repr=False,
+                cmp=None,
+                hash=None,
+                init=False,
+                metadata=None,
+                type=plot,
+                converter=None,
+                kw_only=True,
+                eq=None,
+                order=None,
+                on_setattr=None,
+                inherited=False,
+            )
+            out.append(at)
+
+        for pltname, plot in cls.trace_attributes().items():
+            plot.configure_for_system(pltname, cls)
+
+            log.info(f"{cls.__name__} adding TRACE {pltname}")
+
+            at = attrs.Attribute(
+                name=pltname,
+                default=plot.make_plot_factory(),
+                validator=None,
+                repr=False,
+                cmp=None,
+                hash=None,
+                init=False,
+                metadata=None,
+                type=plot,
+                converter=None,
+                kw_only=True,
+                eq=None,
+                order=None,
+                on_setattr=None,
+                inherited=False,
+            )
+            out.append(at)
+
+    created_fields = set([o.name for o in out])
+    # print options
+    if cls.log_level < 10:
+        from ottermatics.plotting import PLOT
+
+        for o in out:
+            if isinstance(o.type, PLOT):
+                print(o)
+
+
+    # Merge Fields
+    for k, o in in_fields.items():
+        if k not in created_fields:
+            out.append(o)
+        else:
+            log.warning(
+                f"{cls.__name__} skipping inherited attr: {o.name} as a custom type overriding it"
+            )
+
+    #Enforce Property Changing
+    #FIXME: is this more reliable
+    # real_out = []
+    # for fld in out:
+    #     if fld.type in (int,float,str):
+    #         #log.warning(f"setting property changed on {fld}")
+    #         fld = fld.evolve(on_setattr = property_changed)
+    #         real_out.append(fld)
+    #     else:
+    #         real_out.append(fld)
+    # #return real_out
     return out
 
 
+# TODO: generalize the "Concept" attribute, and apply as attrs.define(field_transformer=this_concept)
+
 # alternate initalisers
 comp_transform = lambda c, f: signals_slots_handler(
-    c, f, True, False, False, False
+    c, f, slots=True, signals=False, solvers=False, sys=False, plots=False
 )
 
 
@@ -216,8 +346,6 @@ def otterize(cls=None, **kwargs):
     1) we use the callback when any property changes
     2) repr is default
     3) hash is by object identity"""
-
-    # TODO: define stochastic input (set attr property changed = always true)
 
     # Define defaults and handle conflicts
     dflts = dict(repr=False, eq=False, slots=False)
@@ -241,6 +369,8 @@ def otterize(cls=None, **kwargs):
             acls.pre_compile()
             acls.validate_class()
             return acls
+
+        # Component/Config Flow
         log.info(f"Configuring: {cls.__name__}")
         acls = attr.s(
             cls,
@@ -308,6 +438,7 @@ class Configuration(LoggingMixin):
         """This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!"""
         # Store abs path On Creation, in case we change
         self._log = None
+        self._anything_changed = True #save by default first go!
         self._created_datetime = datetime.datetime.utcnow()
         self.debug(f"created {self.identity}")
         self.__on_init__()
@@ -356,14 +487,14 @@ class Configuration(LoggingMixin):
     @property
     def identity(self):
         """A customizeable property that will be in the log by default"""
-        if not self.name:
+        if not self.name or self.name=='default':
             return self.classname.lower()
         return f"{self.classname}-{self.name}".lower()
 
     @property
     def classname(self):
         """Shorthand for the classname"""
-        return str(type(self).__name__)
+        return str(type(self).__name__).lower()
 
     # Configuration Information
     # FIXME: make signals and slots for compFanonent links
@@ -395,16 +526,16 @@ class Configuration(LoggingMixin):
         )
 
         if should_yield_level(level):
-            yield '',level, self
+            yield "", level, self
 
         level += 1
-        for key,config in self.internal_configurations.items():
-            for skey,level, iconf in config.go_through_configurations(
+        for key, config in self.internal_configurations.items():
+            for skey, level, iconf in config.go_through_configurations(
                 level, levels_to_descend, parent_level
             ):
-                yield f'{key}.{skey}' if skey else key,level, iconf
+                yield f"{key}.{skey}" if skey else key, level, iconf
 
-    @class_cache
+    @property
     def attrs_fields(self) -> set:
         return set(attr.fields(self.__class__))
 
@@ -454,20 +585,20 @@ class Configuration(LoggingMixin):
         from ottermatics.solver import SOLVER, TRANSIENT
 
         return cls._get_init_attrs_data(TRANSIENT)
-    
+
     @classmethod
     def trace_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all trace attributes for class"""
-        from ottermatics.solver import PLOT,TRACE
+        from ottermatics.plotting import TRACE
+
         return cls._get_init_attrs_data(TRACE)
 
     @classmethod
     def plot_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all plot attributes for class"""
-        from ottermatics.plotting import PLOT,TRACE
+        from ottermatics.plotting import PLOT
 
         return cls._get_init_attrs_data(PLOT)
-
 
     @classmethod
     def input_fields(cls):
@@ -475,7 +606,7 @@ class Configuration(LoggingMixin):
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
 
-        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT)
+        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, tuple, list)
         return cls._get_init_attrs_data(ignore_types, exclude=True)
 
     @classmethod
@@ -484,7 +615,7 @@ class Configuration(LoggingMixin):
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
 
-        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT,str)
+        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, str, tuple, list)
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}
 

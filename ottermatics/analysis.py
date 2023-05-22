@@ -5,6 +5,7 @@ from ottermatics.tabulation import TabulationMixin
 from ottermatics.system import System
 from ottermatics.typing import *
 from ottermatics.reporting import *
+from ottermatics.plotting import PlottingMixin
 
 # import datetime
 import os
@@ -16,6 +17,7 @@ import attrs
 from contextlib import contextmanager
 import inspect
 
+import matplotlib.pylab as pylab
 
 list_check = attrs.validators.instance_of(list)
 
@@ -32,7 +34,7 @@ def make_reporter_check(type_to_check):
 
 
 @otterize
-class Analysis(TabulationMixin):
+class Analysis(TabulationMixin,PlottingMixin):
     """Analysis takes a system and many reporters, runs the system, adds its own system properties to the dataframe and post processes the results
 
     post_process() typically creates plots, but can be overriden
@@ -46,147 +48,58 @@ class Analysis(TabulationMixin):
         factory=list, validator=make_reporter_check(PlotReporter)
     )
 
-    _stored_plots:list = attrs.field(factory=list)
+    _stored_plots: dict = attrs.field(factory=dict)
     _uploaded = False
+
+    show_plots: bool = attrs.field(default=True)
 
     @property
     def uploaded(self):
         return self._uploaded
 
     def run(self, *args, **kwargs):
-        self.info(f"running results with input {args} {kwargs}")
-        out = self.system.run(*args, **kwargs, cb=self.save_data)
+        self.info(f"running analysis {self.identity} with input {args} {kwargs}")
+        cb = lambda sys: self.save_data(force=True, subforce=True)
+        out = self.system.run(*args, **kwargs, _cb=cb)
         self.post_process(*args, **kwargs)
-        self.make_plots()
+
+        self._stored_plots = {}
+        self.make_plots(analysis=self, store_figures = self._stored_plots)
         self.report_results()
 
     def post_process(self, *args, **kwargs):
         """A user customizeable function"""
         pass
 
-    def make_plots(self):
-        """creates user PLOTs and TRACESs (for transients only)"""
-        # TODO:  define PLOT attribute
-        # TODO: define TRACE attribute
-        pass
 
     def report_results(self):
         self.info(f"report results")
 
         for tbl_reporter in self.table_reporters:
-            tbl_reporter.upload(self)
+            try:
+                tbl_reporter.upload(self)
+            except Exception as e:
+                self.error(e, "issue in {tbl_reporter}")
 
         for plt_reporter in self.plot_reporters:
-            plt_reporter.upload(self)
+            try:
+                plt_reporter.upload(self)
+            except Exception as e:
+                self.error(e, "issue in {plt_reporter}")
+
+        if self.show_plots:
+            self.info(f'showing plots {len(self.stored_plots)}')
+            for figkey,fig in self.stored_plots.items():
+                self.info(f'showing {figkey}')
+                try:
+                    fig.show()
+                except Exception as e:
+                    self.error(e,f'issue showing {figkey}')
+                    
 
         self._uploaded = True
 
-#     def go_through_components(
-#         self, level=0, levels_to_descend=-1, parent_level=0
-#     ):
-#         """A generator that will go through all internal configurations up to a certain level
-#         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
-#         only go through this configuration
-# 
-#         :return: level,config"""
-# 
-#         should_yield_level = lambda level: all(
-#             [
-#                 level >= parent_level,
-#                 any([levels_to_descend < 0, level <= levels_to_descend]),
-#             ]
-#         )
-# 
-#         if should_yield_level(level):
-#             yield level, self
-# 
-#         level += 1
-#         for comp in self.internal_components.values():
-#             for level, icomp in comp.go_through_components(
-#                 level, levels_to_descend, parent_level
-#             ):
-#                 yield level, icomp
-# 
-#     @property
-#     def all_internal_components(self):
-#         return list(
-#             [
-#                 comp
-#                 for lvl, comp in self.go_through_components()
-#                 if not self is comp
-#             ]
-#         )
-# 
-#     @property
-#     def unique_internal_components_classes(self):
-#         return list(
-#             set(
-#                 [
-#                     comp.__class__
-#                     for lvl, comp in self.go_through_components()
-#                     if not self.__class__ is comp.__class__
-#                 ]
-#             )
-#         )
-
     # Plotting & Report Methods:
-    @property
-    def saved_plots(self):
-        return self._stored_plots
-
-    @property
-    def plotting_methods(self):
-        return {
-            fname: func
-            for fname, func in inspect.getmembers(
-                self, predicate=inspect.ismethod
-            )
-            if fname.startswith("plot_")
-        }
-
-    @contextmanager
-    def subplots(self, plot_tile, save=True, *args, **kwargs):
-        """context manager for matplotlib subplots, which will save the plot if no failures occured
-        using a context manager makes sense so we can record the plots made, and then upload them in
-        the post processing steps.
-
-        it makes sense to always save images, but to override them.
-        plot id should be identity+plot_title and these should be stored by date in the report path
-        """
-        fig, maxes = plt.subplots(*args, **kwargs)
-
-        try:
-            yield fig, maxes
-
-            if save:
-                # determine file name
-                filename = "{}_{}".format(self.filename, plot_tile)
-                supported_filetypes = plt.gcf().canvas.get_supported_filetypes()
-                if not any(
-                    [
-                        filename.endswith(ext)
-                        for ext in supported_filetypes.keys()
-                    ]
-                ):
-                    if "." in filename:
-                        filename = (
-                            ".".join(filename.split(".")[:-1])
-                            + self._default_image_format
-                        )
-                    else:
-                        filename += self._default_image_format
-
-                filepath = os.path.join(self.config_path_daily, filename)
-
-                self.info("saving plot {}".format(filename))
-                fig.savefig(filepath)
-
-                self._stored_plots.append(filepath)
-
-        except Exception as e:
-            self.error(e, "issue plotting {}".format(plot_tile))
-
-
 #     @property
 #     def _report_path(self):
 #         """Add some name options that work into ClientInfoMixin"""

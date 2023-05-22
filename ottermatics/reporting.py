@@ -1,13 +1,25 @@
 """The set of reporters define an interface to report plots or tables"""
 
 from ottermatics.configuration import Configuration, otterize
+from ottermatics.typing import Options
+from ottermatics.logging import LoggingMixin
 import attrs
 import abc
 
+import os, pathlib
+import datetime
+
+
+def path_exist_validator(inst, attr, value):
+    if not isinstance(value, str):
+        raise ValueError(f"{attr.name} isnt a string")
+    if not os.path.exists(value):
+        raise FileExistsError(f"{value} does not exist")
+
 
 # BASE CLASSSES (PLOT + TABLE)
-@otterize
-class Reporter(Configuration):
+@attrs.define
+class Reporter(LoggingMixin):
     """A mixin intended"""
 
     name: str = attrs.field(default="reporter")
@@ -31,60 +43,145 @@ class Reporter(Configuration):
         raise NotImplemented()
 
 
-@otterize
+# Functionality Mixins
+@attrs.define
+class TemporalReporterMixin(Reporter):
+    """Provide single or periodic keys"""
+
+    # report_mode: Options("single", "daily", "monthly") #choose wisely
+
+    @property
+    def report_root(self):
+        raise NotImplemented()
+
+    @property
+    def date_key(self):
+        d = datetime.datetime.utcnow().date()
+        return f"{d.year}.{d.month:02}.{d.day:02}"
+
+    @property
+    def month_key(self):
+        d = datetime.datetime.utcnow().date()
+        return f"{d.year}.{d.month:02}"
+
+    @property
+    def report_root(self):
+        """define your keys!"""
+        raise NotImplemented()
+
+
+@attrs.define
+class DiskReporterMixin(TemporalReporterMixin):
+    path: str = attrs.field(default=None, validator=path_exist_validator)
+
+    # whats our /report/<key> gonna be
+    report_mode = Options("single", "daily", "monthly")
+
+    @property
+    def report_root(self):
+        if self.report_mode == "single":
+            return self.path
+        elif self.report_mode == "daily":
+            return os.path.join(self.path, self.date_key)
+        elif self.report_mode == "monthly":
+            return os.path.join(self.path, self.month_key)
+
+        raise ValueError(f"options failed!")
+
+    def ensure_exists(self):
+        if not os.path.exists(self.report_root):
+            pth = pathlib.Path(self.report_root)
+            pth.mkdir(parents=True, exist_ok=True)
+
+
+# Basic Reporter Types
+@attrs.define
 class TableReporter(Reporter):
     """A reporter to upload dataframes to a table store"""
 
     name: str = attrs.field(default="table_reporter")
 
 
-@otterize
+@attrs.define
 class PlotReporter(Reporter):
     """A reporter to upload plots to a file store"""
 
     name: str = attrs.field(default="table_reporter")
 
+    #FIXME: make attrs work... layout class conflict
+    #ext = Options('png','jpg','gif')
+    #ext: str = attrs.field(default='png')
+    ext = 'png'
+
+    def upload(self,analysis):
+        
+        for figkey,fig in analysis.stored_plots.items():
+            
+            try:
+                filname = os.path.join(self.report_root,f'{figkey}.{self.ext}')
+                self.info(f'saving {figkey} to {filname}')
+                fig.savefig(filname)
+                    
+            except Exception as e:
+                self.error(e,f'issue showing {figkey}')
+        
+
 
 # Table Reporters
-@otterize
-class CSVReporter(TableReporter):
+@attrs.define
+class CSVReporter(TableReporter, DiskReporterMixin):
     name: str = attrs.field(default="CSV")
-    location: "DiskReporter" = attrs.field()
+
+    def upload(self, analysis: "Analysis"):
+        self.info(f"uploading {analysis.identity} to {self.identity}")
+        self.ensure_exists()
+
+        system = analysis.system
+
+        # Make System Dataframe
+        af = os.path.join(self.report_root, f"system_{system.name}.csv")
+        self.info(f"saving system to: {af}")
+        system.dataframe.to_csv(af)
+
+        # Make Analysis Dataframe
+        af = os.path.join(self.report_root, f"analysis_{analysis.name}.csv")
+        self.info(f"saving analysis to: {af}")
+        analysis.dataframe.to_csv(af)
+
+        for ckey, comp in system.comp_references.items():
+            af = os.path.join(self.report_root, f"{ckey}_{comp.name}.csv")
+            self.info(f"saving {ckey} to: {af}")
+            comp.dataframe.to_csv(af)
 
 
-@otterize
-class ExcelReporter(TableReporter):
+@attrs.define
+class ExcelReporter(TableReporter, DiskReporterMixin):
     name: str = attrs.field(default="EXCEL")
 
 
-@otterize
-class GsheetsReporter(TableReporter):
+@attrs.define
+class GsheetsReporter(TableReporter, TemporalReporterMixin):
     name: str = attrs.field(default="GSHEETS")
 
 
-@otterize
-class SQLReporter(TableReporter):
-    name: str = attrs.field(default="SQL")
-
-
-@otterize
-class ArangoReporter(TableReporter):
-    name: str = attrs.field(default="SQL")
+# @attrs.define
+# class SQLReporter(TableReporter):
+#     name: str = attrs.field(default="SQL")
+#
+#
+# @attrs.define
+# class ArangoReporter(TableReporter):
+#     name: str = attrs.field(default="SQL")
 
 
 # PLOT Reporters
-@otterize
-class DiskReporter(PlotReporter):
+@attrs.define
+class DiskPlotReporter(PlotReporter, DiskReporterMixin):
     name: str = attrs.field(default="SQL")
-    path: str = attrs.field(
-        default=None, validator=attrs.validators.instance_of(str)
-    )
-
-    
 
 
-@otterize
-class GdriveReporter(PlotReporter):
+@attrs.define
+class GdriveReporter(PlotReporter, TemporalReporterMixin):
     name: str = attrs.field(default="Gdrive")
     share_drive: str = attrs.field(
         default=None, validator=attrs.validators.instance_of(str)

@@ -20,6 +20,7 @@ import pandas
 import os
 import collections
 
+
 class TableLog(LoggingMixin):
     pass
 
@@ -39,15 +40,18 @@ class TabulationMixin(Configuration):
 
     # Cached and private
     _table: dict = None
-    _anything_changed = True
+    _anything_changed: bool
     _always_save_data = False
 
     # Data Tabulation - Intelligent Lookups
-    def save_data(self, index=None, saved=None, force=False):
+    def save_data(self, index=None, saved=None, force=False, subforce=False):
         """We'll save data for this object and any other internal configuration if
         anything changed or if the table is empty This should result in at least one row of data,
         or minimal number of rows to track changes
         This should capture all changes but save data"""
+
+        if log.log_level <= 10:
+            log.debug(f'check save for {self}|{index}|save: {self.anything_changed or force}')
 
         if saved is None:
             saved = set()
@@ -68,8 +72,8 @@ class TabulationMixin(Configuration):
             if config is None:
                 continue
             if config not in saved:
-                self.debug(f'saving {config.identity}')
-                config.save_data(index, saved=saved,force=True)
+                self.debug(f"saving {config.identity}")
+                config.save_data(index, saved=saved, force=subforce)
             else:
                 self.debug(f"skipping saved config {config.identity}")
 
@@ -80,27 +84,29 @@ class TabulationMixin(Configuration):
     def internal_components(self) -> dict:
         """get all the internal components"""
         return {k: getattr(self, k) for k in self.slots_attributes()}
-    
+
     @instance_cached
     def internal_references(self) -> dict:
         """get references to all internal attributes and values"""
         out = {}
-        out['attributes'] =at= {}
-        out['properties'] =pr= {}
+        out["attributes"] = at = {}
+        out["properties"] = pr = {}
 
         for key in self.classmethod_system_properties():
-            pr[key] = Ref(self,key)
+            pr[key] = Ref(self, key)
 
         for key in self.input_fields():
-            at[key] = Ref(self,key)
+            at[key] = Ref(self, key)
 
         return out
-
 
     @property
     def anything_changed(self):
         """use the on_setattr method to determine if anything changed,
         also assume that stat_tab could change without input changes"""
+        if not hasattr(self,'_anything_changed'):
+            self._anything_changed = True
+
         if self._anything_changed or self.always_save_data:
             self.debug(
                 f"change: {self._anything_changed}| always: {self.always_save_data}"
@@ -143,12 +149,12 @@ class TabulationMixin(Configuration):
 
         out = collections.OrderedDict()
         sref = self.internal_references
-        for k,v in sref['attributes'].items():
+        for k, v in sref["attributes"].items():
             out[k] = v.value()
-        for k,v in sref['properties'].items():
+        for k, v in sref["properties"].items():
             out[k] = v.value()
-        return out  
-            
+        return out
+
         # out = self.attr_dict
         # out.update(self.table_dict)
         # # out["index"] = self.index
@@ -328,6 +334,7 @@ class TabulationMixin(Configuration):
 
     @classmethod
     def pre_compile(cls):
+        cls._anything_changed = True #set default on class
         if any(
             [
                 v.stochastic
@@ -335,7 +342,6 @@ class TabulationMixin(Configuration):
             ]
         ):
             log.info(f"setting always save on {cls.__name__}")
-            cls._always_save_data = True
 
     @classmethod
     def locate(cls, key, fail=True) -> type:

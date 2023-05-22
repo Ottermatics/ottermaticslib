@@ -333,8 +333,7 @@ class ClientSecrets(Secrets, ClientInfoMixin):
         for path in paths:
             fils = [os.path.join(path, fil) for fil in os.listdir(path)]
             mtch = [
-                fil
-                for fil in fils
+                fil for fil in fils
                 if os.path.isdir(fil)
                 and any(
                     list(
