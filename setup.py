@@ -17,7 +17,7 @@ def parse_requirements(filename):
 install_reqs = parse_requirements('requirements.txt')
 
 setup(name='ottermatics',
-      version='0.6.1',
+      version='0.7.0',
       description='The Ottermatic\'s Python Lib!',
       url='https://github.com/SoundsSerious/ottermaticslib',
       author='kevin russell',

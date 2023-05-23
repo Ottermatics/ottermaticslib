@@ -1,10 +1,13 @@
-Metadata-Version: 1.0
+Metadata-Version: 2.1
 Name: ottermatics
-Version: 0.6.1
+Version: 0.7.0
 Summary: The Ottermatic's Python Lib!
 Home-page: https://github.com/SoundsSerious/ottermaticslib
 Author: kevin russell
 Author-email: kevin@ottermatics.com
 License: MIT
-Description: UNKNOWN
 Platform: UNKNOWN
+License-File: LICENSE
+
+UNKNOWN
+
