@@ -3,19 +3,9 @@ import os, sys
 from ottermatics.common import *
 import ottermatics
 
-from ottermatics._archive.locations import (
-    google_api_token,
-    creds_folder,
-    ottermatics_clients,
-    client_dir_name,
-    ottermatics_project,
-)
+
 from ottermatics.logging import LoggingMixin, logging
-from ottermatics._archive.patterns import (
-    Singleton,
-    SingletonMeta,
-    InputSingletonMeta,
-)
+
 
 from concurrent.futures import ThreadPoolExecutor
 import threading

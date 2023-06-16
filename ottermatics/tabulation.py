@@ -19,7 +19,7 @@ import numpy
 import pandas
 import os
 import collections
-
+import uuid
 
 class TableLog(LoggingMixin):
     pass
@@ -401,9 +401,15 @@ class TabulationMixin(Configuration):
             return None
         return val
 
+    @property
+    def system_id(self) -> str:
+        """returns an instance unique id based on id(self)"""
+        idd = id(self)
+        return f'{self.classname}.{idd}'
+
 
 class Ref:
-    """A way to create portable references to system's and their component's properties"""
+    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
 
     __slots__ = ["comp", "key"]
     comp: "TabulationMixin"
@@ -414,7 +420,10 @@ class Ref:
         self.key = key
 
     def value(self):
-        return getattr(self.comp, self.key)
+        o = getattr(self.comp, self.key)
+        if callable(o):
+            return o()
+        return o
 
     def set_value(self, val):
         return setattr(self.comp, self.key, val)

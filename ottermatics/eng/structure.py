@@ -273,7 +273,6 @@ class Beam(Component):
 
     def __on_init__(self):
         self.info("initalizing...")
-        self._skip_attr = ["mesh_size", "in_Iy", "in_Ix", "in_J", "in_A"]
 
         self.update_section(self.section)
 

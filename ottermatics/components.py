@@ -6,14 +6,7 @@ from ottermatics.tabulation import TabulationMixin, system_property
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.properties import class_cache
 
-# from ottermatics._archive.patterns import SingletonMeta, flatten
 
-
-# import numpy
-# import functools
-# import itertools
-# import datetime
-# import pandas
 import os, sys
 import inspect
 

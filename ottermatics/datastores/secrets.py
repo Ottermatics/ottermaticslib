@@ -1,8 +1,5 @@
 from posix import environ
 from ottermatics.configuration import otterize, Configuration
-from ottermatics._archive.patterns import InputSingletonMeta
-from ottermatics._archive.client import ClientInfoMixin
-from ottermatics._archive.locations import *
 
 import attr
 import os

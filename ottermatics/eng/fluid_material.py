@@ -1,11 +1,10 @@
 from ottermatics.configuration import Configuration, otterize
 from ottermatics.components import Component, system_property, otterize
 
-from ottermatics._archive.patterns import inst_vectorize
 
 import matplotlib
 import random
-import attr
+import attr,attrs
 import numpy
 import inspect
 import sys
@@ -24,24 +23,24 @@ STD_TEMP = 273 + 15
 
 @otterize
 class FluidMaterial(Component):
-    """Placeholder for pressure dependent material"""
+    """Placeholder for pressure dependent material, defaults to ideal water"""
 
-    P = attr.ib(default=STD_PRESSURE, type=float)
-    T = attr.ib(default=STD_TEMP, type=float)
+    P = attrs.field(default=STD_PRESSURE, type=float)
+    T = attrs.field(default=STD_TEMP, type=float)
 
     @abc.abstractproperty
-    def density(self, temp: float):
+    def density(self):
         """default functionality, assumed gas with eq-state= gas constant"""
-        raise NotImplemented()
+        return 1000.0
 
     @abc.abstractproperty
-    def viscosity(self, temp: float):
+    def viscosity(self):
         """ideal fluid has no viscosity"""
-        raise NotImplemented()
+        return 1E-3
 
     @abc.abstractproperty
     def surface_tension(self):
-        return 0.0
+        return 0.001
 
     # TODO: enthalpy
 
@@ -50,15 +49,15 @@ class FluidMaterial(Component):
 class IdealGas(FluidMaterial):
     """Material Defaults To Gas Properties, so eq_of_state is just Rgas, no viscosity, defaults to air"""
 
-    gas_constant = attr.ib(default=287.0, type=float)
+    gas_constant = attrs.field(default=287.0, type=float)
 
     @system_property
-    def density(self):
+    def density(self) -> float:
         """default functionality, assumed gas with eq-state= gas constant"""
         return self.P / (self.gas_constant * self.T)
 
     @system_property
-    def viscosity(self):
+    def viscosity(self) -> float:
         """ideal fluid has no viscosity"""
         return 0.0
 
@@ -75,8 +74,8 @@ IdealSteam = type("IdealSteam", (IdealGas,), {"gas_constant": 461.5})
 # @otterize
 # class PerfectGas(FluidMaterial):
 #     '''A Calorically Perfect gas with viscosity'''
-#     eq_of_state = attr.ib()
-#     P = attr.ib(default=STD_PRESSURE, type=float)
+#     eq_of_state = attrs.field()
+#     P = attrs.field(default=STD_PRESSURE, type=float)
 
 #     @system_property
 #     def density(self):
@@ -118,20 +117,20 @@ class CoolPropMaterial(FluidMaterial):
         return self._state
 
     @system_property
-    def density(self):
+    def density(self) -> float:
         """default functionality, assumed gas with eq-state= gas constant"""
         return PropsSI("D", *self.state)
 
     @system_property
-    def enthalpy(self):
+    def enthalpy(self) -> float:
         return PropsSI("H", *self.state)
 
     @system_property
-    def viscosity(self):
+    def viscosity(self) -> float:
         return PropsSI("V", *self.state)
 
     @system_property
-    def surface_tension(self):
+    def surface_tension(self) -> float:
         """returns liquid surface tension"""
         if self._surf_tension_K and self._surf_tension_Nm:
             X = self._surf_tension_K
@@ -144,21 +143,21 @@ class CoolPropMaterial(FluidMaterial):
         return 0.0
 
     @system_property
-    def thermal_conductivity(self):
+    def thermal_conductivity(self) -> float:
         """returns liquid thermal conductivity"""
         return PropsSI("CONDUCTIVITY", *self.state)
 
     @system_property
-    def specific_heat(self):
+    def specific_heat(self) -> float:
         """returns liquid thermal conductivity"""
         return PropsSI("C", *self.state)
 
     @system_property
-    def Tsat(self):
+    def Tsat(self) -> float:
         return PropsSI("T", "Q", 0, "P", self.P, self.material)
 
     @system_property
-    def Psat(self):
+    def Psat(self) -> float:
         return PropsSI("P", "Q", 0, "T", self.T, self.material)
 
     def __call__(self, *args, **kwargs):
@@ -245,7 +244,7 @@ class CoolPropMixture(CoolPropMaterial):
     _X = 1.0  # 1.0 > mole fraction of material > 0
 
     @system_property
-    def material(self):
+    def material(self) -> str:
         Xm = self._X
         return f"{self.material1}[{Xm}]&{self.materail2}[{1.0-Xm}]"
 

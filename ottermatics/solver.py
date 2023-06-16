@@ -351,6 +351,7 @@ class SolverMixin:
                 self.setX(x_ordered, pre_execute=pre_execute)
                 # Get Em
                 o = [f.value() for f, x in zip(self.Flist, x_ordered)]
+                #o = [f.value() for f  in self.Flist]
                 return numpy.array(o)
             elif x_kw:
                 assert (
@@ -678,6 +679,8 @@ class IntegratorInstance:
     derivative: "Ref"
 
     __slots__ = ["system", "solver", "parameter", "derivative"]
+
+    #TODO: add forward implicit solver
 
     def __init__(self, solver: "TRANSIENT", system: "System") -> None:
         self.solver = solver

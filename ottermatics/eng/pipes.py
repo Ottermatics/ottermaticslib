@@ -18,27 +18,71 @@ from ottermatics.tabulation import (
     system_property,
     NUMERIC_VALIDATOR,
     STR_VALIDATOR,
+    Ref
 )
 from ottermatics.eng.fluid_material import FluidMaterial
 from ottermatics.common import G_grav_constant
+from ottermatics.slots import *
+from ottermatics.signals import *
+from ottermatics.logging import LoggingMixin
+from ottermatics.system import System
+from ottermatics.properties import *
+
+
+import networkx as nx
+
 import attr, attrs
 
 import numpy
 import fluids
 
+import attrs
 
-@otterize(auto_attribs=True)
-class Node(Component):
-    x: float
-    y: float
-    z: float
+class PipeLog(LoggingMixin):
+    pass
+log = PipeLog()
 
 
-@otterize(auto_attribs=True)
+@otterize
+class PipeNode(Component):
+    x: float = attrs.field()
+    y: float = attrs.field()
+    z: float = attrs.field()
+
+    _segments: list #created on init
+
+    def __on_init__(self):
+        self._segments = []
+
+    def add_segment(self,pipe:'PipeFlow'):
+        if pipe not in self.segments:
+            self._segments.append(pipe)
+        else:
+            self.warning(f'pipe already added: {pipe}')
+
+    @property
+    def segments(self):
+        return self._segments
+
+    @system_property
+    def sum_of_flows(self) -> float:
+        out = 0
+        for pipe_seg in self._segments:
+            if self is pipe_seg.node_s:
+                out -= pipe_seg.Q
+            elif self is pipe_seg.node_e:
+                out += pipe_seg.Q
+        return out
+
+
+
+
+
+@otterize
 class PipeFlow(Component):
-    D: float
-    v: float
-    material: FluidMaterial
+    D: float = attrs.field()
+    v: float = attrs.field(default=0)
+    material= SLOT.define(FluidMaterial)
 
     def set_flow(self, flow):
         v = flow / self.A
@@ -46,46 +90,47 @@ class PipeFlow(Component):
 
     # Geometric Propreties
     @system_property
-    def A(self):
+    def A(self) -> float:
         """:returns: the cross sectional area of pipe in [m2]"""
         return 3.1415 * (self.D / 2.0) ** 2.0
 
     @system_property
-    def C(self):
+    def C(self) -> float:
         """:returns: the sectional circmerence of pipe"""
         return 3.1415 * self.D
 
     # Fluid Propreties
     @system_property
-    def Q(self):
+    def Q(self) -> float:
         """:returns: the volumetric flow through this pipe in [m3/s]"""
         return self.A * self.v
 
     @system_property
-    def Mf(self):
+    def Mf(self) -> float:
         """:returns: the massflow through this pipe in [kg/s]"""
         return self.density * self.Q
 
     @system_property
-    def reynoldsNumber(self):
+    def reynoldsNumber(self) -> float:
         """:returns: the flow reynolds number"""
-        return self.density * self.v * self.D / self.viscosity
+        o = abs(self.density * self.v * self.D / self.viscosity)
+        return max(o,1)
 
     # Material Properties Exposure
     @system_property
-    def density(self):
+    def density(self) -> float:
         return self.material.density
 
     @system_property
-    def viscosity(self):
+    def viscosity(self) -> float:
         return self.material.viscosity
 
     @system_property
-    def enthalpy(self):
+    def enthalpy(self) -> float:
         return self.material.enthalpy
 
     @system_property
-    def T(self):
+    def T(self) -> float:
         return self.material.T
 
     @T.setter
@@ -93,7 +138,7 @@ class PipeFlow(Component):
         self.material.T = new_T
 
     @system_property
-    def P(self):
+    def P(self) -> float:
         return self.material.P
 
     @P.setter
@@ -127,46 +172,48 @@ class PipeFlow(Component):
 
 @otterize
 class Pipe(PipeFlow, Component):
-    node_s = attr.ib(type=Node)
-    node_e = attr.ib(type=Node)
-    roughness = attr.ib(default=0.0, type=float)
-    bend_radius = attr.ib(default=None, type=float)
-
-    _skip_attr = ["node_s", "node_e"]
+    node_s = SLOT.define(PipeNode,default_ok=False)
+    node_e = SLOT.define(PipeNode,default_ok=False)
+    roughness:float = attrs.field(default=0.0)
+    bend_radius:float = attrs.field(default=None)
 
     straight_method = "Clamond"
     laminar_method = "Schmidt laminar"
     turbulent_method = "Schmidt turbulent"
 
+    def __on_init__(self):
+        self.node_s.add_segment(self)
+        self.node_e.add_segment(self)
+
     @system_property
-    def Lx(self):
+    def Lx(self) -> float:
         return self.node_e.x - self.node_s.x
 
     @system_property
-    def Ly(self):
+    def Ly(self) -> float:
         return self.node_e.y - self.node_s.y
 
     @system_property
-    def Lz(self):
+    def Lz(self) -> float:
         return self.node_e.z - self.node_s.z
 
     @system_property
-    def Lhz(self):
+    def Lhz(self) -> float:
         """:returns: The length of pipe element in the XY plane"""
         return numpy.sqrt(self.Lx**2.0 + self.Ly**2.0)
 
     @system_property
-    def L(self):
+    def L(self) -> float:
         """:returns: The absolute length of pipe element"""
         return numpy.sqrt(self.Lx**2.0 + self.Ly**2.0 + self.Lz**2.0)
 
     @system_property
-    def inclination(self):
+    def inclination(self) -> float:
         """:returns: the inclination angle in degrees"""
         return numpy.rad2deg(numpy.arctan2(self.Lz, self.Lhz))
 
     @system_property
-    def friction_factor(self):
+    def friction_factor(self) -> float:
         """The friction factor considering bend radius"""
         if self.bend_radius is None:
             re = self.reynoldsNumber
@@ -186,42 +233,63 @@ class Pipe(PipeFlow, Component):
             )
 
     @system_property
-    def Kpipe(self):
+    def Kpipe(self) -> float:
         """The loss coeffient of this pipe section"""
         return self.friction_factor * self.L / self.D
 
     @system_property
-    def dP_f(self):
+    def dP_f(self) -> float:
         """The loss of pressure in the pipe due to pressure"""
-        return self.density * self.v**2.0 * self.Kpipe / 2.0
+        return self.sign * self.density * self.v**2.0 * self.Kpipe / 2.0
 
     @system_property
-    def dP_p(self):
+    def dP_p(self) -> float:
         """The loss of pressure in the pipe due to potential"""
         return self.density * self.Lz * 9.81
 
     @system_property
-    def dP_tot(self):
+    def dP_tot(self) -> float:
         return self.dP_f + self.dP_p
+    
+    @system_property
+    def sign(self) -> int:
+        return numpy.sign(self.v)
 
 
+#Specalized Nodes
+class FlowNode(PipeNode):
+    """Base For Boundary Condition Nodes of """
+
+    @system_property
+    def dP_f(self) -> float:
+        return 0.0
+
+    @system_property
+    def dP_p(self) -> float:
+        return 0.0
+    
+    @system_property
+    def dP_tot(self) -> float:
+        return 0.0 
+    
 @otterize
-class PipeFitting(Node, PipeFlow):
+class PipeFitting(FlowNode,PipeFlow):
     Kfitting = attr.ib(default=0.1, type=float)
 
     @system_property
-    def dP_f(self):
+    def dP_f(self) -> float:
         """The loss of pressure in the pipe due to pressure"""
         return self.density * self.v**2.0 * self.Kfitting / 2.0
 
     @system_property
-    def dP_p(self):
+    def dP_p(self) -> float:
         """The loss of pressure in the pipe due to potential"""
         return 0.0
 
     @system_property
-    def dP_tot(self):
+    def dP_tot(self) -> float:
         return self.dP_f + self.dP_p
+
 
 
 # TODO: Add in fitting numbers:
@@ -273,15 +341,43 @@ class PipeFitting(Node, PipeFlow):
 44                    Water meter                       Disk    7.00
 45                    Water meter                     Piston   15.00
 46                    Water meter  Rotary (star-shaped disk)   10.00
-47                    Water meter              Turbine-wheel    6.00"""
+47                    Water meter              Turbine-wheel    6.00""" 
+
+# 
+@otterize
+class FlowInput(FlowNode):
+    flow_in: float = attrs.field(default=0.0)
+
+    @system_property
+    def sum_of_flows(self) -> float:
+        out = self.flow_in
+        for pipe_seg in self._segments:
+            if self is pipe_seg.node_s:
+                out -= pipe_seg.Q
+            elif self is pipe_seg.node_e:
+                out += pipe_seg.Q
+        return out
+# 
+# class PressureInput(FlowNode):
+#     pressure_in: float = attrs.field()
+# 
+# class PressureOut(FlowNode):
+#     pressure_out: float = attrs.field()
 
 
-@otterize(auto_attribs=True)
+
+
+
+
+
+
+
+@otterize
 class Pump(Component):
     """Simulates a pump with power input, max flow, and max pressure by assuming a flow characteristic"""
 
-    max_flow: float  # volumetric rate m3/s
-    max_pressure: float  # Pa
+    max_flow: float  = attrs.field()
+    max_pressure: float = attrs.field()
     # throttle: float
 
     @property
@@ -300,6 +396,170 @@ class Pump(Component):
     def power(self, current_flow):
         """The power used considering in watts"""
         return self.dPressure(current_flow) * current_flow
+
+
+
+@otterize
+class PipeSystem(System):
+
+    in_node = SLOT.define(PipeNode) 
+    graph: nx.Graph
+    items: dict
+
+    def __on_init__(self):
+        self.items = {}
+        self.flow_solvers = {}
+        self.pipe_flow = {}
+        self.create_graph_from_pipe_or_node(self.in_node)
+        self.assemble_solvers()
+
+    def assemble_solvers(self):
+
+        for i,cycle in enumerate(nx.cycle_basis(self.graph)):
+            cycle_attr_name = f'_cycle_redisual_{i}'
+            pipes = []
+            self.info(f'found cycle: {cycle}')
+            for cs,cl in zip(cycle, cycle[1:]+[cycle[0]]):
+                
+                pipe = self.graph.get_edge_data(cs,cl)['pipe']
+                mult = 1
+                if cs == pipe.node_e.system_id:
+                    #reverse
+                    mult = -1
+                pipes.append((pipe,mult))
+                
+            def res_func():
+                out = 0
+                for pipe,mult in pipes:
+                    out += mult*pipe.dP_tot
+                return out/1000.
+            
+            setattr(self,cycle_attr_name,res_func)
+            self.flow_solvers[cycle_attr_name] = Ref(self,cycle_attr_name)
+
+        bf = lambda kv: len(kv[1].segments)
+        for nid,node in sorted(self.nodes.items(),key=bf):
+            if len(node.segments) > 1:
+                self.flow_solvers[nid] = Ref(node,'sum_of_flows')
+            elif not isinstance(node,FlowInput):
+                self.info(f'deadend: {node.identity}')
+                #self.flow_solvers[nid] = Ref(node,'sum_of_flows')
+
+        for nid,node in self.nodes.items():
+            if isinstance(node,FlowInput):
+                self.flow_solvers[nid] = Ref(node,'sum_of_flows')
+        
+
+        for pid,pipe  in self.pipes.items():
+            self.pipe_flow[pid] = Ref(pipe,'v')
+
+            
+
+    @property
+    def _X(self):
+        return {k:v for k,v in self.pipe_flow.items()}
+
+    @property
+    def _F(self):
+        return {k:v for k,v in self.flow_solvers.items()}
+
+    @instance_cached
+    def F_keyword_order(self):
+        """defines the order of inputs in ordered mode for calcF"""
+        return {i: k for i, k in enumerate(self.flow_solvers)}
+
+
+    @property
+    def nodes(self):
+        return {k:v for k,v in self.items.items() if isinstance(v,PipeNode)}
+
+    @property
+    def pipes(self):
+        return {k:v for k,v in self.items.items() if isinstance(v,Pipe)}
+
+    #Pipe System Composition
+    def add_to_graph(self,graph,node_or_pipe)->str:
+        """recursively add node or pipe elements"""
+
+        idd = node_or_pipe.system_id
+
+        #Early Exit
+        if idd in self.items:
+            return idd
+
+        elif graph.has_node(idd):
+            return idd
+        
+        log.info(f'adding {idd}')
+
+        if isinstance(node_or_pipe,PipeNode):
+            if not graph.has_node(idd):
+                graph.add_node(idd,sys_id=idd,node=node_or_pipe)
+                self.items[idd] = node_or_pipe
+            
+            for seg in node_or_pipe.segments:
+                self.add_to_graph(graph,seg)
+
+        elif isinstance(node_or_pipe, Pipe):
+            nodes = node_or_pipe.node_s
+            nodee = node_or_pipe.node_e
+
+            if not graph.has_node(nodes.system_id):
+                nsid = self.add_to_graph(graph,nodes)
+            else:
+                nsid = nodes.system_id
+
+            if not graph.has_node(nodee.system_id):
+                neid = self.add_to_graph(graph,nodee)
+            else:
+                neid = nodee.system_id
+            
+            if not graph.has_edge(nsid,neid):
+                graph.add_edge(nsid,neid,sys_id=idd,pipe=node_or_pipe)
+                self.items[idd] = node_or_pipe
+
+        else:
+            raise ValueError(f'not a node or pipe: {node_or_pipe}')
+        
+        return idd
+
+
+    def create_graph_from_pipe_or_node(self,node_or_pipe)->nx.Graph:
+        """Creates a networkx graph from a pipe or node"""
+        
+        self.graph = nx.Graph()
+
+        if isinstance(node_or_pipe,PipeNode):
+            self.add_to_graph(self.graph,node_or_pipe)
+
+        elif isinstance(node_or_pipe, Pipe):
+            self.add_to_graph(self.graph,node_or_pipe)
+
+        else:
+            raise ValueError(f'not a node or pipe: {node_or_pipe}')
+        
+        return self.graph
+
+
+    def draw(self):
+
+        try:
+            from pyvis.network import Network
+
+            net = Network(directed=False)
+
+            net.from_nx(self.graph)
+            net.show("process_graph.html")            
+        
+        except:
+            pos = pos=nx.spring_layout(self.graph)
+            nx.draw(self.graph,pos=pos)
+            labels = nx.draw_networkx_labels(self.graph, pos=pos)
+
+
+
+
+
 
 
 if __name__ == "__main__":

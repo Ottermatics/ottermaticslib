@@ -9,6 +9,7 @@ matplotlib
 jupyter
 pandas
 scikit-learn
+seaborn
 sectionproperties>=1.0.8
 PyNiteFEA>=0.0.74
 slycot

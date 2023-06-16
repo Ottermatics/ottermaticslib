@@ -8,7 +8,13 @@ ottermatics/components.py
 ottermatics/configuration.py
 ottermatics/env_var.py
 ottermatics/logging.py
+ottermatics/plotting.py
 ottermatics/properties.py
+ottermatics/reporting.py
+ottermatics/signals.py
+ottermatics/slots.py
+ottermatics/solver.py
+ottermatics/system.py
 ottermatics/tabulation.py
 ottermatics/typing.py
 ottermatics.egg-info/PKG-INFO

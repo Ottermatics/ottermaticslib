@@ -4,7 +4,6 @@ import attr, attrs
 from ottermatics.logging import LoggingMixin, log
 from ottermatics.properties import *
 
-# from ottermatics._archive.locations import *
 
 import typing
 import datetime
