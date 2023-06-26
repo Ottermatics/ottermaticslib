@@ -151,7 +151,6 @@ class cached_system_property(system_property):
 
     def get_func_return(self, func):
         anno = func.__annotations__
-        print(func, func.__dict__)
         self.gname = func.__name__
         typ = anno.get("return", None)
         if not typ in (int, str, float):

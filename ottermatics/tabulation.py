@@ -96,7 +96,7 @@ class TabulationMixin(Configuration):
             pr[key] = Ref(self, key)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key)
+            at[key] = Ref(self, key,False)
 
         return out
 
@@ -150,7 +150,8 @@ class TabulationMixin(Configuration):
         out = collections.OrderedDict()
         sref = self.internal_references
         for k, v in sref["attributes"].items():
-            out[k] = v.value()
+            if k in self.attr_raw_keys:
+                out[k] = v.value()
         for k, v in sref["properties"].items():
             out[k] = v.value()
         return out
@@ -203,7 +204,7 @@ class TabulationMixin(Configuration):
 
     @class_cache
     def attr_raw_keys(self) -> list:
-        good = set(self.input_fields())
+        good = set(self.numeric_fields())
         return [k for k in attr.fields_dict(self.__class__).keys() if k in good]
 
     @solver_cached
@@ -411,17 +412,19 @@ class TabulationMixin(Configuration):
 class Ref:
     """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
 
-    __slots__ = ["comp", "key"]
+    __slots__ = ["comp", "key","use_call"]
     comp: "TabulationMixin"
     key: str
+    use_call:bool
 
-    def __init__(self, component, key):
+    def __init__(self, component, key,use_call=True):
         self.comp = component
         self.key = key
+        self.use_call = use_call
 
     def value(self):
         o = getattr(self.comp, self.key)
-        if callable(o):
+        if self.use_call and callable(o):
             return o()
         return o
 

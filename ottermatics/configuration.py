@@ -370,7 +370,7 @@ def otterize(cls=None, **kwargs):
             return acls
 
         # Component/Config Flow
-        log.info(f"Configuring: {cls.__name__}")
+        log.msg(f"Configuring: {cls.__name__}")
         acls = attr.s(
             cls,
             on_setattr=property_changed,

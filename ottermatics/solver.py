@@ -228,8 +228,9 @@ class SolverMixin:
         try:
             out = self.execute()
         except Exception as e:
-            self.info(f"solver failed @ {self.X}:\n{e}")
+            self.error(e,f"solver failed @ {self.X}")
             out = None
+            raise e
 
         # Solve Each Internal System
         for key, comp in self.internal_components.items():

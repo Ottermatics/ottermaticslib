@@ -5,7 +5,7 @@ arrow
 diskcache>=5.6.1
 numpy==1.24.3
 scipy
-matplotlib
+matplotlib>=3.7.1
 jupyter
 pandas
 scikit-learn

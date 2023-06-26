@@ -38,6 +38,7 @@ from ottermatics.plotting import PlottingMixin
 import copy
 import collections
 
+import numpy
 
 # make a module logger
 class SystemsLog(LoggingMixin):
@@ -151,9 +152,17 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         out = collections.OrderedDict()
         sref = self.system_references
         for k, v in sref["attributes"].items():
-            out[k] = v.value()
+            val = v.value()
+            if isinstance(val,TABLE_TYPES):
+                out[k] = val
+            else:
+                out[k] = numpy.nan                
         for k, v in sref["properties"].items():
-            out[k] = v.value()
+            val = v.value()
+            if isinstance(val,TABLE_TYPES):            
+                out[k] = val
+            else:
+                out[k] = numpy.nan
         return out
 
     @property

@@ -139,7 +139,7 @@ class CoolPropMaterial(FluidMaterial):
             r = Y[-1]
             return numpy.interp(self.T, xp=X, fp=Y, left=l, right=r)
 
-        self.warning("no surface tension model! returning 0")
+        self.debug("no surface tension model! returning 0")
         return 0.0
 
     @system_property
@@ -158,7 +158,10 @@ class CoolPropMaterial(FluidMaterial):
 
     @system_property
     def Psat(self) -> float:
-        return PropsSI("P", "Q", 0, "T", self.T, self.material)
+        try:
+            return PropsSI("P", "Q", 0, "T", self.T, self.material)
+        except:
+            return numpy.nan
 
     def __call__(self, *args, **kwargs):
         """calls coolprop module with args adding the material"""
