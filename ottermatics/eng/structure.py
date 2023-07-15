@@ -283,7 +283,7 @@ class Structure(System):
     def visulize(self, **kwargs):
         if 'combo_name' not in kwargs:
             kwargs['combo_name'] = 'only_gravity'
-        Visualization.RenderModel(self.frame, **kwargs)
+        Visualization.render_model(self.frame, **kwargs)
 
     # TODO: add mesh stress / deflection info min/max ect.
     @property
@@ -330,6 +330,8 @@ class Structure(System):
         return numpy.array([0, 0, -self.mass * g])
 
     def __getattr__(self, attr):
+        if attr.startswith('analyze'):
+            self.warning(f'analyzing...')
         return getattr(self.frame, attr)
 
     def __dir__(self):

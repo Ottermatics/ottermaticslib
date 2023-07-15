@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import attr
 import numpy
 import functools
@@ -98,6 +99,8 @@ class Beam(Component):
         validator=attr.validators.instance_of((int, float, nonetype)),
     )
 
+    analysis_intervals:int = attrs.field(default=3)
+
     _L = None
     _section_properties = None
     _ITensor = None
@@ -122,9 +125,10 @@ class Beam(Component):
         if isinstance(self.section, geometry.Geometry):
             self.debug(f"determining mesh {section} properties...")
             mesh = self.section.create_mesh([self.mesh_size])
+            # no material here
             self._section_properties = cross_section.Section(
                 self.section, mesh
-            )  # no material here
+            )  
             self._section_properties.calculate_geometric_properties()
             self._section_properties.calculate_warping_properties()
             ans = self._section_properties.calculate_frame_properties()
@@ -356,7 +360,7 @@ class Beam(Component):
     def show_mesh(self):
         return self._section_properties.plot_mesh()
 
-    @system_property
+    @property
     def max_von_mises(self) -> float:
         """The worst of the worst cases, after adjusting the beem orientation for best loading"""
         return numpy.nanmax([self.max_von_mises_by_case])
@@ -386,16 +390,14 @@ class Beam(Component):
             return vt
 
     # TODO: Breakout other stress vectors
+    @instance_cached
     def von_mises_stress_l(self):
         """Max von-mises stress"""
-
         out = {}
         for combo in self.structure.frame.LoadCombos:
             rows = []
-            for i in numpy.linspace(0, 1, 3):
-                sol = self.get_stress_at(i, combo)
-                mat_stresses = sol.get_stress()
-
+            for i in numpy.linspace(0, 1, self.analysis_intervals):
+                mat_stresses = self.section_stresses[combo][i]
                 max_vm = numpy.nanmax(
                     [
                         numpy.nanmax(stresses["sig_vm"])
@@ -403,34 +405,63 @@ class Beam(Component):
                     ]
                 )
                 rows.append(max_vm)
-
             out[combo] = numpy.array(rows)
-
         return out
 
+    @instance_cached
     def stress_info(self):
         """Max profile stress info along beam for each type"""
-
-        out = {}
+        rows = []
         for combo in self.structure.frame.LoadCombos:
-            rows = []
-            for i in numpy.linspace(0, 1, 3):
-                sol = self.get_stress_at(i, combo)
-                mat_stresses = sol.get_stress()
-                oout = {"x": x}
+
+            for i in numpy.linspace(0, 1, self.analysis_intervals):
+                mat_stresses = self.section_stresses[combo][i]
+                oout = {"x": i,'combo':combo}
                 for stresses in mat_stresses:
-                    vals = {
-                        sn + "_" + stresses["Material"]: numpy.nanmax(stress)
+                    max_vals = {
+                        sn + "_max_" + stresses["Material"]: numpy.nanmax(stress)
                         for sn, stress in stresses.items()
                         if isinstance(stress, numpy.ndarray)
                     }
+                    min_vals = {
+                        sn + "_min_" + stresses["Material"]: numpy.nanmin(stress)
+                        for sn, stress in stresses.items()
+                        if isinstance(stress, numpy.ndarray)
+                    }   
+                    min_vals = {
+                        sn + "_avg_" + stresses["Material"]: numpy.nanmean(stress)
+                        for sn, stress in stresses.items()
+                        if isinstance(stress, numpy.ndarray)
+                    }                                      
+                    factor_of_saftey = numpy.nanmax(stresses['sig_vm']) / self.material.allowable_stress
+                    fsnm = stresses["Material"] + "_saftey_factor"
+                    allowable = {fsnm: factor_of_saftey}
+                    oout.update(allowable)
                     oout.update(vals)
-            out[combo] = pandas.DataFrame(rows)
+                rows.append(oout)
 
-        return out
+        return pandas.DataFrame(rows)
+    
+    @instance_cached
+    def section_stresses(self):
+        #FIXME: enable: assert self.structure.solved, f'must be solved first!'
+        combos = {}
+        for combo in self.structure.frame.LoadCombos:
+            combos[combo] = spans = {}
+            for i in numpy.linspace(0, 1, self.analysis_intervals):
+                self.info(f'evaluating stresses for {combo} @ {i}')
+                sol = self.get_stress_at(i, combo)
+                mat_stresses = sol.get_stress()
+                spans[i] = mat_stresses
+        return combos
 
-    def get_forces_at(self,x,combo='Combo 1'):
+    def get_forces_at(self,x,combo=None):
         """outputs pynite results in section_properties.calculate_stress() input"""
+        if combo is None:
+            combo = self.structure.current_combo
+
+        x = x*self.L #frac of L
+
         inp = dict(
             N=self.member.axial(x, combo),
             Vx=self.member.shear("Fz", x, combo),
@@ -666,3 +697,9 @@ class Beam(Component):
             total_weight = self.mass * self.structure.gravity_mag
             d = {z_dir:z_mag*total_weight}
             self.apply_pt_load(x, case=case,**d)
+
+
+    def __dir__(self) -> Iterable[str]:
+        d = set(super().__dir__())
+        return list(d.union(dir(Beam)))
+        

@@ -255,18 +255,18 @@ class CoolPropMixture(CoolPropMaterial):
     def setup(cls):
         try:
             CoolProp.apply_simple_mixing_rule(
-                self.material, self.material2, "linear"
+                cls.material, cls.material2, "linear"
             )
         except Exception as e:
             pass
             # self.error(e,'issue setting mixing rule, but continuting.')
 
     @system_property
-    def Mmass1(self):
+    def Mmass1(self) -> float:
         return PropsSI("M", "T", self.T, "P", self.P, self.material1)
 
     @system_property
-    def Mmass2(self):
+    def Mmass2(self) -> float:
         return PropsSI("M", "T", self.T, "P", self.P, self.material2)
 
     def update_mass_ratios(self, m1, m2):
