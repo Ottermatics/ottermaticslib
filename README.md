@@ -105,7 +105,7 @@ ax2.set_xlabel(f'throttle%')
 ```
 
 ### Results
-![[air_filter_calc.png]]
+[air_filter_calc.png](media/air_filter_calc.png)
 
 
 ## Spring Mass Damper
@@ -168,55 +168,11 @@ df.groupby('run_id').plot('time','x')
 ```
 
 ### Results Damping Off
-![[olib_spring_mass_clac.png]]
+[olib_spring_mass_clac.png](media/olib_spring_mass_clac.png)
 
 ### Results - Damping On
-![[olib_spring_mass_clac_damp 1.png]]
+[olib_spring_mass_clac_damp 1.png](media/olib_spring_mass_clac_damp 1.png)
 
-
-
-
-# Tasks
-- [ ] #ottermaticslib Stable [[Release]]
-- [ ] #ottermaticslib  sable MVP features
-- [ ] #ottermaticslib  plan for future features (including removing from lib)
-
-
-# Simulation
-
-- transient simulation pg 213 
-![[NPSSUserGuide2.pdf]]
-
-
-# MDAO Python Framework
-- backup plan! https://openmdao.org/newdocs/versions/latest/main.html
-![[MDAO_Hwang2018a.pdf]]
-
-# Automatic Differentiation
-- use `dis.dis` to load bytecode.
-- instance variables are grabbed via `LOAD_ATTR`
-- use graph for calls between attrs and properties to optimize via adjoint methods!
-- from [[ottermaticslib#Spring Mass Damper]] example, looking at `sumF`
-```python
-dis.dis(SpringMass.sumF)
-Disassembly of fget:
- 62           0 LOAD_FAST                0 (self)
-              2 LOAD_ATTR                0 (Fspring)
-              4 LOAD_FAST                0 (self)
-              6 LOAD_ATTR                1 (Fgrav)
-              8 BINARY_SUBTRACT
-             10 LOAD_FAST                0 (self)
-             12 LOAD_ATTR                2 (Faccel)
-             14 BINARY_SUBTRACT
-             16 LOAD_FAST                0 (self)
-             18 LOAD_ATTR                3 (Ffric)
-             20 BINARY_SUBTRACT
-             22 RETURN_VALUE
-
-Disassembly of return_type:
-
-
-```
 
 
 Documentation:
