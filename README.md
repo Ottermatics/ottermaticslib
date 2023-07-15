@@ -1,23 +1,28 @@
 # ottermaticslib
 A library to tabulate information from complex systems with variuos ways to store data.
 
-# Core Functions
+### Installation
+```bash
+pip install git+https://github.com/Ottermatics/ottermaticslib.git
+```
+
+### Core Functions
 1. Tabulation Of Complex Systems
 2. Modular Post Processing (dataframes)
 3. Exploratory Analysis (ipython + functions / docs)
 4. Workflows for core engineering problemes (structures + cost, thermal+fluids solve)
 
-# MVP Features (WIP)
+### MVP Features (WIP)
 1. Tabulation, use `attrs.field` and `system_property` to capture `y=f(x)` [Done]
 2. Dynamic Programing ensures work is only done when new data is available with `cached_system_property`. [Done]
 3. Quick Calculation provided by direct cached references to attribues and properties [Done]
 4. Solver based on `NPSS` strategy of balances and integrators [Done]
 5. Reporting to google sheets, csv and excel. 
 
-# Example Engineering Problems:
+### Example Engineering Problems:
 These problems demonstrate functionality
 
-## Air Filter
+#### Air Filter
 run a throttle sweep with filter loss characteristic and fan afinity law based pressure based off of a design point.
 ```python
 @otterize
@@ -93,12 +98,12 @@ ax2.set_title(f'pressure')
 ax2.set_xlabel(f'throttle%')
 ```
 
-### Results
+##### Results
 ![air_filter_calc.png](media/air_filter_calc.png)
 
 
-## Spring Mass Damper
-### Overview
+#### Spring Mass Damper
+##### Overview
 Test case results in accurate resonance frequency calculation
 ```python
 @otterize
@@ -156,15 +161,15 @@ df = sm.dataframe
 df.groupby('run_id').plot('time','x')
 ```
 
-### Results Damping Off
+##### Results Damping Off
 ![olib_spring_mass_clac.png](media/olib_spring_mass_clac.png)
 
-### Results - Damping On
+##### Results - Damping On
 <img src="media/olib_spring_mass_clac_damp 1.png" />
 
 
 
-Documentation:
+## Documentation:
 https://ottermatics.github.io/ottermaticslib/build/html/index.html
 
 
