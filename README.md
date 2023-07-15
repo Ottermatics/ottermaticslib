@@ -1,11 +1,4 @@
 # ottermaticslib
-
-
-##### TODO
-```tasks  
-(not done) AND (description includes #ottermaticslib)
-```
-
 A library to tabulate information from complex systems with variuos ways to store data.
 
 # Core Functions
@@ -14,19 +7,15 @@ A library to tabulate information from complex systems with variuos ways to stor
 3. Exploratory Analysis (ipython + functions / docs)
 4. Workflows for core engineering problemes (structures + cost, thermal+fluids solve)
 
-# Separation Of Concerns
-1. remove any project init / structuring from lib and insert into [[projectlib]]
-2. embody [[12 factor]] [[principals]] separaing env vars and dbs as pluggables.
-
-# [[MVP]] Features
-1. Tabulation, use `attrs.field` and `system_property` to capture `y=f(x)`
-2. Dynamic Programing ensures work is only done when new data is available.
-3. Quick Calculation provided by direct cached references to attribues and properties
-4. Solver based on `NPSS` strategy of balances and integrators
-5. Reporting to google sheets, csv and excel.
+# MVP Features (WIP)
+1. Tabulation, use `attrs.field` and `system_property` to capture `y=f(x)` [Done]
+2. Dynamic Programing ensures work is only done when new data is available with `cached_system_property`. [Done]
+3. Quick Calculation provided by direct cached references to attribues and properties [Done]
+4. Solver based on `NPSS` strategy of balances and integrators [Done]
+5. Reporting to google sheets, csv and excel. 
 
 # Example Engineering Problems:
-These problems demonstrate
+These problems demonstrate functionality
 
 ## Air Filter
 run a throttle sweep with filter loss characteristic and fan afinity law based pressure based off of a design point.
