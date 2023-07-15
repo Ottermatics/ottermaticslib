@@ -54,7 +54,9 @@ class Airfilter(System):
     flow_solver = SOLVER.define("sum_dP", "w")
     flow_solver.add_constraint("min", 0)
 
-    flow_curve = PLOT.define('throttle','w',kind='lineplot',title='Flow Curve')
+    flow_curve = PLOT.define(
+        "throttle", "w", kind="lineplot", title="Flow Curve"
+    )
 
     @system_property
     def dP_parasitic(self) -> float:
@@ -68,6 +70,7 @@ class Airfilter(System):
     def dp_positive(self) -> float:
         return self.dP_parasitic - self.filt.dP_filter
 
+
 @otterize
 class AirFilterAnalysis(Analysis):
     efficiency: float = attrs.field(default=0.9)
@@ -79,35 +82,29 @@ class AirFilterAnalysis(Analysis):
 
 
 class TestFilterSystem(unittest.TestCase):
-
-
     def setUp(self):
         self.af = Airfilter()
-        
-    
+
     def test_plot(self):
-        self.af.run(throttle=np.linspace(0,1,10))
+        self.af.run(throttle=np.linspace(0, 1, 10))
         fig = self.af.flow_curve()
         self.assertIsNotNone(fig)
 
+
 class TestAnalysis(unittest.TestCase):
-
-
     def setUp(self):
         self.af = AirFilterAnalysis()
-        
-    
+
     def test_plot(self):
-        self.af.run(throttle=np.linspace(0,1,10))
+        self.af.run(throttle=np.linspace(0, 1, 10))
         fig = self.af.system.flow_curve()
-        ofig = self.af._stored_plots['airfilteranalysis.airfilter.flow_curve']
+        ofig = self.af._stored_plots["airfilteranalysis.airfilter.flow_curve"]
         print(fig)
         print(ofig)
 
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ofig)
 
-                
 
 #
 # # TODO: create test case

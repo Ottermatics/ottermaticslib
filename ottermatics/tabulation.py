@@ -19,6 +19,7 @@ import numpy
 import pandas
 import os
 import collections
+import uuid
 
 
 class TableLog(LoggingMixin):
@@ -51,7 +52,9 @@ class TabulationMixin(Configuration):
         This should capture all changes but save data"""
 
         if log.log_level <= 10:
-            log.debug(f'check save for {self}|{index}|save: {self.anything_changed or force}')
+            log.debug(
+                f"check save for {self}|{index}|save: {self.anything_changed or force}"
+            )
 
         if saved is None:
             saved = set()
@@ -96,7 +99,7 @@ class TabulationMixin(Configuration):
             pr[key] = Ref(self, key)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key)
+            at[key] = Ref(self, key, False)
 
         return out
 
@@ -104,7 +107,7 @@ class TabulationMixin(Configuration):
     def anything_changed(self):
         """use the on_setattr method to determine if anything changed,
         also assume that stat_tab could change without input changes"""
-        if not hasattr(self,'_anything_changed'):
+        if not hasattr(self, "_anything_changed"):
             self._anything_changed = True
 
         if self._anything_changed or self.always_save_data:
@@ -150,7 +153,8 @@ class TabulationMixin(Configuration):
         out = collections.OrderedDict()
         sref = self.internal_references
         for k, v in sref["attributes"].items():
-            out[k] = v.value()
+            if k in self.attr_raw_keys:
+                out[k] = v.value()
         for k, v in sref["properties"].items():
             out[k] = v.value()
         return out
@@ -203,7 +207,7 @@ class TabulationMixin(Configuration):
 
     @class_cache
     def attr_raw_keys(self) -> list:
-        good = set(self.input_fields())
+        good = set(self.numeric_fields())
         return [k for k in attr.fields_dict(self.__class__).keys() if k in good]
 
     @solver_cached
@@ -334,7 +338,7 @@ class TabulationMixin(Configuration):
 
     @classmethod
     def pre_compile(cls):
-        cls._anything_changed = True #set default on class
+        cls._anything_changed = True  # set default on class
         if any(
             [
                 v.stochastic
@@ -401,20 +405,31 @@ class TabulationMixin(Configuration):
             return None
         return val
 
+    @property
+    def system_id(self) -> str:
+        """returns an instance unique id based on id(self)"""
+        idd = id(self)
+        return f"{self.classname}.{idd}"
+
 
 class Ref:
-    """A way to create portable references to system's and their component's properties"""
+    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
 
-    __slots__ = ["comp", "key"]
+    __slots__ = ["comp", "key", "use_call"]
     comp: "TabulationMixin"
     key: str
+    use_call: bool
 
-    def __init__(self, component, key):
+    def __init__(self, component, key, use_call=True):
         self.comp = component
         self.key = key
+        self.use_call = use_call
 
     def value(self):
-        return getattr(self.comp, self.key)
+        o = getattr(self.comp, self.key)
+        if self.use_call and callable(o):
+            return o()
+        return o
 
     def set_value(self, val):
         return setattr(self.comp, self.key, val)

@@ -34,7 +34,7 @@ def make_reporter_check(type_to_check):
 
 
 @otterize
-class Analysis(TabulationMixin,PlottingMixin):
+class Analysis(TabulationMixin, PlottingMixin):
     """Analysis takes a system and many reporters, runs the system, adds its own system properties to the dataframe and post processes the results
 
     post_process() typically creates plots, but can be overriden
@@ -58,19 +58,20 @@ class Analysis(TabulationMixin,PlottingMixin):
         return self._uploaded
 
     def run(self, *args, **kwargs):
-        self.info(f"running analysis {self.identity} with input {args} {kwargs}")
+        self.info(
+            f"running analysis {self.identity} with input {args} {kwargs}"
+        )
         cb = lambda sys: self.save_data(force=True, subforce=True)
         out = self.system.run(*args, **kwargs, _cb=cb)
         self.post_process(*args, **kwargs)
 
         self._stored_plots = {}
-        self.make_plots(analysis=self, store_figures = self._stored_plots)
+        self.make_plots(analysis=self, store_figures=self._stored_plots)
         self.report_results()
 
     def post_process(self, *args, **kwargs):
         """A user customizeable function"""
         pass
-
 
     def report_results(self):
         self.info(f"report results")
@@ -88,18 +89,19 @@ class Analysis(TabulationMixin,PlottingMixin):
                 self.error(e, "issue in {plt_reporter}")
 
         if self.show_plots:
-            self.info(f'showing plots {len(self.stored_plots)}')
-            for figkey,fig in self.stored_plots.items():
-                self.info(f'showing {figkey}')
+            self.info(f"showing plots {len(self.stored_plots)}")
+            for figkey, fig in self.stored_plots.items():
+                self.info(f"showing {figkey}")
                 try:
                     fig.show()
                 except Exception as e:
-                    self.error(e,f'issue showing {figkey}')
-                    
+                    self.error(e, f"issue showing {figkey}")
 
         self._uploaded = True
 
     # Plotting & Report Methods:
+
+
 #     @property
 #     def _report_path(self):
 #         """Add some name options that work into ClientInfoMixin"""

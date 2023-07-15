@@ -89,7 +89,7 @@ class Test(unittest.TestCase):
     def test_assemble_data_always_save(self):
         # print(f"testing data assembly {self.test_config.always_save_data}")
         # Run before test_table_to...
-    
+
         self.assertFalse(self.test_config.TABLE)
         self.test_config.save_data()
 
@@ -118,7 +118,9 @@ class Test(unittest.TestCase):
         # Change Something
         cur_val = self.test_config.attrs_prop
         new_val = 6 + cur_val
-        self.test_config.info(f'setting attrs prop on in {cur_val } => {new_val}')
+        self.test_config.info(
+            f"setting attrs prop on in {cur_val } => {new_val}"
+        )
         self.test_config.attrs_prop = new_val
         self.test_config.save_data()
         self.assertTrue(2 in self.test_config.TABLE)
@@ -135,8 +137,8 @@ class Test(unittest.TestCase):
         attr_in = {}
         for i in range(iter):
             cur_val = self.test_config.attrs_prop
-            attr_in[i] = val = cur_val + i**2.            
-            self.test_config.info(f'setting attrs prop df {cur_val } => {val}')            
+            attr_in[i] = val = cur_val + i**2.0
+            self.test_config.info(f"setting attrs prop df {cur_val } => {val}")
             self.test_config.attrs_prop = val
             self.test_config.save_data()
 

@@ -24,11 +24,7 @@ from os import sys
 
 import cachetools
 
-from ottermatics._archive.patterns import (
-    Singleton,
-    SingletonMeta,
-    singleton_meta_object,
-)
+
 from ottermatics.logging import (
     LoggingMixin,
     set_all_loggers_to,

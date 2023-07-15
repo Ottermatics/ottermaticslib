@@ -4,8 +4,7 @@ import attr, attrs
 from ottermatics.logging import LoggingMixin, log
 from ottermatics.properties import *
 
-# from ottermatics._archive.locations import *
-
+import deepdiff
 import typing
 import datetime
 
@@ -20,14 +19,19 @@ log = ConfigLog()
 
 # Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
+    from ottermatics.tabulation import TabulationMixin
+
+    if not isinstance(instance, (TabulationMixin)):
+        return
+
     if log.log_level <= 10:
         log.info(f"checking property changed {instance}{variable.name} {value}")
 
     if instance._anything_changed:
-        #Bypass Check since we've already flagged for an update
+        # Bypass Check since we've already flagged for an update
         return value
-    
-    #Check if shoudl be updated
+
+    # Check if shoudl be updated
     cur = getattr(instance, variable.name)
     attrs = attr.fields(instance.__class__)
     if variable in attrs and value != cur:
@@ -36,10 +40,12 @@ def property_changed(instance, variable, value):
         instance._anything_changed = True
 
     elif log.log_level <= 10 and variable in attrs:
-        instance.warning(f'didnt change variables {variable.name}| {value} == {cur}')
+        instance.warning(
+            f"didnt change variables {variable.name}| {value} == {cur}"
+        )
 
     elif log.log_level <= 10:
-        instance.critical(f'missing variable {variable.name} not in {attrs}')
+        instance.critical(f"missing variable {variable.name} not in {attrs}")
 
     return value
 
@@ -84,7 +90,7 @@ def signals_slots_handler(
             metadata=None,
             type=str,
             converter=None,
-            kw_only=False,
+            kw_only=True,
             inherited=True,
             on_setattr=None,
             alias="name",
@@ -308,7 +314,6 @@ def signals_slots_handler(
             if isinstance(o.type, PLOT):
                 print(o)
 
-
     # Merge Fields
     for k, o in in_fields.items():
         if k not in created_fields:
@@ -318,8 +323,8 @@ def signals_slots_handler(
                 f"{cls.__name__} skipping inherited attr: {o.name} as a custom type overriding it"
             )
 
-    #Enforce Property Changing
-    #FIXME: is this more reliable
+    # Enforce Property Changing
+    # FIXME: is this more reliable
     # real_out = []
     # for fld in out:
     #     if fld.type in (int,float,str):
@@ -348,7 +353,7 @@ def otterize(cls=None, **kwargs):
     3) hash is by object identity"""
 
     # Define defaults and handle conflicts
-    dflts = dict(repr=False, eq=False, slots=False)
+    dflts = dict(repr=False, eq=False, slots=False, kw_only=True)
     for k, v in kwargs.items():
         if k in dflts:
             dflts.pop(k)
@@ -371,7 +376,7 @@ def otterize(cls=None, **kwargs):
             return acls
 
         # Component/Config Flow
-        log.info(f"Configuring: {cls.__name__}")
+        log.msg(f"Configuring: {cls.__name__}")
         acls = attr.s(
             cls,
             on_setattr=property_changed,
@@ -438,7 +443,7 @@ class Configuration(LoggingMixin):
         """This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!"""
         # Store abs path On Creation, in case we change
         self._log = None
-        self._anything_changed = True #save by default first go!
+        self._anything_changed = True  # save by default first go!
         self._created_datetime = datetime.datetime.utcnow()
         self.debug(f"created {self.identity}")
         self.__on_init__()
@@ -487,7 +492,7 @@ class Configuration(LoggingMixin):
     @property
     def identity(self):
         """A customizeable property that will be in the log by default"""
-        if not self.name or self.name=='default':
+        if not self.name or self.name == "default":
             return self.classname.lower()
         return f"{self.classname}-{self.name}".lower()
 
@@ -538,6 +543,8 @@ class Configuration(LoggingMixin):
     @property
     def attrs_fields(self) -> set:
         return set(attr.fields(self.__class__))
+    
+
 
     @classmethod
     def _get_init_attrs_data(cls, subclass_of: type, exclude=False):
@@ -618,6 +625,41 @@ class Configuration(LoggingMixin):
         ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, str, tuple, list)
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}
+
+    #Dictonaries
+    @property
+    def as_dict(self):
+        o = {k.name:getattr(self,k.name,None) for k in self.attrs_fields}
+        o = {k:v if not isinstance(v,Configuration) else v.as_dict for k,v in o.items()}
+        return o
+
+    @property
+    def input_as_dict(self):
+        o = {k:getattr(self,k,None) for k in self.input_fields}
+        o = {k:v if not isinstance(v,Configuration) else v.input_as_dict for k,v in o.items()}
+        return o
+    
+    @property
+    def numeric_as_dict(self):
+        o = {k:getattr(self,k,None) for k in self.numeric_fields}
+        o = {k:v if not isinstance(v,Configuration) else v.numeric_as_dict for k,v in o.items()}
+        return o
+
+    #Hashes
+    @property   
+    def unique_hash(self):
+        d = self.as_dict
+        return deepdiff.DeepHash(d)[d]
+
+    @property
+    def numeric_hash(self):
+        d = self.input_as_dict
+        return deepdiff.DeepHash(d)[d]
+
+    @property
+    def numeric_hash(self):
+        d = self.numeric_as_dict
+        return deepdiff.DeepHash(d)[d]
 
     @contextmanager
     def difference(self, **kwargs):

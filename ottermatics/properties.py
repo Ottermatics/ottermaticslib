@@ -151,7 +151,6 @@ class cached_system_property(system_property):
 
     def get_func_return(self, func):
         anno = func.__annotations__
-        print(func, func.__dict__)
         self.gname = func.__name__
         typ = anno.get("return", None)
         if not typ in (int, str, float):
@@ -188,7 +187,7 @@ class cached_system_property(system_property):
         setattr(instance, self.private_var, val)
         return val
 
-
+#TODO: install solver reset / declarative instance cache+
 class solver_cached(otter_prop):
     """
     A property that updates a first time and then anytime time the input data changed, as signaled by attrs.on_setattr callback
@@ -229,7 +228,7 @@ class solver_cached(otter_prop):
         setattr(instance, self.private_var, val)
         return val
 
-
+#TODO: install solver reset / declarative instance cache+
 class instance_cached(otter_prop):
     """
     A property that caches a result to an instance the first call then returns that each successive call

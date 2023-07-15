@@ -36,7 +36,7 @@ class SpringMass(System):
     vtx = TRANSIENT.define("v", "a")
     xtx = TRANSIENT.define("x", "v")
 
-    pos = TRACE.define(y='x',y2=['v','a'])
+    pos = TRACE.define(y="x", y2=["v", "a"])
 
     @system_property
     def dx(self) -> float:

@@ -217,6 +217,11 @@ class LoggingMixin(logging.Filter):
     @property
     def identity(self):
         return type(self).__name__
+    
+    def __getstate__(self):
+        d = dict(self.__dict__)
+        d['_f_change_log'] = None
+        return d    
 
 
 class Log(LoggingMixin):
