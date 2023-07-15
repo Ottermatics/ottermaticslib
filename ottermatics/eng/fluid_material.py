@@ -4,7 +4,7 @@ from ottermatics.components import Component, system_property, otterize
 
 import matplotlib
 import random
-import attr,attrs
+import attr, attrs
 import numpy
 import inspect
 import sys
@@ -36,11 +36,11 @@ class FluidMaterial(Component):
     @abc.abstractproperty
     def viscosity(self):
         """ideal fluid has no viscosity"""
-        return 1E-3
+        return 1e-10
 
     @abc.abstractproperty
     def surface_tension(self):
-        return 0.001
+        return 1E-10
 
     # TODO: enthalpy
 
@@ -59,7 +59,7 @@ class IdealGas(FluidMaterial):
     @system_property
     def viscosity(self) -> float:
         """ideal fluid has no viscosity"""
-        return 0.0
+        return 1e-10
 
     # @system_property
     # def surface_tension(self):
@@ -261,11 +261,11 @@ class CoolPropMixture(CoolPropMaterial):
             pass
             # self.error(e,'issue setting mixing rule, but continuting.')
 
-    @property
+    @system_property
     def Mmass1(self):
         return PropsSI("M", "T", self.T, "P", self.P, self.material1)
 
-    @property
+    @system_property
     def Mmass2(self):
         return PropsSI("M", "T", self.T, "P", self.P, self.material2)
 

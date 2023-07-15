@@ -40,6 +40,7 @@ import collections
 
 import numpy
 
+
 # make a module logger
 class SystemsLog(LoggingMixin):
     pass
@@ -153,13 +154,13 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         sref = self.system_references
         for k, v in sref["attributes"].items():
             val = v.value()
-            if isinstance(val,TABLE_TYPES):
+            if isinstance(val, TABLE_TYPES):
                 out[k] = val
             else:
-                out[k] = numpy.nan                
+                out[k] = numpy.nan
         for k, v in sref["properties"].items():
             val = v.value()
-            if isinstance(val,TABLE_TYPES):            
+            if isinstance(val, TABLE_TYPES):
                 out[k] = val
             else:
                 out[k] = numpy.nan

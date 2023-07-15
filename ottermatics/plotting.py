@@ -86,10 +86,10 @@ SEABORN_PALETTE = EnvVariable(
     **_def_opts,
 )
 
-#Figure Saving Config
-#FIGURE_SAVE = EnvVariable(
+# Figure Saving Config
+# FIGURE_SAVE = EnvVariable(
 #    ""
-#)
+# )
 
 # TODO: fonts are platform dependent :(
 # SEABORN_FONT = EnvVariable('SEABORN_FONT',default='sans-serif',**_def_opts)
@@ -127,6 +127,7 @@ def install_seaborn(rc_override=None, **kwargs):
 
 install_seaborn()
 
+
 class PlottingMixin:
     """Inherited by Systems and Analyses to provide common interface for plotting"""
 
@@ -135,75 +136,77 @@ class PlottingMixin:
     @instance_cached
     def plots(self):
         return {k: getattr(self, k) for k in self.plot_attributes()}
-    
+
     @property
     def stored_plots(self):
-        if not hasattr(self,'_stored_plots'):
+        if not hasattr(self, "_stored_plots"):
             self._stored_plots = {}
         return self._stored_plots
 
     @instance_cached
     def traces(self):
         if not self.transients_attributes():
-            return {} #not a transient system
+            return {}  # not a transient system
         return {k: getattr(self, k) for k in self.trace_attributes()}
-    
-    def make_plots(self,analysis:"Analysis"=None,store_figures:bool=True,pre=None):
-        """makes plots and traces of all on this instance, and if a system is 
+
+    def make_plots(
+        self, analysis: "Analysis" = None, store_figures: bool = True, pre=None
+    ):
+        """makes plots and traces of all on this instance, and if a system is
         subsystems. Analysis should call make plots however it can be called on a system as well
         :param analysis: the analysis that has triggered this plot
         :param store_figure: a boolean or dict, if neither a dictionary will be created and returend from this function
         :returns: the dictionary from store_figures logic
         """
         if not pre:
-            pre = f'{self.classname}'
+            pre = f"{self.classname}"
         else:
-            pre =  f'{pre}.{self.classname}'
+            pre = f"{pre}.{self.classname}"
 
         if analysis and store_figures is True:
             imgstore = analysis._stored_plots
         elif store_figures == True:
-            imgstore = {} #gotta store somewhere
-        elif isinstance(store_figures,dict):
+            imgstore = {}  # gotta store somewhere
+        elif isinstance(store_figures, dict):
             imgstore = store_figures
         else:
             imgstore = None
 
+        # Announce
+        log.info(f"Plotting {pre}")
 
-        #Announce
-        log.info(f'Plotting {pre}')
-        
-        #Traces
-        for plotnm,plot in self.plots.items():
+        # Traces
+        for plotnm, plot in self.plots.items():
             try:
-                log.info(f'{self.identity} plotting {pre}.{plotnm} | {plot}')
-                fig,ax = plot()
-                if isinstance(fig,pylab.Figure):
+                log.info(f"{self.identity} plotting {pre}.{plotnm} | {plot}")
+                fig, ax = plot()
+                if isinstance(fig, pylab.Figure):
                     pylab.close(fig)
                 if imgstore is not None:
-                    imgstore[f'{pre}.{plotnm}']=fig
+                    imgstore[f"{pre}.{plotnm}"] = fig
             except Exception as e:
-                log.error(e,f'issue in plot {plot}')
+                log.error(e, f"issue in plot {plot}")
 
-        #Traces
-        for plotnm,plot in self.traces.items():
+        # Traces
+        for plotnm, plot in self.traces.items():
             try:
-                log.info(f'{self.identity} tracing {pre}.{plotnm} | {plot}')
-                fig,ax = plot()
-                if isinstance(fig,pylab.Figure):
+                log.info(f"{self.identity} tracing {pre}.{plotnm} | {plot}")
+                fig, ax = plot()
+                if isinstance(fig, pylab.Figure):
                     pylab.close(fig)
                 if imgstore is not None:
-                    imgstore[f'{pre}.{plotnm}']=fig
+                    imgstore[f"{pre}.{plotnm}"] = fig
             except Exception as e:
-                log.error(e,f'issue in trace {plot}')
+                log.error(e, f"issue in trace {plot}")
 
-        #Sub Systems
+        # Sub Systems
         for confnm, conf in self.internal_configurations.items():
-            if isinstance(conf,PlottingMixin):
-                log.info(f'{self.identity} system plotting {confnm} | {conf}')
-                conf.make_plots(analysis,store_figures=store_figures,pre=pre)
+            if isinstance(conf, PlottingMixin):
+                log.info(f"{self.identity} system plotting {confnm} | {conf}")
+                conf.make_plots(analysis, store_figures=store_figures, pre=pre)
 
         return imgstore
+
 
 class PlotInstance:
     """combine plotclass parms with system info"""
@@ -222,8 +225,8 @@ class PlotInstance:
 
         diff = set()
         parms = set()
-        for k,vers in self.plot_cls.plot_parms().items():
-            if isinstance(vers,list):
+        for k, vers in self.plot_cls.plot_parms().items():
+            if isinstance(vers, list):
                 for v in vers:
                     if v not in sys_ref:
                         diff.add(v)
@@ -299,7 +302,7 @@ class PlotInstance:
             fig.subplots_adjust(top=0.9)
             fig.suptitle(title)
 
-        return fig,ax
+        return fig, ax
 
     @property
     def identity(self) -> str:
@@ -357,21 +360,21 @@ class PLOT_ATTR(attrs.Attribute):
     @classmethod
     def validate_plot_args(cls, system: "System"):
         """Checks system.system_references that cls.plot_parms exists"""
-        log.info(f'validating: {system}')
+        log.info(f"validating: {system}")
         sys_ref = system.system_references
         attr_keys = set(sys_ref["attributes"].keys())
         prop_keys = set(sys_ref["properties"].keys())
         valid = attr_keys.union(prop_keys)
 
         diff = set()
-        for k,vers in cls.plot_parms().items():
-            if isinstance(vers,list):
+        for k, vers in cls.plot_parms().items():
+            if isinstance(vers, list):
                 for v in vers:
                     if v not in valid:
                         diff.add(v)
             elif vers not in valid:
                 diff.add(vers)
-            
+
         if log.log_level <= 10:
             log.debug(
                 f"{cls.__name__} has parms: {attr_keys} and bad input: {diff}"
@@ -413,15 +416,15 @@ class TraceInstance(PlotInstance):
 
         type = PC.type
         types = self.plot_cls.types
-        if 'type' in override_kw and override_kw['type'] in types:
-            type = override_kw.pop('type')
-        elif 'type' in override_kw:
-            raise KeyError(f'invalid trace type, must be in {types}')
+        if "type" in override_kw and override_kw["type"] in types:
+            type = override_kw.pop("type")
+        elif "type" in override_kw:
+            raise KeyError(f"invalid trace type, must be in {types}")
 
-        if type == 'scatter':
-            f = lambda ax,*args,**kwargs: ax.scatter(*args,**kwargs)
-        elif type == 'line':
-            f = lambda ax,*args,**kwargs: ax.plot(*args,**kwargs)
+        if type == "scatter":
+            f = lambda ax, *args, **kwargs: ax.scatter(*args, **kwargs)
+        elif type == "line":
+            f = lambda ax, *args, **kwargs: ax.plot(*args, **kwargs)
 
         # Defaults
         args = PC.plot_args.copy()
@@ -443,58 +446,66 @@ class TraceInstance(PlotInstance):
             f"plotting {self.system.identity}| {self.identity} with {args}"
         )
 
-        #PLOTTING
+        # PLOTTING
         # Make the axes and plot
-        #Get The MVPS
-        x =args.pop('x')
-        if 'x' in override_kw:
-            x = override_kw['x']
-        y=args.pop('y')
-        if 'y' in override_kw:
-            y = override_kw['y']
-        if not isinstance(y,list): y = list(y)
-        
-        #secondary plot
+        # Get The MVPS
+        x = args.pop("x")
+        if "x" in override_kw:
+            x = override_kw["x"]
+        y = args.pop("y")
+        if "y" in override_kw:
+            y = override_kw["y"]
+        if not isinstance(y, list):
+            y = list(y)
+
+        # secondary plot
         if "y2" in args and args["y2"]:
-            y2=args.pop('y2')
-            if 'y2' in override_kw:
-                y2 = override_kw['y2']
-            if y2 is None: 
+            y2 = args.pop("y2")
+            if "y2" in override_kw:
+                y2 = override_kw["y2"]
+            if y2 is None:
                 y2 = []
-            elif not isinstance(y2,list): 
+            elif not isinstance(y2, list):
                 y2 = list(y2)
         else:
             y2 = []
 
-        #TODO: insert marker, color ect per group, ensure no overlap
+        # TODO: insert marker, color ect per group, ensure no overlap
         fig, axes = pylab.subplots(2 if y2 else 1, 1)
         if y2:
-            ax,ax2=axes[0],axes[1]
+            ax, ax2 = axes[0], axes[1]
         else:
             ax = axes
-            ax2=None
+            ax2 = None
 
-
-        #Loop over y1
+        # Loop over y1
         yleg = []
         for y in y:
-            f(ax,x,y,data=self.system.dataframe,label=y,**args,**extra)
+            f(ax, x, y, data=self.system.dataframe, label=y, **args, **extra)
         else:
             # The only specificity of the code is when plotting the legend
-            h, l = np.hstack([l.get_legend_handles_labels()
-                            for l in ax.figure.axes
-                            if l.bbox.bounds == ax.bbox.bounds]).tolist()
-            ax.legend(handles=h, labels=l, loc='upper right')               
+            h, l = np.hstack(
+                [
+                    l.get_legend_handles_labels()
+                    for l in ax.figure.axes
+                    if l.bbox.bounds == ax.bbox.bounds
+                ]
+            ).tolist()
+            ax.legend(handles=h, labels=l, loc="upper right")
 
-        #Loop over y2
+        # Loop over y2
         for y in y2:
-            f(ax2,x,y,data=self.system.dataframe,label=y,**args,**extra)     
+            f(ax2, x, y, data=self.system.dataframe, label=y, **args, **extra)
         else:
             # The only specificity of the code is when plotting the legend
-            h, l = np.hstack([l.get_legend_handles_labels()
-                            for l in ax2.figure.axes
-                            if l.bbox.bounds == ax2.bbox.bounds]).tolist()
-            ax2.legend(handles=h, labels=l, loc='upper right')                        
+            h, l = np.hstack(
+                [
+                    l.get_legend_handles_labels()
+                    for l in ax2.figure.axes
+                    if l.bbox.bounds == ax2.bbox.bounds
+                ]
+            ).tolist()
+            ax2.legend(handles=h, labels=l, loc="upper right")
 
         return self.process_fig(fig, title)
 
@@ -559,14 +570,14 @@ class TRACE(PLOT_ATTR):
         if x is None or y is None:
             raise ValueError(f"x and y must both be input")
 
-        if not isinstance(x,str):
-            raise ValueError(f'x must be string')
-        
-        if not isinstance(y,(list,str)):
-            raise ValueError(f'y must be string or list')
+        if not isinstance(x, str):
+            raise ValueError(f"x must be string")
 
-        if not any([ y2 is None, isinstance(y2,(list,str)) ]):
-            raise ValueError(f'y2 must be string or list')
+        if not isinstance(y, (list, str)):
+            raise ValueError(f"y must be string or list")
+
+        if not any([y2 is None, isinstance(y2, (list, str))]):
+            raise ValueError(f"y2 must be string or list")
 
         # Validate Plot
         assert kind in cls.types, f"invalid kind not in {cls.types}"
@@ -594,11 +605,11 @@ class TRACE(PLOT_ATTR):
         # Validate Args
         assert set(kwargs).issubset(parm_args), f"invalid plot args {kwargs}"
         plot_args = kwargs
-        plot_args['x'] = x
-        plot_args['y'] = y
-        
-        if 'y2':
-            plot_args['y2'] = y2
+        plot_args["x"] = x
+        plot_args["y"] = y
+
+        if "y2":
+            plot_args["y2"] = y2
 
         log.info(f"adding TRACE|{kind} {x},{y},{y2},{kwargs}")
 
@@ -636,7 +647,7 @@ class TRACE(PLOT_ATTR):
     @classmethod
     def plot_parms(cls) -> set:
         pa = cls.plot_args.copy()
-        
+
         y1 = pa.pop("y")
         c = set()
         if isinstance(y1, list):
@@ -644,7 +655,7 @@ class TRACE(PLOT_ATTR):
                 c.add(y)
         else:
             c.add(y1)
-        pa['y'] = list(c)
+        pa["y"] = list(c)
 
         if "y2" in c:
             c = set()
@@ -655,7 +666,7 @@ class TRACE(PLOT_ATTR):
             else:
                 c.add(y2)
 
-            pa['y2'] = list(c)
+            pa["y2"] = list(c)
         return pa
 
     @classmethod

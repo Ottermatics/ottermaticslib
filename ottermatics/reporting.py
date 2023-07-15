@@ -108,23 +108,20 @@ class PlotReporter(Reporter):
 
     name: str = attrs.field(default="table_reporter")
 
-    #FIXME: make attrs work... layout class conflict
-    #ext = Options('png','jpg','gif')
-    #ext: str = attrs.field(default='png')
-    ext = 'png'
+    # FIXME: make attrs work... layout class conflict
+    # ext = Options('png','jpg','gif')
+    # ext: str = attrs.field(default='png')
+    ext = "png"
 
-    def upload(self,analysis):
-        
-        for figkey,fig in analysis.stored_plots.items():
-            
+    def upload(self, analysis):
+        for figkey, fig in analysis.stored_plots.items():
             try:
-                filname = os.path.join(self.report_root,f'{figkey}.{self.ext}')
-                self.info(f'saving {figkey} to {filname}')
+                filname = os.path.join(self.report_root, f"{figkey}.{self.ext}")
+                self.info(f"saving {figkey} to {filname}")
                 fig.savefig(filname)
-                    
+
             except Exception as e:
-                self.error(e,f'issue showing {figkey}')
-        
+                self.error(e, f"issue showing {figkey}")
 
 
 # Table Reporters

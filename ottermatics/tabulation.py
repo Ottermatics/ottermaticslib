@@ -21,6 +21,7 @@ import os
 import collections
 import uuid
 
+
 class TableLog(LoggingMixin):
     pass
 
@@ -51,7 +52,9 @@ class TabulationMixin(Configuration):
         This should capture all changes but save data"""
 
         if log.log_level <= 10:
-            log.debug(f'check save for {self}|{index}|save: {self.anything_changed or force}')
+            log.debug(
+                f"check save for {self}|{index}|save: {self.anything_changed or force}"
+            )
 
         if saved is None:
             saved = set()
@@ -96,7 +99,7 @@ class TabulationMixin(Configuration):
             pr[key] = Ref(self, key)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key,False)
+            at[key] = Ref(self, key, False)
 
         return out
 
@@ -104,7 +107,7 @@ class TabulationMixin(Configuration):
     def anything_changed(self):
         """use the on_setattr method to determine if anything changed,
         also assume that stat_tab could change without input changes"""
-        if not hasattr(self,'_anything_changed'):
+        if not hasattr(self, "_anything_changed"):
             self._anything_changed = True
 
         if self._anything_changed or self.always_save_data:
@@ -335,7 +338,7 @@ class TabulationMixin(Configuration):
 
     @classmethod
     def pre_compile(cls):
-        cls._anything_changed = True #set default on class
+        cls._anything_changed = True  # set default on class
         if any(
             [
                 v.stochastic
@@ -406,18 +409,18 @@ class TabulationMixin(Configuration):
     def system_id(self) -> str:
         """returns an instance unique id based on id(self)"""
         idd = id(self)
-        return f'{self.classname}.{idd}'
+        return f"{self.classname}.{idd}"
 
 
 class Ref:
     """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
 
-    __slots__ = ["comp", "key","use_call"]
+    __slots__ = ["comp", "key", "use_call"]
     comp: "TabulationMixin"
     key: str
-    use_call:bool
+    use_call: bool
 
-    def __init__(self, component, key,use_call=True):
+    def __init__(self, component, key, use_call=True):
         self.comp = component
         self.key = key
         self.use_call = use_call

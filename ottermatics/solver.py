@@ -110,7 +110,7 @@ class SolverMixin:
         # parameters input
         for k, v in kwargs.items():
             # Ensure Its a List
-            if isinstance(v,numpy.ndarray):
+            if isinstance(v, numpy.ndarray):
                 v = v.tolist()
 
             if not isinstance(v, list):
@@ -228,7 +228,7 @@ class SolverMixin:
         try:
             out = self.execute()
         except Exception as e:
-            self.error(e,f"solver failed @ {self.X}")
+            self.error(e, f"solver failed @ {self.X}")
             out = None
             raise e
 
@@ -352,7 +352,7 @@ class SolverMixin:
                 self.setX(x_ordered, pre_execute=pre_execute)
                 # Get Em
                 o = [f.value() for f, x in zip(self.Flist, x_ordered)]
-                #o = [f.value() for f  in self.Flist]
+                # o = [f.value() for f  in self.Flist]
                 return numpy.array(o)
             elif x_kw:
                 assert (
@@ -681,7 +681,7 @@ class IntegratorInstance:
 
     __slots__ = ["system", "solver", "parameter", "derivative"]
 
-    #TODO: add forward implicit solver
+    # TODO: add forward implicit solver
 
     def __init__(self, solver: "TRANSIENT", system: "System") -> None:
         self.solver = solver

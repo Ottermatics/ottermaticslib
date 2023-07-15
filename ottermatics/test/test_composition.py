@@ -129,9 +129,9 @@ class TestComposition(unittest.TestCase):
 
         # solver constraints checking
         input = self.system.dataframe["input"][0]
-        self.assertGreaterEqual(input, -1E3)  # min protection
+        self.assertGreaterEqual(input, -1e3)  # min protection
         self.assertLessEqual(input, 1)  # max protection
 
         in2 = self.system.dataframe["input"][0]
-        self.assertGreaterEqual(in2,  -1E3)  # min protection
+        self.assertGreaterEqual(in2, -1e3)  # min protection
         self.assertLessEqual(in2, 4 - input)  # max protection

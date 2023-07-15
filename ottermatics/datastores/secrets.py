@@ -44,6 +44,7 @@ SLACK_WEBHOOK_NOTIFICATION = None  # TOOD: Make a default slack webhook!
 # Local Credentials
 
 
+# TODO: Remove this and use aws copilot concepts
 @otterize
 class Secrets(Configuration, metaclass=InputSingletonMeta):
     """Secrets handles an explicit user manage input and output of secrets
@@ -330,7 +331,8 @@ class ClientSecrets(Secrets, ClientInfoMixin):
         for path in paths:
             fils = [os.path.join(path, fil) for fil in os.listdir(path)]
             mtch = [
-                fil for fil in fils
+                fil
+                for fil in fils
                 if os.path.isdir(fil)
                 and any(
                     list(
