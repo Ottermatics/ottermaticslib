@@ -105,7 +105,7 @@ ax2.set_xlabel(f'throttle%')
 ```
 
 ### Results
-[air_filter_calc.png](media/air_filter_calc.png)
+![air_filter_calc.png](media/air_filter_calc.png)
 
 
 ## Spring Mass Damper
@@ -168,10 +168,10 @@ df.groupby('run_id').plot('time','x')
 ```
 
 ### Results Damping Off
-[olib_spring_mass_clac.png](media/olib_spring_mass_clac.png)
+![olib_spring_mass_clac.png](media/olib_spring_mass_clac.png)
 
 ### Results - Damping On
-[olib_spring_mass_clac_damp 1.png](media/olib_spring_mass_clac_damp 1.png)
+<img src="media/olib_spring_mass_clac_damp 1.png" />
 
 
 
