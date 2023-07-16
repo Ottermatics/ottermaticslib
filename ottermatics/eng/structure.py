@@ -197,8 +197,15 @@ class Structure(System):
             )
             self._materials[uid] = material
 
+        beam_attrs = {k:v for k,v in kwargs.items() if k in Beam.input_attrs()}
+        kwargs = {k:v for k,v in kwargs.items() if k not in beam_attrs}
+        # print(Beam.input_attrs())
+        # print(beam_attrs)
+        # print(kwargs)
+
+
         B = beam = Beam(
-            structure=self, name=name, material=material, section=section
+            structure=self, name=name, material=material, section=section,**beam_attrs
         )
         self._beams[name] = beam
         self.frame.add_member(
@@ -293,7 +300,7 @@ class Structure(System):
             rows = []
             for node in self.nodes.values():
                 row = {
-                    "name": node.Name,
+                    "name": node.name,
                     "dx": node.DX[case],
                     "dy": node.DY[case],
                     "dz": node.DZ[case],
@@ -330,9 +337,15 @@ class Structure(System):
         return numpy.array([0, 0, -self.mass * g])
 
     def __getattr__(self, attr):
-        if attr.startswith('analyze'):
-            self.warning(f'analyzing...')
-        return getattr(self.frame, attr)
+        #print(f'get {attr}')
+        if attr in dir(self.frame):
+            return getattr(self.frame, attr)           
+        #if attr in dir(self):
+            #return getattr(self,attr)         
+        #raise AttributeError(f'{attr} not found!')
+        return self.__getattribute__(attr)
+        
+
 
     def __dir__(self):
         return sorted(set(dir(super(Structure, self))+dir(Structure)+ dir(self.frame)))

@@ -99,6 +99,7 @@ class Beam(Component):
         validator=attr.validators.instance_of((int, float, nonetype)),
     )
 
+    in_mesh_size:float = attrs.field(default=0.01)
     analysis_intervals:int = attrs.field(default=3)
 
     _L = None
@@ -124,7 +125,7 @@ class Beam(Component):
         self.debug(f"determining {section} properties...")
         if isinstance(self.section, geometry.Geometry):
             self.debug(f"determining mesh {section} properties...")
-            mesh = self.section.create_mesh([self.mesh_size])
+            mesh = self.section.create_mesh([self.in_mesh_size])
             # no material here
             self._section_properties = cross_section.Section(
                 self.section, mesh
@@ -132,7 +133,7 @@ class Beam(Component):
             self._section_properties.calculate_geometric_properties()
             self._section_properties.calculate_warping_properties()
             ans = self._section_properties.calculate_frame_properties()
-            self.in_A, self.in_Ix, self.in_Iy, self.in_Ixy, PrincpAx = ans
+            (self.in_A, self.in_Ix, self.in_Iy, self.in_Ixy,self.in_J, PrincpAx) = ans
 
         elif isinstance(self.section, ottgeo.ShapelySection):
             self.debug(f"determining profile {section} properties...")
@@ -372,7 +373,7 @@ class Beam(Component):
         cmprv = {}
         for rxy in [True, False]:
             new = []
-            out = self.von_mises_stress_l()
+            out = self.von_mises_stress_l
             for cmbo, vm_stress_vec in out.items():
                 new.append(numpy.nanmax(vm_stress_vec))
             cmprv[rxy] = numpy.array(new)
@@ -428,16 +429,21 @@ class Beam(Component):
                         for sn, stress in stresses.items()
                         if isinstance(stress, numpy.ndarray)
                     }   
-                    min_vals = {
+                    avg_vals = {
                         sn + "_avg_" + stresses["Material"]: numpy.nanmean(stress)
                         for sn, stress in stresses.items()
                         if isinstance(stress, numpy.ndarray)
-                    }                                      
-                    factor_of_saftey = numpy.nanmax(stresses['sig_vm']) / self.material.allowable_stress
+                    }
+                    #Make some simple to determine dataframe failure prediction                     
+                    factor_of_saftey = self.material.yield_strength / numpy.nanmax(stresses['sig_vm']) 
+                    fail_frac = numpy.nanmax(stresses['sig_vm']) / self.material.allowable_stress                    
                     fsnm = stresses["Material"] + "_saftey_factor"
-                    allowable = {fsnm: factor_of_saftey}
+                    fsff = stresses["Material"] + "_fail_frac"
+                    allowable = {fsnm: factor_of_saftey,fsff:fail_frac}
                     oout.update(allowable)
-                    oout.update(vals)
+                    oout.update(max_vals)
+                    oout.update(min_vals)
+                    oout.update(avg_vals)
                 rows.append(oout)
 
         return pandas.DataFrame(rows)
@@ -485,41 +491,41 @@ class Beam(Component):
         return numpy.array([0, 0, -self.mass * g])
 
     # TODO: put these in dataframe via evaluate current_case loop
-    #     @property
-    #     def results(self):
-    #         """Min and max stress and deflection dataframes per case"""
-    #         rows = []
-    #         for combo in self.structure.frame.LoadCombos:
-    #             mem = self.member
-    #             row = dict(
-    #                 case=combo,
-    #                 Iy=self.Iy,
-    #                 Ix=self.Ix,
-    #                 A=self.A,
-    #                 E=self.E,
-    #                 J=self.J,
-    #                 G=self.G,
-    #                 max_axial=mem.MaxAxial(combo),
-    #                 min_axial=mem.MinAxial(combo),
-    #                 max_my=mem.MaxMoment("My", combo),
-    #                 min_my=mem.MinMoment("My", combo),
-    #                 max_mz=mem.MaxMoment("Mz", combo),
-    #                 min_mz=mem.MinMoment("Mz", combo),
-    #                 max_shear_y=mem.MaxShear("Fy", combo),
-    #                 min_shear_y=mem.MinShear("Fy", combo),
-    #                 max_shear_z=mem.MaxShear("Fz", combo),
-    #                 min_shear_z=mem.MinShear("Fz", combo),
-    #                 max_torsion=mem.MaxTorsion(combo),
-    #                 min_torsion=mem.MinTorsion(combo),
-    #                 max_deflection_y=mem.MaxDeflection("dy", combo),
-    #                 min_deflection_y=mem.MinDeflection("dy", combo),
-    #                 max_deflection_x=mem.MaxDeflection("dx", combo),
-    #                 min_deflection_x=mem.MinDeflection("dx", combo),
-    #             )
-    #
-    #             rows.append(row)
-    #
-    #         return pandas.DataFrame(rows)
+#     @property
+#     def results(self):
+#         """Min and max stress and deflection dataframes per case"""
+#         rows = []
+#         for combo in self.structure.frame.LoadCombos:
+#             mem = self.member
+#             row = dict(
+#                 case=combo,
+#                 Iy=self.Iy,
+#                 Ix=self.Ix,
+#                 A=self.A,
+#                 E=self.E,
+#                 J=self.J,
+#                 G=self.G,
+#                 max_axial=mem.MaxAxial(combo),
+#                 min_axial=mem.MinAxial(combo),
+#                 max_my=mem.MaxMoment("My", combo),
+#                 min_my=mem.MinMoment("My", combo),
+#                 max_mz=mem.MaxMoment("Mz", combo),
+#                 min_mz=mem.MinMoment("Mz", combo),
+#                 max_shear_y=mem.MaxShear("Fy", combo),
+#                 min_shear_y=mem.MinShear("Fy", combo),
+#                 max_shear_z=mem.MaxShear("Fz", combo),
+#                 min_shear_z=mem.MinShear("Fz", combo),
+#                 max_torsion=mem.MaxTorsion(combo),
+#                 min_torsion=mem.MinTorsion(combo),
+#                 max_deflection_y=mem.MaxDeflection("dy", combo),
+#                 min_deflection_y=mem.MinDeflection("dy", combo),
+#                 max_deflection_x=mem.MaxDeflection("dx", combo),
+#                 min_deflection_x=mem.MinDeflection("dx", combo),
+#             )
+# 
+#             rows.append(row)
+# 
+#         return pandas.DataFrame(rows)
 
     # RESULTS:
     # axial
