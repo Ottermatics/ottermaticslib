@@ -93,6 +93,11 @@ class DiskReporterMixin(TemporalReporterMixin):
             pth = pathlib.Path(self.report_root)
             pth.mkdir(parents=True, exist_ok=True)
 
+    def ensure_path(self,file_path):
+        pth = pathlib.Path(file_path)
+        if not pth.parent.exists():
+            pth.mkdir(parents=True, exist_ok=True)
+
 
 # Basic Reporter Types
 @attrs.define
@@ -106,7 +111,7 @@ class TableReporter(Reporter):
 class PlotReporter(Reporter):
     """A reporter to upload plots to a file store"""
 
-    name: str = attrs.field(default="table_reporter")
+    name: str = attrs.field(default="plot_reporter")
 
     # FIXME: make attrs work... layout class conflict
     # ext = Options('png','jpg','gif')
@@ -117,6 +122,7 @@ class PlotReporter(Reporter):
         for figkey, fig in analysis.stored_plots.items():
             try:
                 filname = os.path.join(self.report_root, f"{figkey}.{self.ext}")
+                self.ensure_path(filname)
                 self.info(f"saving {figkey} to {filname}")
                 fig.savefig(filname)
 
@@ -137,16 +143,19 @@ class CSVReporter(TableReporter, DiskReporterMixin):
 
         # Make System Dataframe
         af = os.path.join(self.report_root, f"system_{system.name}.csv")
+        self.ensure_path(af)
         self.info(f"saving system to: {af}")
         system.dataframe.to_csv(af)
 
         # Make Analysis Dataframe
         af = os.path.join(self.report_root, f"analysis_{analysis.name}.csv")
+        self.ensure_path(af)
         self.info(f"saving analysis to: {af}")
         analysis.dataframe.to_csv(af)
 
         for ckey, comp in system.comp_references.items():
             af = os.path.join(self.report_root, f"{ckey}_{comp.name}.csv")
+            self.ensure_path(af)
             self.info(f"saving {ckey} to: {af}")
             comp.dataframe.to_csv(af)
 
