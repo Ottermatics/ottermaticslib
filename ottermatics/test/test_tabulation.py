@@ -142,7 +142,15 @@ class Test(unittest.TestCase):
             self.test_config.attrs_prop = val
             self.test_config.save_data()
 
+        #print(df)
+        # print(self.test_config.attr_raw_keys)
+        # print(self.test_config.attr_row)
+        # print(self.test_config.internal_references)
+        # print(self.test_config.TABLE)
+
         df = self.test_config.dataframe
+
+
         self.assertEqual(len(df.index), iter)
 
         self.assertEqual(df["test_one"].max(), 1)

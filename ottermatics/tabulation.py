@@ -168,7 +168,7 @@ class TabulationMixin(Configuration):
         #     if isinstance(v, TABLE_TYPES)
         # }
 
-    @class_cache
+    @instance_cached
     def skip_attr(self) -> list:
         if self.skip_parms is None:
             return list(self.internal_configurations.keys())
@@ -182,7 +182,7 @@ class TabulationMixin(Configuration):
     def format_label(self, label):
         return label.replace("_", " ").replace("-", " ").title()
 
-    @class_cache
+    @instance_cached
     def attr_labels(self) -> list:
         """Returns formated attr label if the value is numeric"""
         attr_labels = list(
@@ -205,9 +205,9 @@ class TabulationMixin(Configuration):
             ]
         )
 
-    @class_cache
+    @instance_cached
     def attr_raw_keys(self) -> list:
-        good = set(self.numeric_fields())
+        good = set(self.table_fields())
         return [k for k in attr.fields_dict(self.__class__).keys() if k in good]
 
     @solver_cached
@@ -225,7 +225,7 @@ class TabulationMixin(Configuration):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    @class_cache
+    @instance_cached
     def always_save_data(self):
         """Checks if any properties are stochastic (random)"""
         return self._always_save_data
@@ -246,7 +246,7 @@ class TabulationMixin(Configuration):
         ]
         return tabulated_properties
 
-    @class_cache
+    @instance_cached
     def system_properties_labels(self) -> list:
         """Returns the labels from table properties"""
         class_dict = self.__class__.__dict__
@@ -255,7 +255,7 @@ class TabulationMixin(Configuration):
         ]
         return tabulated_properties
 
-    @class_cache
+    @instance_cached
     def system_properties_types(self) -> list:
         """Returns the types from table properties"""
         class_dict = self.__class__.__dict__
@@ -264,7 +264,7 @@ class TabulationMixin(Configuration):
         ]
         return tabulated_properties
 
-    @class_cache
+    @instance_cached
     def system_properties_keys(self) -> list:
         """Returns the table property keys"""
         tabulated_properties = [
@@ -272,7 +272,7 @@ class TabulationMixin(Configuration):
         ]
         return tabulated_properties
 
-    @class_cache
+    @instance_cached
     def system_properties_description(self) -> list:
         """returns system_property descriptions if they exist"""
         class_dict = self.__class__.__dict__

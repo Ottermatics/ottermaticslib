@@ -545,7 +545,6 @@ class Configuration(LoggingMixin):
         return set(attr.fields(self.__class__))
     
 
-
     @classmethod
     def _get_init_attrs_data(cls, subclass_of: type, exclude=False):
         choose = issubclass
@@ -608,6 +607,10 @@ class Configuration(LoggingMixin):
         return cls._get_init_attrs_data(PLOT)
 
     @classmethod
+    def input_attrs(cls):
+        return attr.fields_dict(cls)
+
+    @classmethod
     def input_fields(cls):
         from ottermatics.solver import SOLVER, TRANSIENT
         from ottermatics.signals import SIGNAL
@@ -625,6 +628,16 @@ class Configuration(LoggingMixin):
         ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, str, tuple, list)
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}
+    
+    @classmethod
+    def table_fields(cls):
+        from ottermatics.solver import SOLVER, TRANSIENT
+        from ottermatics.signals import SIGNAL
+        from ottermatics.slots import SLOT
+
+        ignore_types = (str, float, int) #TODO: add numpy fields
+        typ = cls._get_init_attrs_data(ignore_types)
+        return {k: v for k, v in typ.items() }    
 
     #Dictonaries
     @property

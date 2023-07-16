@@ -63,6 +63,10 @@ class Airfilter(System):
     flow_solver = SOLVER.define('sum_dP','w')
     flow_solver.add_constraint('min',0)
 
+    flow_curve = PLOT.define(
+        "throttle", "w", kind="lineplot", title="Flow Curve"
+    )    
+
     @system_property
     def dP_parasitic(self) -> float:
         return self.k_parasitic * self.w**2.0
@@ -166,6 +170,68 @@ df.groupby('run_id').plot('time','x')
 
 ##### Results - Damping On
 <img src="media/olib_spring_mass_clac_damp 1.png" />
+
+
+## Reporting & Analysis
+`Analysis` is capable of tabulation as a `Component` or `System` and wraps a top level `System` and will save data for each system interval. `Analysis` stores several reporters for tables and plots that may be used to store results in multiple locations.
+
+Reporting is supported for tables via dataframes in CSV,Excel and Gsheets (WIP).
+
+For plots reporting is supported in disk storage.
+
+```python
+
+from ottermatics.analysis import Analysis
+from ottermatics.reporting import CSVReporter,DiskPlotReporter
+from ottermatics.properties import system_property
+import numpy as np
+import os,pathlib
+
+this_dir = str(pathlib.Path(__file__).parent)
+this_dir = os.path.join(this_dir,'airfilter_report')
+if not os.path.exists(this_dir):
+    os.path.mkdir(this_dir)
+
+csv = CSVReporter(path=this_dir,report_mode='daily')
+csv_latest = CSVReporter(path=this_dir,report_mode='single')
+
+plots = DiskPlotReporter(path=this_dir,report_mode='monthly')
+plots_latest = DiskPlotReporter(path=this_dir,report_mode='single')
+
+
+@otterize
+class AirfilterAnalysis(Analysis):
+    """Does post processing on a system"""
+    
+    efficiency = attrs.field(defualt=0.95)
+
+    @system_property
+    def clean_air_delivery_rate(self) -> float:
+        return self.system.w*self.efficiency
+
+    def post_process(self,*run_args,**run_kwargs):
+        pass
+        #TODO: something custom!
+
+#Air Filter as before
+fan = Fan()
+filt = Filter()
+af = Airfilter(fan=fan,filt=filt)
+
+#Make The Analysis
+sa = AirfilterAnalysis(
+                    system = af,
+                    table_reporters = [csv,csv_latest],
+                    plot_reporters = [plots,plots_latest]
+                   )
+
+#Run the analysis! Input passed to system
+sa.run(throttle=list(np.arange(0.1,1.1,0.1)))
+
+#CSV's & Plots available in ./airfilter_report!
+
+```
+
 
 
 
