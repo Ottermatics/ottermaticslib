@@ -1,5 +1,5 @@
 # ottermaticslib
-A library to tabulate information from complex systems with variuos ways to store data.
+A library to tabulate information from complex systems with various ways to store data and act as glue code for tough engineering problems.
 
 ### Installation
 ```bash
