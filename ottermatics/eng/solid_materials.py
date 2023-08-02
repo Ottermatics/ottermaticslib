@@ -200,8 +200,8 @@ class Aluminum(SolidMaterial):
     # Structural Properties
     density: float = attr.ib(default=2680.0)  # kg/m3
     elastic_modulus: float = attr.ib(default=70.3e9)  # Pa
-    yield_strength: float = attr.ib(default=86e6)  # Pa
-    tensile_strength_ultimate: float = attr.ib(default=193e6)  # Pa
+    yield_strength: float = attr.ib(default=240e6)  # Pa
+    tensile_strength_ultimate: float = attr.ib(default=290e6)  # Pa
     poissons_ratio: float = attr.ib(default=0.33)
 
     # Thermal Properties

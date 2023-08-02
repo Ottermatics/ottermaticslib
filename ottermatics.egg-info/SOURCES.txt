@@ -4,6 +4,7 @@ setup.py
 ottermatics/__init__.py
 ottermatics/analysis.py
 ottermatics/common.py
+ottermatics/component_collections.py
 ottermatics/components.py
 ottermatics/configuration.py
 ottermatics/env_var.py

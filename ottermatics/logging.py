@@ -99,7 +99,19 @@ class LoggingMixin(logging.Filter):
         return self._log
 
     def resetLog(self):
+        """reset log"""
         self._log = None
+        self.debug(f'reset!')
+
+    def resetSystemLogs(self,reseted=None):
+        """resets log on all internal instance LoggingMixins"""
+        self.resetLog()
+        self.debug(f'reset!')
+        if reseted is None: reseted = set()
+        for k,v in self.__dict__.items():
+            if isinstance(v,LoggingMixin) and id(v) not in reseted:
+                reseted.add(id(v))
+                v.resetSystemLogs(reseted)
 
     def installSTDLogger(self):
         """We only want std logging to start"""
@@ -115,7 +127,7 @@ class LoggingMixin(logging.Filter):
     def filter(self, record):
         """This acts as the interface for `logging.Filter`
         Don't overwrite this, use `add_fields` instead."""
-        record.name = self.identity.lower()
+        record.name = self.identity.lower()[:24]
         self.add_fields(record)
         return True
 

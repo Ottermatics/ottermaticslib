@@ -538,7 +538,7 @@ class Configuration(LoggingMixin):
             for skey, level, iconf in config.go_through_configurations(
                 level, levels_to_descend, parent_level
             ):
-                yield f"{key}.{skey}" if skey else key, level, iconf
+                yield f"{key}.{skey}" if skey else key, level, iconf            
 
     @property
     def attrs_fields(self) -> set:
@@ -615,8 +615,10 @@ class Configuration(LoggingMixin):
         from ottermatics.solver import SOLVER, TRANSIENT
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
+        from ottermatics.plotting import PLOT,TRACE
 
-        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, tuple, list)
+
+        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, tuple, list,PLOT,TRACE)
         return cls._get_init_attrs_data(ignore_types, exclude=True)
 
     @classmethod
@@ -624,8 +626,9 @@ class Configuration(LoggingMixin):
         from ottermatics.solver import SOLVER, TRANSIENT
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
+        from ottermatics.plotting import PLOT,TRACE
 
-        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, str, tuple, list)
+        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, str, tuple, list,PLOT,TRACE)
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}
     
@@ -635,15 +638,16 @@ class Configuration(LoggingMixin):
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
 
-        ignore_types = (str, float, int) #TODO: add numpy fields
-        typ = cls._get_init_attrs_data(ignore_types)
+        keeps = (str, float, int) #TODO: add numpy fields
+        typ = cls._get_init_attrs_data(keeps)
         return {k: v for k, v in typ.items() }    
 
     #Dictonaries
     @property
     def as_dict(self):
-        o = {k.name:getattr(self,k.name,None) for k in self.attrs_fields}
-        o = {k:v if not isinstance(v,Configuration) else v.as_dict for k,v in o.items()}
+        o = {k:getattr(self,k,None) for k,v in self.input_attrs().items()}
+        o = {k:v if not isinstance(v,Configuration) else v.as_dict 
+                 for k,v in o.items() }
         return o
 
     @property

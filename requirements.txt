@@ -83,7 +83,7 @@ expiringdict>=1.2.1
 #Supercomputing
 boto3
 #deco
-ray==2.2.0
+ray[default]~=2.6.1
 termcolor
 pyee
 
