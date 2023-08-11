@@ -84,6 +84,7 @@ expiringdict>=1.2.1
 boto3
 #deco
 ray[default]~=2.6.1
+ray[tune]~=2.6.1
 termcolor
 pyee
 
