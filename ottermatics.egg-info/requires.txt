@@ -31,5 +31,6 @@ networkx>=2.5.1
 expiringdict>=1.2.1
 boto3
 ray[default]~=2.6.1
+ray[tune]~=2.6.1
 termcolor
 pyee
