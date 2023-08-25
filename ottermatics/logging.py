@@ -23,7 +23,7 @@ def change_all_log_levels(new_log_level: int, check_function=None):
     :param new_log_level: int - changes unit level log level (10-msg,20-debug,30-info,40-warning,50-error,60-crit)
     :param check_function: callable -> bool - (optional) if provided if check_function(unit) is true then the new_log_level is applied
     """
-
+    print(f'changing log levels to {new_log_level}...')
     if isinstance(new_log_level, float):
         new_log_level = int(new_log_level)  # Float Case Is Handled
 
@@ -53,6 +53,8 @@ class LoggingMixin(logging.Filter):
 
     slack_webhook_url = None
     # log_silo = False
+
+    change_all_log_lvl = lambda s,*a,**kw: change_all_log_levels(*a,**kw)
 
     @property
     def logger(self):
@@ -99,7 +101,19 @@ class LoggingMixin(logging.Filter):
         return self._log
 
     def resetLog(self):
+        """reset log"""
         self._log = None
+        self.debug(f'reset!')
+
+    def resetSystemLogs(self,reseted=None):
+        """resets log on all internal instance LoggingMixins"""
+        self.resetLog()
+        self.debug(f'reset!')
+        if reseted is None: reseted = set()
+        for k,v in self.__dict__.items():
+            if isinstance(v,LoggingMixin) and id(v) not in reseted:
+                reseted.add(id(v))
+                v.resetSystemLogs(reseted)
 
     def installSTDLogger(self):
         """We only want std logging to start"""
@@ -115,7 +129,7 @@ class LoggingMixin(logging.Filter):
     def filter(self, record):
         """This acts as the interface for `logging.Filter`
         Don't overwrite this, use `add_fields` instead."""
-        record.name = self.identity.lower()
+        record.name = self.identity.lower()[:24]
         self.add_fields(record)
         return True
 

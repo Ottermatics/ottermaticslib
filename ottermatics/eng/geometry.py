@@ -28,6 +28,10 @@ import attr, attrs
 class Profile2D(Configuration):
     name: str = attr.ib(default="generic cross section")
 
+    #provide relative interface over 
+    y_bounds: tuple = None
+    x_bounds: tuple = None
+
     @property
     def A(self):
         return 0
@@ -72,6 +76,10 @@ class Rectangle(Profile2D):
     h: float = attr.ib()
     name: str = attr.ib(default="rectangular section")
 
+    def __on_init__(self):
+        self.y_bounds = (self.h/2,-self.h/2)
+        self.x_bounds = (self.b/2,-self.b/2)
+
     @property
     def A(self):
         return self.h * self.b
@@ -97,6 +105,10 @@ class Triangle(Profile2D):
     h: float = attr.ib()
     name: str = attr.ib(default="rectangular section")
 
+    def __on_init__(self):
+        self.y_bounds = (self.h/2,-self.h/2)
+        self.x_bounds = (self.b/2,-self.b/2)
+
     @property
     def A(self):
         return self.h * self.b / 2.0
@@ -120,6 +132,9 @@ class Circle(Profile2D):
 
     d: float = attr.ib()
     name: str = attr.ib(default="rectangular section")
+
+    def __on_init__(self):
+        self.x_bounds = self.y_bounds = (self.d/2,-self.d/2)
 
     @property
     def A(self):
@@ -145,6 +160,10 @@ class HollowCircle(Profile2D):
     d: float = attr.ib()
     t: float = attr.ib()
     name: str = attr.ib(default="rectangular section")
+
+    def __on_init__(self):
+        self.y_bounds = (self.d/2,-self.d/2)
+        self.x_bounds = (self.d/2,-self.d/2)
 
     @property
     def di(self):
@@ -215,6 +234,15 @@ class ShapelySection(Profile2D):
         self._Ixx,self._Iyy,self._Ixy = self._sec.get_ic()
         self._J = self._sec.get_j()
 
+        self.calculate_bounds()
+
+    def calculate_bounds(self):
+        self.info(f'calculating shape bounds!')
+        xcg,ycg = self._geo.calculate_centroid()
+        minx,maxx,miny,maxy = self._geo.calculate_extents()
+        self.y_bounds = (miny-ycg,maxy-ycg)
+        self.x_bounds = (minx-xcg,maxx-xcg)
+
     @property
     def A(self):
         return self._A
@@ -252,8 +280,7 @@ class ShapelySection(Profile2D):
 
     def plot_mesh(self):
         return self._sec.plot_centroids()
-
-
+    
 
 
 

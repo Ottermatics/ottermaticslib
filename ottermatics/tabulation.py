@@ -65,7 +65,7 @@ class TabulationMixin(Configuration):
                 self.index = index
             else:
                 # normal increiment
-                self.index += 1
+                self.index
             self.TABLE[self.index] = self.data_dict
             self.debug("saving data {}".format(self.index))
             saved.add(self)
@@ -86,7 +86,9 @@ class TabulationMixin(Configuration):
     @instance_cached
     def internal_components(self) -> dict:
         """get all the internal components"""
-        return {k: getattr(self, k) for k in self.slots_attributes()}
+        o = {k: getattr(self, k) for k in self.slots_attributes()}   
+        o = {k:v for k,v in o.items() if isinstance(o,TabulationMixin)}
+        return o
 
     @instance_cached
     def internal_references(self) -> dict:
@@ -119,7 +121,7 @@ class TabulationMixin(Configuration):
 
     def reset_table(self):
         """Resets the table, and attrs label stores"""
-        self.index = 0.0
+        self.index = 0
         self._table = None
 
     @property
@@ -158,15 +160,6 @@ class TabulationMixin(Configuration):
         for k, v in sref["properties"].items():
             out[k] = v.value()
         return out
-
-        # out = self.attr_dict
-        # out.update(self.table_dict)
-        # # out["index"] = self.index
-        # return {
-        #     k.lower(): v if v is not None else numpy.nan
-        #     for k, v in out.items()
-        #     if isinstance(v, TABLE_TYPES)
-        # }
 
     @instance_cached
     def skip_attr(self) -> list:
@@ -210,14 +203,14 @@ class TabulationMixin(Configuration):
         good = set(self.table_fields())
         return [k for k in attr.fields_dict(self.__class__).keys() if k in good]
 
-    @solver_cached
-    def attr_dict(self) -> list:
-        """Returns formated attr data if the value is numeric"""
-        return {
-            k.lower(): getattr(self, k)
-            for k in self.attr_raw_keys
-            if hasattr(self, k) and k not in self.skip_attr
-        }
+    # @solver_cached
+    # def attr_dict(self) -> list:
+    #     """Returns formated attr data if the value is numeric"""
+    #     return {
+    #         k.lower(): getattr(self, k)
+    #         for k in self.attr_raw_keys
+    #         if hasattr(self, k) and k not in self.skip_attr
+    #     }
 
     def set_attr(self, **kwargs):
         assert set(kwargs).issubset(set(self.attr_raw_keys))

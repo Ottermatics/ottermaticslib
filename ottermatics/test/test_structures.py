@@ -45,7 +45,7 @@ class test_cantilever(unittest.TestCase):
         #self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
         self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
 
-        df = self.st.node_dataframes["only_gravity"]
+        df = self.st.node_dataframes["gravity"]
 
         dfw = df[df["name"] == "wall"]
         dff = df[df["name"] == "free"]
@@ -58,7 +58,7 @@ class test_cantilever(unittest.TestCase):
         self.subtest_assert_near(float(dff["rxfx"]), 0)
         self.subtest_assert_near(float(dff["rxmz"]), 0)
 
-        stress_obj = self.bm.get_stress_at(0, "only_gravity")
+        stress_obj = self.bm.get_stress_at(0, "gravity")
         #stress_obj.plot_stress_vm()
 
     def subtest_assert_near(self, value, truth, pct=0.025):
@@ -151,7 +151,7 @@ class test_truss(unittest.TestCase):
         #self.st.visulize()
 
     def test_reactions(self):
-        df = self.st.node_dataframes["only_gravity"]
+        df = self.st.node_dataframes["gravity"]
         #print(df)
 
         dfa = df[df["name"] == "A"]

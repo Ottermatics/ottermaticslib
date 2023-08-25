@@ -193,7 +193,7 @@ class SolverMixin:
                     self.evaluate(_cb=_cb)
 
             if revert and revert_x:
-                self.set_system_state(**revert_x)
+                self.set_system_state(ignore=['index'],**revert_x)
 
             self._solved = True
         else:
@@ -223,6 +223,9 @@ class SolverMixin:
         if self.log_level < 20:
             self.debug(f"running with X: {self.X} & {fields_input}")
         self.pre_execute(**fields_input)
+
+        #prep index
+        self.index += 1
 
         # Runs The Solver
         try:
