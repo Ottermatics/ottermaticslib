@@ -23,7 +23,7 @@ def change_all_log_levels(new_log_level: int, check_function=None):
     :param new_log_level: int - changes unit level log level (10-msg,20-debug,30-info,40-warning,50-error,60-crit)
     :param check_function: callable -> bool - (optional) if provided if check_function(unit) is true then the new_log_level is applied
     """
-
+    print(f'changing log levels to {new_log_level}...')
     if isinstance(new_log_level, float):
         new_log_level = int(new_log_level)  # Float Case Is Handled
 
@@ -53,6 +53,8 @@ class LoggingMixin(logging.Filter):
 
     slack_webhook_url = None
     # log_silo = False
+
+    change_all_log_lvl = lambda s,*a,**kw: change_all_log_levels(*a,**kw)
 
     @property
     def logger(self):
