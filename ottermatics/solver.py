@@ -244,7 +244,7 @@ class SolverMixin:
         self.post_execute()
 
         # Save The Data
-        self.save_data()
+        self.save_data(index=self.index)
 
         if _cb:
             _cb(self)

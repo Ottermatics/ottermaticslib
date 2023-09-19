@@ -65,7 +65,7 @@ class TabulationMixin(Configuration):
                 self.index = index
             else:
                 # normal increiment
-                self.index
+                self.index += 1
             self.TABLE[self.index] = self.data_dict
             self.debug("saving data {}".format(self.index))
             saved.add(self)
