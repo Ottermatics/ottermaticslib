@@ -363,13 +363,6 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
         :param echo: if the engine echos or not"""
         self.info("initalizing db connection")
         # Get ENV Defaults
-        self.load_configuration_from_env()
-        
-        
-        
-        
-        
-        
 
         if database_name is not None:
             self.dbname = database_name
@@ -402,8 +395,6 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
             self.echo = kwargs["echo"]
         else:
             self.echo = False
-
-
 
         if "batchmode" in kwargs:
             self._batchmode = True  # kwargs['batchmode']
