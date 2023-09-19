@@ -21,7 +21,7 @@ import psycopg2
 
 import cachetools
 
-
+from ottermatics.env_var import EnvVariable
 from ottermatics.patterns import SingletonMeta,InputSingletonMeta
 from ottermatics.logging import (
     LoggingMixin,
@@ -39,6 +39,13 @@ from contextlib import contextmanager
 import diskcache
 
 log = logging.getLogger("otterlib-data")
+
+#Env Vars
+DB_NAME = EnvVariable("OTTR_DB_NAME")
+DB_HOST = EnvVariable("OTTR_DB_HOST",default='localhost')
+DB_PORT = EnvVariable("OTTR_DB_PORT",int,default=5432)
+DB_USER = EnvVariable('OTTR_DB_USER',default='postgres')
+DB_PASS = EnvVariable('OTTR_DB_PASS',default='postgres')
 
 
 def addapt_numpy_float64(numpy_float64):
@@ -197,6 +204,7 @@ class DiskCacheStore(LoggingMixin, metaclass=SingletonMeta):
         else:
             self.cache_init_kwargs = {}
         self.info(f"Created DiskCacheStore In {self.cache_root}")
+        self.cache
 
     @property
     def cache_root(self):
@@ -318,8 +326,8 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
     """
 
     # TODO: Make Threadsafe W/ ThreadPoolExecutor!
-
-    _connection_template = "postgresql://{user}:{passd}@{host}:{port}/{database}"  # we love postgres!
+    # we love postgres!
+    _connection_template = "postgresql://{user}:{passd}@{host}:{port}/{database}"  
 
     pool_size = 20
     max_overflow = 0
@@ -356,29 +364,46 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
         self.info("initalizing db connection")
         # Get ENV Defaults
         self.load_configuration_from_env()
+        
+        
+        
+        
+        
+        
 
         if database_name is not None:
             self.dbname = database_name
+        else:
+            self.dbname = DB_NAME.secret
+
         if host is not None:
-            self.info("Getting DB host arg")
             self.host = host
+        else:
+            self.host = HOST = DB_HOST.secret
+
         if user is not None:
-            self.info("Getting DB user arg")
             self.user = user
+        else:
+            self.user = USER = DB_USER.secret
+
         if passd is not None:
             self.info("Getting DB pass arg")
             self.passd = passd
+        else:
+            self.passd = PASS = DB_PASS.secret
+
+        # Args with defaults
+        if "port" in kwargs:
+            self.port = kwargs["port"]
+        else:
+            self.port = DB_PORT.secret
 
         if "echo" in kwargs:
-            self.info("Setting Echo")
             self.echo = kwargs["echo"]
         else:
             self.echo = False
 
-        # Args with defaults
-        if "port" in kwargs:
-            self.info("Getting DB port arg")
-            self.port = kwargs["port"]
+
 
         if "batchmode" in kwargs:
             self._batchmode = True  # kwargs['batchmode']
@@ -435,30 +460,6 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
             session.close()
         del session
 
-    def load_configuration_from_env(self):
-        global PORT, PASS, USER, HOST, DB_NAME  # Backwards Compatability
-
-        if "DB_NAME" in os.environ:
-            self.dbname = DB_NAME = os.environ["DB_NAME"]
-            self.info("Getting ENV DB_NAME")
-
-        if "DB_CONNECTION" in os.environ:
-            self.host = HOST = os.environ["DB_CONNECTION"]
-            self.info("Getting ENV DB_CONNECTION")
-
-        if "DB_USER" in os.environ:
-            self.user = USER = os.environ["DB_USER"]
-            self.info("Getting ENV DB_USER")
-
-        if "DB_PASS" in os.environ:
-            self.passd = PASS = os.environ["DB_PASS"]
-            self.info("Getting ENV DB_PASS")
-
-        if "DB_PORT" in os.environ:
-            self.port = PORT = os.environ["DB_PORT"]
-            self.info("Getting ENV DB_PORT")
-
-        return PORT, PASS, USER, HOST
 
     def rebuild_database(self, confirm=True):
         """Rebuild database on confirmation, create the database if nessicary"""
