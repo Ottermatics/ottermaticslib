@@ -5,7 +5,7 @@ import ottermatics
 
 
 from ottermatics.logging import LoggingMixin, logging
-
+from ottermatics.locations import client_path
 
 from concurrent.futures import ThreadPoolExecutor
 import threading
@@ -46,6 +46,10 @@ STANDARD_FOLDERS = {
     "Ottermatics": None,
     "Research": None,
 }
+
+#TODO: make env_vars:
+#1. CLIENT_GDRIVE_PATH
+
 # We'll hook this up with functionality at the module level
 global CLIENT_G_DRIVE, CLIENT_GDRIVE_SYNC, CLIENT_GMAIL, CLIENT_NAME
 

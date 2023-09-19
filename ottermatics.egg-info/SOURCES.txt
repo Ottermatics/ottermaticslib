@@ -8,7 +8,9 @@ ottermatics/component_collections.py
 ottermatics/components.py
 ottermatics/configuration.py
 ottermatics/env_var.py
+ottermatics/locations.py
 ottermatics/logging.py
+ottermatics/patterns.py
 ottermatics/plotting.py
 ottermatics/properties.py
 ottermatics/reporting.py

@@ -1,6 +1,6 @@
 import logging
 
-from ottermatics.datastores.data import *
+from ottermatics.datastores.datastores.data import *
 from ottermatics.tabulation import *
 from ottermatics.configuration import *
 from ottermatics.components import *

@@ -72,3 +72,53 @@ class ComponentDict(Component,UserDict):
         #cache the references
         self._ref_cache = out
         return out
+    
+@otterize
+class ComponentIterator(Component,UserList):
+    """Stores components by name, and allows tabulation of them"""
+
+    component_type:type = attrs.field(
+                            validator= check_comp_type
+                            )
+    
+    #tabulate_depth:int = attrs.field(default=1) #TODO: impement this
+
+    _ref_cache: dict = None
+
+
+    #Dict Setup
+    def __on_init__(self):
+        UserList.__init__(self)
+
+    def __setitem__(self, key, value):
+        assert isinstance(value,self.component_type),f'{value} is not of type: {self.component_type}'
+        super().__setitem__(key, value)
+        #reset reference cache
+        self._ref_cache = None 
+
+    #Tabulation Override
+    @property
+    def internal_references(self):
+        """lists the this_name.comp_key.<attr/prop key>: Ref format to override data_dict"""
+
+        if self._ref_cache:
+            return self._ref_cache
+
+        out = {}
+        out["attributes"] = at = {}
+        out["properties"] = pr = {}
+
+        for it,item in enumerate(self.data):
+            it_base_key = f'{self.component_type.__name__.lower()}.{it}'
+
+            for key in item.classmethod_system_properties():
+                k = f'{it_base_key}.{key}'
+                pr[k] = Ref(item, key)
+
+            for key in item.input_fields():
+                k = f'{it_base_key}.{key}'
+                at[k] = Ref(item, key, False)
+
+        #cache the references
+        self._ref_cache = out
+        return out    

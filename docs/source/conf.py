@@ -30,7 +30,7 @@ author = 'Kevin Russell'
 
 
 # The full version, including alpha/beta/rc tags
-release = '0.7.2'
+release = '0.7.3'
 
 
 extensions = [
