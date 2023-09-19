@@ -7,7 +7,7 @@ Created on Sat May 11 22:38:11 2019
 """
 
 from setuptools import setup
-
+import setuptools
 
 def parse_requirements(filename):
     """ load requirements from a pip requirements file """
@@ -21,7 +21,8 @@ setup(name='ottermatics',
       description='The Ottermatic\'s Python Lib!',
       url='https://github.com/SoundsSerious/ottermaticslib',
       author='kevin russell',
-      packages=["ottermatics"],
+      #packages=["ottermatics"],
+      packages=setuptools.find_packages(),
       author_email='kevin@ottermatics.com',
       license='MIT',
       entry_points={
