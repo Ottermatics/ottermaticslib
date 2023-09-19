@@ -122,12 +122,15 @@ class EnvVariable(LoggingMixin):
             self.__class__._secrets.remove(self)
 
     @classmethod
+    def load_env_vars(self):
+        for s in EnvVariable._secrets.values():
+            str(s)        
+
+    @classmethod
     def print_env_vars(cls):
         """prints env vars in memory"""
         #preload
-        for s in EnvVariable._secrets.values():
-            str(s)
-
+        cls.load_env_vars()
         for var,s in sorted(EnvVariable._secrets.items(),key=lambda kv:kv[1].var_name):
             print(f'{s.var_name:<40}|{s}')
 
