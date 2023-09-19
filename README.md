@@ -25,6 +25,20 @@ These problems demonstrate functionality
 #### Air Filter
 run a throttle sweep with filter loss characteristic and fan afinity law based pressure based off of a design point.
 ```python
+from ottermatics.analysis import Analysis
+from ottermatics.reporting import CSVReporter,DiskPlotReporter
+from ottermatics.properties import system_property
+from ottermatics.components import Component
+from ottermatics.system import System
+from ottermatics.plotting import PLOT
+from ottermatics.slots import SLOT
+from ottermatics.solver import SOLVER
+from ottermatics.signals import SIGNAL
+from ottermatics.configuration import otterize
+import numpy as np
+import os,pathlib
+import attrs
+
 @otterize
 class Fan(Component):
 
