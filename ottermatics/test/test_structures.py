@@ -38,7 +38,7 @@ class test_cantilever(unittest.TestCase):
         self.subtest_assert_near(self.bm.Iy, 388.8 / (100**4))
         self.subtest_assert_near(self.bm.section_mass, 41.9)
 
-        self.subtest_assert_near(self.bm.max_von_mises, 27.4e6)
+        self.subtest_assert_near(self.bm.max_von_mises(), 27.4e6)
         self.subtest_assert_near(
             float(self.bm.data_dict["min_deflection_y"]), -0.0076
         )

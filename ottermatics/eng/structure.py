@@ -228,7 +228,8 @@ class Structure(System):
             self.pre_execute(combo)
             self.analyze(combos=[combo],*args,**kwargs)
             self.post_execute(combo)
-            self.save_data(force=True) #backup data saver.
+            #backup data saver.
+            self.save_data(index=self.index,force=True) 
 
 
     def pre_execute(self,combo):

@@ -6,11 +6,9 @@ from sqlalchemy.orm import backref
 from sqlalchemy.orm import scoped_session
 from sqlalchemy_utils import *
 
-import ray
 import functools
-from twisted.python import context
 
-import os
+import os,sys
 import logging
 import numpy
 import time
@@ -20,16 +18,18 @@ import time
 from urllib.request import urlopen
 from psycopg2.extensions import register_adapter, AsIs
 import psycopg2
-from os import sys
 
 import cachetools
 
 
+from ottermatics.patterns import SingletonMeta,InputSingletonMeta
 from ottermatics.logging import (
     LoggingMixin,
-    set_all_loggers_to,
-    is_ec2_instance,
+    change_all_log_levels,
 )
+from ottermatics.locations import client_path
+
+from ottermatics.common import is_ec2_instance
 from ottermatics.tabulation import *  # This should be considered a module of data
 
 from sqlalchemy_batch_inserts import enable_batch_inserting
@@ -409,14 +409,12 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
         )
         self.engine.echo = self.echo
 
-        self.scopefunc = functools.partial(context.get, "uuid")
+       # self.scopefunc = functools.partial(context.get, "uuid")
 
         self.session_factory = sessionmaker(
             bind=self.engine, expire_on_commit=True
         )
-        self.Session = scoped_session(
-            self.session_factory, scopefunc=self.scopefunc
-        )
+        self.Session = scoped_session(self.session_factory)
 
     @contextmanager
     def session_scope(self):

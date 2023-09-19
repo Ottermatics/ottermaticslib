@@ -124,14 +124,14 @@ class TestComposition(unittest.TestCase):
             **{"comp.aux": 5, "comp.comp.aux": 6}  # , dt=0.1, endtime=0.1
         )
         self.assertEqual(len(self.system.TABLE), 1, f"wrong run config")
-        self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))
-        self.assertEqual(set(self.system.comp.comp.dataframe["aux"]), set([6]))
+        self.assertEqual(set(self.system.dataframe["comp.aux"]), set([5]))
+        self.assertEqual(set(self.system.dataframe["comp.comp.aux"]), set([6]))
 
         # solver constraints checking
         input = self.system.dataframe["input"][0]
         self.assertGreaterEqual(input, -1e3)  # min protection
         self.assertLessEqual(input, 1)  # max protection
 
-        in2 = self.system.dataframe["input"][0]
+        in2 = self.system.dataframe["in2"][0]
         self.assertGreaterEqual(in2, -1e3)  # min protection
         self.assertLessEqual(in2, 4 - input)  # max protection
