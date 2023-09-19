@@ -28,7 +28,7 @@ class EnvVariable(LoggingMixin):
     default: Any = None
     obscure: bool = True
     _override: str
-    _secrets = set()  # its class based so like a singleton
+    _secrets = {}  # its class based so like a singleton
     fail_on_missing: bool
     desc: str = None
 
@@ -59,7 +59,7 @@ class EnvVariable(LoggingMixin):
 
         self.fail_on_missing = fail_on_missing
 
-        self.__class__._secrets.add(self)
+        self.__class__._secrets[secret_var_name] = self
 
     def __str__(self):
         if self.obscure:
@@ -121,6 +121,15 @@ class EnvVariable(LoggingMixin):
         if self in self.__class__._secrets:
             self.__class__._secrets.remove(self)
 
+    @classmethod
+    def print_env_vars(cls):
+        """prints env vars in memory"""
+        #preload
+        for s in EnvVariable._secrets.values():
+            str(s)
+
+        for var,s in sorted(EnvVariable._secrets.items(),key=lambda kv:kv[1].var_name):
+            print(f'{s.var_name:<40}|{s}')
 
 # DEFAULT ENV VARIABLES
 try:
