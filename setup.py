@@ -34,4 +34,5 @@ setup(name='ottermatics',
             ]
       },
       install_requires = install_reqs,
+      include_package_data=True,
       zip_safe=False)
