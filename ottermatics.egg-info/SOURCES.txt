@@ -27,6 +27,12 @@ ottermatics.egg-info/entry_points.txt
 ottermatics.egg-info/not-zip-safe
 ottermatics.egg-info/requires.txt
 ottermatics.egg-info/top_level.txt
+ottermatics/datastores/__init__.py
+ottermatics/datastores/data.py
+ottermatics/datastores/gdocs.py
+ottermatics/datastores/reporting.py
+ottermatics/datastores/secrets.py
+ottermatics/datastores/datastores_requirements.txt
 ottermatics/eng/__init__.py
 ottermatics/eng/fluid_material.py
 ottermatics/eng/geometry.py
