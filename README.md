@@ -26,7 +26,7 @@ By default the system calls a `default_solver()` method in its `execute()` funct
 
 To use the solver & constraints 
 ```python
-SovlerSystem(System):
+SolverSystem(System):
     sol2 = SOLVER.define("dep", "indep")
     sol2.add_constraint("max", limit_max) #indep should never go above this value (or function)
     sol2.add_constraint("min", 0) #indep should never go below zero
