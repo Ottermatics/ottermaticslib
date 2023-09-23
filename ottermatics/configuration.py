@@ -537,12 +537,11 @@ class Configuration(LoggingMixin):
             for skey, level, iconf in config.go_through_configurations(
                 level, levels_to_descend, parent_level
             ):
-                yield f"{key}.{skey}" if skey else key, level, iconf            
+                yield f"{key}.{skey}" if skey else key, level, iconf
 
     @property
     def attrs_fields(self) -> set:
         return set(attr.fields(self.__class__))
-    
 
     @classmethod
     def _get_init_attrs_data(cls, subclass_of: type, exclude=False):
@@ -614,10 +613,18 @@ class Configuration(LoggingMixin):
         from ottermatics.solver import SOLVER, TRANSIENT
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
-        from ottermatics.plotting import PLOT,TRACE
+        from ottermatics.plotting import PLOT, TRACE
 
-
-        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, tuple, list,PLOT,TRACE)
+        ignore_types = (
+            SLOT,
+            SIGNAL,
+            SOLVER,
+            TRANSIENT,
+            tuple,
+            list,
+            PLOT,
+            TRACE,
+        )
         return cls._get_init_attrs_data(ignore_types, exclude=True)
 
     @classmethod
@@ -625,44 +632,62 @@ class Configuration(LoggingMixin):
         from ottermatics.solver import SOLVER, TRANSIENT
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
-        from ottermatics.plotting import PLOT,TRACE
+        from ottermatics.plotting import PLOT, TRACE
 
-        ignore_types = (SLOT, SIGNAL, SOLVER, TRANSIENT, str, tuple, list,PLOT,TRACE)
+        ignore_types = (
+            SLOT,
+            SIGNAL,
+            SOLVER,
+            TRANSIENT,
+            str,
+            tuple,
+            list,
+            PLOT,
+            TRACE,
+        )
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}
-    
+
     @classmethod
     def table_fields(cls):
         from ottermatics.solver import SOLVER, TRANSIENT
         from ottermatics.signals import SIGNAL
         from ottermatics.slots import SLOT
 
-        keeps = (str, float, int) #TODO: add numpy fields
+        keeps = (str, float, int)  # TODO: add numpy fields
         typ = cls._get_init_attrs_data(keeps)
-        return {k: v for k, v in typ.items() }    
+        return {k: v for k, v in typ.items()}
 
-    #Dictonaries
+    # Dictonaries
     @property
     def as_dict(self):
-        o = {k:getattr(self,k,None) for k,v in self.input_attrs().items()}
-        o = {k:v if not isinstance(v,Configuration) else v.as_dict 
-                 for k,v in o.items() }
+        o = {k: getattr(self, k, None) for k, v in self.input_attrs().items()}
+        o = {
+            k: v if not isinstance(v, Configuration) else v.as_dict
+            for k, v in o.items()
+        }
         return o
 
     @property
     def input_as_dict(self):
-        o = {k:getattr(self,k,None) for k in self.input_fields}
-        o = {k:v if not isinstance(v,Configuration) else v.input_as_dict for k,v in o.items()}
-        return o
-    
-    @property
-    def numeric_as_dict(self):
-        o = {k:getattr(self,k,None) for k in self.numeric_fields}
-        o = {k:v if not isinstance(v,Configuration) else v.numeric_as_dict for k,v in o.items()}
+        o = {k: getattr(self, k, None) for k in self.input_fields}
+        o = {
+            k: v if not isinstance(v, Configuration) else v.input_as_dict
+            for k, v in o.items()
+        }
         return o
 
-    #Hashes
-    @property   
+    @property
+    def numeric_as_dict(self):
+        o = {k: getattr(self, k, None) for k in self.numeric_fields}
+        o = {
+            k: v if not isinstance(v, Configuration) else v.numeric_as_dict
+            for k, v in o.items()
+        }
+        return o
+
+    # Hashes
+    @property
     def unique_hash(self):
         d = self.as_dict
         return deepdiff.DeepHash(d)[d]

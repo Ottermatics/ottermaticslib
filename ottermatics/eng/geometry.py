@@ -21,14 +21,14 @@ import attr, attrs
 # https://mechanicalbase.com/area-moment-of-inertia-calculator-of-certain-cross-sectional-shapes/
 
 
-#TODO: cache SectionProperty sections and develop auto-mesh refinement system.
+# TODO: cache SectionProperty sections and develop auto-mesh refinement system.
 
 
 @otterize
 class Profile2D(Configuration):
     name: str = attr.ib(default="generic cross section")
 
-    #provide relative interface over 
+    # provide relative interface over
     y_bounds: tuple = None
     x_bounds: tuple = None
 
@@ -77,8 +77,8 @@ class Rectangle(Profile2D):
     name: str = attr.ib(default="rectangular section")
 
     def __on_init__(self):
-        self.y_bounds = (self.h/2,-self.h/2)
-        self.x_bounds = (self.b/2,-self.b/2)
+        self.y_bounds = (self.h / 2, -self.h / 2)
+        self.x_bounds = (self.b / 2, -self.b / 2)
 
     @property
     def A(self):
@@ -106,8 +106,8 @@ class Triangle(Profile2D):
     name: str = attr.ib(default="rectangular section")
 
     def __on_init__(self):
-        self.y_bounds = (self.h/2,-self.h/2)
-        self.x_bounds = (self.b/2,-self.b/2)
+        self.y_bounds = (self.h / 2, -self.h / 2)
+        self.x_bounds = (self.b / 2, -self.b / 2)
 
     @property
     def A(self):
@@ -134,7 +134,7 @@ class Circle(Profile2D):
     name: str = attr.ib(default="rectangular section")
 
     def __on_init__(self):
-        self.x_bounds = self.y_bounds = (self.d/2,-self.d/2)
+        self.x_bounds = self.y_bounds = (self.d / 2, -self.d / 2)
 
     @property
     def A(self):
@@ -162,8 +162,8 @@ class HollowCircle(Profile2D):
     name: str = attr.ib(default="rectangular section")
 
     def __on_init__(self):
-        self.y_bounds = (self.d/2,-self.d/2)
-        self.x_bounds = (self.d/2,-self.d/2)
+        self.y_bounds = (self.d / 2, -self.d / 2)
+        self.x_bounds = (self.d / 2, -self.d / 2)
 
     @property
     def di(self):
@@ -212,7 +212,7 @@ class ShapelySection(Profile2D):
     mesh_size: float = attrs.field(default=attrs.Factory(get_mesh_size, True))
     material: sec_material = attrs.field(default=None)
 
-    coarse:bool = attrs.field(default=False)
+    coarse: bool = attrs.field(default=False)
 
     _geo: Geometry
     _A: float
@@ -221,27 +221,27 @@ class ShapelySection(Profile2D):
         self.init_with_material(self.material)
 
     def init_with_material(self, material=None):
-        if hasattr(self,'_sec'):
-            raise Exception(f'already initalized!')
+        if hasattr(self, "_sec"):
+            raise Exception(f"already initalized!")
         self._geo = Geometry(self.shape, self.material)
-        self._mesh = self._geo.create_mesh([ self.mesh_size ],coarse=self.coarse)
+        self._mesh = self._geo.create_mesh([self.mesh_size], coarse=self.coarse)
         self._sec = Section(self._geo)
         self._sec.calculate_geometric_properties()
         self._sec.calculate_warping_properties()
         self._sec.calculate_frame_properties()
 
         self._A = self._sec.get_area()
-        self._Ixx,self._Iyy,self._Ixy = self._sec.get_ic()
+        self._Ixx, self._Iyy, self._Ixy = self._sec.get_ic()
         self._J = self._sec.get_j()
 
         self.calculate_bounds()
 
     def calculate_bounds(self):
-        self.info(f'calculating shape bounds!')
-        xcg,ycg = self._geo.calculate_centroid()
-        minx,maxx,miny,maxy = self._geo.calculate_extents()
-        self.y_bounds = (miny-ycg,maxy-ycg)
-        self.x_bounds = (minx-xcg,maxx-xcg)
+        self.info(f"calculating shape bounds!")
+        xcg, ycg = self._geo.calculate_centroid()
+        minx, maxx, miny, maxy = self._geo.calculate_extents()
+        self.y_bounds = (miny - ycg, maxy - ycg)
+        self.x_bounds = (minx - xcg, maxx - xcg)
 
     @property
     def A(self):
@@ -280,8 +280,6 @@ class ShapelySection(Profile2D):
 
     def plot_mesh(self):
         return self._sec.plot_centroids()
-    
-
 
 
 ALL_CROSSSECTIONS = [

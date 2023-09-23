@@ -47,8 +47,8 @@ STANDARD_FOLDERS = {
     "Research": None,
 }
 
-#TODO: make env_vars:
-#1. CLIENT_GDRIVE_PATH
+# TODO: make env_vars:
+# 1. CLIENT_GDRIVE_PATH
 
 # We'll hook this up with functionality at the module level
 global CLIENT_G_DRIVE, CLIENT_GDRIVE_SYNC, CLIENT_GMAIL, CLIENT_NAME

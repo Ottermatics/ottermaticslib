@@ -135,7 +135,7 @@ class SimpleHeatExchanger(Component):
         return self.Thi - self.Qdot / self.CmatH
 
     @system_property
-    def Tc_out(self)-> float:
+    def Tc_out(self) -> float:
         return self.Tci + self.Qdot / self.CmatC
 
 
@@ -154,17 +154,17 @@ class SimpleCompressor(Component):
     name = attr.ib(default="Compressor")
 
     @system_property
-    def temperature_ratio(self)-> float:
+    def temperature_ratio(self) -> float:
         return (
             self.pressure_ratio ** ((self.gamma - 1.0) / self.gamma) - 1.0
         ) / self.efficiency
 
     @system_property
-    def Tout(self)-> float:
+    def Tout(self) -> float:
         return self.temperature_ratio * self.Tin
 
     @system_property
-    def power_input(self)-> float:
+    def power_input(self) -> float:
         return self.Cp * self.mdot * (self.Tout - self.Tin)
 
     def pressure_out(self, pressure_in):
@@ -187,11 +187,11 @@ class SimpleTurbine(Component):
     name = attr.ib(default="Turbine")
 
     @system_property
-    def pressure_ratio(self)-> float:
+    def pressure_ratio(self) -> float:
         return self.Pin / self.Pout
 
     @system_property
-    def Tout(self)-> float:
+    def Tout(self) -> float:
         return self.Tin * (
             1
             - self.efficiency
@@ -203,7 +203,7 @@ class SimpleTurbine(Component):
         # return self.Tin * self.pressure_ratio**((self.gamma-1.0)/self.gamma)/ self.efficiency
 
     @system_property
-    def power_output(self)-> float:
+    def power_output(self) -> float:
         """calculates power output base on temp diff (where eff applied)"""
         return self.Cp * self.mdot * (self.Tin - self.Tout)
 
@@ -235,11 +235,11 @@ class SimplePump(Component):
             self.warning("pump near saturated temp")
 
     @system_property
-    def volumetric_flow(self)-> float:
+    def volumetric_flow(self) -> float:
         return self.MFin / self.fluid.density
 
     @system_property
-    def temperature_delta(self)-> float:
+    def temperature_delta(self) -> float:
         rho = self.fluid.density
         v = self.MFin / rho
         p = self.Pin
@@ -249,23 +249,23 @@ class SimplePump(Component):
         return dt
 
     @system_property
-    def Pout(self)-> float:
+    def Pout(self) -> float:
         return self.pressure_ratio * self.Pin
 
     @system_property
-    def Tout(self)-> float:
+    def Tout(self) -> float:
         return self.temperature_delta + self.Tin
 
     @system_property
-    def pressure_delta(self)-> float:
+    def pressure_delta(self) -> float:
         return (self.pressure_ratio - 1) * self.Pin
 
     @system_property
-    def power_input(self)-> float:
+    def power_input(self) -> float:
         return self.volumetric_flow * self.pressure_delta / self.efficiency
 
     @system_property
-    def cost(self)-> float:
+    def cost(self) -> float:
         pwr = self.power_input
         c1 = numpy.log(pwr)
         c2 = -0.03195 * pwr**2.0

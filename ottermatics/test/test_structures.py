@@ -1,16 +1,17 @@
 import unittest
 from matplotlib import pylab
 from ottermatics.eng.structure import *
-from sectionproperties.pre.library.steel_sections import i_section 
+from sectionproperties.pre.library.steel_sections import i_section
 
 from numpy import *
+
 
 class test_cantilever(unittest.TestCase):
     # tests the first example here
     # https://www.engineeringtoolbox.com/cantilever-beams-d_1848.html
 
     def setUp(self):
-        self.st = Structure(name="cantilever_beam",add_gravity_force=False)
+        self.st = Structure(name="cantilever_beam", add_gravity_force=False)
         self.st.add_node("wall", 0, 0, 0)
         self.st.add_node("free", 0, 5, 0)
 
@@ -28,7 +29,7 @@ class test_cantilever(unittest.TestCase):
             support_RX=True,
             support_RZ=True,
         )
-        self.st.frame.add_node_load("free", "FX", 3000,case='gravity')
+        self.st.frame.add_node_load("free", "FX", 3000, case="gravity")
 
         self.st.analyze(check_statics=True)
 
@@ -42,7 +43,7 @@ class test_cantilever(unittest.TestCase):
         self.subtest_assert_near(
             float(self.bm.data_dict["min_deflection_y"]), -0.0076
         )
-        #self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
+        # self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
         self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
 
         df = self.st.node_dataframes["gravity"]
@@ -59,7 +60,7 @@ class test_cantilever(unittest.TestCase):
         self.subtest_assert_near(float(dff["rxmz"]), 0)
 
         stress_obj = self.bm.get_stress_at(0, "gravity")
-        #stress_obj.plot_stress_vm()
+        # stress_obj.plot_stress_vm()
 
     def subtest_assert_near(self, value, truth, pct=0.025):
         with self.subTest():
@@ -71,7 +72,7 @@ class test_truss(unittest.TestCase):
     # https://engineeringlibrary.org/reference/trusses-air-force-stress-manual
 
     def setUp(self):
-        self.st = Structure(name="truss",add_gravity_force=False)
+        self.st = Structure(name="truss", add_gravity_force=False)
         self.st.add_node("A", 0, 0, 0)
         self.st.add_node("B", 15, 30 * sqrt(3) / 2, 0)
         self.st.add_node("C", 45, 30 * sqrt(3) / 2, 0)
@@ -112,7 +113,12 @@ class test_truss(unittest.TestCase):
         for n1, n2 in pairs:
             bkey = f"{n1}_{n2}"
             self.bm = self.st.add_member(
-                bkey, n1, n2, material=ANSI_4130(), section=self.beam,in_mesh_size=0.1
+                bkey,
+                n1,
+                n2,
+                material=ANSI_4130(),
+                section=self.beam,
+                in_mesh_size=0.1,
             )
 
             # if n1 not in constrained:
@@ -144,41 +150,41 @@ class test_truss(unittest.TestCase):
         # for node in self.st.nodes:
         #     self.st.frame.Definesupport_(node,support_DZ=True,support_RZ=True)
 
-        self.st.add_node_load("F", "FY", -1000,case='gravity')
-        self.st.add_node_load("G", "FY", -2000,case='gravity')
+        self.st.add_node_load("F", "FY", -1000, case="gravity")
+        self.st.add_node_load("G", "FY", -2000, case="gravity")
 
         self.st.analyze(check_statics=True)
-        #self.st.visulize()
+        # self.st.visulize()
 
     def test_reactions(self):
         df = self.st.node_dataframes["gravity"]
-        #print(df)
+        # print(df)
 
         dfa = df[df["name"] == "A"]
         dfe = df[df["name"] == "E"]
 
-        #print(dfa)
-        #print(dfe)
+        # print(dfa)
+        # print(dfe)
 
         self.subtest_assert_near(float(dfa["rxfy"].iloc[0]), 1667)
         self.subtest_assert_near(float(dfe["rxfy"].iloc[0]), 1333)
 
         self.subtest_member("A", "B", "max_axial", 1925)
-        self.subtest_member("A", "G", "max_axial", -949) #-926 textbook
+        self.subtest_member("A", "G", "max_axial", -949)  # -926 textbook
         self.subtest_member("B", "C", "max_axial", 1925)
         self.subtest_member("B", "G", "max_axial", -1925)
         self.subtest_member("C", "D", "max_axial", 1541)
         self.subtest_member("F", "G", "max_axial", -1734)
         self.subtest_member("C", "F", "max_axial", 382)
         self.subtest_member("C", "G", "max_axial", -382)
-        self.subtest_member("C", "G", "max_axial", -378)#1541 textbook
+        self.subtest_member("C", "G", "max_axial", -378)  # 1541 textbook
         self.subtest_member("D", "F", "max_axial", -1541)
         self.subtest_member("E", "F", "max_axial", -770)
 
         # Visualization.RenderModel( self.st.frame )
 
     def subtest_member(self, nodea, nodeb, result_key, truth, pct=0.025):
-        with self.subTest(msg=f'test {nodea}->{nodeb}'):
+        with self.subTest(msg=f"test {nodea}->{nodeb}"):
             key_1 = f"{nodea}_{nodeb}"
             key_2 = f"{nodeb}_{nodea}"
 
@@ -193,7 +199,9 @@ class test_truss(unittest.TestCase):
             dopasst = abs(value - truth) <= abs(truth) * pct
 
             if not dopasst:
-                print(f"fails {key} {result_key}| {value:3.5f} == {truth:3.5f}?")
+                print(
+                    f"fails {key} {result_key}| {value:3.5f} == {truth:3.5f}?"
+                )
             self.subtest_assert_near(value, truth, pct=pct)
 
     def subtest_assert_near(self, value, truth, pct=0.025):

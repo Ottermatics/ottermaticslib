@@ -45,7 +45,14 @@ class TabulationMixin(Configuration):
     _always_save_data = False
 
     # Data Tabulation - Intelligent Lookups
-    def save_data(self, index=None, saved=None, force=False, subforce=False,save_internal=False):
+    def save_data(
+        self,
+        index=None,
+        saved=None,
+        force=False,
+        subforce=False,
+        save_internal=False,
+    ):
         """We'll save data for this object and any other internal configuration if
         anything changed or if the table is empty This should result in at least one row of data,
         or minimal number of rows to track changes
@@ -87,16 +94,20 @@ class TabulationMixin(Configuration):
     @instance_cached
     def internal_components(self) -> dict:
         """get all the internal components"""
-        o = {k: getattr(self, k) for k in self.slots_attributes()}   
-        o = {k:v for k,v in o.items() if isinstance(v,TabulationMixin)}
+        o = {k: getattr(self, k) for k in self.slots_attributes()}
+        o = {k: v for k, v in o.items() if isinstance(v, TabulationMixin)}
         return o
 
     @instance_cached
     def iterable_components(self) -> dict:
         """Finds ComponentIter internal_components that are not 'wide'"""
         from ottermatics.component_collections import ComponentIter
-        return { k:v for k,v in self.internal_components.items() 
-                     if isinstance(v, ComponentIter) and not v.wide }
+
+        return {
+            k: v
+            for k, v in self.internal_components.items()
+            if isinstance(v, ComponentIter) and not v.wide
+        }
 
     @instance_cached
     def internal_references(self) -> dict:

@@ -127,7 +127,7 @@ class TestComposition(unittest.TestCase):
         self.assertEqual(set(self.system.dataframe["comp.aux"]), set([5]))
         self.assertEqual(set(self.system.dataframe["comp.comp.aux"]), set([6]))
 
-        #internal storage
+        # internal storage
         # self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))
         # self.assertEqual(set(self.system.comp.comp.dataframe["aux"]), set([6]))
 

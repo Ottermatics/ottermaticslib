@@ -5,7 +5,7 @@ import tempfile
 from ottermatics.configuration import otterize
 from ottermatics.tabulation import system_property
 from ottermatics.components import Component
-from ottermatics.component_collections import ComponentIterator,ComponentDict
+from ottermatics.component_collections import ComponentIterator, ComponentDict
 import attr
 import os
 import numpy
@@ -143,14 +143,13 @@ class Test(unittest.TestCase):
             self.test_config.attrs_prop = val
             self.test_config.save_data()
 
-        #print(df)
+        # print(df)
         # print(self.test_config.attr_raw_keys)
         # print(self.test_config.attr_row)
         # print(self.test_config.internal_references)
         # print(self.test_config.TABLE)
 
         df = self.test_config.dataframe
-
 
         self.assertEqual(len(df.index), iter)
 

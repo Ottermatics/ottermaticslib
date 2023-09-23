@@ -26,10 +26,12 @@ import sectionproperties.pre.geometry as geometry
 import sectionproperties.pre.library.primitive_sections as sections
 import sectionproperties.analysis.section as cross_section
 import PyNite as pynite
-#from PyNite import Visualization
+
+# from PyNite import Visualization
 import copy
 
 nonetype = type(None)
+
 
 def rotation_matrix_from_vectors(vec1, vec2):
     """Find the rotation matrix that aligns vec1 to vec2
@@ -61,7 +63,7 @@ class Beam(Component):
 
     # parent structure, will be in its _beams
     structure: "Structure" = attr.ib()
-    
+
     name: str = attr.ib()
     material: "SolidMaterial" = attr.ib(
         validator=attr.validators.instance_of(SolidMaterial),
@@ -99,22 +101,21 @@ class Beam(Component):
         validator=attr.validators.instance_of((int, float, nonetype)),
     )
 
-    in_mesh_size:float = attrs.field(default=0.01)
-    analysis_intervals:int = attrs.field(default=3)
+    in_mesh_size: float = attrs.field(default=0.01)
+    analysis_intervals: int = attrs.field(default=3)
 
     _L = None
     _section_properties = None
     _ITensor = None
 
-    
     min_stress_xy = None  # set to true or false
 
     def __on_init__(self):
         self.debug("initalizing...")
-        #update material
-        if isinstance(self.section,ottgeo.ShapelySection):
+        # update material
+        if isinstance(self.section, ottgeo.ShapelySection):
             if self.section.material is None:
-                raise Exception('No Section Material')
+                raise Exception("No Section Material")
             else:
                 self.material = self.section.material
         self.update_section(self.section)
@@ -124,23 +125,27 @@ class Beam(Component):
 
         self.debug(f"determining {section} properties...")
         if isinstance(self.section, geometry.Geometry):
-            
-            #Calculate Sections X/Y Bounds
-            xcg,ycg = self.section.calculate_centroid()
-            minx,maxx,miny,maxy = self.section.calculate_extents()
-            self.section.y_bounds = (miny-ycg,maxy-ycg)
-            self.section.x_bounds = (minx-xcg,maxx-xcg)
+            # Calculate Sections X/Y Bounds
+            xcg, ycg = self.section.calculate_centroid()
+            minx, maxx, miny, maxy = self.section.calculate_extents()
+            self.section.y_bounds = (miny - ycg, maxy - ycg)
+            self.section.x_bounds = (minx - xcg, maxx - xcg)
 
             self.debug(f"determining mesh {section} properties...")
             mesh = self.section.create_mesh([self.in_mesh_size])
             # no material here
-            self._section_properties = cross_section.Section(
-                self.section, mesh
-            )  
+            self._section_properties = cross_section.Section(self.section, mesh)
             self._section_properties.calculate_geometric_properties()
             self._section_properties.calculate_warping_properties()
             ans = self._section_properties.calculate_frame_properties()
-            (self.in_A, self.in_Ix, self.in_Iy, self.in_Ixy,self.in_J, PrincpAx) = ans
+            (
+                self.in_A,
+                self.in_Ix,
+                self.in_Iy,
+                self.in_Ixy,
+                self.in_J,
+                PrincpAx,
+            ) = ans
 
         elif isinstance(self.section, ottgeo.ShapelySection):
             self.debug(f"determining profile {section} properties...")
@@ -174,7 +179,7 @@ class Beam(Component):
         self._ITensor = numpy.array(T)
 
     @system_property
-    def current_combo(self)->str:
+    def current_combo(self) -> str:
         return self.structure.current_combo
 
     @system_property
@@ -328,7 +333,7 @@ class Beam(Component):
 
     @instance_cached
     def centroid3d(self):
-        return self.L_vec / 2.0 + self.P1 
+        return self.L_vec / 2.0 + self.P1
 
     @property
     def n_vec(self):
@@ -341,9 +346,9 @@ class Beam(Component):
     @property
     def cog(self):
         return self.centroid3d
-    
-    #Geometry Tabulation
-    #p1
+
+    # Geometry Tabulation
+    # p1
     @system_property
     def X1(self) -> float:
         return self.P1[0]
@@ -351,12 +356,12 @@ class Beam(Component):
     @system_property
     def Y1(self) -> float:
         return self.P1[1]
-    
+
     @system_property
     def Z1(self) -> float:
-        return self.P1[2]    
-    
-    #p2
+        return self.P1[2]
+
+    # p2
     @system_property
     def X2(self) -> float:
         return self.P2[0]
@@ -364,12 +369,12 @@ class Beam(Component):
     @system_property
     def Y2(self) -> float:
         return self.P2[1]
-    
+
     @system_property
     def Z2(self) -> float:
-        return self.P2[2]        
+        return self.P2[2]
 
-    #cg
+    # cg
     @system_property
     def Xcg(self) -> float:
         return self.centroid3d[0]
@@ -377,20 +382,20 @@ class Beam(Component):
     @system_property
     def Ycg(self) -> float:
         return self.centroid3d[1]
-    
+
     @system_property
     def Zcg(self) -> float:
-        return self.centroid3d[2]       
+        return self.centroid3d[2]
 
     @property
     def RotationMatrix(self):
-        #FIXME: Ensure that this is the correct orientation
+        # FIXME: Ensure that this is the correct orientation
         n_o = [
             1,
             0,
             0,
-        ]  
-        #n_vec is along Z, so we must tranlate from the along axis which is z
+        ]
+        # n_vec is along Z, so we must tranlate from the along axis which is z
         return rotation_matrix_from_vectors(n_o, self.n_vec)
 
     @property
@@ -408,7 +413,7 @@ class Beam(Component):
         """sum the absolute value of each stress component. This isn't accurate but each value here should represent the worst sections, and take the 1-norm to max for each type of stress"""
 
         if self.section.x_bounds is None:
-            self.warning(f'bad section bounds')
+            self.warning(f"bad section bounds")
             self.section.calculate_bounds()
 
         m_y = max([abs(v) for v in self.section.y_bounds])
@@ -418,28 +423,28 @@ class Beam(Component):
 
         sigma_bx = Mxx * m_y / self.in_Ix
         sigma_by = Myy * m_x / self.in_Iy
-        sigma_tw = Mzz * max(m_y,m_x) / self.in_J
+        sigma_tw = Mzz * max(m_y, m_x) / self.in_J
 
-        #A2 = self.in_A/2.
-        #experimental
-        #sigma_vx = Vx * (A2*m_y/2) / (self.in_Iy*m_x)
-        #sigma_vy = Vy * (A2*m_x/2) / (self.in_Ix*m_y)
+        # A2 = self.in_A/2.
+        # experimental
+        # sigma_vx = Vx * (A2*m_y/2) / (self.in_Iy*m_x)
+        # sigma_vy = Vy * (A2*m_x/2) / (self.in_Ix*m_y)
 
-        #assume circle (worst case)
+        # assume circle (worst case)
         sigma_vx = Vx * 0.75 / self.in_A
         sigma_vy = Vy * 0.75 / self.in_A
 
-        max_bend = abs(sigma_bx)+abs(sigma_by)
-        max_shear = abs(sigma_vx)+abs(sigma_vy)
+        max_bend = abs(sigma_bx) + abs(sigma_by)
+        max_shear = abs(sigma_vx) + abs(sigma_vy)
 
         return abs(sigma_n) + max_bend + abs(sigma_tw) + max_shear
 
     def max_von_mises(self) -> float:
         """The worst of the worst cases, after adjusting the beem orientation for best loading"""
-        #TODO: make faster system property
+        # TODO: make faster system property
         return numpy.nanmax([self.max_von_mises_by_case()])
 
-    def max_von_mises_by_case(self,combos=None):
+    def max_von_mises_by_case(self, combos=None):
         """Gathers max vonmises stress info per case"""
 
         cmprv = {}
@@ -460,7 +465,7 @@ class Beam(Component):
             if vf < vt:
                 self.min_stress_xy = False
                 return vf
-            
+
             self.min_stress_xy = True
             return vt
 
@@ -488,32 +493,43 @@ class Beam(Component):
         """Max profile stress info along beam for each type"""
         rows = []
         for combo in self.structure.frame.LoadCombos:
-
             for i in numpy.linspace(0, 1, self.analysis_intervals):
                 mat_stresses = self.section_stresses[combo][i].get_stress()
-                oout = {"x": i,'combo':combo}
+                oout = {"x": i, "combo": combo}
                 for stresses in mat_stresses:
                     max_vals = {
-                        sn + "_max_" + stresses["Material"]: numpy.nanmax(stress)
+                        sn
+                        + "_max_"
+                        + stresses["Material"]: numpy.nanmax(stress)
                         for sn, stress in stresses.items()
                         if isinstance(stress, numpy.ndarray)
                     }
                     min_vals = {
-                        sn + "_min_" + stresses["Material"]: numpy.nanmin(stress)
-                        for sn, stress in stresses.items()
-                        if isinstance(stress, numpy.ndarray)
-                    }   
-                    avg_vals = {
-                        sn + "_avg_" + stresses["Material"]: numpy.nanmean(stress)
+                        sn
+                        + "_min_"
+                        + stresses["Material"]: numpy.nanmin(stress)
                         for sn, stress in stresses.items()
                         if isinstance(stress, numpy.ndarray)
                     }
-                    #Make some simple to determine dataframe failure prediction                     
-                    factor_of_saftey = self.material.yield_strength / numpy.nanmax(stresses['sig_vm']) 
-                    fail_frac = numpy.nanmax(stresses['sig_vm']) / self.material.allowable_stress                    
+                    avg_vals = {
+                        sn
+                        + "_avg_"
+                        + stresses["Material"]: numpy.nanmean(stress)
+                        for sn, stress in stresses.items()
+                        if isinstance(stress, numpy.ndarray)
+                    }
+                    # Make some simple to determine dataframe failure prediction
+                    factor_of_saftey = (
+                        self.material.yield_strength
+                        / numpy.nanmax(stresses["sig_vm"])
+                    )
+                    fail_frac = (
+                        numpy.nanmax(stresses["sig_vm"])
+                        / self.material.allowable_stress
+                    )
                     fsnm = stresses["Material"] + "_saftey_factor"
                     fsff = stresses["Material"] + "_fail_frac"
-                    allowable = {fsnm: factor_of_saftey,fsff:fail_frac}
+                    allowable = {fsnm: factor_of_saftey, fsff: fail_frac}
                     oout.update(allowable)
                     oout.update(max_vals)
                     oout.update(min_vals)
@@ -521,25 +537,25 @@ class Beam(Component):
                 rows.append(oout)
 
         return pandas.DataFrame(rows)
-    
+
     @instance_cached
     def section_stresses(self):
-        #FIXME: enable: assert self.structure.solved, f'must be solved first!'
+        # FIXME: enable: assert self.structure.solved, f'must be solved first!'
         combos = {}
         for combo in self.structure.frame.LoadCombos:
             combos[combo] = spans = {}
             for i in numpy.linspace(0, 1, self.analysis_intervals):
-                self.info(f'evaluating stresses for {combo} @ {i}')
+                self.info(f"evaluating stresses for {combo} @ {i}")
                 sol = self.get_stress_at(i, combo)
                 spans[i] = sol
         return combos
 
-    def get_forces_at(self,x,combo=None):
+    def get_forces_at(self, x, combo=None):
         """outputs pynite results in section_properties.calculate_stress() input"""
         if combo is None:
             combo = self.structure.current_combo
 
-        x = x*self.L #frac of L
+        x = x * self.L  # frac of L
 
         inp = dict(
             N=self.member.axial(x, combo),
@@ -551,17 +567,17 @@ class Beam(Component):
             M22=0,
             Mzz=self.member.torque(x, combo),
         )
-        return inp        
+        return inp
 
     def get_stress_at(self, x, combo=None):
         """gets stress at x, for load case combo in the actual 2d section"""
         if combo is None:
             combo = self.structure.current_combo
 
-        inp = self.get_forces_at(x,combo)
+        inp = self.get_forces_at(x, combo)
         return self._section_properties.calculate_stress(**inp)
-    
-    def get_stress_with_forces(self,**forces):
+
+    def get_stress_with_forces(self, **forces):
         """takes force input and runs stress calculation"""
         return self._section_properties.calculate_stress(**forces)
 
@@ -574,8 +590,12 @@ class Beam(Component):
     @system_property
     def max_stress_estimate(self) -> float:
         """estimates these are proportional to stress but 2D FEA is "truth" since we lack cross section specifics"""
-        return max([self.estimate_max_stress(**self.get_forces_at(x)) 
-                                              for x in [0,0.5,1]])
+        return max(
+            [
+                self.estimate_max_stress(**self.get_forces_at(x))
+                for x in [0, 0.5, 1]
+            ]
+        )
 
     @system_property
     def fail_factor_estimate(self) -> float:
@@ -684,9 +704,8 @@ class Beam(Component):
         if case is None:
             case = self.structure.default_case
 
-        #adjust x for relative input
+        # adjust x for relative input
         x = x_frac * self.L
-
 
         valid = self.get_valid_force_choices(use_moment=True, only_global=True)
         fin = [(v, kwargs[v]) for v in valid if v in kwargs]
@@ -694,7 +713,7 @@ class Beam(Component):
             if Fval:
                 self.debug(f"adding {Fkey}={Fval}")
                 self.structure.frame.add_member_pt_load(
-                    self.member.name, Fkey, Fval, x,case=case
+                    self.member.name, Fkey, Fval, x, case=case
                 )
 
     def apply_distributed_load(
@@ -702,7 +721,7 @@ class Beam(Component):
     ):
         """add forces in global vector"""
         if case is None:
-            case = self.structure.default_case        
+            case = self.structure.default_case
         valid = self.get_valid_force_choices(use_moment=False, only_global=True)
         fin = [(v, kwargs[v]) for v in valid if v in kwargs]
         for Fkey, Fval in fin:
@@ -719,14 +738,14 @@ class Beam(Component):
     def apply_local_pt_load(self, x, case=None, **kwargs):
         """add a force in a global orientation"""
         if case is None:
-            case = self.structure.default_case  
+            case = self.structure.default_case
         valid = self.get_valid_force_choices(only_local=True, use_moment=True)
         fin = [(v, kwargs[v]) for v in valid if v in kwargs]
         for Fkey, Fval in fin:
             if Fval:
                 self.debug(f"adding {Fkey}={Fval}")
                 self.structure.frame.add_member_pt_load(
-                    self.member.name, Fkey, Fval, x,case=case
+                    self.member.name, Fkey, Fval, x, case=case
                 )
 
     def apply_local_distributed_load(
@@ -734,7 +753,7 @@ class Beam(Component):
     ):
         """add forces in global vector"""
         if case is None:
-            case = self.structure.default_case  
+            case = self.structure.default_case
         valid = self.get_valid_force_choices(only_local=True, use_moment=False)
         fin = [(v, kwargs[v]) for v in valid if v in kwargs]
         for Fkey, Fval in fin:
@@ -748,23 +767,23 @@ class Beam(Component):
                     case=case,
                 )
 
-    def apply_gravity_force_distribution(self, sv=1, ev=1,z_dir='FZ',z_mag=-1):
+    def apply_gravity_force_distribution(
+        self, sv=1, ev=1, z_dir="FZ", z_mag=-1
+    ):
         # TODO: ensure that integral of sv, ev is 1, and all positive
-        self.debug(f'applying gravity distribution to {self.name}')
+        self.debug(f"applying gravity distribution to {self.name}")
         for case in self.structure.gravity_cases:
             total_weight = self.mass * self.structure.gravity_mag
-            d = {z_dir:z_mag*total_weight}
-            self.apply_distributed_load( case=case,**d)
+            d = {z_dir: z_mag * total_weight}
+            self.apply_distributed_load(case=case, **d)
 
-    def apply_gravity_force(self, x_frac=0.5, z_dir='FZ',z_mag=-1):
-        self.debug(f'applying gravity to {self.name}')
+    def apply_gravity_force(self, x_frac=0.5, z_dir="FZ", z_mag=-1):
+        self.debug(f"applying gravity to {self.name}")
         for case in self.structure.gravity_cases:
             total_weight = self.mass * self.structure.gravity_mag
-            d = {z_dir:z_mag*total_weight}
-            self.apply_pt_load(x_frac, case=case,**d)
-
+            d = {z_dir: z_mag * total_weight}
+            self.apply_pt_load(x_frac, case=case, **d)
 
     def __dir__(self) -> Iterable[str]:
         d = set(super().__dir__())
         return list(d.union(dir(Beam)))
-        

@@ -93,7 +93,7 @@ class DiskReporterMixin(TemporalReporterMixin):
             pth = pathlib.Path(self.report_root)
             pth.mkdir(parents=True, exist_ok=True)
 
-    def ensure_path(self,file_path):
+    def ensure_path(self, file_path):
         pth = pathlib.Path(file_path)
         if not pth.parent.exists():
             pth.mkdir(parents=True, exist_ok=True)

@@ -8,7 +8,7 @@ from sqlalchemy_utils import *
 
 import functools
 
-import os,sys
+import os, sys
 import logging
 import numpy
 import time
@@ -22,7 +22,7 @@ import psycopg2
 import cachetools
 
 from ottermatics.env_var import EnvVariable
-from ottermatics.patterns import SingletonMeta,InputSingletonMeta
+from ottermatics.patterns import SingletonMeta, InputSingletonMeta
 from ottermatics.logging import (
     LoggingMixin,
     change_all_log_levels,
@@ -40,12 +40,12 @@ import diskcache
 
 log = logging.getLogger("otterlib-data")
 
-#Env Vars
-DB_NAME = EnvVariable("OTTR_DB_NAME",dontovrride=True)
-DB_HOST = EnvVariable("OTTR_DB_HOST",default='localhost',dontovrride=True)
-DB_PORT = EnvVariable("OTTR_DB_PORT",int,default=5432,dontovrride=True)
-DB_USER = EnvVariable('OTTR_DB_USER',default='postgres',dontovrride=True)
-DB_PASS = EnvVariable('OTTR_DB_PASS',default='postgres',dontovrride=True)
+# Env Vars
+DB_NAME = EnvVariable("OTTR_DB_NAME", dontovrride=True)
+DB_HOST = EnvVariable("OTTR_DB_HOST", default="localhost", dontovrride=True)
+DB_PORT = EnvVariable("OTTR_DB_PORT", int, default=5432, dontovrride=True)
+DB_USER = EnvVariable("OTTR_DB_USER", default="postgres", dontovrride=True)
+DB_PASS = EnvVariable("OTTR_DB_PASS", default="postgres", dontovrride=True)
 
 
 def addapt_numpy_float64(numpy_float64):
@@ -327,7 +327,9 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
 
     # TODO: Make Threadsafe W/ ThreadPoolExecutor!
     # we love postgres!
-    _connection_template = "postgresql://{user}:{passd}@{host}:{port}/{database}"  
+    _connection_template = (
+        "postgresql://{user}:{passd}@{host}:{port}/{database}"
+    )
 
     pool_size = 20
     max_overflow = 0
@@ -425,7 +427,7 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
         )
         self.engine.echo = self.echo
 
-       # self.scopefunc = functools.partial(context.get, "uuid")
+        # self.scopefunc = functools.partial(context.get, "uuid")
 
         self.session_factory = sessionmaker(
             bind=self.engine, expire_on_commit=True
@@ -450,7 +452,6 @@ class DBConnection(LoggingMixin, metaclass=InputSingletonMeta):
         finally:
             session.close()
         del session
-
 
     def rebuild_database(self, confirm=True):
         """Rebuild database on confirmation, create the database if nessicary"""

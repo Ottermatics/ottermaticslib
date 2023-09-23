@@ -63,7 +63,7 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
     # Saftey Properties
     factor_of_saftey: float = attr.ib(default=1.5)
 
-    _unique_id:str = None
+    _unique_id: str = None
 
     @property
     def E(self) -> float:

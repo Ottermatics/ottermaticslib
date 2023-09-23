@@ -67,7 +67,7 @@ class TestDynamics(unittest.TestCase):
     def setUp(self) -> None:
         self.sm = SpringMass()
 
-        #the analytical answer
+        # the analytical answer
         self.w_ans = np.sqrt(self.sm.k / self.sm.m)
 
     def test_sim(self):

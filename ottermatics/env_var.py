@@ -42,7 +42,7 @@ class EnvVariable(LoggingMixin):
         obscure=False,
         fail_on_missing=False,
         desc: str = None,
-        dontovrride = False,
+        dontovrride=False,
     ):
         """pass arguments to SecretVariable to have it look up information at runtime from envargs, but not store it in memory.
         :param secret_var_name: the enviornmental variable
@@ -62,20 +62,20 @@ class EnvVariable(LoggingMixin):
 
         self.fail_on_missing = fail_on_missing
 
-        #record env vars
+        # record env vars
         if secret_var_name in self.__class__._secrets:
             cur = self.__class__._secrets[secret_var_name]
             if dontovrride:
                 pass
             else:
-                self.debug(f'replacing {cur}->{self}')
+                self.debug(f"replacing {cur}->{self}")
                 self._replaced.add(cur)
                 self.__class__._secrets[secret_var_name] = self
         else:
             self.__class__._secrets[secret_var_name] = self
 
-        #FIXME: prevent ottermatics var from replacing other module instnace
-        #not possible to locate where other instances
+        # FIXME: prevent ottermatics var from replacing other module instnace
+        # not possible to locate where other instances
         # if secret_var_name in self.__class__._secrets:
         #     cur = self.__class__._secrets[secret_var_name]
         #     if cur != self and self not in self._replaced:
@@ -85,7 +85,7 @@ class EnvVariable(LoggingMixin):
         #     elif self in self._replaced:
         #         self.info(f'skipping replaced readd {self}')
         #         #self.__class__._secrets[secret_var_name] = self
-        # else:    
+        # else:
         #     self.__class__._secrets[secret_var_name] = self
 
     def __str__(self):
@@ -151,15 +151,18 @@ class EnvVariable(LoggingMixin):
     @classmethod
     def load_env_vars(self):
         for s in EnvVariable._secrets.values():
-            str(s)        
+            str(s)
 
     @classmethod
     def print_env_vars(cls):
         """prints env vars in memory"""
-        #preload
+        # preload
         cls.load_env_vars()
-        for var,s in sorted(EnvVariable._secrets.items(),key=lambda kv:kv[1].var_name):
-            print(f'{s.var_name:<40}|{s}')
+        for var, s in sorted(
+            EnvVariable._secrets.items(), key=lambda kv: kv[1].var_name
+        ):
+            print(f"{s.var_name:<40}|{s}")
+
 
 # DEFAULT ENV VARIABLES
 try:
@@ -170,7 +173,9 @@ except:
 
 global HOSTNAME, SLACK_WEBHOOK
 
-HOSTNAME = EnvVariable("OTTR_HOSTNAME", default=host, obscure=False,dontovrride=True)
+HOSTNAME = EnvVariable(
+    "OTTR_HOSTNAME", default=host, obscure=False, dontovrride=True
+)
 SLACK_WEBHOOK = EnvVariable(
-    "OTTR_SLACK_LOG_WEBHOOK", default=None, obscure=False,dontovrride=True
+    "OTTR_SLACK_LOG_WEBHOOK", default=None, obscure=False, dontovrride=True
 )

@@ -177,7 +177,7 @@ class SolverMixin:
             keys = list(_input.keys())
             for itercomp in self._iterate_components():
                 for parms in itertools.product(*ingrp):
-                    #Set the reference aliases
+                    # Set the reference aliases
                     cur = {k: v for k, v in zip(keys, parms)}
                     for k, v in cur.items():
                         refs[k].set_value(v)
@@ -197,7 +197,7 @@ class SolverMixin:
                         self.evaluate(_cb=_cb)
 
             if revert and revert_x:
-                self.set_system_state(ignore=['index'],**revert_x)
+                self.set_system_state(ignore=["index"], **revert_x)
 
             self._solved = True
         else:
@@ -228,7 +228,7 @@ class SolverMixin:
             self.debug(f"running with X: {self.X} & {fields_input}")
         self.pre_execute(**fields_input)
 
-        #prep index
+        # prep index
         self.index += 1
 
         # Runs The Solver
@@ -243,9 +243,9 @@ class SolverMixin:
         for key, comp in self.internal_components.items():
             if isinstance(comp, System):
                 comp.evaluate()
-            elif isinstance(comp,ComponentIter):
+            elif isinstance(comp, ComponentIter):
                 comp.update(self)
-            elif isinstance(comp,Component):
+            elif isinstance(comp, Component):
                 comp.update(self)
 
         # Post Execute
@@ -262,7 +262,7 @@ class SolverMixin:
     def pre_execute(self, **fields_input):
         """runs the solver of the system"""
         if self.log_level <= 10:
-            self.msg(f'pre execute')
+            self.msg(f"pre execute")
         # TODO: set system fields from input
         for signame, sig in self.signals.items():
             if sig.mode == "pre" or sig.mode == "both":
@@ -271,14 +271,14 @@ class SolverMixin:
     def post_execute(self):
         """runs the solver of the system"""
         if self.log_level <= 10:
-            self.msg(f'post execute')
+            self.msg(f"post execute")
         for signame, sig in self.signals.items():
             if sig.mode == "post" or sig.mode == "both":
                 sig.apply()
 
     def execute(self):
         """Solves the system's system of constraints and integrates transients if any exist
-        
+
         Override this function for custom solving functions, and call `system_solver` to use default solver functionality.
 
         :returns: the result of this function is returned from evaluate()
@@ -286,14 +286,13 @@ class SolverMixin:
         self.system_solver()
 
     def system_solver(self):
-
-        #Check independents to run system
+        # Check independents to run system
         if not self.X.size > 0:
-            if self.log_level <10:
-                self.debug(f'nothing to solve...')
-            return 
+            if self.log_level < 10:
+                self.debug(f"nothing to solve...")
+            return
 
-        self.debug(f'running system solver')
+        self.debug(f"running system solver")
 
         # solvers
         def f(*x):
@@ -345,28 +344,31 @@ class SolverMixin:
             self.warning(f"no solution attempted!")
 
     def _iterate_components(self):
-        """sets the current component for each product combination of iterable_components """
+        """sets the current component for each product combination of iterable_components"""
 
         components = self.iterable_components
 
         if not components:
-            yield #enter once 
+            yield  # enter once
         else:
-            def _gen(gen,compkey):
-                for itemkey,item in gen:
-                    yield compkey,itemkey
 
-            iter_vals = {cn:_gen(comp._item_gen(),cn) 
-                            for cn,comp in components.items()}
+            def _gen(gen, compkey):
+                for itemkey, item in gen:
+                    yield compkey, itemkey
+
+            iter_vals = {
+                cn: _gen(comp._item_gen(), cn)
+                for cn, comp in components.items()
+            }
 
             for out in itertools.product(*list(iter_vals.values())):
-                for ck,ikey in out:
-                    #TODO: progress bar or print location
+                for ck, ikey in out:
+                    # TODO: progress bar or print location
                     components[ck].current_item = ikey
                 yield out
 
-            #finally reset the data!
-            for ck,comp in components.items():
+            # finally reset the data!
+            for ck, comp in components.items():
                 comp.reset()
 
     def setX(self, x_ordered=None, pre_execute=True, **x_kw):

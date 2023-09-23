@@ -117,7 +117,7 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         """A cached set of recursive references to any slot component"""
         out = {}
         for key, lvl, comp in self.go_through_configurations(parent_level=1):
-            if not isinstance(comp,TabulationMixin):
+            if not isinstance(comp, TabulationMixin):
                 continue
             out[key] = comp
         return out
@@ -129,7 +129,7 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         tatr = out["attributes"]
         tprp = out["properties"]
 
-        #component iternals
+        # component iternals
         for key, comp in self.comp_references.items():
             sout = comp.internal_references
             satr = sout["attributes"]
@@ -180,7 +180,7 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         self.debug(f"recording system state: {out}")
         return out
 
-    def set_system_state(self, ignore=None,**kwargs):
+    def set_system_state(self, ignore=None, **kwargs):
         """accepts parital input scoped from system references"""
         sref = self.system_references
         satr = sref["attributes"]

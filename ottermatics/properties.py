@@ -187,7 +187,8 @@ class cached_system_property(system_property):
         setattr(instance, self.private_var, val)
         return val
 
-#TODO: install solver reset / declarative instance cache+
+
+# TODO: install solver reset / declarative instance cache+
 class solver_cached(otter_prop):
     """
     A property that updates a first time and then anytime time the input data changed, as signaled by attrs.on_setattr callback
@@ -228,7 +229,8 @@ class solver_cached(otter_prop):
         setattr(instance, self.private_var, val)
         return val
 
-#TODO: install solver reset / declarative instance cache+
+
+# TODO: install solver reset / declarative instance cache+
 class instance_cached(otter_prop):
     """
     A property that caches a result to an instance the first call then returns that each successive call
@@ -314,15 +316,13 @@ class class_cache(otter_prop):
         raise Exception(f"cannot set {self.gname}")
 
 
-
-
 # #TODO: make a `solver_context` that exposes a ray python remote funciton with wait & other provisions... add to a call graph and optimize later
 # NOTE: challenge to handle class/instance/functions with same code
 # from ottermatics.properties import otter_prop
 # class solver_context(otter_prop):
-#     
+#
 #     fget = None
-#     
+#
 #     def __init__(
 #         self,
 #         fget=None,
@@ -331,22 +331,22 @@ class class_cache(otter_prop):
 #         if fget:
 #             self.fget = remote_func_ret(fget)
 #         self.ray_kw = kwargs
-#     
+#
 #     def __call__(self, fget=None, fset=None, fdel=None, doc=None):
 #         """this will be called when input is provided before property is set"""
 #         if fget and self.fget is None:
 #             self.fget = remote_func_ret(fget,**self.ray_kw)
-#     
+#
 #         return self
-#     
+#
 #     def __get__(self, obj, objtype=None):
 #         if obj is None:
 #             return self
 #         if self.fget is None:
 #             raise AttributeError("unreadable attribute")
 #         return self.fget(obj)
-#         
-# 
+#
+#
 # class remote_func_ret:
 #     fget = None
 #     remote_fget = None
@@ -354,7 +354,7 @@ class class_cache(otter_prop):
 #         self.ray_kwargs = kwargs
 #         if func:
 #             self.setup_func(func)
-#             
+#
 #     def setup_func(self,func):
 #         self.fget = func
 #         if self.ray_kwargs:
@@ -362,56 +362,56 @@ class class_cache(otter_prop):
 #             self.remote_fget = d(func)
 #         else:
 #             self.remote_fget = ray.remote(func)
-#             
+#
 #     def __call__(self,*args,**kwargs):
 #         return self.fget(*args,**kwargs)
-#         
+#
 #     def remote(self,wait=False,getret=False,*args,**kwargs):
 #         res = self.remote_fget.remote(*args,**kwargs)
-#         
+#
 #         if wait:
 #             ray.wait([res])
 #             return res
 #         if getret:
 #             return ray.get([res])
 #         return res
-# 
-# 
+#
+#
 # @solver_context
 # def test_deck(a,b,c):
 #     print(a,b,c)
-#     
+#
 #     return a * b * c
-#     
+#
 # @solver_context(num_cpus=2)
 # def super_test(a,b,c):
 #     print(a,b,c)
-#     
+#
 #     return a * b * c
-#     
-# 
+#
+#
 # class nonactor:
-#     
+#
 #     def __init__(self,c):
 #         self.c = c
-#     
+#
 #     @solver_context
 #     def test_inst(self,a,b):
 #         print(a,b)
-#         
+#
 #         return a * b  * self.c
-# 
+#
 #     @solver_context(num_cpus=2)
 #     def inst_test(self,a,b):
 #         print(a,b)
-# 
+#
 #         return a * b  * self.c
-#         
+#
 # print(test_deck)
 # print(super_test)
 # print(nonactor.test_inst)
 # print(nonactor.inst_test)
-# 
+#
 # ac = nonactor(1)
 # print(ac.test_inst)
 # print(ac.inst_test)

@@ -2,15 +2,16 @@ import numpy, functools
 
 from ottermatics.logging import LoggingMixin, logging
 
+
 class inst_vectorize(numpy.vectorize):
     def __get__(self, obj, objtype):
         return functools.partial(self.__call__, obj)
 
+
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]   
-
+        yield lst[i : i + n]
 
 
 class Singleton:
@@ -34,7 +35,7 @@ class Singleton:
 
         self.__class__.__name__ = self._decorated_cls.__name__
 
-    def instance(self,*args,**kwargs):
+    def instance(self, *args, **kwargs):
         """
         Returns the singleton instance. Upon its first call, it creates a
         new instance of the decorated class and calls its `__init__` method.
@@ -44,11 +45,11 @@ class Singleton:
         try:
             return self._instance
         except AttributeError:
-            self._instance = self._decorated_cls(*args,**kwargs)
+            self._instance = self._decorated_cls(*args, **kwargs)
             return self._instance
 
     def __call__(self):
-        raise TypeError('Singletons must be accessed through `instance()`.')
+        raise TypeError("Singletons must be accessed through `instance()`.")
 
     def __instancecheck__(self, inst):
         return isinstance(inst, self._decorated)
@@ -65,13 +66,14 @@ class SingletonMeta(type):
     >>> a is b
     True
     """
-    
+
     _instances = {}
 
     def __call__(cls, *args, **kwargs):
         if cls not in cls._instances:
-            cls._instances[cls] = super(SingletonMeta, cls).__call__(*args,
-                                                                **kwargs)
+            cls._instances[cls] = super(SingletonMeta, cls).__call__(
+                *args, **kwargs
+            )
         return cls._instances[cls]
 
     @classmethod
@@ -82,13 +84,8 @@ class SingletonMeta(type):
             return isinstance(instance.__class__, mcs)
 
 
-
-
-
-
-
 # class MetaRegistry(type):
-    
+
 #     REGISTRY = {}
 
 #     def __new__(meta, name, bases, class_dict):
@@ -98,7 +95,7 @@ class SingletonMeta(type):
 #         return cls
 
 #     def register_class(target_class):
-#         REGISTRY[target_class.__name__] = target_class        
+#         REGISTRY[target_class.__name__] = target_class
 
 
 class InputSingletonMeta(type):
@@ -112,17 +109,19 @@ class InputSingletonMeta(type):
     >>> a is b
     False
     """
+
     _instances = {}
 
     def __call__(cls, *args, **kwargs):
-        keyarg = {'class':cls,'args':args,**kwargs}
-        keyarg['class'] = cls
-        keyarg['args'] = args
+        keyarg = {"class": cls, "args": args, **kwargs}
+        keyarg["class"] = cls
+        keyarg["args"] = args
         key = frozenset(keyarg.items())
         if key not in cls._instances:
-            #print(f'creating new {key}')
-            cls._instances[key] = super(InputSingletonMeta, cls).__call__(*args,
-                                                                **kwargs)
+            # print(f'creating new {key}')
+            cls._instances[key] = super(InputSingletonMeta, cls).__call__(
+                *args, **kwargs
+            )
         return cls._instances[key]
 
     @classmethod
@@ -130,7 +129,8 @@ class InputSingletonMeta(type):
         if instance.__class__ is mcs:
             return True
         else:
-            return isinstance(instance.__class__, mcs)            
+            return isinstance(instance.__class__, mcs)
+
 
 def singleton_meta_object(cls):
     """Class decorator that transforms (and replaces) a class definition (which
@@ -140,8 +140,9 @@ def singleton_meta_object(cls):
     hashable, and has the correct string representation (the name of the
     singleton)
     """
-    assert isinstance(cls, SingletonMeta), \
+    assert isinstance(cls, SingletonMeta), (
         cls.__name__ + " must use Singleton metaclass"
+    )
 
     def instance(self):
         return cls
@@ -154,20 +155,23 @@ def singleton_meta_object(cls):
     obj.__name__ = cls.__name__
     return obj
 
-    
+
 def flat2gen(alist):
-  for item in alist:
-    if isinstance(item, (list,tuple)):
-      for subitem in item: yield subitem
-    else:
-      yield item
+    for item in alist:
+        if isinstance(item, (list, tuple)):
+            for subitem in item:
+                yield subitem
+        else:
+            yield item
+
 
 def flatten(alist):
     return list(flat2gen(alist))
 
-# 
-# 
-# 
+
+#
+#
+#
 # #TODO: Move to ray-util
 # # FROM RAY INSPECT_SERIALIZE
 # """A utility for debugging serialization issues."""
@@ -176,12 +180,12 @@ def flatten(alist):
 # import ray.cloudpickle as cp
 # import colorama
 # from contextlib import contextmanager
-# 
+#
 # def recursive_python_module_line_counter(curpath=None):
 #     total_lines = 0
 #     if curpath is None or not isinstance(curpath, str):
 #         curpath = os.path.realpath(os.curdir)
-#         
+#
 #     print(f'Getting Python Lines In {curpath}')
 #     for dirpath, dirs, fils in os.walk(curpath):
 #         for fil in fils:
@@ -191,57 +195,57 @@ def flatten(alist):
 #                     lines = len(str(fp.read()).split('\n'))
 #                     total_lines += lines
 #                     print(f'{filpath}: {lines} / {total_lines}')
-# 
+#
 #     print(f'Total Lines {total_lines}')
-# 
+#
 
-# 
+#
 # @contextmanager
 # def _indent(printer):
 #     printer.level += 1
 #     yield
 #     printer.level -= 1
-# 
-# 
+#
+#
 # class _Printer(LoggingMixin):
-# 
+#
 #     log_level = logging.WARNING
-# 
+#
 #     def __init__(self):
 #         self.level = 0
-# 
+#
 #     def indent(self):
 #         return _indent(self)
-# 
+#
 #     def print(self, msg, warning=False):
 #         indent = "    " * self.level
 #         if warning:
 #             self.warning(indent+msg)
 #         else:
 #             self.debug(indent+msg)
-# 
-# 
+#
+#
 # _printer = _Printer()
-# 
-# 
+#
+#
 # class FailureTuple:
 #     """Represents the serialization 'frame'.
-# 
+#
 #     Attributes:
 #         obj: The object that fails serialization.
 #         name: The variable name of the object.
 #         parent: The object that references the `obj`.
 #     """
-# 
+#
 #     def __init__(self, obj: Any, name: str, parent: Any):
 #         self.obj = obj
 #         self.name = name
 #         self.parent = parent
-# 
+#
 #     def __repr__(self):
 #         return f"FailTuple({self.name} [obj={self.obj}, parent={self.parent}])"
-# 
-# 
+#
+#
 # def _inspect_func_serialization(base_obj, depth, parent, failure_set):
 #     """Adds the first-found non-serializable element to the failure_set."""
 #     assert inspect.isfunction(base_obj)
@@ -250,7 +254,7 @@ def flatten(alist):
 #     if closure.globals:
 #         _printer.print(f"Detected {len(closure.globals)} global variables. "
 #                        "Checking serializability...")
-# 
+#
 #         with _printer.indent():
 #             for name, obj in closure.globals.items():
 #                 serializable, _ = inspect_serializability(
@@ -262,7 +266,7 @@ def flatten(alist):
 #                 found = found or not serializable
 #                 if found:
 #                     break
-# 
+#
 #     if closure.nonlocals:
 #         _printer.print(
 #             f"Detected {len(closure.nonlocals)} nonlocal variables. "
@@ -283,8 +287,8 @@ def flatten(alist):
 #             f"WARNING: Did not find non-serializable object in {base_obj}. "
 #             "This may be an oversight.",warning=True)
 #     return found
-# 
-# 
+#
+#
 # def _inspect_generic_serialization(base_obj, depth, parent, failure_set):
 #     """Adds the first-found non-serializable element to the failure_set."""
 #     assert not inspect.isfunction(base_obj)
@@ -301,7 +305,7 @@ def flatten(alist):
 #             found = found or not serializable
 #             if found:
 #                 break
-# 
+#
 #     with _printer.indent():
 #         members = inspect.getmembers(base_obj)
 #         for name, obj in members:
@@ -322,8 +326,8 @@ def flatten(alist):
 #             f"WARNING: Did not find non-serializable object in {base_obj}. "
 #             "This may be an oversight.",warning=True)
 #     return found
-# 
-# 
+#
+#
 # def inspect_serializability(
 #         base_obj: Any,
 #         name: Optional[str] = None,
@@ -331,18 +335,18 @@ def flatten(alist):
 #         _parent: Optional[Any] = None,
 #         _failure_set: Optional[set] = None) -> Tuple[bool, Set[FailureTuple]]:
 #     """Identifies what objects are preventing serialization.
-# 
+#
 #     Args:
 #         base_obj: Object to be serialized.
 #         name: Optional name of string.
 #         depth: Depth of the scope stack to walk through. Defaults to 3.
-# 
+#
 #     Returns:
 #         bool: True if serializable.
 #         set[FailureTuple]: Set of unserializable objects.
-# 
+#
 #     .. versionadded:: 1.1.0
-# 
+#
 #     """
 #     colorama.init()
 #     top_level = False
@@ -355,7 +359,7 @@ def flatten(alist):
 #         _printer.print("=" * min(len(declaration), 80))
 #         _printer.print(declaration)
 #         _printer.print("=" * min(len(declaration), 80))
-# 
+#
 #         if name is None:
 #             name = str(base_obj)
 #     else:
@@ -373,10 +377,10 @@ def flatten(alist):
 #         # Some objects may not be hashable, so we skip adding this to the set.
 #         except Exception:
 #             pass
-# 
+#
 #     if depth <= 0:
 #         return False, _failure_set
-# 
+#
 #     # TODO: we only differentiate between 'function' and 'object'
 #     # but we should do a better job of diving into something
 #     # more specific like a Type, Object, etc.
@@ -386,10 +390,10 @@ def flatten(alist):
 #     else:
 #         _inspect_generic_serialization(
 #             base_obj, depth=depth, parent=base_obj, failure_set=_failure_set)
-# 
+#
 #     if not _failure_set:
 #         _failure_set.add(FailureTuple(base_obj, name, _parent))
-# 
+#
 #     if top_level:
 #         print("=" * min(len(declaration), 80))
 #         if not _failure_set:
@@ -409,39 +413,39 @@ def flatten(alist):
 #               "this error message, please reach out to the "
 #               "Ray developers on github.com/ray-project/ray/issues/",warning=True)
 #         _printer.print("=" * min(len(declaration), 80))
-#     return not found, _failure_set    
-# 
-# 
+#     return not found, _failure_set
+#
+#
 # import pickle
-# 
+#
 # def pickle_trick(obj, max_depth=10):
 #     output = {}
-# 
+#
 #     if max_depth <= 0:
 #         return output
-# 
+#
 #     try:
 #         pickle.dumps(obj)
 #     except (pickle.PicklingError, TypeError) as e:
 #         failing_children = []
-#         
+#
 #         if isinstance(obj, (list,tuple)):
 #             for it in obj:
 #                 result = pickle_trick(v, max_depth=max_depth - 1)
 #                 if result:
-#                     failing_children.append(result)        
-# 
+#                     failing_children.append(result)
+#
 #         elif hasattr(obj, "__dict__"):
 #             for k, v in obj.__dict__.items():
 #                 result = pickle_trick(v, max_depth=max_depth - 1)
 #                 if result:
 #                     failing_children.append(result)
-# 
+#
 #         output = {
-#             "fail": obj, 
-#             "err": e, 
-#             "depth": max_depth, 
+#             "fail": obj,
+#             "err": e,
+#             "depth": max_depth,
 #             "failing_children": failing_children
 #         }
-# 
+#
 #     return output

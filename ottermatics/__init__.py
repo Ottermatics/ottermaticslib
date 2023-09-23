@@ -5,7 +5,7 @@
 # from ottermatics.configuration import Configuration, otterize
 # from ottermatics.components import Component
 # from ottermatics.analysis import Analysis
-# 
+#
 # # TODO: implement this functionality
 # # from ottermatics.eng import *
 # # from ottermatics.datastores import *

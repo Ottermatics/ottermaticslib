@@ -40,7 +40,7 @@ class FluidMaterial(Component):
 
     @abc.abstractproperty
     def surface_tension(self):
-        return 1E-10
+        return 1e-10
 
     # TODO: enthalpy
 

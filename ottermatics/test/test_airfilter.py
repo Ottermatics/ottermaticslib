@@ -106,7 +106,6 @@ class TestAnalysis(unittest.TestCase):
         self.assertIsNotNone(ofig)
 
 
-    
 # from ottermatics.logging import change_all_log_levels
 # from ottermatics.test.test_airfilter import *
 # from matplotlib.pylab import *
