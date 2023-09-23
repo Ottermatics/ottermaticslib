@@ -19,28 +19,6 @@ pip install git+https://github.com/Ottermatics/ottermaticslib.git
 4. Solver based on `NPSS` strategy of balances and integrators [Done]
 5. Reporting to google sheets, csv and excel.
 
-### DataStores
-Datastores are a work in progress feature to provide a zero configuration library for storage of tabulated data and report generated artifacts. No garuntee is provided as to their stability yet.
-Requirements for datasources are attempted upon access of `ottermatics.datastores` and entering of a `CONFIRM` prompt.
-
-### Environmental Variables
-To allow a write-once implement anywhere interface `EnvVariable` is provided for both open (the default) and secret variables. Allowance for type conversion, and defaults are provided.
-
-The current variable slots in memory are listed by `EnvVariable.print_env_vars()`
-```bash
-OTTR_DB_HOST                            |SECRETS[OTTR_DB_HOST]                    = localhost
-OTTR_DB_NAME                            |SECRETS[OTTR_DB_NAME]                    = 
-OTTR_DB_PASS                            |SECRETS[OTTR_DB_PASS]                    = postgres
-OTTR_DB_PORT                            |SECRETS[OTTR_DB_PORT]                    = 5432
-OTTR_DB_USER                            |SECRETS[OTTR_DB_USER]                    = postgres
-OTTR_HOSTNAME                           |SECRETS[OTTR_HOSTNAME]                   = DEATHRAY
-OTTR_REPORT_PATH                        |SECRETS[OTTR_REPORT_PATH]                = 
-OTTR_SLACK_LOG_WEBHOOK                  |SECRETS[OTTR_SLACK_LOG_WEBHOOK]          = 
-SEABORN_CONTEXT                         |SECRETS[SEABORN_CONTEXT]                 = paper
-SEABORN_PALETTE                         |SECRETS[SEABORN_PALETTE]                 = deep
-SEABORN_THEME                           |SECRETS[SEABORN_THEME]                   = darkgrid
-```
-
 ### Systems & Analysis
 Systems record data from components, and can execute a solver via the `run(**parameter_iterables)` command. Via a system's run command its state and internal component's & systems state can be altered in an outer product fashion, ie all combinations of inputs will be run. At the start of a run the systems & its components state is recorded and reset by default using `Ref` instances so that way multiple systems can use the same component. Its possible reference loops may occcur so its generally preferred to create components per system, however for coupled systems this is often desireable to converge on a solution.
 
@@ -294,4 +272,25 @@ sa.run(throttle=list(np.arange(0.1,1.1,0.1)))
 ## Documentation:
 https://ottermatics.github.io/ottermaticslib/build/html/index.html
 
+### DataStores
+Datastores are a work in progress feature to provide a zero configuration library for storage of tabulated data and report generated artifacts. No garuntee is provided as to their stability yet.
+Requirements for datasources are attempted upon access of `ottermatics.datastores` and entering of a `CONFIRM` prompt.
+
+### Environmental Variables
+To allow a write-once implement anywhere interface `EnvVariable` is provided for both open (the default) and secret variables. Allowance for type conversion, and defaults are provided.
+
+The current variable slots in memory are listed by `EnvVariable.print_env_vars()`
+```bash
+OTTR_DB_HOST                            |SECRETS[OTTR_DB_HOST]                    = localhost
+OTTR_DB_NAME                            |SECRETS[OTTR_DB_NAME]                    = 
+OTTR_DB_PASS                            |SECRETS[OTTR_DB_PASS]                    = postgres
+OTTR_DB_PORT                            |SECRETS[OTTR_DB_PORT]                    = 5432
+OTTR_DB_USER                            |SECRETS[OTTR_DB_USER]                    = postgres
+OTTR_HOSTNAME                           |SECRETS[OTTR_HOSTNAME]                   = DEATHRAY
+OTTR_REPORT_PATH                        |SECRETS[OTTR_REPORT_PATH]                = 
+OTTR_SLACK_LOG_WEBHOOK                  |SECRETS[OTTR_SLACK_LOG_WEBHOOK]          = 
+SEABORN_CONTEXT                         |SECRETS[SEABORN_CONTEXT]                 = paper
+SEABORN_PALETTE                         |SECRETS[SEABORN_PALETTE]                 = deep
+SEABORN_THEME                           |SECRETS[SEABORN_THEME]                   = darkgrid
+```
 
