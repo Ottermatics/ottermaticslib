@@ -45,7 +45,7 @@ class TabulationMixin(Configuration):
     _always_save_data = False
 
     # Data Tabulation - Intelligent Lookups
-    def save_data(self, index=None, saved=None, force=False, subforce=False):
+    def save_data(self, index=None, saved=None, force=False, subforce=False,save_internal=False):
         """We'll save data for this object and any other internal configuration if
         anything changed or if the table is empty This should result in at least one row of data,
         or minimal number of rows to track changes
@@ -71,14 +71,15 @@ class TabulationMixin(Configuration):
             saved.add(self)
 
         # TODO: move to slots structure
-        for config in self.internal_components.values():
-            if config is None:
-                continue
-            if config not in saved:
-                self.debug(f"saving {config.identity}")
-                config.save_data(index, saved=saved, force=subforce)
-            else:
-                self.debug(f"skipping saved config {config.identity}")
+        if save_internal:
+            for config in self.internal_components.values():
+                if config is None:
+                    continue
+                if config not in saved:
+                    self.debug(f"saving {config.identity}")
+                    config.save_data(index, saved=saved, force=subforce)
+                else:
+                    self.debug(f"skipping saved config {config.identity}")
 
         # reset value
         self._anything_changed = False
@@ -87,8 +88,15 @@ class TabulationMixin(Configuration):
     def internal_components(self) -> dict:
         """get all the internal components"""
         o = {k: getattr(self, k) for k in self.slots_attributes()}   
-        o = {k:v for k,v in o.items() if isinstance(o,TabulationMixin)}
+        o = {k:v for k,v in o.items() if isinstance(v,TabulationMixin)}
         return o
+
+    @instance_cached
+    def iterable_components(self) -> dict:
+        """Finds ComponentIter internal_components that are not 'wide'"""
+        from ottermatics.component_collections import ComponentIter
+        return { k:v for k,v in self.internal_components.items() 
+                     if isinstance(v, ComponentIter) and not v.wide }
 
     @instance_cached
     def internal_references(self) -> dict:

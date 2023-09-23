@@ -128,6 +128,8 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         out = self.internal_references
         tatr = out["attributes"]
         tprp = out["properties"]
+
+        #component iternals
         for key, comp in self.comp_references.items():
             sout = comp.internal_references
             satr = sout["attributes"]

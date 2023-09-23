@@ -26,7 +26,7 @@ import sectionproperties.pre.geometry as geometry
 import sectionproperties.pre.library.primitive_sections as sections
 import sectionproperties.analysis.section as cross_section
 import PyNite as pynite
-from PyNite import Visualization
+#from PyNite import Visualization
 import copy
 
 nonetype = type(None)

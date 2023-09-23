@@ -25,7 +25,7 @@ import sectionproperties
 import sectionproperties.pre.geometry as geometry
 import sectionproperties.pre.library.primitive_sections as sections
 import PyNite as pynite
-from PyNite import Visualization
+
 import pandas as pd
 import ray
 import collections
@@ -533,6 +533,7 @@ class Structure(System):
         return out
 
     def visulize(self, **kwargs):
+        from PyNite import Visualization
         if 'combo_name' not in kwargs:
             kwargs['combo_name'] = 'gravity'
         Visualization.render_model(self.frame, **kwargs)
