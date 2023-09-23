@@ -12,21 +12,6 @@ ottermatics.analysis module
    :undoc-members:
    :show-inheritance:
 
-ottermatics.billing module
---------------------------
-
-.. automodule:: ottermatics.billing
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-ottermatics.client module
--------------------------
-
-.. automodule:: ottermatics.client
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 ottermatics.common module
 -------------------------
@@ -44,6 +29,14 @@ ottermatics.components module
    :undoc-members:
    :show-inheritance:
 
+ottermatics.component_collections module
+-----------------------------
+
+.. automodule:: ottermatics.component_collections
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ottermatics.configuration module
 --------------------------------
 
@@ -52,23 +45,23 @@ ottermatics.configuration module
    :undoc-members:
    :show-inheritance:
 
-ottermatics.data module
+ottermatics.datastores.data module
 -----------------------
 
-.. automodule:: ottermatics.data
+.. automodule:: ottermatics.datastores.data
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.gdocs module
+ottermatics.datastores.gdocs module
 ------------------------
 
-.. automodule:: ottermatics.gdocs
+.. automodule:: ottermatics.datastores.gdocs
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.geometry module
+ottermatics.eng.geometry module
 ---------------------------
 
 .. automodule:: ottermatics.geometry
@@ -100,10 +93,10 @@ ottermatics.patterns module
    :undoc-members:
    :show-inheritance:
 
-ottermatics.pipes module
+ottermatics.eng.pipes module
 ------------------------
 
-.. automodule:: ottermatics.pipes
+.. automodule:: ottermatics.eng.pipes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -132,34 +125,27 @@ ottermatics.reporting module
    :undoc-members:
    :show-inheritance:
 
-ottermatics.research module
----------------------------
 
-.. automodule:: ottermatics.research
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-ottermatics.secrets module
+ottermatics.env_var module
 --------------------------
 
-.. automodule:: ottermatics.secrets
+.. automodule:: ottermatics.env_var
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.solid\_materials module
+ottermatics.eng.solid\_materials module
 -----------------------------------
 
-.. automodule:: ottermatics.solid_materials
+.. automodule:: ottermatics.eng.solid_materials
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.structure module
+ottermatics.eng.structure module
 ----------------------------
 
-.. automodule:: ottermatics.structure
+.. automodule:: ottermatics.eng.structure
    :members:
    :undoc-members:
    :show-inheritance:
@@ -172,10 +158,10 @@ ottermatics.tabulation module
    :undoc-members:
    :show-inheritance:
 
-ottermatics.thermodynamics module
+ottermatics.eng.thermodynamics module
 ---------------------------------
 
-.. automodule:: ottermatics.thermodynamics
+.. automodule:: ottermatics.eng.thermodynamics
    :members:
    :undoc-members:
    :show-inheritance:

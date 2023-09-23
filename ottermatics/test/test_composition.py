@@ -127,6 +127,10 @@ class TestComposition(unittest.TestCase):
         self.assertEqual(set(self.system.dataframe["comp.aux"]), set([5]))
         self.assertEqual(set(self.system.dataframe["comp.comp.aux"]), set([6]))
 
+        #internal storage
+        # self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))
+        # self.assertEqual(set(self.system.comp.comp.dataframe["aux"]), set([6]))
+
         # solver constraints checking
         input = self.system.dataframe["input"][0]
         self.assertGreaterEqual(input, -1e3)  # min protection

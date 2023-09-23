@@ -104,21 +104,21 @@ class SimpleHeatExchanger(Component):
     name = attr.ib(default="HeatExchanger")
 
     @system_property
-    def CmatH(self):
+    def CmatH(self) -> float:
         return self.Cp_h * self.mdot_h
 
     @system_property
-    def CmatC(self):
+    def CmatC(self) -> float:
         return self.Cp_c * self.mdot_c
 
     @system_property
-    def Tout_ideal(self):
+    def Tout_ideal(self) -> float:
         numerator = self.Thi * self.CmatH + self.Tci * self.CmatC
         denominator = self.CmatC + self.CmatH
         return numerator / denominator
 
     @system_property
-    def Qdot_ideal(self):
+    def Qdot_ideal(self) -> float:
         """Use Tout ideal to determine the heat flow should be the same for both"""
         v1 = self.CmatH * (self.Thi - self.Tout_ideal)
         v2 = self.CmatC * (self.Tout_ideal - self.Tci)
@@ -127,15 +127,15 @@ class SimpleHeatExchanger(Component):
         return (v1 + v2) / 2.0
 
     @system_property
-    def Qdot(self):
+    def Qdot(self) -> float:
         return self.Qdot_ideal * self.efficiency
 
     @system_property
-    def Th_out(self):
+    def Th_out(self) -> float:
         return self.Thi - self.Qdot / self.CmatH
 
     @system_property
-    def Tc_out(self):
+    def Tc_out(self)-> float:
         return self.Tci + self.Qdot / self.CmatC
 
 
@@ -154,17 +154,17 @@ class SimpleCompressor(Component):
     name = attr.ib(default="Compressor")
 
     @system_property
-    def temperature_ratio(self):
+    def temperature_ratio(self)-> float:
         return (
             self.pressure_ratio ** ((self.gamma - 1.0) / self.gamma) - 1.0
         ) / self.efficiency
 
     @system_property
-    def Tout(self):
+    def Tout(self)-> float:
         return self.temperature_ratio * self.Tin
 
     @system_property
-    def power_input(self):
+    def power_input(self)-> float:
         return self.Cp * self.mdot * (self.Tout - self.Tin)
 
     def pressure_out(self, pressure_in):
@@ -187,11 +187,11 @@ class SimpleTurbine(Component):
     name = attr.ib(default="Turbine")
 
     @system_property
-    def pressure_ratio(self):
+    def pressure_ratio(self)-> float:
         return self.Pin / self.Pout
 
     @system_property
-    def Tout(self):
+    def Tout(self)-> float:
         return self.Tin * (
             1
             - self.efficiency
@@ -203,7 +203,7 @@ class SimpleTurbine(Component):
         # return self.Tin * self.pressure_ratio**((self.gamma-1.0)/self.gamma)/ self.efficiency
 
     @system_property
-    def power_output(self):
+    def power_output(self)-> float:
         """calculates power output base on temp diff (where eff applied)"""
         return self.Cp * self.mdot * (self.Tin - self.Tout)
 
@@ -235,11 +235,11 @@ class SimplePump(Component):
             self.warning("pump near saturated temp")
 
     @system_property
-    def volumetric_flow(self):
+    def volumetric_flow(self)-> float:
         return self.MFin / self.fluid.density
 
     @system_property
-    def temperature_delta(self):
+    def temperature_delta(self)-> float:
         rho = self.fluid.density
         v = self.MFin / rho
         p = self.Pin
@@ -249,23 +249,23 @@ class SimplePump(Component):
         return dt
 
     @system_property
-    def Pout(self):
+    def Pout(self)-> float:
         return self.pressure_ratio * self.Pin
 
     @system_property
-    def Tout(self):
+    def Tout(self)-> float:
         return self.temperature_delta + self.Tin
 
     @system_property
-    def pressure_delta(self):
+    def pressure_delta(self)-> float:
         return (self.pressure_ratio - 1) * self.Pin
 
     @system_property
-    def power_input(self):
+    def power_input(self)-> float:
         return self.volumetric_flow * self.pressure_delta / self.efficiency
 
     @system_property
-    def cost(self):
+    def cost(self)-> float:
         pwr = self.power_input
         c1 = numpy.log(pwr)
         c2 = -0.03195 * pwr**2.0

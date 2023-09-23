@@ -5,6 +5,7 @@ import tempfile
 from ottermatics.configuration import otterize
 from ottermatics.tabulation import system_property
 from ottermatics.components import Component
+from ottermatics.component_collections import ComponentIterator,ComponentDict
 import attr
 import os
 import numpy

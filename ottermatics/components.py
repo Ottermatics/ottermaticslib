@@ -34,7 +34,10 @@ class Component(TabulationMixin):
             cls.subclasses(out)
 
         return out
-
+    
+    def update(self,system):
+        """override with custom system interaction"""
+        pass
 
 # TODO: move inspection for components to mixin for inspection of slots
 #

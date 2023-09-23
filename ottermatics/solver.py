@@ -9,6 +9,8 @@ import numpy
 import scipy.optimize as scopt
 from contextlib import contextmanager
 import copy
+from ottermatics.components import Component
+from ottermatics.component_collections import ComponentIter
 from ottermatics.configuration import otterize
 from ottermatics.properties import *
 
@@ -173,24 +175,26 @@ class SolverMixin:
             # Premute the input as per SS or Transient Logic
             ingrp = list(_input.values())
             keys = list(_input.keys())
-            for parms in itertools.product(*ingrp):
-                cur = {k: v for k, v in zip(keys, parms)}
-                for k, v in cur.items():
-                    refs[k].set_value(v)
+            for itercomp in self._iterate_components():
+                for parms in itertools.product(*ingrp):
+                    #Set the reference aliases
+                    cur = {k: v for k, v in zip(keys, parms)}
+                    for k, v in cur.items():
+                        refs[k].set_value(v)
 
-                # Transeint
-                if self.transients and trs_opts:
-                    self._run_id = int(uuid.uuid4())
-                    self.time = 0
-                    self.run_transient(
-                        dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb
-                    )
-
-                else:
-                    # stead=y state
-                    if self._run_id is None:
+                    # Transeint
+                    if self.transients and trs_opts:
                         self._run_id = int(uuid.uuid4())
-                    self.evaluate(_cb=_cb)
+                        self.time = 0
+                        self.run_transient(
+                            dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb
+                        )
+
+                    else:
+                        # stead=y state
+                        if self._run_id is None:
+                            self._run_id = int(uuid.uuid4())
+                        self.evaluate(_cb=_cb)
 
             if revert and revert_x:
                 self.set_system_state(ignore=['index'],**revert_x)
@@ -239,6 +243,10 @@ class SolverMixin:
         for key, comp in self.internal_components.items():
             if isinstance(comp, System):
                 comp.evaluate()
+            elif isinstance(comp,ComponentIter):
+                comp.update(self)
+            elif isinstance(comp,Component):
+                comp.update(self)
 
         # Post Execute
         self.post_execute()
@@ -253,7 +261,8 @@ class SolverMixin:
 
     def pre_execute(self, **fields_input):
         """runs the solver of the system"""
-
+        if self.log_level <= 10:
+            self.msg(f'pre execute')
         # TODO: set system fields from input
         for signame, sig in self.signals.items():
             if sig.mode == "pre" or sig.mode == "both":
@@ -261,13 +270,30 @@ class SolverMixin:
 
     def post_execute(self):
         """runs the solver of the system"""
-
+        if self.log_level <= 10:
+            self.msg(f'post execute')
         for signame, sig in self.signals.items():
             if sig.mode == "post" or sig.mode == "both":
                 sig.apply()
 
     def execute(self):
-        """Solves the system's system of constraints and integrates transients if any exist"""
+        """Solves the system's system of constraints and integrates transients if any exist
+        
+        Override this function for custom solving functions, and call `system_solver` to use default solver functionality.
+
+        :returns: the result of this function is returned from evaluate()
+        """
+        self.system_solver()
+
+    def system_solver(self):
+
+        #Check independents to run system
+        if not self.X.size > 0:
+            if self.log_level <10:
+                self.debug(f'nothing to solve...')
+            return 
+
+        self.debug(f'running system solver')
 
         # solvers
         def f(*x):
@@ -283,38 +309,65 @@ class SolverMixin:
             return ans
 
         if self.solver_option == "root" and not self.has_constraints:
-            ans = scopt.root(f, x0=self.X)
-            if ans.success:
-                self.setX(ans.x, pre_execute=True)
+            self._ans = scopt.root(f, x0=self.X)
+            if self._ans.success:
+                self.setX(self._ans.x, pre_execute=True)
                 self._converged = True
             else:
                 self._converged = False
                 raise Exception(f"solver didnt converge: {ans}")
-            return ans
+            return self._ans
 
         elif self.solver_option == "minimize" or self.has_constraints:
             cons = self.solver_constraints
             opts = {"rhobeg": 0.01, "catol": 1e-4, "tol": 1e-6}
-            ans = scopt.minimize(
+            self._ans = scopt.minimize(
                 f_min, x0=self.X, method="COBYLA", options=opts, **cons
             )
-            if ans.success and abs(ans.fun) < 0.01:
-                self.setX(ans.x)
+            if self._ans.success and abs(self._ans.fun) < 0.01:
+                self.setX(self._ans.x)
                 self._converged = True
-            elif ans.success:
-                self.setX(ans.x)
+
+            elif self._ans.success:
+                self.setX(self._ans.x)
                 self.warning(
-                    f"solver didnt fully solve equations! {ans.x} -> residual: {ans.fun}"
+                    f"solver didnt fully solve equations! {self._ans.x} -> residual: {self._ans.fun}"
                 )
                 self._converged = False
+
             else:
                 self._converged = False
-                raise Exception(f"solver didnt converge: {ans}")
+                raise Exception(f"solver didnt converge: {self._ans}")
 
-            return ans
+            return self._ans
 
         else:
             self.warning(f"no solution attempted!")
+
+    def _iterate_components(self):
+        """sets the current component for each product combination of iterable_components """
+
+        components = self.iterable_components
+
+        if not components:
+            yield #enter once 
+        else:
+            def _gen(gen,compkey):
+                for itemkey,item in gen:
+                    yield compkey,itemkey
+
+            iter_vals = {cn:_gen(comp._item_gen(),cn) 
+                            for cn,comp in components.items()}
+
+            for out in itertools.product(*list(iter_vals.values())):
+                for ck,ikey in out:
+                    #TODO: progress bar or print location
+                    components[ck].current_item = ikey
+                yield out
+
+            #finally reset the data!
+            for ck,comp in components.items():
+                comp.reset()
 
     def setX(self, x_ordered=None, pre_execute=True, **x_kw):
         """Apply full X data to X. #TODO allow partial data"""

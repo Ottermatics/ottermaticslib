@@ -25,7 +25,7 @@ def property_changed(instance, variable, value):
         return
 
     if log.log_level <= 10:
-        log.info(f"checking property changed {instance}{variable.name} {value}")
+        log.msg(f"checking property changed {instance}{variable.name} {value}")
 
     if instance._anything_changed:
         # Bypass Check since we've already flagged for an update
@@ -502,7 +502,6 @@ class Configuration(LoggingMixin):
         return str(type(self).__name__).lower()
 
     # Configuration Information
-    # FIXME: make signals and slots for compFanonent links
     @property
     def internal_configurations(self):
         """go through all attributes determining which are configuration objects
