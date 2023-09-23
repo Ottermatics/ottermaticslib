@@ -63,7 +63,7 @@ def conv_maps(map):
 
 
 # Seaborn Config Via Env Var
-_def_opts = {"obscure": False}
+_def_opts = {"obscure": False,dontovrride=True}
 SEABORN_CONTEXT = EnvVariable(
     "SEABORN_CONTEXT",
     default="paper",

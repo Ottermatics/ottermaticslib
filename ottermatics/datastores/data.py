@@ -41,11 +41,11 @@ import diskcache
 log = logging.getLogger("otterlib-data")
 
 #Env Vars
-DB_NAME = EnvVariable("OTTR_DB_NAME")
-DB_HOST = EnvVariable("OTTR_DB_HOST",default='localhost')
-DB_PORT = EnvVariable("OTTR_DB_PORT",int,default=5432)
-DB_USER = EnvVariable('OTTR_DB_USER',default='postgres')
-DB_PASS = EnvVariable('OTTR_DB_PASS',default='postgres')
+DB_NAME = EnvVariable("OTTR_DB_NAME",dontovrride=True)
+DB_HOST = EnvVariable("OTTR_DB_HOST",default='localhost',dontovrride=True)
+DB_PORT = EnvVariable("OTTR_DB_PORT",int,default=5432,dontovrride=True)
+DB_USER = EnvVariable('OTTR_DB_USER',default='postgres',dontovrride=True)
+DB_PASS = EnvVariable('OTTR_DB_PASS',default='postgres',dontovrride=True)
 
 
 def addapt_numpy_float64(numpy_float64):

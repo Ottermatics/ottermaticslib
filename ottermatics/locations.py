@@ -1,6 +1,6 @@
 from ottermatics.env_var import EnvVariable
 
-OTTR_PATH_VAR = EnvVariable('OTTR_REPORT_PATH',default=None)
+OTTR_PATH_VAR = EnvVariable('OTTR_REPORT_PATH',default=None,dontovrride=True)
 
 
 def client_path(alternate_path=None,**kw):

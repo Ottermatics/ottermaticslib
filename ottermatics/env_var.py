@@ -12,6 +12,7 @@ import os
 from ottermatics.logging import LoggingMixin
 from typing import Any
 import socket
+import inspect
 
 global warned
 warned = set()  # a nice global variable to hold any warnings
@@ -29,6 +30,7 @@ class EnvVariable(LoggingMixin):
     obscure: bool = True
     _override: str
     _secrets = {}  # its class based so like a singleton
+    _replaced = set()
     fail_on_missing: bool
     desc: str = None
 
@@ -40,6 +42,7 @@ class EnvVariable(LoggingMixin):
         obscure=False,
         fail_on_missing=False,
         desc: str = None,
+        dontovrride = False,
     ):
         """pass arguments to SecretVariable to have it look up information at runtime from envargs, but not store it in memory.
         :param secret_var_name: the enviornmental variable
@@ -59,7 +62,31 @@ class EnvVariable(LoggingMixin):
 
         self.fail_on_missing = fail_on_missing
 
-        self.__class__._secrets[secret_var_name] = self
+        #record env vars
+        if secret_var_name in self.__class__._secrets:
+            cur = self.__class__._secrets[secret_var_name]
+            if dontovrride:
+                pass
+            else:
+                self.debug(f'replacing {cur}->{self}')
+                self._replaced.add(cur)
+                self.__class__._secrets[secret_var_name] = self
+        else:
+            self.__class__._secrets[secret_var_name] = self
+
+        #FIXME: prevent ottermatics var from replacing other module instnace
+        #not possible to locate where other instances
+        # if secret_var_name in self.__class__._secrets:
+        #     cur = self.__class__._secrets[secret_var_name]
+        #     if cur != self and self not in self._replaced:
+        #         self._replaced.add(cur)
+        #         self.info(f'replacing {cur}->{self}')
+        #         self.__class__._secrets[secret_var_name] = self
+        #     elif self in self._replaced:
+        #         self.info(f'skipping replaced readd {self}')
+        #         #self.__class__._secrets[secret_var_name] = self
+        # else:    
+        #     self.__class__._secrets[secret_var_name] = self
 
     def __str__(self):
         if self.obscure:
@@ -143,7 +170,7 @@ except:
 
 global HOSTNAME, SLACK_WEBHOOK
 
-HOSTNAME = EnvVariable("OTTR_HOSTNAME", default=host, obscure=False)
+HOSTNAME = EnvVariable("OTTR_HOSTNAME", default=host, obscure=False,dontovrride=True)
 SLACK_WEBHOOK = EnvVariable(
-    "OTTR_SLACK_LOG_WEBHOOK", default=None, obscure=False
+    "OTTR_SLACK_LOG_WEBHOOK", default=None, obscure=False,dontovrride=True
 )
