@@ -41,6 +41,25 @@ SEABORN_PALETTE                         |SECRETS[SEABORN_PALETTE]               
 SEABORN_THEME                           |SECRETS[SEABORN_THEME]                   = darkgrid
 ```
 
+### Systems & Analysis
+Systems record data from components, and can execute a solver via the `run(**parameter_iterables)` command. Via a system's run command its state and internal component's & systems state can be altered in an outer product fashion, ie all combinations of inputs will be run. At the start of a run the systems & its components state is recorded and reset by default using `Ref` instances so that way multiple systems can use the same component. Its possible reference loops may occcur so its generally preferred to create components per system, however for coupled systems this is often desireable to converge on a solution.
+
+By default the system calls a `default_solver()` method in its `execute()` function. A solver aims to drive its dependent parameter to zero by changing the independent parameters to zero, however it may adjust multiple parameters to meet multiple targets in more complex applications. For custom System behavior or to invoke custom solvers this method may be overriden. 
+
+To use the solver & constraints 
+```python
+SovlerSystem(System):
+    sol2 = SOLVER.define("dep", "indep")
+    sol2.add_constraint("max", limit_max) #indep should never go above this value (or function)
+    sol2.add_constraint("min", 0) #indep should never go below zero
+```
+
+`Analysis` is a pluggable way to provide different output and calculation from the same system and interacts with plot and table reporters.
+
+### Components, Signals & Slots
+Component are able to be mounted into multiple Systems via `SLOTS.define( ComponentType )`. A Component's properties can be updated via `SIGNALS` in the Systems's solver in the `pre_execute` and/or the `post_execute` functions via `SIGNAL.define(target, source, mode)` where mode can be `pre`,`post` or `both` to update before the `System.execute()` method.
+
+Iterable Components may be defined on a System via `SLOT.define_iterable( <ComponentIter>, wide=True/False)` to choose how the system should iterate over the component, `wide` mode provides all the component `attributes` and `properties` in the same row whereas the `narrow` mode will iterate over each combination of component as though it was input into `system.run()`
 
 ### Example Engineering Problems:
 These problems demonstrate functionality
