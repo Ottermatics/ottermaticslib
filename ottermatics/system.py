@@ -122,7 +122,7 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
             out[key] = comp
         return out
 
-    @instance_cached
+    @property
     def system_references(self):
         """gather a list of references to attributes and"""
         out = self.internal_references

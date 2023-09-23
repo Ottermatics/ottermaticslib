@@ -294,7 +294,7 @@ class SolverMixin:
 
         self.debug(f"running system solver")
 
-        # solvers
+        # solver objective functions
         def f(*x):
             res = self.calcF(x[0], pre_execute=True)
             return res
@@ -314,7 +314,7 @@ class SolverMixin:
                 self._converged = True
             else:
                 self._converged = False
-                raise Exception(f"solver didnt converge: {ans}")
+                raise Exception(f"solver didnt converge: {self._ans}")
             return self._ans
 
         elif self.solver_option == "minimize" or self.has_constraints:
