@@ -37,11 +37,12 @@ ottermatics/eng/structure_beams.py
 ottermatics/eng/thermodynamics.py
 ottermatics/test/__init__.py
 ottermatics/test/report_testing.py
-ottermatics/test/system_tests.py
 ottermatics/test/test_airfilter.py
 ottermatics/test/test_analysis.py
+ottermatics/test/test_comp_iter.py
 ottermatics/test/test_composition.py
 ottermatics/test/test_dynamics.py
+ottermatics/test/test_modules.py
 ottermatics/test/test_pipes.py
 ottermatics/test/test_structures.py
 ottermatics/test/test_tabulation.py

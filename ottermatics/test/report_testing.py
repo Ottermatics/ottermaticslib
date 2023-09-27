@@ -151,7 +151,7 @@ if __name__ == "__main__":
     # rr.initalize()
 
     # 2) Use ComponentRegistry, and AnalysisRegistry to gather subclasses of each. Analysis will also have results tables since they are components, these will be referenced in the analysis table.
-    analysis.solve()
+    analysis.run()
     rr.ensure_analysis(analysis)
     thread = rr.upload_analysis(analysis, use_thread=True)
     thread.join()
