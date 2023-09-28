@@ -174,10 +174,11 @@ class TabulationMixin(Configuration):
         '''Checks columns for ones that only contain numeric types or haven't been explicitly skipped'''
         if self.dataframe is not None:
             check_type = lambda key: all([ isinstance(v, NUMERIC_TYPES) for v in self.dataframe[key] ])
+            check_non_mono =  lambda key: len(set(self.dataframe[key])) > 1
 
 
-            return [ var.title() for var in self.dataframe.columns 
-                                 if var.lower() not in self.skip_plot_vars and check_type(var)]
+            return [ var for var in self.dataframe.columns 
+                         if var.lower() not in self.skip_plot_vars and check_type(var) and check_non_mono(var)]
         return []
 
     # Properties & Attribues
