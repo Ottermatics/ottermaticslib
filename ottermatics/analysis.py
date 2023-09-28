@@ -99,6 +99,11 @@ class Analysis(TabulationMixin, PlottingMixin):
 
         self._uploaded = True
 
+    @property
+    def dataframe(self):
+        #TODO: join with analysis dataframe
+        return self.system.dataframe
+
     # Plotting & Report Methods:
 
 

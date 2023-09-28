@@ -37,7 +37,8 @@ class TabulationMixin(Configuration):
     index = 0  # Not an attr on purpose, we want pandas to provide the index
 
     # override per class:
-    skip_parms = None
+    _skip_table_parms: list = None
+    _skip_plot_parms: list
 
     # Cached and private
     _table: dict = None
@@ -160,6 +161,26 @@ class TabulationMixin(Configuration):
         data = [self.TABLE[v] for v in sorted(self.TABLE)]
         return pandas.DataFrame(data=data, copy=True)
 
+    #Plotting Interface
+    @property
+    def skip_plot_vars(self) -> list:
+        """accesses '_skip_plot_vars' if it exists, otherwise returns empty list"""
+        if hasattr(self,'_skip_plot_vars'):
+            return [var.lower() for var in self._skip_plot_vars]
+        return []
+
+    @property
+    def plotable_variables(self):
+        '''Checks columns for ones that only contain numeric types or haven't been explicitly skipped'''
+        if self.dataframe is not None:
+            check_type = lambda key: all([ isinstance(v, NUMERIC_TYPES) for v in self.dataframe[key] ])
+            check_non_mono =  lambda key: len(set(self.dataframe[key])) > 1
+
+
+            return [ var for var in self.dataframe.columns 
+                         if var.lower() not in self.skip_plot_vars and check_type(var) and check_non_mono(var)]
+        return []
+
     # Properties & Attribues
     def print_info(self):
         print(f"INFO: {self.name} | {self.identity}")
@@ -182,10 +203,11 @@ class TabulationMixin(Configuration):
 
     @instance_cached
     def skip_attr(self) -> list:
-        if self.skip_parms is None:
-            return list(self.internal_configurations.keys())
-        return self.skip_parms + list(self.internal_configurations.keys())
-
+        base = list(self.internal_configurations.keys())
+        if self._skip_table_parms is None:
+            return base
+        return self._skip_table_parms + base
+    
     def format_label_attr(self, k, attr_prop):
         if attr_prop.metadata and "label" in attr_prop.metadata:
             return self.format_label(attr_prop.metadata["label"])

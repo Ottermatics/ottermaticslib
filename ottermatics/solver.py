@@ -263,6 +263,7 @@ class SolverMixin:
         """runs the solver of the system"""
         if self.log_level <= 10:
             self.msg(f"pre execute")
+
         # TODO: set system fields from input
         for signame, sig in self.signals.items():
             if sig.mode == "pre" or sig.mode == "both":
@@ -272,6 +273,7 @@ class SolverMixin:
         """runs the solver of the system"""
         if self.log_level <= 10:
             self.msg(f"post execute")
+            
         for signame, sig in self.signals.items():
             if sig.mode == "post" or sig.mode == "both":
                 sig.apply()
