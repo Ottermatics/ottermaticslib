@@ -340,7 +340,7 @@ class Rock(SolidMaterial):
     electrical_resistitivity: float = attr.ib(default=1e6)  # ohm-m
 
     # Economic Properties
-    cost_per_kg: float = attr.ib(default=95.44 / 1000.0)  # dollar per kg
+    cost_per_kg: float = attr.ib(default=50.44 / 1000.0)  # dollar per kg
 
 
 @otterize
