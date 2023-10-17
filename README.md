@@ -1,3 +1,4 @@
+[![build](https://github.com/Ottermatics/ottermaticslib/actions/workflows/build.yml/badge.svg)](https://github.com/Ottermatics/ottermaticslib/actions/workflows/build.yml)
 # ottermaticslib
 A library to tabulate information from complex systems with various ways to store data and act as glue code for tough engineering problems.
 
