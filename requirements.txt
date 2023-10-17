@@ -31,7 +31,8 @@ seaborn
 #Engineering
 sectionproperties>=1.0.8
 #PyNiteFEA>=0.0.78
-PyNiteFEA @ git+ssh://git@github.com/Ottermatics/PyNite.git@v1nept
+#PyNiteFEA @ git+ssh://git@github.com/Ottermatics/PyNite.git@v1nept
+PyNiteFEA @ git+https://github.com/Ottermatics/PyNite.git@v1nept
 #slycot
 control
 fluids
