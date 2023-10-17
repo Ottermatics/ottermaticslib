@@ -16,13 +16,73 @@ import sectionproperties.pre.library.primitive_sections as sections
 import numpy as np
 import shapely
 import attr, attrs
+import functools
 
 # generic cross sections from
 # https://mechanicalbase.com/area-moment-of-inertia-calculator-of-certain-cross-sectional-shapes/
 
 
-# TODO: cache SectionProperty sections and develop auto-mesh refinement system.
+def conver_np(inpt):
+    if isinstance(inpt,np.ndarray):
+        return inpt
+    elif isinstance(inpt,(list,tuple)):
+        return np.array(inpt)
+    elif isinstance(inpt,(int,float)):
+        return np.array([inpt])
+    else:
+        raise ValueError(f'got non numpy array/float: {inpt}')
 
+
+
+@attrs.define(slots=False)
+class ParametricSpline:
+    """a multivariate spline defined by uniform length vector input, with points P1,P2 and their slopes P1ds,P2ds"""
+
+    P1=attrs.field(converter=conver_np)
+    P2=attrs.field(converter=conver_np)
+    P1ds=attrs.field(converter=conver_np)
+    P2ds=attrs.field(converter=conver_np)
+
+    def __attrs_post_init__(self):
+        assert len(self.P1) == len(self.P2)
+        assert len(self.P1ds) == len(self.P2ds)
+        assert len(self.P1) == len(self.P1ds)
+
+    @functools.cached_property
+    def a0(self):
+        return self.P1
+
+    @functools.cached_property
+    def a1(self):
+        return self.P1ds
+
+    @functools.cached_property
+    def a2(self):
+        return 3*(self.P2-self.P1 ) - 2*self.P1ds - self.P2ds
+    
+    @functools.cached_property
+    def a3(self):
+        return (self.P2ds - self.P1ds - 2*self.a2)/3.
+    
+    def coords(self,s:float):
+        if isinstance(s,(float,int)):
+            assert s <= 1
+            assert 0 <= s
+            return self._coords(s)
+        elif isinstance(s,(list,tuple,numpy.ndarray)):
+            assert max(s) <= 1
+            assert min(s) >= 0
+            ol = [self._coords(si) for si in s]
+            return numpy.array(ol)
+        else:
+            raise ValueError(f'non array/float input {s}')
+
+    def _coords(self,s:float):
+        return self.a0 + self.a1*s + self.a2*s**2 +self.a3*s**3
+
+
+
+# TODO: cache SectionProperty sections and develop auto-mesh refinement system.
 
 @otterize
 class Profile2D(Configuration):

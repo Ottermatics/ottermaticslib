@@ -145,19 +145,29 @@ class SolverMixin:
         system = cls(**_firsts)
         return system.run(**kwargs, **trs_opts, _cb=_cb)
 
-    def run(self, revert=True, _cb=None, **kwargs):
+    def run(self, revert=True, _cb=None, sequence:list=None,**kwargs):
         """applies a permutation of input parameters for parameters not marked as transient, runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. The run command additionally configures the transient parameters
 
         :param dt: timestep in s, required for transients
         :param endtime: when to end the simulation
         :param revert: will reset the values of X that were recorded at the beginning of the run.
         :param _cb: a callback function that takes the system as an argument cb(system)
-
+        :param sequence: a list of dictionaries that should be run in order per the outer-product of kwargs
+        :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
         """
-        self.info(f"running system {self.identity} with input {kwargs}")
+        self.debug(f"running system {self.identity} with input {kwargs}")
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
+        
+        #create iterable null for sequence
+        if sequence is None:
+            sequence = [{}]
+
+        #Create Keys List
+        sequence_keys = set()
+        for seq in sequence:
+            sequence_keys = sequence_keys.union(set(seq.keys()))
 
         # RUN
         if not self.solved or self.anything_changed:
@@ -171,6 +181,8 @@ class SolverMixin:
             refs = {}
             for k, v in _input.items():
                 refs[k] = self.locate_ref(k)
+            for k in sequence_keys:
+                refs[k] = self.locate_ref(k)
 
             # Premute the input as per SS or Transient Logic
             ingrp = list(_input.values())
@@ -179,22 +191,29 @@ class SolverMixin:
                 for parms in itertools.product(*ingrp):
                     # Set the reference aliases
                     cur = {k: v for k, v in zip(keys, parms)}
-                    for k, v in cur.items():
-                        refs[k].set_value(v)
+                    #Sequence Loop (null will loop as well)
+                    for seq in sequence:
+                        #apply sequenc evalues
+                        icur = cur.copy()
+                        if seq:
+                            icur.update(**seq)
 
-                    # Transeint
-                    if self.transients and trs_opts:
-                        self._run_id = int(uuid.uuid4())
-                        self.time = 0
-                        self.run_transient(
-                            dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb
-                        )
-
-                    else:
-                        # stead=y state
-                        if self._run_id is None:
+                        for k, v in icur.items():
+                            refs[k].set_value(v)
+                    
+                        # Transeint
+                        if self.transients and trs_opts:
                             self._run_id = int(uuid.uuid4())
-                        self.evaluate(_cb=_cb)
+                            self.time = 0
+                            self.run_transient(
+                                dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb
+                            )
+
+                        else:
+                            # stead=y state
+                            if self._run_id is None:
+                                self._run_id = int(uuid.uuid4())
+                            self.evaluate(_cb=_cb)
 
             if revert and revert_x:
                 self.set_system_state(ignore=["index"], **revert_x)
