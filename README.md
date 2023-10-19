@@ -1,3 +1,4 @@
+[![build](https://github.com/Ottermatics/ottermaticslib/actions/workflows/build.yml/badge.svg)](https://github.com/Ottermatics/ottermaticslib/actions/workflows/build.yml)
 # ottermaticslib
 A library to tabulate information from complex systems with various ways to store data and act as glue code for tough engineering problems.
 
@@ -24,7 +25,7 @@ Systems record data from components, and can execute a solver via the `run(**par
 
 By default the system calls a `default_solver()` method in its `execute()` function. A solver aims to drive its dependent parameter to zero by changing the independent parameters to zero, however it may adjust multiple parameters to meet multiple targets in more complex applications. For custom System behavior or to invoke custom solvers this method may be overriden. 
 
-To use the solver & constraints 
+To use the default solver & constraints 
 ```python
 SolverSystem(System):
     sol2 = SOLVER.define("dep", "indep")
