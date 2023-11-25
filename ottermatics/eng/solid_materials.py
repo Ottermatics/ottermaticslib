@@ -35,7 +35,7 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
     __metaclass__ = SecMat
 
     name: str = attr.ib(default="solid material")
-    color: float = attr.ib(factory=random_color)
+    color: float = attr.ib(default=random_color())
 
     # Structural Properties
     density: float = attr.ib(default=1.0)
@@ -64,6 +64,10 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
     factor_of_saftey: float = attr.ib(default=1.5)
 
     _unique_id: str = None
+
+    @classmethod
+    def pre_compile(cls):
+        cls.color = random_color()
 
     @property
     def E(self) -> float:

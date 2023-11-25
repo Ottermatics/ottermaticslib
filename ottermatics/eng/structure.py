@@ -1179,7 +1179,7 @@ def remote_section(
 
 
 # Remote Analysis
-def parallel_run_failure_analysis(struct, SF=1.0, run_full=False, **kw):
+def parallel_run_failure_analysis(struct, SF=1.0, run_full=False, purge=False, **kw):
     """
     Failure Determination:
     Beam Stress Estiates are used to determine if a 2D FEA beam/combo analysis should be run. The maximum beam vonmises stress is compared the the beam material allowable stress / saftey factor.
@@ -1211,6 +1211,9 @@ def parallel_run_failure_analysis(struct, SF=1.0, run_full=False, **kw):
             failures[combo] = fail
             struct.failure_load_exithandler(combo, fail, report, run_full)
 
+            if purge:
+                purge_combo(struct,combo)
+
     except KeyboardInterrupt:
         return report
 
@@ -1218,6 +1221,17 @@ def parallel_run_failure_analysis(struct, SF=1.0, run_full=False, **kw):
         struct.error(e, "issue in failur analysis")
 
     return report  # tada!
+
+def purge_combo(struct,combo):
+
+    struct._D.pop(combo,None)
+    for node in struct.Nodes.values():
+        node.DX.pop(combo,None)
+        node.DY.pop(combo,None)
+        node.DZ.pop(combo,None)
+        node.RX.pop(combo,None)
+        node.RY.pop(combo,None)
+        node.RZ.pop(combo,None)
 
 
 @ray.remote

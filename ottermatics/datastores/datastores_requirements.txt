@@ -29,6 +29,6 @@ pydrive2==1.8.1
 boto3
 
 #deco
-ray[default]~=2.6.1
-ray[tune]~=2.6.1
+ray[default]~=2.7.1
+ray[tune]~=2.7.1
 sqlalchemy-batch-inserts
