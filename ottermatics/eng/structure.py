@@ -1149,7 +1149,7 @@ def remote_run_combo(ref_structure, combo):
         raise e
 
 
-@ray.remote
+@ray.remote(max_retries=-1,retry_exceptions=True)
 def remote_section(
     beamsection,
     beamname,
