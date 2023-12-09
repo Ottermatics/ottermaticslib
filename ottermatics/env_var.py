@@ -33,6 +33,7 @@ class EnvVariable(LoggingMixin):
     _replaced = set()
     fail_on_missing: bool
     desc: str = None
+    _upgrd_warn:bool = False
 
     def __init__(
         self,
@@ -107,6 +108,19 @@ class EnvVariable(LoggingMixin):
 
     @property
     def secret(self):
+
+        #Check if this secret is the one in the secrets registry
+        sec = self.__class__._secrets[self.var_name]
+        if sec is not self:
+
+            #Provide warning that the secret is being replaced
+            if not self._upgrd_warn:
+                self._upgrd_warn = True
+                self.info(f'upgrading: {self.var_name} from {id(self)}->{id(sec)}')
+                
+            #Monkeypatch dictionary
+            self.__dict__ = sec.__dict__
+
         if hasattr(self, "_override"):
             return self._override
 

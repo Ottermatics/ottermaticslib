@@ -187,11 +187,13 @@ class SolverMixin:
             # Premute the input as per SS or Transient Logic
             ingrp = list(_input.values())
             keys = list(_input.keys())
+            #Iterate over components
             for itercomp in self._iterate_components():
+                #Iterate over inputs
                 for parms in itertools.product(*ingrp):
                     # Set the reference aliases
                     cur = {k: v for k, v in zip(keys, parms)}
-                    #Sequence Loop (null will loop as well)
+                    #Iterate over Sequence (or run once)
                     for seq in sequence:
                         #apply sequenc evalues
                         icur = cur.copy()
@@ -210,7 +212,7 @@ class SolverMixin:
                             )
 
                         else:
-                            # stead=y state
+                            #steady state
                             if self._run_id is None:
                                 self._run_id = int(uuid.uuid4())
                             self.evaluate(_cb=_cb)
@@ -225,6 +227,7 @@ class SolverMixin:
     def run_transient(self, dt, N, _cb=None):
         """integrates the time series over N points at a increment of dt"""
         for i in range(N):
+            #TODO: adapt timestep & integrate ODE system integrator
             # Run The SS Timestep
             self.evaluate(_cb=_cb)
             # Run Integrators
@@ -236,7 +239,6 @@ class SolverMixin:
     # Single Point Flow
     def evaluate(self, _cb=None, **fields_input):
         """Evaluates the system with overrides for fields_input
-
         :param _cb: an optional callback taking the system as an argument
         """
 
