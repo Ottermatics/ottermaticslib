@@ -29,6 +29,7 @@ class SLOT(attrs.Attribute):
 
         :param none_ok: will allow no component on that item, oterwise will fail
         :param default_ok: will create the slot class with no input if true, which is the behavior by default
+        #TODO: add default_args,default_kwargs
         """
         from ottermatics.components import Component
         from ottermatics.component_collections import ComponentIter

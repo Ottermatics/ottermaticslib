@@ -210,6 +210,7 @@ class Structure(System):
 
     _always_save_data = True  # we dont respond to inputs so use this
     _meshes = None
+    _any_solved = False
 
     def __on_init__(self):
         self._materials = {}
@@ -233,17 +234,25 @@ class Structure(System):
             self.index += 1
             self.info(f"running load combo : {combo}")
             self.current_combo = combo
-            self.pre_execute(combo)
+            self.struct_pre_execute(combo)
             self.analyze(combos=[combo], *args, **kwargs)
-            self.post_execute(combo)
+            self._any_solved = True
+            self.struct_post_execute(combo)
             # backup data saver.
             self.save_data(index=self.index, force=True)
 
-    def pre_execute(self, combo):
+    def save_data(self,*args,**kw):
+        if self._any_solved:
+            super().save_data(*args,**kw)
+            self._any_solved = False
+        else:
+            self.info(f'nothing to save, run() structure first')
+
+    def struct_pre_execute(self, combo=None):
         """yours to override to prep solver or dataframe"""
         pass
 
-    def post_execute(self, combo):
+    def struct_post_execute(self, combo=None):
         """yours to override dataframe"""
         pass
 

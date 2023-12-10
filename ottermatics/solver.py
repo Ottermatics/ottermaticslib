@@ -237,8 +237,8 @@ class SolverMixin:
             self.time = self.time + dt
 
     # Single Point Flow
-    def evaluate(self, _cb=None, **fields_input):
-        """Evaluates the system with overrides for fields_input
+    def evaluate(self, _cb=None, *args,**kw):
+        """Evaluates the system with additional inputs for execute()
         :param _cb: an optional callback taking the system as an argument
         """
 
@@ -247,14 +247,14 @@ class SolverMixin:
 
         if self.log_level < 20:
             self.debug(f"running with X: {self.X} & {fields_input}")
-        self.pre_execute(**fields_input)
+        self.pre_execute()
 
         # prep index
         self.index += 1
 
         # Runs The Solver
         try:
-            out = self.execute()
+            out = self.execute( *args,**kw)
         except Exception as e:
             self.error(e, f"solver failed @ {self.X}")
             out = None
@@ -280,7 +280,7 @@ class SolverMixin:
 
         return out
 
-    def pre_execute(self, **fields_input):
+    def pre_execute(self):
         """runs the solver of the system"""
         if self.log_level <= 10:
             self.msg(f"pre execute")
@@ -299,7 +299,7 @@ class SolverMixin:
             if sig.mode == "post" or sig.mode == "both":
                 sig.apply()
 
-    def execute(self):
+    def execute(self, *args,**kw):
         """Solves the system's system of constraints and integrates transients if any exist
 
         Override this function for custom solving functions, and call `system_solver` to use default solver functionality.

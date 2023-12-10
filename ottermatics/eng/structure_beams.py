@@ -590,6 +590,8 @@ class Beam(Component):
     @system_property
     def max_stress_estimate(self) -> float:
         """estimates these are proportional to stress but 2D FEA is "truth" since we lack cross section specifics"""
+        if not self.structure._any_solved:
+            return numpy.nan              
         return max(
             [
                 self.estimate_max_stress(**self.get_forces_at(x))
@@ -600,75 +602,109 @@ class Beam(Component):
     @system_property
     def fail_factor_estimate(self) -> float:
         """the ratio of max estimated stress to the material's allowable stress"""
+        if not self.structure._any_solved:
+            return numpy.nan              
         return self.max_stress_estimate / self.material.allowable_stress
 
     # axial
     @system_property
     def min_axial(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.min_axial(self.structure.current_combo)
 
     @system_property
     def max_axial(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan        
         return self.member.max_axial(self.structure.current_combo)
 
     # deflection
     @system_property
     def min_deflection_x(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan        
         return self.member.min_deflection("dx", self.structure.current_combo)
 
     @system_property
     def max_deflection_x(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan        
         return self.member.max_deflection("dx", self.structure.current_combo)
 
     @system_property
     def min_deflection_y(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan        
         return self.member.min_deflection("dy", self.structure.current_combo)
 
     @system_property
     def max_deflection_y(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan        
         return self.member.max_deflection("dy", self.structure.current_combo)
 
     # torsion
     @system_property
     def min_torsion(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.min_torque(self.structure.current_combo)
 
     @system_property
     def max_torsion(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.max_torque(self.structure.current_combo)
 
     # shear
     @system_property
     def min_shear_z(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.min_shear("Fz", self.structure.current_combo)
 
     @system_property
     def max_shear_z(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.max_shear("Fz", self.structure.current_combo)
 
     @system_property
     def min_shear_y(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.min_shear("Fy", self.structure.current_combo)
 
     @system_property
     def max_shear_y(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.max_shear("Fy", self.structure.current_combo)
 
     # moment
     @system_property
     def min_moment_z(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.min_moment("Mz", self.structure.current_combo)
 
     @system_property
     def max_moment_z(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.max_moment("Mz", self.structure.current_combo)
 
     @system_property
     def min_moment_y(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.min_moment("My", self.structure.current_combo)
 
     @system_property
     def max_moment_y(self) -> float:
+        if not self.structure._any_solved:
+            return numpy.nan
         return self.member.max_moment("My", self.structure.current_combo)
 
     # Load Application
