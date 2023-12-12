@@ -126,10 +126,10 @@ class TabulationMixin(Configuration):
         out["properties"] = pr = {}
 
         for key in self.classmethod_system_properties():
-            pr[key] = Ref(self, key)
+            pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key, False)
+            at[key] = Ref(self, key, False,True)
 
         return out
 
@@ -211,7 +211,7 @@ class TabulationMixin(Configuration):
 
     @instance_cached
     def skip_attr(self) -> list:
-        base = list(self.internal_configurations.keys())
+        base = list((self.internal_configurations()).keys())
         if self._skip_table_parms is None:
             return base
         return self._skip_table_parms + base
@@ -455,26 +455,46 @@ class TabulationMixin(Configuration):
 
 
 class Ref:
-    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
+    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated,
+    
+    A dictionary can be used
+    """
 
-    __slots__ = ["comp", "key", "use_call"]
+    __slots__ = ["comp", "key", "use_call",'use_dict','allow_set','eval_f']
     comp: "TabulationMixin"
     key: str
     use_call: bool
+    use_dict: bool
+    allow_set: bool
+    eval_f: callable
 
-    def __init__(self, component, key, use_call=True):
+    def __init__(self, component, key, use_call=True,allow_set=True,eval_f=None):
         self.comp = component
+        if isinstance(self.comp,dict):
+            self.use_dict = True
+        else:
+            self.use_dict = False
         self.key = key
         self.use_call = use_call
+        self.allow_set = allow_set
+        self.eval_f = eval_f
 
     def value(self):
-        o = getattr(self.comp, self.key)
+        if self.use_dict:
+            o = self.comp.get(self.key)
+        else:
+            o = getattr(self.comp, self.key)
         if self.use_call and callable(o):
-            return o()
+            o = o()
+        if self.eval_f:
+            return self.eval_f(o)
         return o
 
     def set_value(self, val):
-        return setattr(self.comp, self.key, val)
+        if self.allow_set:
+            return setattr(self.comp, self.key, val)
+        else:
+            raise Exception(f'not allowed to set value on {self.key}')
 
     def __str__(self) -> str:
         return f"REF[{self.comp.classname}.{self.key}]"

@@ -525,19 +525,24 @@ class Configuration(LoggingMixin):
         return str(type(self).__name__).lower()
 
     # Configuration Information
-    @property
-    def internal_configurations(self):
+    def internal_configurations(self,check_config=True)->dict:
         """go through all attributes determining which are configuration objects
-        we skip any configuration that start with an underscore (private variable)
+        additionally this skip any configuration that start with an underscore (private variable)
         """
+
+        if check_config:
+            chk = lambda k,v: isinstance(v, Configuration)
+        else:
+            chk = lambda k,v: k in self.slots_attributes()
+
         return {
             k: v
             for k, v in self.__dict__.items()
-            if isinstance(v, Configuration) and not k.startswith("_")
+            if chk(k,v) and not k.startswith("_")
         }
 
     def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0
+        self, level=0, levels_to_descend=-1, parent_level=0,**kw
     ):
         """A generator that will go through all internal configurations up to a certain level
         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
@@ -556,11 +561,15 @@ class Configuration(LoggingMixin):
             yield "", level, self
 
         level += 1
-        for key, config in self.internal_configurations.items():
-            for skey, level, iconf in config.go_through_configurations(
-                level, levels_to_descend, parent_level
-            ):
-                yield f"{key}.{skey}" if skey else key, level, iconf
+        for key, config in self.internal_configurations(**kw).items():
+
+            if isinstance(config,Configuration):
+                for skey, level, iconf in config.go_through_configurations(
+                    level, levels_to_descend, parent_level
+                ):
+                    yield f"{key}.{skey}" if skey else key, level, iconf
+            else:
+                yield key,level,config
 
     @property
     def attrs_fields(self) -> set:

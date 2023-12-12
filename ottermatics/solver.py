@@ -161,6 +161,10 @@ class SolverMixin:
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
         
+        #Recache system references
+        if isinstance(self,System):
+            self.system_references(recache=True)
+
         #create iterable null for sequence
         if sequence is None:
             sequence = [{}]
@@ -178,9 +182,6 @@ class SolverMixin:
                 # TODO: revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
                 revert_x = self.system_state
 
-            #Recache system references
-            if isinstance(self,System):
-                self.system_references(recache=True)
             # prep references for keys
             refs = {}
             for k, v in _input.items():
@@ -220,8 +221,6 @@ class SolverMixin:
                             if self._run_id is None:
                                 self._run_id = int(uuid.uuid4())
                             #Recache system references
-                            if isinstance(self,System):
-                                self.system_references(recache=True)
                             self.evaluate(_cb=_cb)
 
             if revert and revert_x:
@@ -278,6 +277,10 @@ class SolverMixin:
 
         # Post Execute
         self.post_execute()
+
+        #Record any changed state in components
+        if isinstance(self,System):
+            self.system_references(recache=True)        
 
         # Save The Data
         self.save_data(index=self.index)

@@ -105,10 +105,10 @@ class ComponentIter(Component):
         out["properties"] = pr = {}
 
         for key in self.classmethod_system_properties():
-            pr[key] = Ref(self, key)
+            pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key, False)
+            at[key] = Ref(self, key, False,True)
 
         return out
 
@@ -135,14 +135,14 @@ class ComponentIter(Component):
             # set property refs
             for key in item.classmethod_system_properties():
                 k = f"{it_base_key}.{key}"
-                rc = Ref(item, key)
+                rc = Ref(item, key,True,False)
                 pr[k] = rc
                 prr[key] = rc
 
             # set attr refs
             for key in item.input_fields():
                 k = f"{it_base_key}.{key}"
-                ri = Ref(item, key, False)
+                ri = Ref(item, key, False,True)
                 at[k] = ri
                 atr[key] = ri
 

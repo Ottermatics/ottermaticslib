@@ -200,7 +200,7 @@ class PlottingMixin:
                 log.error(e, f"issue in trace {plot}")
 
         # Sub Systems
-        for confnm, conf in self.internal_configurations.items():
+        for confnm, conf in self.internal_configurations().items():
             if isinstance(conf, PlottingMixin):
                 log.info(f"{self.identity} system plotting {confnm} | {conf}")
                 conf.make_plots(analysis, store_figures=store_figures, pre=pre)
