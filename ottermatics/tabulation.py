@@ -44,6 +44,7 @@ class TabulationMixin(Configuration):
     _table: dict = None
     _anything_changed: bool
     _always_save_data = False
+    _prv_internal_references: dict 
 
     # Data Tabulation - Intelligent Lookups
     def save_data(
@@ -110,9 +111,16 @@ class TabulationMixin(Configuration):
             if isinstance(v, ComponentIter) and not v.wide
         }
 
-    @instance_cached
-    def internal_references(self) -> dict:
+    def internal_references(self,recache=False) -> dict:
         """get references to all internal attributes and values"""
+        if recache == False and hasattr(self,'_prv_internal_references'):
+            return self._prv_internal_references  
+              
+        out = self._gather_references()
+        self._prv_internal_references = out
+        return out
+    
+    def _gather_references(self) -> dict:
         out = {}
         out["attributes"] = at = {}
         out["properties"] = pr = {}
@@ -193,7 +201,7 @@ class TabulationMixin(Configuration):
         """this is what is captured and used in each row of the dataframe / table"""
 
         out = collections.OrderedDict()
-        sref = self.internal_references
+        sref = self.internal_references()
         for k, v in sref["attributes"].items():
             if k in self.attr_raw_keys:
                 out[k] = v.value()

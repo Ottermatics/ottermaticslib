@@ -156,6 +156,7 @@ class SolverMixin:
         :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
         """
+        from ottermatics.system import System
         self.debug(f"running system {self.identity} with input {kwargs}")
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
@@ -177,6 +178,9 @@ class SolverMixin:
                 # TODO: revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
                 revert_x = self.system_state
 
+            #Recache system references
+            if isinstance(self,System):
+                self.system_references(recache=True)
             # prep references for keys
             refs = {}
             for k, v in _input.items():
@@ -215,6 +219,9 @@ class SolverMixin:
                             #steady state
                             if self._run_id is None:
                                 self._run_id = int(uuid.uuid4())
+                            #Recache system references
+                            if isinstance(self,System):
+                                self.system_references(recache=True)
                             self.evaluate(_cb=_cb)
 
             if revert and revert_x:
@@ -246,7 +253,7 @@ class SolverMixin:
         from ottermatics.system import System
 
         if self.log_level < 20:
-            self.debug(f"running with X: {self.X} & {fields_input}")
+            self.debug(f"running with X: {self.X} & args:{args} kw:{kw}")
         self.pre_execute()
 
         # prep index

@@ -361,7 +361,7 @@ class PLOT_ATTR(attrs.Attribute):
     def validate_plot_args(cls, system: "System"):
         """Checks system.system_references that cls.plot_parms exists"""
         log.info(f"validating: {system}")
-        sys_ref = system.system_references
+        sys_ref = system.system_references()
         attr_keys = set(sys_ref["attributes"].keys())
         prop_keys = set(sys_ref["properties"].keys())
         valid = attr_keys.union(prop_keys)

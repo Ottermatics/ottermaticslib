@@ -371,8 +371,10 @@ def otterize(cls=None, **kwargs):
             )
 
             # must be here since can't inspect till after fields corrected
-            acls.pre_compile()
+            acls.pre_compile() #custom class compiler
             acls.validate_class()
+            if acls.__name__ != 'Configuration': #prevent configuration lookup
+                acls.cls_compile() #compile subclasses
             return acls
 
         # Component/Config Flow
@@ -385,8 +387,10 @@ def otterize(cls=None, **kwargs):
             **kwargs,
         )
         # must be here since can't inspect till after fields corrected
-        acls.pre_compile()
+        acls.pre_compile() #custom class compiler
         acls.validate_class()
+        if acls.__name__ != 'Configuration': #prevent configuration lookup
+            acls.cls_compile() #compile subclasses
         return acls
 
     else:
@@ -455,9 +459,28 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def pre_compile(cls):
+        """an overrideable classmethod that executes when compiled, however will not execute as a subclass"""
         pass
 
-    # Identity & locatoin Methods
+    @classmethod
+    def cls_compile(cls):
+        """compiles all subclass functionality"""
+        for subcls in cls.parent_configurations_cls():
+            if subcls.subcls_compile is not Configuration:
+                log.debug(f'{cls.__name__} compiling {subcls.__name__}')
+            subcls.subcls_compile()
+
+    @classmethod
+    def subcls_compile(cls):
+        """reliably compiles this method even for subclasses, override this to compile functionality for subclass interfaces & mixins"""
+        pass
+
+    @classmethod
+    def parent_configurations_cls(cls)->list:
+        """returns all subclasses that are a Configuration"""
+        return [c for c in cls.mro() if issubclass(c,Configuration)]
+
+    #Identity & location Methods
     @property
     def filename(self):
         """A nice to have, good to override"""

@@ -78,7 +78,7 @@ class ComponentIter(Component):
 
     def reset(self):
         # reset reference cache
-        self._ref_cache = None
+        self._prv_internal_references = None
         self._item_refs = None
         self.current_item = None
         self.wide = True
@@ -91,7 +91,7 @@ class ComponentIter(Component):
     def _internal_references(self) -> dict:
         """considers wide format to return active references"""
         if self.wide:
-            return self._ref_cache
+            return self._prv_internal_references
         else:
             if self.current_item is None:
                 return self._item_refs[self._first_item_key]
@@ -112,12 +112,11 @@ class ComponentIter(Component):
 
         return out
 
-    @property
-    def internal_references(self):
+    def internal_references(self,recache=False):
         """lists the this_name.comp_key.<attr/prop key>: Ref format to override data_dict"""
 
-        if self._ref_cache:
-            return self._internal_references
+        if recache == False and hasattr(self,'_prv_internal_references') and self._prv_internal_references:
+            return self._internal_references  
 
         keeprefcopy = lambda d: {k: {**c} for k, c in d.items()}
 
@@ -148,7 +147,7 @@ class ComponentIter(Component):
                 atr[key] = ri
 
         # cache the references
-        self._ref_cache = out
+        self._prv_internal_references = out
         self._item_refs = _item_refs
         return self._internal_references
 
