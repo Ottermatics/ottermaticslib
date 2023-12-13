@@ -18,11 +18,17 @@ from ottermatics.typing import *
 from ottermatics.tabulation import Ref, system_property
 from ottermatics.properties import *
 
+
 import attrs
 
 
 def check_comp_type(instance, attr, value):
     """ensures the input component type is a Component"""
+    from ottermatics.eng.costs import CostMixin
+
+    if isinstance(value, type) and issubclass(value, CostMixin):
+        raise TypeError(f"Cost Mixin Not Supported As Iter Type! {value}")
+
     if isinstance(value, type) and issubclass(value, Component):
         return
 
@@ -81,7 +87,6 @@ class ComponentIter(Component):
         self._prv_internal_references = None
         self._item_refs = None
         self.current_item = None
-        self.wide = True
 
     def _item_key(self, itkey, item):
         """override this to customize data access to self.data or other container name"""
@@ -150,6 +155,9 @@ class ComponentIter(Component):
         self._prv_internal_references = out
         self._item_refs = _item_refs
         return self._internal_references
+    
+    def __hash__(self):
+        return hash(id(self))
 
 
 @otterize

@@ -112,8 +112,11 @@ class SLOT(attrs.Attribute):
     def validate_slot(cls, instance, attribute, value):
         from ottermatics.component_collections import ComponentIter
 
+        
+
         # apply wide behavior to componentiter instance
         if isinstance(value, ComponentIter) and attribute.type.wide == False:
+            #print(f'validate {instance} {attribute} {value}')
             value.wide = False
 
         if value in cls.accepted or all([value is None, cls.none_ok]):

@@ -26,8 +26,11 @@ class Comp2(Norm,CostMixin):
     comp1 = SLOT.define(Comp1,none_ok=True,default_ok=False)
 
 @otterize
-class CompGroup(ComponentIterator,CostMixin):
+class CompGroup(ComponentIterator):
     pass
+# @otterize
+# class CostGroup(CompGroup,CostMixin):
+#     pass
 
 @otterize
 class EconRecursive(System,CostMixin):
@@ -43,8 +46,38 @@ class EconWide(System):
 @otterize
 class EconNarrow(System):
     econ = SLOT.define(Economics)
-    comp_set = SLOT.define_iterator(CompGroup)
+    comp_set = SLOT.define_iterator(CompGroup,wide=False)
 
+#TODO: get cost accounting working for ComponentIter components
+# class TestEconomicsIter(unittest.TestCase):
+# 
+#     def tearDown(self):
+#         Comp1.reset_cls_costs()
+#         Comp2.reset_cls_costs()
+#         EconWide.reset_cls_costs()
+#         EconNarrow.reset_cls_costs()
+#         CostGroup.reset_cls_costs()
+# 
+#     def test_comp_wide(self):
+# 
+#     def test_comp_narrow(self):
+# 
+#     def test_cost_wide(self):
+# 
+#     def test_comp_narrow(self):
+#         cg = CompGroup(component_type=Comp1)
+#         total = 0
+#         for i in range(11):
+#             cg.data.append(Comp1(cost_per_item=i))
+#             total += i
+# 
+#         ew = EconNarrow(comp_set = cg)
+#         ew.run()
+#         
+#         d = ew.data_dict
+#         self.assertEqual(d['econ.comp_set.item_cost'], ew.comp_set.current.item_cost)
+#         self.assertEqual(ew.econ.total_cost,total)
+#         self.assertEqual(ew.econ.total_cost,total)
 
 class TestEconomicsAccounting(unittest.TestCase):
 

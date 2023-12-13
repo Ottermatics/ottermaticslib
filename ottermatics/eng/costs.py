@@ -2,14 +2,25 @@ from ottermatics.components import Component
 from ottermatics.configuration import otterize,Configuration
 from ottermatics.tabulation import TabulationMixin, system_property, Ref
 from ottermatics.properties import instance_cached
-
+from ottermatics.logging import LoggingMixin
+from ottermatics.component_collections import ComponentIter
 import typing
 import attrs
+
+class CostLog(LoggingMixin):pass
+log = CostLog()
 
 #Cost Term Modes are a quick lookup for cost term support
 cost_term_modes = {'initial': lambda term: True if term <= 1 else False,
                    'maintenance': lambda term: True if term > 1 else False,
                    'always': lambda term: True}
+
+class cost_property(system_property):
+    """A thin wrapper over `system_property` that will be accounted by `Economics` Components
+    
+    #todo: add categories & terms
+    """
+    pass
 
 @otterize
 class CostMixin(TabulationMixin): 
@@ -29,6 +40,7 @@ class CostMixin(TabulationMixin):
     
     @classmethod
     def subcls_compile(cls):
+        assert not issubclass(cls,ComponentIter), 'component iter not supported'
         cls.reset_cls_costs()
 
     @classmethod
@@ -74,15 +86,33 @@ class CostMixin(TabulationMixin):
     def combine_cost(self)->float:
         return self.sum_costs()
 
-    def sum_costs(self,saved=None):
+    def sum_costs(self,saved:set=None):
         if saved is None:
             saved = set((self,)) #item cost included!
         return self.sub_costs(saved) + self.item_cost
     
-    def sub_costs(self,saved=None):
+    def sub_costs(self,saved:set=None):
         if saved is None:
             saved = set()
+
         sub_tot = 0
+
+        # if isinstance(self,CostMixin):
+        #     sub_tot += self.item_cost
+
+        #accomodate ComponentIter in wide mode
+        # if isinstance(self,ComponentIter):
+        #     item = self.current
+        #     if self.wide:
+        #         items = item
+        #     else:
+        #         items = [items]
+        # else:
+        #     items = [self]
+
+        #accomodate ComponentIter in wide mode
+        #for item in items:
+    
         for slot in self.slots_attributes():
             comp = getattr(self,slot)
 
@@ -98,18 +128,19 @@ class CostMixin(TabulationMixin):
             elif slot in self._slot_costs:
                 dflt = self._slot_costs[slot]
 
-                sub_tot += evaluate_slot_cost(dflt)
+                sub_tot += evaluate_slot_cost(dflt,saved)
 
         return sub_tot        
 
-def evaluate_slot_cost(slot_item:typing.Union[float,int,CostMixin,dict]):
+cost_type = typing.Union[float,int,CostMixin,dict]
+def evaluate_slot_cost(slot_item:cost_type,saved:set=None):
     sub_tot = 0
     if isinstance(slot_item,(float,int)):
         sub_tot += slot_item
     elif isinstance(slot_item,CostMixin):
         sub_tot += slot_item.sum_costs(saved)
     elif isinstance(slot_item,type) and issubclass(slot_item,CostMixin):
-        self.warning(f'slot {slot} has class CostMixin, using its `item_cost` only, create an instance to fully model the cost')
+        log.warning(f'slot {slot_item} has class CostMixin, using its `item_cost` only, create an instance to fully model the cost')
         sub_tot += slot_item.cost_per_item
     elif isinstance(slot_item,dict):
         sub_tot += sum(slot_item.values())
@@ -194,6 +225,20 @@ class Economics(Component):
             kbase = '.'.join(key.split('.')[:-1])
             comp_key = key.split('.')[-1]
 
+            # if isinstance(conf,ComponentIter):
+            #     conf = conf.current
+            #     #if isinstance(conf,CostMixin):
+            #     #    sub_tot += conf.item_cost
+            # if isinstance(conf,ComponentIter):
+            #     item = conf.current
+            #     if conf.wide:
+            #         items = item
+            #     else:
+            #         items = [items]
+            # else:
+            #     items = [conf]
+            #for conf in items:
+
             #Get Costs Directly
             if isinstance(conf,CostMixin):
                 CST[bse+'combine_cost'] = Ref(conf,'combine_cost',True,False)
@@ -212,8 +257,11 @@ class Economics(Component):
                 if isinstance(parent,CostMixin) and comp_key in child._slot_costs:
                     CST[bse+'item_cost'] = Ref(child._slot_costs,comp_key,False,False,eval_f=evaluate_slot_cost)
 
-            elif kbase == '' and comp_key in parent._slot_costs:
-                CST[bse+'item_cost'] = Ref(parent._slot_costs,comp_key,False,False,eval_f=evaluate_slot_cost)
+                elif isinstance(parent,CostMixin) and kbase == '' and comp_key in parent._slot_costs:
+                    CST[bse+'item_cost'] = Ref(parent._slot_costs,comp_key,False,False,eval_f=evaluate_slot_cost)
+
+            else:
+                self.debug(f'unhandled cost: {key}')
                     
         self._cost_references = CST
         return CST
