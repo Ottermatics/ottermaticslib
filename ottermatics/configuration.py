@@ -371,8 +371,10 @@ def otterize(cls=None, **kwargs):
             )
 
             # must be here since can't inspect till after fields corrected
-            acls.pre_compile()
+            acls.pre_compile() #custom class compiler
             acls.validate_class()
+            if acls.__name__ != 'Configuration': #prevent configuration lookup
+                acls.cls_compile() #compile subclasses
             return acls
 
         # Component/Config Flow
@@ -385,8 +387,10 @@ def otterize(cls=None, **kwargs):
             **kwargs,
         )
         # must be here since can't inspect till after fields corrected
-        acls.pre_compile()
+        acls.pre_compile() #custom class compiler
         acls.validate_class()
+        if acls.__name__ != 'Configuration': #prevent configuration lookup
+            acls.cls_compile() #compile subclasses
         return acls
 
     else:
@@ -455,9 +459,28 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def pre_compile(cls):
+        """an overrideable classmethod that executes when compiled, however will not execute as a subclass"""
         pass
 
-    # Identity & locatoin Methods
+    @classmethod
+    def cls_compile(cls):
+        """compiles all subclass functionality"""
+        for subcls in cls.parent_configurations_cls():
+            if subcls.subcls_compile is not Configuration:
+                log.debug(f'{cls.__name__} compiling {subcls.__name__}')
+            subcls.subcls_compile()
+
+    @classmethod
+    def subcls_compile(cls):
+        """reliably compiles this method even for subclasses, override this to compile functionality for subclass interfaces & mixins"""
+        pass
+
+    @classmethod
+    def parent_configurations_cls(cls)->list:
+        """returns all subclasses that are a Configuration"""
+        return [c for c in cls.mro() if issubclass(c,Configuration)]
+
+    #Identity & location Methods
     @property
     def filename(self):
         """A nice to have, good to override"""
@@ -502,19 +525,24 @@ class Configuration(LoggingMixin):
         return str(type(self).__name__).lower()
 
     # Configuration Information
-    @property
-    def internal_configurations(self):
+    def internal_configurations(self,check_config=True)->dict:
         """go through all attributes determining which are configuration objects
-        we skip any configuration that start with an underscore (private variable)
+        additionally this skip any configuration that start with an underscore (private variable)
         """
+
+        if check_config:
+            chk = lambda k,v: isinstance(v, Configuration)
+        else:
+            chk = lambda k,v: k in self.slots_attributes()
+
         return {
             k: v
             for k, v in self.__dict__.items()
-            if isinstance(v, Configuration) and not k.startswith("_")
+            if chk(k,v) and not k.startswith("_")
         }
 
     def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0
+        self, level=0, levels_to_descend=-1, parent_level=0,**kw
     ):
         """A generator that will go through all internal configurations up to a certain level
         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
@@ -533,11 +561,15 @@ class Configuration(LoggingMixin):
             yield "", level, self
 
         level += 1
-        for key, config in self.internal_configurations.items():
-            for skey, level, iconf in config.go_through_configurations(
-                level, levels_to_descend, parent_level
-            ):
-                yield f"{key}.{skey}" if skey else key, level, iconf
+        for key, config in self.internal_configurations(**kw).items():
+
+            if isinstance(config,Configuration):
+                for skey, level, iconf in config.go_through_configurations(
+                    level, levels_to_descend, parent_level
+                ):
+                    yield f"{key}.{skey}" if skey else key, level, iconf
+            else:
+                yield key,level,config
 
     @property
     def attrs_fields(self) -> set:

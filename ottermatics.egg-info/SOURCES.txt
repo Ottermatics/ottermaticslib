@@ -34,6 +34,7 @@ ottermatics/datastores/gdocs.py
 ottermatics/datastores/reporting.py
 ottermatics/datastores/secrets.py
 ottermatics/eng/__init__.py
+ottermatics/eng/costs.py
 ottermatics/eng/fluid_material.py
 ottermatics/eng/geometry.py
 ottermatics/eng/pipes.py

@@ -28,8 +28,52 @@ class TableLog(LoggingMixin):
 
 log = TableLog()
 
+#Dataframe interrogation functions
+def is_uniform(s:pandas.Series):
+    a = s.to_numpy() # s.values (pandas<0.24)
+    if (a[0] == a).all():
+        return True
+    if not numpy.isfinite(a).any():
+        return True
+    return False
 
-# @otterize
+def determine_split(df:pandas.DataFrame,top:int=1):
+    raw = sorted(set(df.columns))
+
+    parents = {}
+
+    for rw in raw:
+        grp = rw.split('.')
+        for i in range(len(grp)):
+            tkn = '.'.join(grp[0:i+1])
+            parents[tkn] = set()
+        assert rw == tkn
+        
+    for rw in raw:
+        for par in parents:
+            if par in rw:
+                parents[par].add(rw)
+
+
+    grps = sorted(parents.items(),key=lambda kv: len(kv[1]),reverse=True)[:5]
+    return [g[0] for g in grps]
+
+def split_dataframe(df:pandas.DataFrame)->tuple:
+    """split dataframe into a dictionary of invariants and a dataframe of variable values
+    
+    :returns tuple: constants,dataframe
+    """
+    uniform = {}
+    for s in df:
+        c = df[s]
+        if is_uniform(c):
+            uniform[s] = c[0]
+
+    df_unique = df.copy().drop(columns=list(uniform))
+    return uniform,df_unique
+
+    
+
 class TabulationMixin(Configuration):
     """In which we define a class that can enable tabulation"""
 
@@ -44,6 +88,7 @@ class TabulationMixin(Configuration):
     _table: dict = None
     _anything_changed: bool
     _always_save_data = False
+    _prv_internal_references: dict 
 
     # Data Tabulation - Intelligent Lookups
     def save_data(
@@ -110,18 +155,25 @@ class TabulationMixin(Configuration):
             if isinstance(v, ComponentIter) and not v.wide
         }
 
-    @instance_cached
-    def internal_references(self) -> dict:
+    def internal_references(self,recache=False) -> dict:
         """get references to all internal attributes and values"""
+        if recache == False and hasattr(self,'_prv_internal_references'):
+            return self._prv_internal_references  
+              
+        out = self._gather_references()
+        self._prv_internal_references = out
+        return out
+    
+    def _gather_references(self) -> dict:
         out = {}
         out["attributes"] = at = {}
         out["properties"] = pr = {}
 
         for key in self.classmethod_system_properties():
-            pr[key] = Ref(self, key)
+            pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key, False)
+            at[key] = Ref(self, key, False,True)
 
         return out
 
@@ -158,8 +210,22 @@ class TabulationMixin(Configuration):
 
     @solver_cached
     def dataframe(self):
+        """The table compiled into a dataframe"""
         data = [self.TABLE[v] for v in sorted(self.TABLE)]
         return pandas.DataFrame(data=data, copy=True)
+    
+    @solver_cached
+    def split_dataframe(self):
+        """splits dataframe between constant values and variants"""
+        return split_dataframe(self.dataframe)
+    
+    @property
+    def dataframe_constants(self):
+        return self.split_dataframe[0]
+    
+    @property
+    def dataframe_variants(self):
+        return self.split_dataframe[1]    
 
     #Plotting Interface
     @property
@@ -193,7 +259,7 @@ class TabulationMixin(Configuration):
         """this is what is captured and used in each row of the dataframe / table"""
 
         out = collections.OrderedDict()
-        sref = self.internal_references
+        sref = self.internal_references()
         for k, v in sref["attributes"].items():
             if k in self.attr_raw_keys:
                 out[k] = v.value()
@@ -203,7 +269,7 @@ class TabulationMixin(Configuration):
 
     @instance_cached
     def skip_attr(self) -> list:
-        base = list(self.internal_configurations.keys())
+        base = list((self.internal_configurations()).keys())
         if self._skip_table_parms is None:
             return base
         return self._skip_table_parms + base
@@ -444,29 +510,52 @@ class TabulationMixin(Configuration):
         """returns an instance unique id based on id(self)"""
         idd = id(self)
         return f"{self.classname}.{idd}"
+    
 
 
 class Ref:
-    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
+    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated,
+    
+    A dictionary can be used
+    """
 
-    __slots__ = ["comp", "key", "use_call"]
+    __slots__ = ["comp", "key", "use_call",'use_dict','allow_set','eval_f']
     comp: "TabulationMixin"
     key: str
     use_call: bool
+    use_dict: bool
+    allow_set: bool
+    eval_f: callable
 
-    def __init__(self, component, key, use_call=True):
+    def __init__(self, component, key, use_call=True,allow_set=True,eval_f=None):
         self.comp = component
+        if isinstance(self.comp,dict):
+            self.use_dict = True
+        else:
+            self.use_dict = False
         self.key = key
         self.use_call = use_call
+        self.allow_set = allow_set
+        self.eval_f = eval_f
 
     def value(self):
-        o = getattr(self.comp, self.key)
+        if self.use_dict:
+            o = self.comp.get(self.key)
+        else:
+            o = getattr(self.comp, self.key)
         if self.use_call and callable(o):
-            return o()
+            o = o()
+        if self.eval_f:
+            return self.eval_f(o)
         return o
 
     def set_value(self, val):
-        return setattr(self.comp, self.key, val)
+        if self.allow_set:
+            return setattr(self.comp, self.key, val)
+        else:
+            raise Exception(f'not allowed to set value on {self.key}')
 
     def __str__(self) -> str:
+        if self.use_dict:
+            return f"REF[DICT.{self.key}]"
         return f"REF[{self.comp.classname}.{self.key}]"

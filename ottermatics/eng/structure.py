@@ -236,15 +236,16 @@ class Structure(System):
             self.current_combo = combo
             self.struct_pre_execute(combo)
             self.analyze(combos=[combo], *args, **kwargs)
-            self._any_solved = True
+            self._any_solved = True #Flag system properties to save
             self.struct_post_execute(combo)
             # backup data saver.
             self.save_data(index=self.index, force=True)
+            #self._any_solved = False #Flag system properties to save
 
     def save_data(self,*args,**kw):
         if self._any_solved:
             super().save_data(*args,**kw)
-            self._any_solved = False
+            #self._any_solved = False
         else:
             self.info(f'nothing to save, run() structure first')
 

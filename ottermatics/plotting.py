@@ -200,7 +200,7 @@ class PlottingMixin:
                 log.error(e, f"issue in trace {plot}")
 
         # Sub Systems
-        for confnm, conf in self.internal_configurations.items():
+        for confnm, conf in self.internal_configurations().items():
             if isinstance(conf, PlottingMixin):
                 log.info(f"{self.identity} system plotting {confnm} | {conf}")
                 conf.make_plots(analysis, store_figures=store_figures, pre=pre)
@@ -361,7 +361,7 @@ class PLOT_ATTR(attrs.Attribute):
     def validate_plot_args(cls, system: "System"):
         """Checks system.system_references that cls.plot_parms exists"""
         log.info(f"validating: {system}")
-        sys_ref = system.system_references
+        sys_ref = system.system_references()
         attr_keys = set(sys_ref["attributes"].keys())
         prop_keys = set(sys_ref["properties"].keys())
         valid = attr_keys.union(prop_keys)

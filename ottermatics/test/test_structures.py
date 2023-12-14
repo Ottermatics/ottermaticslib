@@ -31,7 +31,7 @@ class test_cantilever(unittest.TestCase):
         )
         self.st.frame.add_node_load("free", "FX", 3000, case="gravity")
 
-        self.st.analyze(check_statics=True)
+        self.st.run(check_statics=True)
 
     def test_beam(self):
         self.subtest_assert_near(self.bm.A, 53.4 / (100**2))
@@ -153,7 +153,7 @@ class test_truss(unittest.TestCase):
         self.st.add_node_load("F", "FY", -1000, case="gravity")
         self.st.add_node_load("G", "FY", -2000, case="gravity")
 
-        self.st.analyze(check_statics=True)
+        self.st.run(check_statics=True)
         # self.st.visulize()
 
     def test_reactions(self):

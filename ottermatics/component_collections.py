@@ -18,11 +18,17 @@ from ottermatics.typing import *
 from ottermatics.tabulation import Ref, system_property
 from ottermatics.properties import *
 
+
 import attrs
 
 
 def check_comp_type(instance, attr, value):
     """ensures the input component type is a Component"""
+    from ottermatics.eng.costs import CostModel
+
+    if isinstance(value, type) and issubclass(value, CostModel):
+        raise TypeError(f"Cost Mixin Not Supported As Iter Type! {value}")
+
     if isinstance(value, type) and issubclass(value, Component):
         return
 
@@ -78,10 +84,9 @@ class ComponentIter(Component):
 
     def reset(self):
         # reset reference cache
-        self._ref_cache = None
+        self._prv_internal_references = None
         self._item_refs = None
         self.current_item = None
-        self.wide = True
 
     def _item_key(self, itkey, item):
         """override this to customize data access to self.data or other container name"""
@@ -91,7 +96,7 @@ class ComponentIter(Component):
     def _internal_references(self) -> dict:
         """considers wide format to return active references"""
         if self.wide:
-            return self._ref_cache
+            return self._prv_internal_references
         else:
             if self.current_item is None:
                 return self._item_refs[self._first_item_key]
@@ -105,19 +110,18 @@ class ComponentIter(Component):
         out["properties"] = pr = {}
 
         for key in self.classmethod_system_properties():
-            pr[key] = Ref(self, key)
+            pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key, False)
+            at[key] = Ref(self, key, False,True)
 
         return out
 
-    @property
-    def internal_references(self):
+    def internal_references(self,recache=False):
         """lists the this_name.comp_key.<attr/prop key>: Ref format to override data_dict"""
 
-        if self._ref_cache:
-            return self._internal_references
+        if recache == False and hasattr(self,'_prv_internal_references') and self._prv_internal_references:
+            return self._internal_references  
 
         keeprefcopy = lambda d: {k: {**c} for k, c in d.items()}
 
@@ -136,21 +140,24 @@ class ComponentIter(Component):
             # set property refs
             for key in item.classmethod_system_properties():
                 k = f"{it_base_key}.{key}"
-                rc = Ref(item, key)
+                rc = Ref(item, key,True,False)
                 pr[k] = rc
                 prr[key] = rc
 
             # set attr refs
             for key in item.input_fields():
                 k = f"{it_base_key}.{key}"
-                ri = Ref(item, key, False)
+                ri = Ref(item, key, False,True)
                 at[k] = ri
                 atr[key] = ri
 
         # cache the references
-        self._ref_cache = out
+        self._prv_internal_references = out
         self._item_refs = _item_refs
         return self._internal_references
+    
+    def __hash__(self):
+        return hash(id(self))
 
 
 @otterize
