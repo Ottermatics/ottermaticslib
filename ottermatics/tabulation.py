@@ -497,4 +497,6 @@ class Ref:
             raise Exception(f'not allowed to set value on {self.key}')
 
     def __str__(self) -> str:
+        if self.use_dict:
+            return f"REF[DICT.{self.key}]"
         return f"REF[{self.comp.classname}.{self.key}]"

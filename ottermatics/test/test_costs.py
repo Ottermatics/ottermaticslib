@@ -6,7 +6,7 @@
 
 import unittest
 from ottermatics.configuration import otterize
-from ottermatics.eng.costs import CostMixin, Economics
+from ottermatics.eng.costs import CostModel, Economics, cost_property
 from ottermatics.slots import SLOT
 from ottermatics.system import System
 from ottermatics.components import Component
@@ -17,67 +17,104 @@ class Norm(Component):
     pass
 
 @otterize
-class Comp1(Component,CostMixin):
+class Comp1(Component,CostModel):
     norm = SLOT.define(Norm,none_ok=True)
 
 @otterize
-class Comp2(Norm,CostMixin):
+class Comp2(Norm,CostModel):
 
     comp1 = SLOT.define(Comp1,none_ok=True,default_ok=False)
 
+quarterly = lambda inst,term: True if (term+1)%3==0 else False
 @otterize
-class CompGroup(ComponentIterator):
-    pass
-# @otterize
-# class CostGroup(CompGroup,CostMixin):
-#     pass
+class TermCosts(Comp1,CostModel):
+
+    @cost_property(category='capex')
+    def cost_init(self):
+        return 100
+    
+    @cost_property(mode='maintenance',category='opex')
+    def cost_maintenance(self):
+        return 10
+
+    @cost_property(mode='always',category='tax')
+    def cost_tax(self):
+        return 1
+    
+    @cost_property(mode=quarterly,category='opex,tax',label='quarterly wage tax')
+    def cost_wage_tax(self):
+        return 5*3
+    
 
 @otterize
-class EconRecursive(System,CostMixin):
+class EconRecursive(System,CostModel):
     econ = SLOT.define(Economics)
     comp1 = SLOT.define(Comp1,none_ok=True)
     comp2 = SLOT.define(Comp2,none_ok=True)
 
-@otterize
-class EconWide(System):
-    econ = SLOT.define(Economics)
-    comp_set = SLOT.define_iterator(CompGroup,wide=True)
 
-@otterize
-class EconNarrow(System):
-    econ = SLOT.define(Economics)
-    comp_set = SLOT.define_iterator(CompGroup,wide=False)
+class TestCategoriesAndTerms(unittest.TestCase):
 
-#TODO: get cost accounting working for ComponentIter components
-# class TestEconomicsIter(unittest.TestCase):
-# 
-#     def tearDown(self):
-#         Comp1.reset_cls_costs()
-#         Comp2.reset_cls_costs()
-#         EconWide.reset_cls_costs()
-#         EconNarrow.reset_cls_costs()
-#         CostGroup.reset_cls_costs()
-# 
-#     def test_comp_wide(self):
-# 
-#     def test_comp_narrow(self):
-# 
-#     def test_cost_wide(self):
-# 
-#     def test_comp_narrow(self):
-#         cg = CompGroup(component_type=Comp1)
-#         total = 0
-#         for i in range(11):
-#             cg.data.append(Comp1(cost_per_item=i))
-#             total += i
-# 
-#         ew = EconNarrow(comp_set = cg)
-#         ew.run()
-#         
-#         d = ew.data_dict
-#         self.assertEqual(d['econ.comp_set.item_cost'], ew.comp_set.current.item_cost)
-#         self.assertEqual(ew.econ.total_cost,total)
-#         self.assertEqual(ew.econ.total_cost,total)
+    def tearDown(self) -> None:
+        Comp1.reset_cls_costs()
+        Comp2.reset_cls_costs()
+        EconRecursive.reset_cls_costs()
+        TermCosts.reset_cls_costs()
+
+    def test_itemized_costs(self):
+        tc = TermCosts()
+
+        ct = tc.costs_at_term(0)
+        self.assertEqual(ct['cost_init'],100)
+        self.assertEqual(ct['cost_maintenance'],0)
+        self.assertEqual(ct['cost_tax'],1)
+        self.assertEqual(ct['cost_wage_tax'],0)
+
+        ct = tc.costs_at_term(1)
+        self.assertEqual(ct['cost_init'],00)
+        self.assertEqual(ct['cost_maintenance'],10)
+        self.assertEqual(ct['cost_tax'],1)
+        self.assertEqual(ct['cost_wage_tax'],0)
+
+        ct = tc.costs_at_term(2)
+        self.assertEqual(ct['cost_init'],00)
+        self.assertEqual(ct['cost_maintenance'],10)
+        self.assertEqual(ct['cost_tax'],1)
+        self.assertEqual(ct['cost_wage_tax'],15)
+
+    def test_category_costs(self):
+
+        tc = TermCosts()
+        cc = tc.cost_categories_at_term(0)
+        self.assertEqual(cc['capex'],100)
+        self.assertEqual(cc['opex'],0)
+        self.assertEqual(cc['tax'],1)
+
+        tc = TermCosts()
+        cc = tc.cost_categories_at_term(2)
+        self.assertEqual(cc['capex'],0)
+        self.assertEqual(cc['opex'],25)
+        self.assertEqual(cc['tax'],16)        
+
+    def test_econ(self):
+
+        tc = TermCosts()
+        Comp2.default_cost('comp1',50)
+        c2 = Comp2(cost_per_item=10)
+        er = EconRecursive(comp1=tc,comp2=c2)
+        #inkw = {'econ.term_length':[1,5,10,50],'econ.discount_rate':[0,0.01,0.05,0.1]}
+        inkw = {}
+        er.run(revert=False,**inkw)
+        
+        d = er.data_dict
+        self.assertEqual(d['econ.lifecycle.term_cost'],161)
+        self.assertEqual(d['econ.summary.total_cost'],161)
+        self.assertEqual(d['combine_cost'],161)
+        self.assertEqual(d['sub_items_cost'],161)
+
+
+
+
 
 class TestEconomicsAccounting(unittest.TestCase):
 
@@ -150,7 +187,7 @@ class TestEconomicsAccounting(unittest.TestCase):
 
 
 
-class TestCostMixin(unittest.TestCase):
+class TestCostModel(unittest.TestCase):
 
     def setUp(self):
         pass
@@ -215,6 +252,57 @@ class TestCostMixin(unittest.TestCase):
         c1 = Comp1(cost_per_item=15,norm=c2)
         self.assertEqual(c1.combine_cost, 30)
         self.assertEqual(c1.sub_items_cost , 15)        
+
+
+#TODO: get cost accounting working for ComponentIter components
+
+# @otterize
+# class CompGroup(ComponentIterator):
+#     pass
+# # @otterize
+# # class CostGroup(CompGroup,CostModel):
+# #     pass
+
+# @otterize
+# class EconWide(System):
+#     econ = SLOT.define(Economics)
+#     comp_set = SLOT.define_iterator(CompGroup,wide=True)
+# 
+# @otterize
+# class EconNarrow(System):
+#     econ = SLOT.define(Economics)
+#     comp_set = SLOT.define_iterator(CompGroup,wide=False)
+
+# class TestEconomicsIter(unittest.TestCase):
+# 
+#     def tearDown(self):
+#         Comp1.reset_cls_costs()
+#         Comp2.reset_cls_costs()
+#         EconWide.reset_cls_costs()
+#         EconNarrow.reset_cls_costs()
+#         CostGroup.reset_cls_costs()
+# 
+#     def test_comp_wide(self):
+# 
+#     def test_comp_narrow(self):
+# 
+#     def test_cost_wide(self):
+# 
+#     def test_comp_narrow(self):
+#         cg = CompGroup(component_type=Comp1)
+#         total = 0
+#         for i in range(11):
+#             cg.data.append(Comp1(cost_per_item=i))
+#             total += i
+# 
+#         ew = EconNarrow(comp_set = cg)
+#         ew.run()
+#         
+#         d = ew.data_dict
+#         self.assertEqual(d['econ.comp_set.item_cost'], ew.comp_set.current.item_cost)
+#         self.assertEqual(ew.econ.total_cost,total)
+#         self.assertEqual(ew.econ.total_cost,total)
+
 
 
 if __name__ == '__main__':

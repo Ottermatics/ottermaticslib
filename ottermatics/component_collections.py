@@ -24,9 +24,9 @@ import attrs
 
 def check_comp_type(instance, attr, value):
     """ensures the input component type is a Component"""
-    from ottermatics.eng.costs import CostMixin
+    from ottermatics.eng.costs import CostModel
 
-    if isinstance(value, type) and issubclass(value, CostMixin):
+    if isinstance(value, type) and issubclass(value, CostModel):
         raise TypeError(f"Cost Mixin Not Supported As Iter Type! {value}")
 
     if isinstance(value, type) and issubclass(value, Component):
