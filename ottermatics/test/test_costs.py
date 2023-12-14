@@ -11,7 +11,7 @@ from ottermatics.slots import SLOT
 from ottermatics.system import System
 from ottermatics.components import Component
 from ottermatics.component_collections import ComponentIterator
-
+import numpy as np
 @otterize
 class Norm(Component):
     pass
@@ -112,6 +112,18 @@ class TestCategoriesAndTerms(unittest.TestCase):
         self.assertEqual(d['combine_cost'],161)
         self.assertEqual(d['sub_items_cost'],161)
 
+    def test_econ_array(self):
+        tc = TermCosts()
+        Comp2.default_cost('comp1',50)
+        c2 = Comp2(cost_per_item=10)
+        er = EconRecursive(comp1=tc,comp2=c2)        
+        inkw = {'econ.term_length':[1,5,10,15],'econ.fixed_output':1}
+        #inkw = {}
+        er.run(revert=False,**inkw)
+
+        df = er.dataframe
+        tc = (df['econ.summary.total_cost'] == np.array([172., 246., 316., 401.])).all()
+        self.assertTrue(tc)
 
 
 

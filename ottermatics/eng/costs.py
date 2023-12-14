@@ -2,7 +2,28 @@
 
 CostModels can have a `cost_per_item` and additionally calculate a `cumulative_cost` from internally defined `CostModel`s.
 
-CostModel's can have cost_property's which detail how and when a cost should be applied & grouped.
+CostModel's can have cost_property's which detail how and when a cost should be applied & grouped. By default each CostModel has a `cost_per_item` which is reflected in `item_cost` cost_property set on the `initial` term as a `unit` category. Multiple categories of cost are also able to be set on cost_properties as follows
+
+```
+@otterize
+class Widget(Component,CostModel):
+
+    @cost_property(mode='initial',category='capex,manufacturing')
+    def cost_of_XYZ(self):
+        return ...
+```
+
+Economics models sum CostModel.cost_properties recursively on the parent they are defined. Economics computes the grouped category costs for each item recursively as well as summary properties like annualized values and levalized cost. Economic output is determined by a `fixed_output` or overriding `calculate_production(self,parent)` to dynamically calculate changing economics based on factors in the parent.
+
+The economics term_length applies costs over the term, using the `cost_property.mode` to determine at which terms a cost should be applied.
+
+class Parent(System)
+
+    econ = SLOT.define(Economics)
+
+Parent(econ=Economics(term_length=25,discount_rate=0.05,fixed_output=1000))
+
+
 """
 
 from ottermatics.components import Component
