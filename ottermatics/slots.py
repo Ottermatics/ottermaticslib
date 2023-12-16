@@ -34,6 +34,7 @@ class SLOT(attrs.Attribute):
         from ottermatics.components import Component
         from ottermatics.component_collections import ComponentIter
         from ottermatics.system import System
+        from ottermatics.eng.costs import CostModel
 
         # Format THe Accepted Component Types
         assert (
@@ -48,6 +49,11 @@ class SLOT(attrs.Attribute):
                 for c in component_or_systems
             ]
         ), "Not System Or Component Input"
+
+        ### Cost models should always default to None
+        if any([issubclass(c, CostModel) for c in component_or_systems]):
+            default_ok = False 
+            none_ok = True
 
         # FIXME: come up with a better name :)
         new_name = f"SLOT_{str(uuid.uuid4()).replace('-','')[0:16]}"

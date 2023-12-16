@@ -165,6 +165,8 @@ class cached_system_property(system_property):
         return f"_{self.gname}"
 
     def __get__(self, instance: "TabulationMixin", objtype=None):
+        if instance is None:
+            return self        
         if not hasattr(instance, self.private_var):
             from ottermatics.tabulation import TabulationMixin
 

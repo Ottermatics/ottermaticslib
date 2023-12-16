@@ -154,12 +154,14 @@ def signals_slots_handler(
 
             log.info(f"{cls.__name__} adding SLOT {slot_name}")
             stype = slot.accepted
-
+            
+            #TODO: expand default options with kwargs and multiple types
             if isinstance(stype, (list, tuple)):
                 stype = stype[0]
+            
             at = attrs.Attribute(
                 name=slot_name,
-                default=attrs.Factory(stype) if slot.default_ok else None,
+                default=attrs.Factory(stype,False) if slot.default_ok else None,
                 validator=slot.validate_slot,
                 repr=True,
                 cmp=None,
@@ -440,17 +442,36 @@ class Configuration(LoggingMixin):
 
     # Our Special Init Methodology
     def __on_init__(self):
-        """Override this when creating your special init functionality, you must use attrs for input variables"""
+        """Override this when creating your special init functionality, you must use attrs for input variables, this is called after parents are assigned"""
+        pass
+
+    def __pre_init__(self):
+        """Override this when creating your special init functionality, you must use attrs for input variables, this is called before parents are assigned"""
         pass
 
     def __attrs_post_init__(self):
         """This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!"""
         # Store abs path On Creation, in case we change
+        
+        from ottermatics.components import Component
+
         self._log = None
         self._anything_changed = True  # save by default first go!
         self._created_datetime = datetime.datetime.utcnow()
+        self.__pre_init__()
+                
+        #Assign Parents, ensure single componsition
+        for compnm,comp in self.internal_configurations(False).items():
+            if isinstance(comp,Component):
+                if (not hasattr(comp,'parent')) and (comp.parent is not None):
+                    self.warning(f"Component {compnm} already has a parent {comp.parent} copying, and assigning to {self}")
+                    setattr(self,compnm,attrs.evolve(comp,parent=self))
+                else:
+                    comp.parent = self
+            
         self.debug(f"created {self.identity}")
         self.__on_init__()
+
 
     @classmethod
     def validate_class(cls):
@@ -465,6 +486,7 @@ class Configuration(LoggingMixin):
     @classmethod
     def cls_compile(cls):
         """compiles all subclass functionality"""
+        
         for subcls in cls.parent_configurations_cls():
             if subcls.subcls_compile is not Configuration:
                 log.debug(f'{cls.__name__} compiling {subcls.__name__}')
@@ -561,6 +583,8 @@ class Configuration(LoggingMixin):
             yield "", level, self
 
         level += 1
+        if 'check_config' not in kw:
+            kw['check_config'] = False
         for key, config in self.internal_configurations(**kw).items():
 
             if isinstance(config,Configuration):

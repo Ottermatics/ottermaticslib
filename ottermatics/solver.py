@@ -274,6 +274,7 @@ class SolverMixin:
                 comp.update(self)
             elif isinstance(comp, Component):
                 comp.update(self)
+                comp.update_internal()
 
         # Post Execute
         self.post_execute()

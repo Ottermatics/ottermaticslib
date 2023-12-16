@@ -195,6 +195,9 @@ class TabulationMixin(Configuration):
         """Resets the table, and attrs label stores"""
         self.index = 0
         self._table = None
+        cls = self.__class__
+        if hasattr(cls,'_{cls.__name__}_system_properties'):
+            return  setattr(cls,'_{cls.__name__}_system_properties',None)    
 
     @property
     def TABLE(self):
@@ -214,18 +217,38 @@ class TabulationMixin(Configuration):
         data = [self.TABLE[v] for v in sorted(self.TABLE)]
         return pandas.DataFrame(data=data, copy=True)
     
-    @solver_cached
-    def split_dataframe(self):
+    def smart_split_dataframe(self,df,split_groups=0):
         """splits dataframe between constant values and variants"""
-        return split_dataframe(self.dataframe)
+        out = {}
+        const,vardf = split_dataframe( df )
+        out['constants'] = const
+        columns = set(vardf.columns)
+        split_groups = min(split_groups,len(columns)-1)
+        if split_groups==0:
+            out['variants'] = vardf
+        else:
+            grps = determine_split(vardf,split_groups)
+            
+            for i,grp in enumerate(sorted(grps,reverse=True)):
+                columns = set(vardf.columns)
+                bad_columns = [c for c in columns if grp not in c]
+                good_columns = [c for c in columns if grp in c]
+                out[grp] = vardf.copy().drop(columns=bad_columns)
+                vardf = vardf.drop(columns=good_columns) #remove columns from vardf
+        return out
+    
+    @solver_cached
+    def _split_dataframe(self):
+        """splits dataframe between constant values and variants"""
+        return split_dataframe(self.dataframe)    
     
     @property
     def dataframe_constants(self):
-        return self.split_dataframe[0]
+        return self._split_dataframe[0]
     
     @property
     def dataframe_variants(self):
-        return self.split_dataframe[1]    
+        return self._split_dataframe[1:]    
 
     #Plotting Interface
     @property
@@ -401,8 +424,16 @@ class TabulationMixin(Configuration):
         return self.__class__.classmethod_system_properties()
 
     @classmethod
-    def classmethod_system_properties(cls):
+    def classmethod_system_properties(cls,recache=False):
         """Combine other classes table properties into this one, in the case of subclassed system_properties"""
+
+        #Use a cache for deep recursion
+        if not recache and hasattr(cls,'_{cls.__name__}_system_properties'):
+            res=getattr(cls,'_{cls.__name__}_system_properties')
+            if res is not None:
+                return res
+
+        #otherwise make the cache
         __system_properties = {}
         for k, obj in cls.__dict__.items():
             if isinstance(obj, system_property):
@@ -434,6 +465,8 @@ class TabulationMixin(Configuration):
                                 f"adding system property {mrv.__name__}.{k}"
                             )
 
+        setattr(cls,'_{cls.__name__}_system_properties',__system_properties)
+
         return __system_properties
 
     @classmethod
@@ -442,7 +475,7 @@ class TabulationMixin(Configuration):
         if any(
             [
                 v.stochastic
-                for k, v in cls.classmethod_system_properties().items()
+                for k, v in cls.classmethod_system_properties(True).items()
             ]
         ):
             log.info(f"setting always save on {cls.__name__}")

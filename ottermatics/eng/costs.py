@@ -17,9 +17,11 @@ Economics models sum CostModel.cost_properties recursively on the parent they ar
 
 The economics term_length applies costs over the term, using the `cost_property.mode` to determine at which terms a cost should be applied.
 
-class Parent(System)
+@otterize
+class Parent(System,CostModel)
 
-    econ = SLOT.define(Economics)
+    econ = SLOT.define(Economics) #will calculate parent costs as well
+    cost = SLOT.define(Widget) #slots automatically set to none if no input provided
 
 Parent(econ=Economics(term_length=25,discount_rate=0.05,fixed_output=1000))
 
@@ -29,7 +31,7 @@ Parent(econ=Economics(term_length=25,discount_rate=0.05,fixed_output=1000))
 from ottermatics.components import Component
 from ottermatics.configuration import otterize,Configuration
 from ottermatics.tabulation import TabulationMixin, system_property, Ref
-from ottermatics.properties import instance_cached,solver_cached
+from ottermatics.properties import instance_cached,solver_cached,cached_system_property
 from ottermatics.logging import LoggingMixin
 from ottermatics.component_collections import ComponentIter
 import typing
@@ -135,6 +137,18 @@ class CostModel(TabulationMixin):
     #TODO: add dictionary & category implementations for economics comp to sum groups of
     #cost_category: str = attrs.field(default=None)
 
+    def __on_init__(self):
+        self.set_default_costs()
+
+    def set_default_costs(self):
+        """set default costs if no costs are set"""
+        inter_config = self.internal_configurations()
+        for k,dflt in self._slot_costs.items():
+            if k not in inter_config and isinstance(dflt,CostModel):
+                setattr(self,k,attrs.evolve(dflt,parent=self))
+            elif k not in inter_config and isinstance(dflt,type) and issubclass(dflt,CostModel):
+                self.warning(f'setting default cost {k} from costmodel class, provide a default instance instead!')
+                setattr(self,k,dflt())
     
     @classmethod
     def subcls_compile(cls):
@@ -152,6 +166,11 @@ class CostModel(TabulationMixin):
         assert not isinstance(cost,type), f'insantiate classes before adding as a cost!'
         assert slot_name in cls.slots_attributes(), f'slot {slot_name} doesnt exist'
         assert isinstance(cost,(float,int,dict)) or isinstance(cost,CostModel), 'only numeric types or CostModel instances supported'
+
+        atrb = cls.slots_attributes()[slot_name]
+        atypes = atrb.type.accepted
+        assert all([issubclass(at,CostModel) for at in atypes]), f'costs can only be applied to CostModel based slots'
+
         cls._slot_costs[slot_name] = cost
 
         #IDEA: create slot if one doesn't exist, for dictionaries and assign a ComponentDict+CostModel in wide mode?
@@ -162,9 +181,14 @@ class CostModel(TabulationMixin):
         assert slot_name in self.slots_attributes(), f'slot {slot_name} doesnt exist'
         assert isinstance(cost,(float,int,dict)) or isinstance(cost,CostModel), 'only numeric types or CostModel instances supported'
 
+        atrb = self.__class__.slots_attributes()[slot_name]
+        atypes = atrb.type.accepted
+        assert all([issubclass(at,CostModel) for at in atypes]), f'costs can only be applied to CostModel based slots'
+            
         if self._slot_costs is self.__class__._slot_costs:
             self._slot_costs =  self.__class__._slot_costs.copy()
-        self._slot_costs[slot_name] = cost     
+        self._slot_costs[slot_name] = cost
+        self.set_default_costs()   
 
 
     def calculate_item_cost(self)->float:
@@ -176,7 +200,7 @@ class CostModel(TabulationMixin):
         """calculates the total cost of all sub-items, using the components CostModel if it is provided, and using the declared_cost as a backup"""
         return self.sub_costs()
 
-    @cost_property
+    @cost_property(mode='initial',category='unit')
     def item_cost(self)->float:
         calc_item = self.calculate_item_cost()
         return numpy.nansum([0,calc_item])
@@ -190,7 +214,7 @@ class CostModel(TabulationMixin):
         """sums costs of cost_property's in this item that are present at term=0"""
         initial_costs = self.costs_at_term(0)
         return numpy.nansum( list(initial_costs.values()) )
-    
+    # 
     @system_property
     def future_costs(self)->float:
         """sums costs of cost_property's in this item that do not appear at term=0"""
@@ -300,7 +324,7 @@ def gend(deect:dict):
                 yield f'{k}.{kk}',v
         else:
             yield k,v
-
+parent_types = typing.Union[Component,'System']
 @otterize
 class Economics(Component): 
     """Economics is a component that summarizes costs and reports the economics of a system and its components in a recursive format"""
@@ -317,17 +341,20 @@ class Economics(Component):
     _cost_categories: dict = None
     _comp_categories: dict = None
     _comp_costs: dict = None
-    parent:'System'
+    parent:parent_types
 
     def __on_init__(self):
         self._cost_categories = collections.defaultdict(list)
         self._comp_categories = collections.defaultdict(list)
         self._comp_costs = dict()        
 
-    def update(self,parent:typing.Union[Component,'System']):
+    def update(self,parent:parent_types):
         #self.parent = parent
+        
+        self.parent = parent
+
         self._gather_cost_references(parent)
-        self._output = self.calculate_production(parent)
+        self._output = self.calculate_production(parent,0)
         self._costs = self.calculate_costs(parent)
 
         if self._output is None:
@@ -340,7 +367,7 @@ class Economics(Component):
         #     if isinstance(comp,CostModel):
         #         comp.update(self)
 
-    def calculate_production(self,parent)->float:
+    def calculate_production(self,parent,term)->float:
         """must override this function and set economic_output"""
         return numpy.nansum([0,self.fixed_output])
 
@@ -383,6 +410,9 @@ class Economics(Component):
     #Gather & Set References (the magic!)
     def internal_references(self,recache=True):
         """standard component references are """
+        if not recache and hasattr(self,'__cache_refs'):
+            return self.__cache_refs
+        
         d = self._gather_references()
         self._create_term_eval_functions()
         #Gather all internal economic variables and report costs
@@ -405,6 +435,8 @@ class Economics(Component):
         for k,v in lc_out.items():
             props[k] = Ref(lc_out,k,False,False)
 
+        self.__cache_refs = d        
+    
         return d
 
     @property
@@ -457,7 +489,8 @@ class Economics(Component):
                 row[k] = sum_f(i)
             row['term_cost'] = tc = numpy.nansum([v(i) for v in self._term_comp_cost.values()])
             row['levalized_cost'] = tc / (1+self.discount_rate)**i
-            row['levalized_output'] = self.output / (1+self.discount_rate)**i
+            row['output'] = output =  self.calculate_production(self.parent,i)
+            row['levalized_output'] = output / (1+self.discount_rate)**i
 
 
         return pandas.DataFrame(out)
@@ -490,6 +523,8 @@ class Economics(Component):
         comps = {}
         comp_set = set()
 
+        #print(f'gather cost refs')
+
         self._cost_categories = collections.defaultdict(list)
         self._comp_categories = collections.defaultdict(list)
         self._comp_costs = dict()
@@ -511,14 +546,7 @@ class Economics(Component):
 
             #Get Costs Directly
             if isinstance(conf,CostModel):
-                CST[bse+'combine_cost'] = Ref(conf,'combine_cost',True,False)
-                _key = bse+'item_cost'
-                #CST[_key] = ref = Ref(conf,'item_cost',True,False)
-                CST[bse+'sub_cost'] = Ref(conf,'sub_items_cost',True,False)
-                # cc = 'unit'
-                # self._comp_costs[_key] = ref
-                # self._cost_categories['category.'+cc].append(ref)
-                # self._comp_categories[bse+'category.'+cc].append(ref)   
+                _key = bse+'item_cost'  
 
                 #Add cost fields
                 for cost_nm,cost_prop in conf.class_cost_properties().items():
@@ -539,37 +567,27 @@ class Economics(Component):
 
                 #add slot costs with now current items:
                 for slot_name, slot_value in conf._slot_costs.items():
+                    #Skip items that are internal components
+                    if slot_name in conf.internal_components:
+                        self.debug(f'skipping slot {slot_name}')
+                        continue
+                    else:
+                        self.debug(f'adding slot {slot_name}')
+                    #Check if current slot isn't occupied
                     cur_slot = getattr(conf,slot_name)
-                    if not isinstance(cur_slot,Configuration):
-                        _key = bse+slot_name+'.item_cost'
+                    _key = bse+slot_name+'.cost.item_cost'
+                    if not isinstance(cur_slot,Configuration) and _key not in CST:
                         CST[_key] = ref = Ref(conf._slot_costs,slot_name,False,False,eval_f = evaluate_slot_cost)
 
                         cc = 'unit'
                         self._comp_costs[_key] = ref
                         self._cost_categories['category.'+cc].append(ref)
                         self._comp_categories[bse+'category.'+cc].append(ref)
-
-            #Look For Defaults
-            elif kbase and kbase in comps:
-                child = comps[kbase]
-                if isinstance(parent,CostModel) and comp_key in child._slot_costs:
-                    _key=bse+'item_cost'
-                    CST[_key] = ref = Ref(child._slot_costs,comp_key,False,False, eval_f = evaluate_slot_cost)
-                    cc = 'unit'
-                    self._comp_costs[_key] = ref
-                    self._cost_categories['category.'+cc].append(ref)
-                    self._comp_categories[bse+'category.'+cc].append(ref)
-
-                elif isinstance(parent,CostModel) and kbase == '' and comp_key in parent._slot_costs:
-                    _key=bse+'item_cost'
-                    CST[_key] = ref = Ref(parent._slot_costs,comp_key,False,False, eval_f = evaluate_slot_cost)
-                    cc = 'unit'
-                    self._comp_costs[_key] = ref
-                    self._cost_categories['category.'+cc].append(ref)
-                    self._comp_categories[bse+'category.'+cc].append(ref)
+                    elif _key in CST:
+                        self.debug(f'skipping key {_key}')
 
             else:
-                self.debug(f'unhandled cost: {key}')
+                self.debug(f'unhandled cost: {key}|{conf}')
                     
         self._cost_references = CST
         self._anything_changed = True

@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import attr
+import typing
 
 # from ottermatics.logging import LoggingMixin, log
 from ottermatics.tabulation import TabulationMixin, system_property
@@ -18,6 +19,8 @@ import matplotlib.pyplot as plt
 @otterize
 class Component(TabulationMixin):
     """Component is an Evaluatable configuration with tabulation and reporting functionality"""
+
+    parent: typing.Union['Component','System'] = attr.ib(default=None)
 
     @classmethod
     def subclasses(cls, out=None):
@@ -38,6 +41,12 @@ class Component(TabulationMixin):
     def update(self, system):
         """override with custom system interaction"""
         pass
+
+    def update_internal(self):
+        """updates internal components with self"""
+        for key, config in self.internal_components.items():
+            config.update(self)
+            config.update_internal()
 
 
 # TODO: move inspection for components to mixin for inspection of slots
