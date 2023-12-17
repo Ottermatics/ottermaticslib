@@ -726,7 +726,7 @@ class Configuration(LoggingMixin):
 
     @property
     def input_as_dict(self):
-        o = {k: getattr(self, k, None) for k in self.input_fields}
+        o = {k: getattr(self, k, None) for k in self.input_fields()}
         o = {
             k: v if not isinstance(v, Configuration) else v.input_as_dict
             for k, v in o.items()

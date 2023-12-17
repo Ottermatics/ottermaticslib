@@ -42,11 +42,25 @@ class Component(TabulationMixin):
         """override with custom system interaction"""
         pass
 
-    def update_internal(self):
+    def post_update(self, system):
+        """override with custom system interaction, will execute after all components have been updated"""
+        pass    
+
+    def update_internal(self,ignore:tuple=None):
         """updates internal components with self"""
         for key, config in self.internal_components.items():
+            if ignore is not None and config in ignore:
+                continue
             config.update(self)
-            config.update_internal()
+            config.update_internal(ignore)
+
+    def post_update_internal(self,ignore:tuple=None):
+        """updates internal components with self"""
+        for key, config in self.internal_components.items():
+            if ignore is not None and config in ignore:
+                continue            
+            config.post_update(self)
+            config.post_update_internal(ignore)            
 
 
 # TODO: move inspection for components to mixin for inspection of slots

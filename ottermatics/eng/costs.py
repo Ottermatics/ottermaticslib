@@ -126,7 +126,7 @@ class cost_property(system_property):
 class CostModel(TabulationMixin): 
     """CostModel is a mixin for components or systems that reports its costs through the `cost` system property, which by default sums the `item_cost` and `sub_items_cost`.
 
-    `item_cost` is determined by `calculate_item_cost()` which by default uses: `cost_per_item` field to return the item cost
+    `item_cost` is determined by `calculate_item_cost()` which by default uses: `cost_per_item` field to return the item cost, which defaults to `numpy.nan` if not set. Nan values are ignored and replaced with 0.
     
     `sub_items_cost` system_property summarizes the costs of any component in a SLOT that has a `CostModel` or for SLOTS which CostModel.declare_cost(`slot`,default=numeric|CostModelInst|dict[str,float])
     """
@@ -139,6 +139,10 @@ class CostModel(TabulationMixin):
 
     def __on_init__(self):
         self.set_default_costs()
+    
+        # for k,config in self.internal_configurations().items():
+        #     if isinstance(config,CostModel):
+        #         config.update(self)
 
     def set_default_costs(self):
         """set default costs if no costs are set"""
@@ -221,16 +225,23 @@ class CostModel(TabulationMixin):
         initial_costs = self.costs_at_term(0,False)
         return numpy.nansum(list(initial_costs.values()))
 
-    def sum_costs(self,saved:set=None):
+    def sum_costs(self,saved:set=None,categories:tuple=None,term=0):
+        """sums costs of cost_property's in this item that are present at term=0, and by category if define as input"""
         if saved is None:
             saved = set((self,)) #item cost included!
         elif self not in saved:
             saved.add(self)
-        csts = [self.sub_costs(saved),self.itemized_costs]
+        itemcst = list(self.dict_itemized_costs(saved,categories,term).values())
+        csts = [self.sub_costs(saved,categories,term),numpy.nansum(itemcst)]
         return numpy.nansum(csts)
+
+    def dict_itemized_costs(self,saved:set=None,categories:tuple=None,term=0,test_val = True)->dict:
+        ccp = self.class_cost_properties()
+        costs = {k: obj.__get__(self) if obj.apply_at_term(self,term)==test_val else 0 for k,obj in ccp.items() if categories is None or any([cc in categories for cc in obj.cost_categories])}
+        return costs
          
     
-    def sub_costs(self,saved:set=None):
+    def sub_costs(self,saved:set=None,categories:tuple=None,term=0):
         """gets items from CostModel's defined in a SLOT attribute or in a slot default"""
         if saved is None:
             saved = set()
@@ -248,12 +259,12 @@ class CostModel(TabulationMixin):
                 saved.add(comp)
 
             if isinstance(comp,CostModel):
-                sub = comp.sum_costs(saved)
+                sub = comp.sum_costs(saved,categories,term)
                 log.debug(f'{self} adding: {comp}: {sub}+{sub_tot}')
                 cst = [sub_tot,sub]
                 sub_tot = numpy.nansum(cst)
 
-            elif slot in self._slot_costs:
+            elif slot in self._slot_costs and (categories is None or 'unit' in categories) and term==0:
                 dflt = self._slot_costs[slot]
                 sub = evaluate_slot_cost(dflt,saved)
                 log.debug(f'{self} adding slot: {comp}.{slot}: {sub}+{sub_tot}')
@@ -267,8 +278,7 @@ class CostModel(TabulationMixin):
         """returns a dictionary of all costs at term i, with zero if the mode 
         function returns False at that term"""
         ccp = self.class_cost_properties()
-        return {k: obj.__get__(self) if obj.apply_at_term(self,term)==test_val else 0 
-                  for k,obj in ccp.items()}        
+        return {k: obj.__get__(self) if obj.apply_at_term(self,term)==test_val else 0 for k,obj in ccp.items()}        
 
     @classmethod
     def class_cost_properties(cls)->dict:
@@ -335,7 +345,7 @@ class Economics(Component):
     output_type: str = attrs.field(default='generic')
     terms_per_year: int = attrs.field(default=1)
 
-    _output: float = None
+    _calc_output: float = None
     _costs: float  = None
     _cost_references: dict = None
     _cost_categories: dict = None
@@ -354,10 +364,10 @@ class Economics(Component):
         self.parent = parent
 
         self._gather_cost_references(parent)
-        self._output = self.calculate_production(parent,0)
+        self._calc_output = self.calculate_production(parent,0)
         self._costs = self.calculate_costs(parent)
 
-        if self._output is None:
+        if self._calc_output is None:
             self.warning(f'no economic output!')
         if self._costs is None:
             self.warning(f'no economic costs!')
@@ -478,19 +488,25 @@ class Economics(Component):
         """simulates the economics lifecycle and stores the results in a term based dataframe"""    
         out = []
 
-        for i in range(self.term_length+1):
-            row = {'term':i,'year':i/self.terms_per_year}
+        if self.term_length == 0:
+            rng = [0]
+        else:
+            rng = list(range(0,self.term_length))
+        
+        for i in rng:
+            t = i
+            row = {'term':t,'year':t/self.terms_per_year}
             out.append(row)
             for k,sum_f in self._term_comp_category.items():
-                row[k] = sum_f(i)
+                row[k] = sum_f(t)
             for k,sum_f in self._term_cost_category.items():
-                row[k] = sum_f(i)
+                row[k] = sum_f(t)
             for k,sum_f in self._term_comp_cost.items():
-                row[k] = sum_f(i)
-            row['term_cost'] = tc = numpy.nansum([v(i) for v in self._term_comp_cost.values()])
-            row['levalized_cost'] = tc / (1+self.discount_rate)**i
-            row['output'] = output =  self.calculate_production(self.parent,i)
-            row['levalized_output'] = output / (1+self.discount_rate)**i
+                row[k] = sum_f(t)
+            row['term_cost'] = tc = numpy.nansum([v(t) for v in self._term_comp_cost.values()])
+            row['levalized_cost'] = tc * (1+self.discount_rate)**(-1*t)
+            row['output'] = output =  self.calculate_production(self.parent,t)
+            row['levalized_output'] = output * (1+self.discount_rate)**(-1*t)
 
 
         return pandas.DataFrame(out)
@@ -605,9 +621,9 @@ class Economics(Component):
     
     @system_property
     def output(self)->float:
-        if self._output is None:
+        if self._calc_output is None:
             return 0
-        return self._output
+        return self._calc_output
 
 
 # if isinstance(conf,ComponentIter):
