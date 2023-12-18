@@ -34,6 +34,7 @@ class EnvVariable(LoggingMixin):
     fail_on_missing: bool
     desc: str = None
     _upgrd_warn:bool = False
+    _dontovrride: bool = False
 
     def __init__(
         self,
@@ -55,6 +56,7 @@ class EnvVariable(LoggingMixin):
         """
         self.var_name = secret_var_name
         self.type_conv = type_conv
+        self._dontovrride = dontovrride
 
         if default is not None:
             self.default = default
@@ -67,9 +69,10 @@ class EnvVariable(LoggingMixin):
         if secret_var_name in self.__class__._secrets:
             cur = self.__class__._secrets[secret_var_name]
             if dontovrride:
-                pass
+                self.debug(f"not replacing: {cur}->{self}")
+                self.__dict__ = cur.__dict__
             else:
-                self.debug(f"replacing {cur}->{self}")
+                self.info(f"replacing {cur}->{self}")
                 self._replaced.add(cur)
                 self.__class__._secrets[secret_var_name] = self
         else:
@@ -111,7 +114,7 @@ class EnvVariable(LoggingMixin):
 
         #Check if this secret is the one in the secrets registry
         sec = self.__class__._secrets[self.var_name]
-        if sec is not self:
+        if sec is not self and not sec._dontovrride:
 
             #Provide warning that the secret is being replaced
             if not self._upgrd_warn:

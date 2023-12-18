@@ -193,7 +193,7 @@ class TestEconomicsAccounting(unittest.TestCase):
 
     def test_recursive_null(self,ANS=75):
 
-        Comp1.default_cost('norm',5)
+        Comp1.default_cost('norm',5) #BUGFIX: can't make this work, no cls domain makes it impossible?
         Comp2.default_cost('comp1',10)
         EconRecursive.default_cost('comp1',3)
         EconRecursive.default_cost('comp2',7)
