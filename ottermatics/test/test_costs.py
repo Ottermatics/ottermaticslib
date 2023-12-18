@@ -49,10 +49,41 @@ class TermCosts(Comp1,CostModel):
     
 
 @otterize
+class EconDefault(System,CostModel):
+    econ = SLOT.define(Economics)
+    comp = SLOT.define(Component,none_ok=True)
+    comp1 = SLOT.define(Comp1,none_ok=True)
+
+@otterize
 class EconRecursive(System,CostModel):
     econ = SLOT.define(Economics)
     comp1 = SLOT.define(Comp1,none_ok=True)
     comp2 = SLOT.define(Comp2,none_ok=True)
+
+
+class TestEconDefaults(unittest.TestCase):
+
+
+    def tearDown(self) -> None:
+        Comp1.reset_cls_costs()
+        EconDefault.reset_cls_costs()
+
+    def test_custom_costs(self):
+
+        ed = EconDefault()
+        self.assertNotIn('comp1',ed.internal_components())
+
+        ed.custom_cost('comp1',Comp1())
+        self.assertIn('comp1',ed.internal_components())
+
+    def test_non_costmodel_default(self):
+        EconDefault.default_cost('comp',Comp1(cost_per_item=10))
+        ed = EconDefault(comp=Component())
+        self.assertEqual(ed.combine_cost,10)
+        self.assertEqual(ed.econ.combine_cost,10)
+        
+
+
 
 
 class TestCategoriesAndTerms(unittest.TestCase):
@@ -119,12 +150,12 @@ class TestCategoriesAndTerms(unittest.TestCase):
         Comp2.default_cost('comp1',50)
         c2 = Comp2(cost_per_item=10)
         er = EconRecursive(comp1=tc,comp2=c2)        
-        inkw = {'econ.term_length':[1,5,10,15],'econ.fixed_output':1}
+        inkw = {'econ.term_length':[0,5,10,15],'econ.fixed_output':1}
         #inkw = {}
         er.run(revert=False,**inkw)
 
         df = er.dataframe
-        tc = (df['econ.summary.total_cost'] == np.array([172., 246., 316., 401.])).all()
+        tc = (df['econ.summary.total_cost'] == np.array([161., 220., 305., 390.])).all()
         self.assertTrue(tc)
 
 
@@ -148,19 +179,19 @@ class TestEconomicsAccounting(unittest.TestCase):
         EconRecursive.default_cost('comp2',Comp2(cost_per_item=3))
         er = EconRecursive(cost_per_item=50)
         c2 = er.comp2
-        self.assertEqual(er.combine_cost, 68)
-        self.assertEqual(er.sub_items_cost , 18)
+        self.assertEqual(er.combine_cost, 78)
+        self.assertEqual(er.sub_items_cost , 28)
 
         er.run()
         d = er.data_dict
-        self.assertEqual(68,d['econ.summary.total_cost'])
-        self.assertEqual(68,d['econ.lifecycle.annualized.term_cost'])
-        self.assertEqual(68,d['econ.lifecycle.annualized.levalized_cost'])
-        self.assertEqual(68,d['econ.lifecycle.term_cost'])        
+        self.assertEqual(78,d['econ.summary.total_cost'])
+        self.assertEqual(78,d['econ.lifecycle.annualized.term_cost'])
+        self.assertEqual(78,d['econ.lifecycle.annualized.levalized_cost'])
+        self.assertEqual(78,d['econ.lifecycle.term_cost'])        
 
 
 
-    def test_recursive_null(self,ANS=60):
+    def test_recursive_null(self,ANS=75):
 
         Comp1.default_cost('norm',5)
         Comp2.default_cost('comp1',10)
@@ -179,7 +210,7 @@ class TestEconomicsAccounting(unittest.TestCase):
         self.assertEqual(3,d['econ.comp1.cost.item_cost'])
         self.assertEqual(7,d['econ.comp2.cost.item_cost'])
 
-    def test_recursive_comp2(self,ANS=75):
+    def test_recursive_comp2(self,ANS=80):
 
         Comp1.default_cost('norm',5)
         Comp2.default_cost('comp1',10)
@@ -196,7 +227,7 @@ class TestEconomicsAccounting(unittest.TestCase):
         self.assertEqual(3,d['econ.comp1.cost.item_cost'])
         #self.assertEqual(10,d['econ.comp2.combine_cost'])
 
-    def test_recursive_all(self,ANS=75):
+    def test_recursive_all(self,ANS=80):
 
         Comp1.default_cost('norm',5)
         Comp2.default_cost('comp1',10)
@@ -281,8 +312,8 @@ class TestCostModel(unittest.TestCase):
         #Comp1.reset_cls_costs()
         c2 = Comp2(cost_per_item=15)
         c1 = Comp1(cost_per_item=15,norm=c2)
-        self.assertEqual(c1.combine_cost, 30)
-        self.assertEqual(c1.sub_items_cost , 15)   
+        self.assertEqual(c1.combine_cost, 40)
+        self.assertEqual(c1.sub_items_cost , 25)   
 
 
     def test_defaults(self):

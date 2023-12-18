@@ -48,7 +48,7 @@ class Component(TabulationMixin):
 
     def update_internal(self,ignore:tuple=None):
         """updates internal components with self"""
-        for key, config in self.internal_components.items():
+        for key, config in self.internal_components().items():
             if ignore is not None and config in ignore:
                 continue
             config.update(self)
@@ -56,7 +56,7 @@ class Component(TabulationMixin):
 
     def post_update_internal(self,ignore:tuple=None):
         """updates internal components with self"""
-        for key, config in self.internal_components.items():
+        for key, config in self.internal_components().items():
             if ignore is not None and config in ignore:
                 continue            
             config.post_update(self)
@@ -98,7 +98,7 @@ class Component(TabulationMixin):
 #         self.reset_table()
 #         self._stored_plots = []
 #         self.index = 0
-#         for config in self.internal_components.values():
+#         for config in self.internal_components().values():
 #             config.reset_data()
 #
 

@@ -153,6 +153,9 @@ class CostModel(TabulationMixin):
             elif k not in inter_config and isinstance(dflt,type) and issubclass(dflt,CostModel):
                 self.warning(f'setting default cost {k} from costmodel class, provide a default instance instead!')
                 setattr(self,k,dflt())
+
+        #Reset cache
+        self.internal_components(True)
     
     @classmethod
     def subcls_compile(cls):
@@ -165,7 +168,7 @@ class CostModel(TabulationMixin):
 
 
     @classmethod
-    def default_cost(cls,slot_name:str,cost:typing.Union[float,'CostModel']):
+    def default_cost(cls,slot_name:str,cost:typing.Union[float,'CostModel'],warn_on_non_costmodel=True):
         """Provide a default cost for SLOT items that are not CostModel's. Cost is applied class wide, but can be overriden with custom_cost per instance"""
         assert not isinstance(cost,type), f'insantiate classes before adding as a cost!'
         assert slot_name in cls.slots_attributes(), f'slot {slot_name} doesnt exist'
@@ -173,13 +176,14 @@ class CostModel(TabulationMixin):
 
         atrb = cls.slots_attributes()[slot_name]
         atypes = atrb.type.accepted
-        assert all([issubclass(at,CostModel) for at in atypes]), f'costs can only be applied to CostModel based slots'
+        if warn_on_non_costmodel and not any([issubclass(at,CostModel) for at in atypes]):
+            log.warning(f'assigning cost to non CostModel based slot')
 
         cls._slot_costs[slot_name] = cost
 
         #IDEA: create slot if one doesn't exist, for dictionaries and assign a ComponentDict+CostModel in wide mode?
 
-    def custom_cost(self,slot_name:str,cost:typing.Union[float,'CostModel']):
+    def custom_cost(self,slot_name:str,cost:typing.Union[float,'CostModel'],warn_on_non_costmodel=True):
         """Takes class costs set, and creates a copy of the class costs, then applies the cost numeric or CostMethod in the same way but only for that instance of"""
         assert not isinstance(cost,type), f'insantiate classes before adding as a cost!'
         assert slot_name in self.slots_attributes(), f'slot {slot_name} doesnt exist'
@@ -187,12 +191,21 @@ class CostModel(TabulationMixin):
 
         atrb = self.__class__.slots_attributes()[slot_name]
         atypes = atrb.type.accepted
-        assert all([issubclass(at,CostModel) for at in atypes]), f'costs can only be applied to CostModel based slots'
+        if warn_on_non_costmodel and not any([issubclass(at,CostModel) for at in atypes]):
+            self.warning(f'assigning cost to non CostModel based slot')
             
         if self._slot_costs is self.__class__._slot_costs:
             self._slot_costs =  self.__class__._slot_costs.copy()
         self._slot_costs[slot_name] = cost
-        self.set_default_costs()   
+        self.set_default_costs()
+    
+        #if the cost is a cost model, and there's nothing assigned to the slot, assign it
+        # if assign_when_missing and isinstance(cost,CostModel):
+        #     if hasattr(self,slot_name) and getattr(self,slot_name) is None:
+        #         self.info(f'assigning custom cost {slot_name} with {cost}')
+        #         setattr(self,slot_name,cost)
+        #     elif hasattr(self,slot_name):
+        #         self.warning(f'could not assign custom cost to {slot_name} with {cost}, already assigned to {getattr(self,slot_name)}')
 
 
     def calculate_item_cost(self)->float:
@@ -218,7 +231,7 @@ class CostModel(TabulationMixin):
         """sums costs of cost_property's in this item that are present at term=0"""
         initial_costs = self.costs_at_term(0)
         return numpy.nansum( list(initial_costs.values()) )
-    # 
+    
     @system_property
     def future_costs(self)->float:
         """sums costs of cost_property's in this item that do not appear at term=0"""
@@ -264,12 +277,29 @@ class CostModel(TabulationMixin):
                 cst = [sub_tot,sub]
                 sub_tot = numpy.nansum(cst)
 
+            
             elif slot in self._slot_costs and (categories is None or 'unit' in categories) and term==0:
+                #Add default costs from direct slots
                 dflt = self._slot_costs[slot]
-                sub = evaluate_slot_cost(dflt,saved)
+                sub = evaluate_slot_cost(dflt,saved)                
                 log.debug(f'{self} adding slot: {comp}.{slot}: {sub}+{sub_tot}')
                 cst= [sub_tot,sub]
                 sub_tot = numpy.nansum(cst)
+
+            #add base class slot values when comp was nonee
+            if comp is None:
+                #print(f'skipping {slot}:{comp}')
+                comp_cls = self.slots_attributes()[slot].type.accepted
+                for cc in comp_cls:
+                    if issubclass(cc,CostModel):
+                        if cc._slot_costs:
+                            for k,v in cc._slot_costs.items():
+                                sub = evaluate_slot_cost(v,saved)
+                                log.debug(f'{self} adding dflt: {slot}.{k}: {sub}+{sub_tot}')
+                                cst= [sub_tot,sub]
+                                sub_tot = numpy.nansum(cst)
+                            break #only add once
+                    
 
         return sub_tot
 
@@ -373,7 +403,7 @@ class Economics(Component):
             self.warning(f'no economic costs!')
 
         # #Update child cost elements with parents
-        # for slot,comp in self.internal_components.items():
+        # for slot,comp in self.internal_components().items():
         #     if isinstance(comp,CostModel):
         #         comp.update(self)
 
@@ -535,7 +565,7 @@ class Economics(Component):
         """put many tabulation.Ref objects into a dictionary to act as additional references for this economics model.
         
         References are found from a walk through the parent slots through all child slots"""
-        CST = {}
+        self._cost_references = CST = {}
         comps = {}
         comp_set = set()
 
@@ -556,58 +586,125 @@ class Economics(Component):
             else:
                 comp_set.add(key)
 
-            comps[key] = conf
+            
             kbase = '.'.join(key.split('.')[:-1])
             comp_key = key.split('.')[-1]
 
-            #Get Costs Directly
+            #Get Costs Directly From the cost model instance
             if isinstance(conf,CostModel):
-                _key = bse+'item_cost'  
+                comps[key] = conf
+                self.debug(f'adding cost model for {kbase}.{comp_key}')
+                self._extract_cost_references(conf,bse)
+                
+            #Look For Defaults in parent to determine if a 
+            elif kbase and kbase in comps:
+                self.debug(f'adding cost for {kbase}.{comp_key}')
 
-                #Add cost fields
-                for cost_nm,cost_prop in conf.class_cost_properties().items():
-                    _key=bse+'cost.'+cost_nm
-                    CST[_key] = ref = Ref(conf,cost_nm,True,False)
-                    self._comp_costs[_key] = ref
-
-                    #If there are categories we'll add references to later sum them
-                    if cost_prop.cost_categories:
-                        for cc in cost_prop.cost_categories:
-                            self._cost_categories['category.'+cc].append(ref)
-                            self._comp_categories[bse+'category.'+cc].append(ref)
-                    else:
-                        #we'll reference it as uncategorized
-                        cc = 'uncategorized'
-                        self._cost_categories['category.'+cc].append(ref)
-                        self._comp_categories[bse+'category.'+cc].append(ref)
-
-                #add slot costs with now current items:
-                for slot_name, slot_value in conf._slot_costs.items():
-                    #Skip items that are internal components
-                    if slot_name in conf.internal_components:
-                        self.debug(f'skipping slot {slot_name}')
-                        continue
-                    else:
-                        self.debug(f'adding slot {slot_name}')
-                    #Check if current slot isn't occupied
-                    cur_slot = getattr(conf,slot_name)
-                    _key = bse+slot_name+'.cost.item_cost'
-                    if not isinstance(cur_slot,Configuration) and _key not in CST:
-                        CST[_key] = ref = Ref(conf._slot_costs,slot_name,False,False,eval_f = evaluate_slot_cost)
-
+                child = comps[kbase]
+                if isinstance(child,CostModel) and comp_key in parent._slot_costs:
+                    compcanidate = child._slot_costs[comp_key]
+                    if isinstance(compcanidate,CostModel):
+                        self.debug(f'dflt child costmodel {kbase}.{comp_key}')
+                        self._extract_cost_references(compcanidate,bse+'cost.')
+                    else:                    
+                        _key=bse+'cost.item_cost'
+                        self.debug(f'dflt child cost for {kbase}.{comp_key}')
+                        CST[_key] = ref = Ref(child._slot_costs,comp_key,False,False, eval_f = evaluate_slot_cost)
                         cc = 'unit'
                         self._comp_costs[_key] = ref
                         self._cost_categories['category.'+cc].append(ref)
                         self._comp_categories[bse+'category.'+cc].append(ref)
-                    elif _key in CST:
-                        self.debug(f'skipping key {_key}')
+
+            elif isinstance(parent,CostModel) and kbase == '' and comp_key in parent._slot_costs:
+                
+                compcanidate = parent._slot_costs[comp_key]
+                if isinstance(compcanidate,CostModel):
+                    self.debug(f'dflt parent cost model for {kbase}.{comp_key}')
+                    self._extract_cost_references(compcanidate,bse+'cost.')
+                else:
+                    self.debug(f'dflt parent cost for {kbase}.{comp_key}')
+                    _key=bse+'cost.item_cost'
+                    CST[_key] = ref = Ref(parent._slot_costs,comp_key,False,False, eval_f = evaluate_slot_cost)
+                    cc = 'unit'
+                    self._comp_costs[_key] = ref
+                    self._cost_categories['category.'+cc].append(ref)
+                    self._comp_categories[bse+'category.'+cc].append(ref)
 
             else:
-                self.debug(f'unhandled cost: {key}|{conf}')
+                self.debug(f'unhandled cost: {key}')
                     
         self._cost_references = CST
         self._anything_changed = True
         return CST
+    
+    def _extract_cost_references(self,conf:'CostModel',bse:str):
+        #Add cost fields
+        _key = bse+'item_cost'
+        CST = self._cost_references
+
+        for cost_nm,cost_prop in conf.class_cost_properties().items():
+            _key=bse+'cost.'+cost_nm
+            CST[_key] = ref = Ref(conf,cost_nm,True,False)
+            self._comp_costs[_key] = ref
+
+            #If there are categories we'll add references to later sum them
+            if cost_prop.cost_categories:
+                for cc in cost_prop.cost_categories:
+                    self._cost_categories['category.'+cc].append(ref)
+                    self._comp_categories[bse+'category.'+cc].append(ref)
+            else:
+                #we'll reference it as uncategorized
+                cc = 'uncategorized'
+                self._cost_categories['category.'+cc].append(ref)
+                self._comp_categories[bse+'category.'+cc].append(ref)
+
+        #add slot costs with now current items:
+        for slot_name, slot_value in conf._slot_costs.items():
+            #Skip items that are internal components
+            if slot_name in conf.internal_components():
+                self.debug(f'skipping slot {slot_name}')
+                continue
+            else:
+                self.debug(f'adding slot {conf}.{slot_name}')
+            #Check if current slot isn't occupied
+            cur_slot = getattr(conf,slot_name)
+            _key = bse+slot_name+'.cost.item_cost'
+            if not isinstance(cur_slot,Configuration) and _key not in CST:
+                CST[_key] = ref = Ref(conf._slot_costs,slot_name,False,False,eval_f = evaluate_slot_cost)
+
+                cc = 'unit'
+                self._comp_costs[_key] = ref
+                self._cost_categories['category.'+cc].append(ref)
+                self._comp_categories[bse+'category.'+cc].append(ref)
+            elif _key in CST:
+                self.debug(f'skipping key {_key}')
+
+        #add base class slot values when comp was nonee
+        for compnm,comp in conf.internal_configurations(False).items():
+            if comp is None:
+                
+                comp_cls = conf.slots_attributes()[compnm].type.accepted
+                for cc in comp_cls:
+                    if issubclass(cc,CostModel):
+                        if cc._slot_costs:
+                            for k,v in cc._slot_costs.items():
+                                _key=bse+compnm+'.'+k+'.cost.item_cost'
+                                if _key in CST:
+                                    break #skip if already added
+
+                                if isinstance(v,CostModel):
+                                    self._extract_cost_references(v,bse+compnm+'.'+k+'.')
+                                else:
+                                    
+                                    self.debug(f'adding missing cost for {conf}.{compnm}')
+                                    CST[_key] = ref = Ref(cc._slot_costs,k,False,False,eval_f = evaluate_slot_cost)
+
+                                    cc = 'unit'
+                                    self._comp_costs[_key] = ref
+                                    self._cost_categories['category.'+cc].append(ref)
+                                    self._comp_categories[bse+'category.'+cc].append(ref)
+                                
+                            break #only add once      
 
     @property
     def cost_references(self):

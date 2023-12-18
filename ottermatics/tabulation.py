@@ -125,7 +125,7 @@ class TabulationMixin(Configuration):
 
         # TODO: move to slots structure
         if save_internal:
-            for config in self.internal_components.values():
+            for config in self.internal_components().values():
                 if config is None:
                     continue
                 if config not in saved:
@@ -137,11 +137,14 @@ class TabulationMixin(Configuration):
         # reset value
         self._anything_changed = False
 
-    @instance_cached
-    def internal_components(self) -> dict:
+    def internal_components(self,recache=False) -> dict:
         """get all the internal components"""
+        if recache == False and hasattr(self,'_prv_internal_components'):
+            return self._prv_internal_components 
+            
         o = {k: getattr(self, k) for k in self.slots_attributes()}
         o = {k: v for k, v in o.items() if isinstance(v, TabulationMixin)}
+        self._prv_internal_components = o
         return o
 
     @instance_cached
@@ -151,7 +154,7 @@ class TabulationMixin(Configuration):
 
         return {
             k: v
-            for k, v in self.internal_components.items()
+            for k, v in self.internal_components().items()
             if isinstance(v, ComponentIter) and not v.wide
         }
 

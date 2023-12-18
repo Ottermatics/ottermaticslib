@@ -267,7 +267,7 @@ class SolverMixin:
             raise e
 
         # Solve Each Internal System
-        for key, comp in self.internal_components.items():
+        for key, comp in self.internal_components().items():
             if isinstance(comp, System):
                 comp.evaluate()
             elif isinstance(comp, ComponentIter):
@@ -277,7 +277,7 @@ class SolverMixin:
                 comp.update_internal()
         
         #Post Update Each Internal System
-        for key, comp in self.internal_components.items():
+        for key, comp in self.internal_components().items():
             if isinstance(comp, ComponentIter):
                 comp.post_update(self)
             elif isinstance(comp, Component):
