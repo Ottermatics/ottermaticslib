@@ -4,6 +4,8 @@ When `wide` is set each component's references are reported to the system's tabl
 
 Define a Iterable Component slot in a system by calling `SLOT.define_iterable(...,wide=True/False)`
 
+CostModel isonly supported in wide mode at this time.
+
 Types: 
 1. ComponentList, ordered by index
 2. ComponentDict, ordered by key
@@ -26,7 +28,7 @@ def check_comp_type(instance, attr, value):
     """ensures the input component type is a Component"""
     from ottermatics.eng.costs import CostModel
 
-    if isinstance(value, type) and issubclass(value, CostModel):
+    if  not instance.wide and isinstance(value, type) and issubclass(value, CostModel):
         raise TypeError(f"Cost Mixin Not Supported As Iter Type! {value}")
 
     if isinstance(value, type) and issubclass(value, Component):
@@ -119,7 +121,7 @@ class ComponentIter(Component):
 
     def internal_references(self,recache=False):
         """lists the this_name.comp_key.<attr/prop key>: Ref format to override data_dict"""
-
+        
         if recache == False and hasattr(self,'_prv_internal_references') and self._prv_internal_references:
             return self._internal_references  
 

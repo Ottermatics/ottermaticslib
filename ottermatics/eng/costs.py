@@ -1,3 +1,4 @@
+
 """Defines a CostModel & Economics Component that define & orchestrate cost accounting respectively.
 
 CostModels can have a `cost_per_item` and additionally calculate a `cumulative_cost` from internally defined `CostModel`s.
@@ -139,10 +140,29 @@ class CostModel(TabulationMixin):
 
     def __on_init__(self):
         self.set_default_costs()
-    
-        # for k,config in self.internal_configurations().items():
-        #     if isinstance(config,CostModel):
-        #         config.update(self)
+
+    def update_dflt_costs(self,callback=None):
+        """updates internal default slot costs if the current component doesn't exist or isn't a cost model, this is really a component method but we will use it never the less.
+        
+        The cost model can be updated with a callback(dflt,parent) after update
+
+        This should be called from Component.update() if default costs are used
+        """
+
+        if self._slot_costs:
+            current_comps = self.internal_components()
+            for k,v in self._slot_costs.items():
+                #Check if the cost model will  be accessed
+                no_comp = k not in current_comps
+                is_cost = isinstance(current_comps[k],CostModel)
+                dflt_is_cost_comp = all([isinstance(v,CostModel),isinstance(v,Component)])
+                if no_comp and not is_cost and dflt_is_cost_comp:
+                    self.debug('Updating default {k}')
+                    v.update(self)
+
+                    if callback:
+                        callback(v,self)
+                    
 
     def set_default_costs(self):
         """set default costs if no costs are set"""
@@ -177,7 +197,7 @@ class CostModel(TabulationMixin):
         atrb = cls.slots_attributes()[slot_name]
         atypes = atrb.type.accepted
         if warn_on_non_costmodel and not any([issubclass(at,CostModel) for at in atypes]):
-            log.warning(f'assigning cost to non CostModel based slot')
+            log.warning(f'assigning cost to non CostModel based slot {slot_name}')
 
         cls._slot_costs[slot_name] = cost
 
@@ -192,7 +212,7 @@ class CostModel(TabulationMixin):
         atrb = self.__class__.slots_attributes()[slot_name]
         atypes = atrb.type.accepted
         if warn_on_non_costmodel and not any([issubclass(at,CostModel) for at in atypes]):
-            self.warning(f'assigning cost to non CostModel based slot')
+            self.warning(f'assigning cost to non CostModel based slot {slot_name}')
             
         if self._slot_costs is self.__class__._slot_costs:
             self._slot_costs =  self.__class__._slot_costs.copy()

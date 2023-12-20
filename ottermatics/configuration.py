@@ -78,7 +78,7 @@ def signals_slots_handler(
         log.warning(f"{cls.__name__} does not have a name!")
         name = attrs.Attribute(
             name="name",
-            default="default",
+            default="none",
             validator=None,
             repr=True,
             eq=True,
@@ -316,10 +316,21 @@ def signals_slots_handler(
             if isinstance(o.type, PLOT):
                 print(o)
 
-    # Merge Fields
+    # Merge Fields Checking if we are overriding an attribute with system_property
+    #hack since TabulationMixin isn't available yet
+    if 'TabulationMixin' in str(cls.mro()):
+        cls_properties = cls.classmethod_system_properties()
+    else:
+        cls_properties = {}
     for k, o in in_fields.items():
         if k not in created_fields:
-            out.append(o)
+            if k in cls_properties and o.inherited:
+                log.warning(
+                    f"{cls.__name__} overriding inherited attr: {o.name} as a custom type overriding it"
+                )
+            else:
+                log.debug(f'{cls.__name__} adding attr: {o.name}')
+                out.append(o)
         else:
             log.warning(
                 f"{cls.__name__} skipping inherited attr: {o.name} as a custom type overriding it"
@@ -618,6 +629,74 @@ class Configuration(LoggingMixin):
 
         return attrval
 
+    @classmethod
+    def _extract_type(cls,typ):
+        """gathers valid types for an attribute.type"""
+        from ottermatics.slots import SLOT
+            
+        if not isinstance(typ,type) or typ is None:
+            return list()
+
+        if issubclass(typ,SLOT):
+            accept = typ.accepted
+            if isinstance(accept,(tuple,list)):
+                return list(accept)
+            return [accept]
+            
+        elif issubclass(typ,Configuration):
+            return [typ]
+        
+        elif issubclass(typ,TABLE_TYPES):
+            return [typ]
+
+    @classmethod
+    def check_ref_slot_type(cls,sys_key:str)->list:
+        """recursively checks class slots for the key, and returns the slot type"""
+        slot_refs = cls.slot_refs()
+        if sys_key in slot_refs:
+            return slot_refs[sys_key]
+        
+        slts = cls.input_attrs()
+        key_segs = sys_key.split('.')
+        out = []
+       # print(slts.keys(),sys_key)
+        if '.' not in sys_key and sys_key not in slts:
+            pass
+
+        elif sys_key in slts:
+            #print(f'slt find {sys_key}')
+            return cls._extract_type(slts[sys_key].type)
+        else:
+            fst = key_segs[0]
+            rem = key_segs[1:]
+            if fst in slts:
+                sub_clss = cls._extract_type(slts[fst].type)
+                out = []
+                for acpt in sub_clss:
+                    if isinstance(acpt,type) and issubclass(acpt,Configuration):
+                        
+                        vals = acpt.check_ref_slot_type('.'.join(rem))
+                        #print(f'recursive find {acpt}.{rem} = {vals}')
+                        if vals:
+                            out.extend(vals)
+                        
+                    elif isinstance(acpt,type):
+                        out.append(acpt)
+
+        slot_refs[sys_key] = out
+
+        return out
+    
+    @classmethod
+    def slot_refs(cls,recache=False):
+        """returns all slot references in this configuration"""
+        key = f'{cls.__name__}_prv_slot_sys_refs'
+        if recache == False and hasattr(cls,key):
+            return getattr(cls,key)
+        o = {}
+        setattr(cls,key,o)
+        return o
+        
     @classmethod
     def slots_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all slots attributes for class"""

@@ -218,6 +218,7 @@ class solver_cached(otter_prop):
             return self.set_cache(instance, reason="set")
         elif instance.anything_changed:
             return self.set_cache(instance)
+    
         return getattr(instance, self.private_var)
 
     def __set__(self, instance, value):

@@ -79,6 +79,7 @@ class TestEconDefaults(unittest.TestCase):
     def test_non_costmodel_default(self):
         EconDefault.default_cost('comp',Comp1(cost_per_item=10))
         ed = EconDefault(comp=Component())
+        ed.run()
         self.assertEqual(ed.combine_cost,10)
         self.assertEqual(ed.econ.combine_cost,10)
         

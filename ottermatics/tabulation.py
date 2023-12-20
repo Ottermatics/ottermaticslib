@@ -33,8 +33,11 @@ def is_uniform(s:pandas.Series):
     a = s.to_numpy() # s.values (pandas<0.24)
     if (a[0] == a).all():
         return True
-    if not numpy.isfinite(a).any():
-        return True
+    try:
+        if not numpy.isfinite(a).any():
+            return True
+    except:
+        pass
     return False
 
 def determine_split(df:pandas.DataFrame,top:int=1):
@@ -72,9 +75,53 @@ def split_dataframe(df:pandas.DataFrame)->tuple:
     df_unique = df.copy().drop(columns=list(uniform))
     return uniform,df_unique
 
-    
+class DataframeMixin:
+    dataframe: pandas.DataFrame
 
-class TabulationMixin(Configuration):
+    def smart_split_dataframe(self,df=None,split_groups=0):
+        """splits dataframe between constant values and variants"""
+        if df is None:
+            df = self.dataframe
+        out = {}
+        const,vardf = split_dataframe( df )
+        out['constants'] = const
+        columns = set(vardf.columns)
+        split_groups = min(split_groups,len(columns)-1)
+        if split_groups==0:
+            out['variants'] = vardf
+        else:
+            grps = determine_split(vardf,split_groups)
+            
+            for i,grp in enumerate(sorted(grps,reverse=True)):
+                columns = set(vardf.columns)
+                bad_columns = [c for c in columns if grp not in c]
+                good_columns = [c for c in columns if grp in c]
+                out[grp] = vardf.copy().drop(columns=bad_columns)
+                vardf = vardf.drop(columns=good_columns) #remove columns from vardf
+        return out
+    
+    @solver_cached
+    def _split_dataframe(self):
+        """splits dataframe between constant values and variants"""
+        return split_dataframe(self.dataframe)    
+    
+    @property
+    def dataframe_constants(self):
+        return self._split_dataframe[0]
+    
+    @property
+    def dataframe_variants(self):
+        return self._split_dataframe[1:]    
+
+    #Plotting Interface
+    @property
+    def skip_plot_vars(self) -> list:
+        """accesses '_skip_plot_vars' if it exists, otherwise returns empty list"""
+        if hasattr(self,'_skip_plot_vars'):
+            return [var.lower() for var in self._skip_plot_vars]
+        return []
+
+class TabulationMixin(Configuration,DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
@@ -141,11 +188,22 @@ class TabulationMixin(Configuration):
         """get all the internal components"""
         if recache == False and hasattr(self,'_prv_internal_components'):
             return self._prv_internal_components 
+        from ottermatics.components import Component
+        o = {k: getattr(self, k) for k in self.slots_attributes()}
+        o = {k: v for k, v in o.items() if isinstance(v, Component)}
+        self._prv_internal_components = o
+        return o
+    
+    def internal_tabulations(self,recache=False) -> dict:
+        """get all the internal tabulations"""
+        
+        if recache == False and hasattr(self,'_prv_internal_tabs'):
+            return self._prv_internal_tabs 
             
         o = {k: getattr(self, k) for k in self.slots_attributes()}
         o = {k: v for k, v in o.items() if isinstance(v, TabulationMixin)}
-        self._prv_internal_components = o
-        return o
+        self._prv_internal_tabs = o
+        return o    
 
     @instance_cached
     def iterable_components(self) -> dict:
@@ -220,46 +278,6 @@ class TabulationMixin(Configuration):
         data = [self.TABLE[v] for v in sorted(self.TABLE)]
         return pandas.DataFrame(data=data, copy=True)
     
-    def smart_split_dataframe(self,df,split_groups=0):
-        """splits dataframe between constant values and variants"""
-        out = {}
-        const,vardf = split_dataframe( df )
-        out['constants'] = const
-        columns = set(vardf.columns)
-        split_groups = min(split_groups,len(columns)-1)
-        if split_groups==0:
-            out['variants'] = vardf
-        else:
-            grps = determine_split(vardf,split_groups)
-            
-            for i,grp in enumerate(sorted(grps,reverse=True)):
-                columns = set(vardf.columns)
-                bad_columns = [c for c in columns if grp not in c]
-                good_columns = [c for c in columns if grp in c]
-                out[grp] = vardf.copy().drop(columns=bad_columns)
-                vardf = vardf.drop(columns=good_columns) #remove columns from vardf
-        return out
-    
-    @solver_cached
-    def _split_dataframe(self):
-        """splits dataframe between constant values and variants"""
-        return split_dataframe(self.dataframe)    
-    
-    @property
-    def dataframe_constants(self):
-        return self._split_dataframe[0]
-    
-    @property
-    def dataframe_variants(self):
-        return self._split_dataframe[1:]    
-
-    #Plotting Interface
-    @property
-    def skip_plot_vars(self) -> list:
-        """accesses '_skip_plot_vars' if it exists, otherwise returns empty list"""
-        if hasattr(self,'_skip_plot_vars'):
-            return [var.lower() for var in self._skip_plot_vars]
-        return []
 
     @property
     def plotable_variables(self):
@@ -533,6 +551,9 @@ class TabulationMixin(Configuration):
         elif key in self.classmethod_system_properties():
             # val= cls.classmethod_system_properties()[key]
             return Ref(self, key)
+        
+        elif key in self.internal_configurations() or key in self.slot_attributes():
+            return Ref(self,key)
 
         # Fail on comand but otherwise return val
         if val is None:

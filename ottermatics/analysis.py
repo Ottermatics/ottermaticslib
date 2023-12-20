@@ -1,11 +1,12 @@
 import attr
 from ottermatics.configuration import otterize, Configuration
 from ottermatics.components import Component
-from ottermatics.tabulation import TabulationMixin
+from ottermatics.tabulation import TabulationMixin,DataframeMixin
 from ottermatics.system import System
 from ottermatics.typing import *
 from ottermatics.reporting import *
 from ottermatics.plotting import PlottingMixin
+
 
 # import datetime
 import os
@@ -34,7 +35,7 @@ def make_reporter_check(type_to_check):
 
 
 @otterize
-class Analysis(TabulationMixin, PlottingMixin):
+class Analysis(TabulationMixin, PlottingMixin, DataframeMixin):
     """Analysis takes a system and many reporters, runs the system, adds its own system properties to the dataframe and post processes the results
 
     make_plots() makes plots from the analysis, and stores figure

@@ -20,6 +20,7 @@ from ottermatics.component_collections import ComponentDict
 from ottermatics.eng.solid_materials import *
 from ottermatics.common import *
 from ottermatics.logging import log, LoggingMixin
+from ottermatics.eng.costs import CostModel,cost_property
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
@@ -178,7 +179,7 @@ def calculate_quad_vonmises(quad, combo) -> dict:
 
 # TODO: Make analysis, where each load case is a row, but how sytactically?
 @otterize
-class Structure(System):
+class Structure(System,CostModel):
     """A integration between sectionproperties and PyNite, with a focus on ease of use
 
     Right now we just need an integration between Sections+Materials and Members, to find, CG, and inertial components
@@ -239,6 +240,7 @@ class Structure(System):
             self._any_solved = True #Flag system properties to save
             self.struct_post_execute(combo)
             # backup data saver.
+            self._anything_changed = True #change costs 
             self.save_data(index=self.index, force=True)
             #self._any_solved = False #Flag system properties to save
 
@@ -559,11 +561,21 @@ class Structure(System):
             quads[quadname] = q["mass"]
         return out
 
-    @system_property
-    def cost(self) -> float:
+    @cached_system_property
+    def structure_cost_beams(self) -> float:
         """sum of all beams and quad cost"""
-        return sum([sum(d.values()) for d in self.costs().values()])
+        return sum([sum(self.costs['beams'].values())])
 
+    @cached_system_property
+    def structure_cost_panels(self) -> float:
+        """sum of all panels cost"""
+        return sum([sum(self.costs['quads'].values())]) 
+
+    @cost_property(category='mfg,material,panels')
+    def structure_cost(self):
+        return self.structure_cost_beams + self.structure_cost_panels       
+
+    @solver_cached
     def costs(self) -> dict:
         """return a dictionary of beam & quad costs"""
         out = {}

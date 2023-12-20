@@ -20,6 +20,7 @@ from ottermatics.system import System
 from ottermatics.eng.solid_materials import *
 from ottermatics.common import *
 import ottermatics.eng.geometry as ottgeo
+from ottermatics.eng.costs import CostModel,cost_property
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
@@ -58,7 +59,7 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 @otterize
-class Beam(Component):
+class Beam(Component,CostModel):
     """Beam is a wrapper for emergent useful properties of the structure"""
 
     # parent structure, will be in its _beams
@@ -323,7 +324,7 @@ class Beam(Component):
     def mass(self) -> float:
         return self.material.density * self.Vol
 
-    @system_property
+    @cost_property(category='mfg,material,beams')
     def cost(self) -> float:
         return self.mass * self.material.cost_per_kg
 
