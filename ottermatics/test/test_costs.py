@@ -11,8 +11,11 @@ from ottermatics.slots import SLOT
 from ottermatics.system import System
 from ottermatics.components import Component
 from ottermatics.component_collections import ComponentIterator
-import numpy as np
 
+from ottermatics.properties import system_property
+
+import numpy as np
+import attrs
 @otterize
 class Norm(Component,CostModel):
     pass
@@ -324,9 +327,86 @@ class TestCostModel(unittest.TestCase):
         c2 = Comp2(cost_per_item=3)
         self.assertEqual(c2.combine_cost, 18)
         self.assertEqual(c2.sub_items_cost , 15)
-        
-                    
 
+
+
+#FAN System test
+@otterize
+class Fan(Component,CostModel):
+    """a fan component"""
+    blade_cost_com: float = attrs.field(default=100.0)
+    area:float = attrs.field(default=10.0)
+    V:float = attrs.field(default=5.0)
+
+    @system_property
+    def volumetric_flow(self) -> float:
+        return self.V * self.area
+    
+    @cost_property(category='capex,mfg,material',mode='initial')
+    def blade_cost(self):
+        return self.area * self.blade_cost_com
+    
+    @cost_property(category='labor,opex',mode='maintenance')
+    def repair_cost(self):
+        return self.volumetric_flow * 0.1     
+    
+@otterize
+class Motor(Component,CostModel):
+    """a fan component"""
+    spc_motor_cost: float = attrs.field(default=100.0)
+
+    @system_property
+    def power(self) -> float:
+        return self.parent.fan.volumetric_flow * self.parent.fan.V
+    
+    @cost_property(category='capex,mfg,electrical',mode='initial')
+    def motor_cost(self):
+        return self.power * self.spc_motor_cost  
+    
+    @cost_property(category='labor,opex',mode='maintenance')
+    def repair_cost(self):
+        return self.power * 0.1    
+
+@otterize
+class MetalBase(Component,CostModel):
+
+    cost_per_item = 1000
+        
+@otterize
+class SysEcon(Economics):
+
+    terms_per_year = 12
+
+    def calculate_production(self,parent,term):
+        return self.parent.fan.volumetric_flow
+
+@otterize
+class FanSystem(System,CostModel):
+
+    base = SLOT.define(Component)
+    fan = SLOT.define(Fan)
+    motor = SLOT.define(Motor)
+
+    econ = SLOT.define(SysEcon)
+
+FanSystem.default_cost('base',100)
+
+class TestFanSystemDataFrame(unittest.TestCase):
+
+    def test_dataframe(self):
+        # Create the FanSystem instance
+        fs = FanSystem(fan=Fan(), motor=Motor(), base=MetalBase())
+        fs.run(**{'econ.term_length': [1, 10, 20, 50], 'fan.V': [1, 5, 10], 'fan.area': [1, 5, 10]}, base=[None, MetalBase()])
+
+        # Get the dataframe
+        df_complete = fs.dataframe
+
+        dfc = df_complete
+        match = (dfc['fan.blade_cost']+dfc['motor.motor_cost']==dfc['econ.lifecycle.category.capex']).all()
+        self.assertTrue(match)
+
+        match = (df_complete['fan.area']*df_complete['fan.V'] == df_complete['fan.volumetric_flow']).all()
+        self.assertTrue(match)
 
 #TODO: get cost accounting working for ComponentIter components
 

@@ -318,10 +318,12 @@ def signals_slots_handler(
 
     # Merge Fields Checking if we are overriding an attribute with system_property
     #hack since TabulationMixin isn't available yet
-    if 'TabulationMixin' in str(cls.mro()):
-        cls_properties = cls.classmethod_system_properties()
+    #print(cls.mro())
+    if 'TabulationMixin' in str(cls.mro()):   
+        cls_properties = cls.classmethod_system_properties(True)
     else:
         cls_properties = {}
+    #print(f'tab found!! {cls_properties.keys()}')
     for k, o in in_fields.items():
         if k not in created_fields:
             if k in cls_properties and o.inherited:

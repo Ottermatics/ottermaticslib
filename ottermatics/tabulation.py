@@ -40,9 +40,22 @@ def is_uniform(s:pandas.Series):
         pass
     return False
 
-def determine_split(df:pandas.DataFrame,top:int=1):
-    raw = sorted(set(df.columns))
+#key_func = lambda kv: len(kv[0].split('.'))*len(kv[1])
+#key_func = lambda kv: len(kv[1])/len(kv[0].split('.'))
+key_func = lambda kv: len(kv[1])
 
+    
+#TODO: remove duplicate columns
+# mtches = collections.defaultdict(set)
+# dfv = ecs.dataframe_variants[0]
+# for v1,v2 in itertools.combinations(dfv.columns,2):
+#     if numpy.all(dfv[v1]==dfv[v2]):
+#         
+#         mtches[v1].add(v2)
+#         mtches[v2].add(v1)
+        
+    
+def determine_split(raw,top:int=1,key_f = key_func):
     parents = {}
 
     for rw in raw:
@@ -50,15 +63,14 @@ def determine_split(df:pandas.DataFrame,top:int=1):
         for i in range(len(grp)):
             tkn = '.'.join(grp[0:i+1])
             parents[tkn] = set()
-        assert rw == tkn
         
     for rw in raw:
         for par in parents:
-            if par in rw:
+            if rw.startswith(par):
                 parents[par].add(rw)
 
 
-    grps = sorted(parents.items(),key=lambda kv: len(kv[1]),reverse=True)[:5]
+    grps = sorted(parents.items(),key=key_f,reverse=True)[:top]
     return [g[0] for g in grps]
 
 def split_dataframe(df:pandas.DataFrame)->tuple:
@@ -78,7 +90,7 @@ def split_dataframe(df:pandas.DataFrame)->tuple:
 class DataframeMixin:
     dataframe: pandas.DataFrame
 
-    def smart_split_dataframe(self,df=None,split_groups=0):
+    def smart_split_dataframe(self,df=None,split_groups=0,key_f = key_func):
         """splits dataframe between constant values and variants"""
         if df is None:
             df = self.dataframe
@@ -90,14 +102,18 @@ class DataframeMixin:
         if split_groups==0:
             out['variants'] = vardf
         else:
-            grps = determine_split(vardf,split_groups)
+            raw = sorted(set(df.columns))
+            grps = determine_split(raw,split_groups,key_f=key_f)
             
             for i,grp in enumerate(sorted(grps,reverse=True)):
                 columns = set(vardf.columns)
                 bad_columns = [c for c in columns if grp not in c]
                 good_columns = [c for c in columns if grp in c]
                 out[grp] = vardf.copy().drop(columns=bad_columns)
-                vardf = vardf.drop(columns=good_columns) #remove columns from vardf
+                #remove columns from vardf
+                vardf = vardf.drop(columns=good_columns) 
+            if vardf.size>0:
+                out['misc'] = vardf
         return out
     
     @solver_cached
@@ -194,6 +210,16 @@ class TabulationMixin(Configuration,DataframeMixin):
         self._prv_internal_components = o
         return o
     
+    def internal_systems(self,recache=False) -> dict:
+        """get all the internal components"""
+        if recache == False and hasattr(self,'_prv_internal_systems'):
+            return self._prv_internal_systems 
+        from ottermatics.system import System
+        o = {k: getattr(self, k) for k in self.slots_attributes()}
+        o = {k: v for k, v in o.items() if isinstance(v, System)}
+        self._prv_internal_systems = o
+        return o    
+    
     def internal_tabulations(self,recache=False) -> dict:
         """get all the internal tabulations"""
         
@@ -246,9 +272,10 @@ class TabulationMixin(Configuration,DataframeMixin):
             self._anything_changed = True
 
         if self._anything_changed or self.always_save_data:
-            self.debug(
-                f"change: {self._anything_changed}| always: {self.always_save_data}"
-            )
+            if self.log_level <= 5:
+                self.msg(
+                    f"change: {self._anything_changed}| always: {self.always_save_data}"
+                )
             return True
         return False
 
@@ -552,7 +579,7 @@ class TabulationMixin(Configuration,DataframeMixin):
             # val= cls.classmethod_system_properties()[key]
             return Ref(self, key)
         
-        elif key in self.internal_configurations() or key in self.slot_attributes():
+        elif key in self.internal_configurations() or key in self.slots_attributes():
             return Ref(self,key)
 
         # Fail on comand but otherwise return val

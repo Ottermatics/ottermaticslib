@@ -116,7 +116,7 @@ class SolverMixin:
             #If a slot check the type is applicable
             subslot = cls.check_ref_slot_type(k)
             if subslot is not None:
-                print(f'found subslot {k}: {subslot}')
+                #log.debug(f'found subslot {k}: {subslot}')
                 addty = subslot
             else:
                 addty = []
@@ -260,14 +260,75 @@ class SolverMixin:
             # Mark Time
             self.time = self.time + dt
 
+    def run_internal_systems(self,sys_kw=None):
+        """runs internal systems with potentially scoped kwargs"""
+        # Pre Execute Which Sets Fields And PRE Signals
+        from ottermatics.system import System
+        #Record any changed state in components
+        if isinstance(self,System):
+            self.system_references(recache=True)                              
+        
+        #System Solver Loop
+        for key, comp in self.internal_systems().items():
+            #self.debug(f"checking sys {key}.{comp}")
+            if sys_kw and key in sys_kw:
+                sys_kw_comp = sys_kw[key]
+            else:
+                sys_kw_comp = {}   
+                         
+            #Systems solve cycle
+            if isinstance(comp, System): #should always be true
+                self.info(f"solving {key} with {sys_kw_comp}")
+                comp.evaluate(**sys_kw_comp)
+
+    def update_internal(self,eval_kw=None,*args,**kw):
+        """update internal elements with input arguments"""
+        # Solve Each Internal System
+        if hasattr(self,'update'):
+            self.update(self.parent,*args,**kw)
+
+        for key, comp in self.internal_configurations(False).items():
+            
+            #provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}              
+            
+            #comp update cycle
+            self.debug(f"updating {key}")
+            if isinstance(comp, ComponentIter):
+                comp.update(self,**eval_kw_comp)
+            elif isinstance(comp, Component):
+                comp.update(self,**eval_kw_comp)
+                comp.update_internal()
+
+    def post_update_internal(self,eval_kw=None,*args,**kw):
+        """Post update all internal components"""
+        #Post Update Self
+        if hasattr(self,'post_update'):
+            self.post_update(self.parent,*args,**kw)
+        
+        for key, comp in self.internal_configurations(False).items():
+            
+            #provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}   
+
+            self.debug(f"post_update {key}")
+            if isinstance(comp, ComponentIter):
+                comp.post_update(self,**eval_kw_comp)
+            elif isinstance(comp, Component):
+                comp.post_update(self,**eval_kw_comp)
+                comp.post_update_internal()
+
     # Single Point Flow
     def evaluate(self, _cb=None,eval_kw:dict=None,sys_kw:dict=None, *args,**kw):
         """Evaluates the system with additional inputs for execute()
         :param _cb: an optional callback taking the system as an argument
         """
-
-        # Pre Execute Which Sets Fields And PRE Signals
-        from ottermatics.system import System
 
         if self.log_level < 20:
             self.debug(f"running with X: {self.X} & args:{args} kw:{kw}")
@@ -284,46 +345,17 @@ class SolverMixin:
             out = None
             raise e
 
-        # Solve Each Internal System
-        for key, comp in self.internal_components().items():
-            
-            #provide add eval_kw
-            if eval_kw and key in eval_kw:
-                eval_kw_comp = eval_kw[key]
-            else:
-                eval_kw_comp = {}
-
-            if sys_kw and key in sys_kw:
-                sys_kw_comp = sys_kw[key]
-            else:
-                sys_kw_comp = {}                   
-            
-            #comp update cycle
-            if isinstance(comp, ComponentIter):
-                comp.update(self,**eval_kw_comp)
-            elif isinstance(comp, Component):
-                comp.update(self,**eval_kw_comp)
-                comp.update_internal()
-                
-            #Systems solve cycle
-            if isinstance(comp, System):
-                comp.evaluate(**sys_kw_comp)
+        #Update Internal Elements
+        self.update_internal(eval_kw=eval_kw,*args,**kw)
         
+        self.run_internal_systems(sys_kw=sys_kw)
+
         # Post Execute
         self.post_execute()
 
         #Post Update Each Internal System
-        for key, comp in self.internal_components().items():
-            if isinstance(comp, ComponentIter):
-                comp.post_update(self,**eval_kw_comp)
-            elif isinstance(comp, Component):
-                comp.post_update(self,**eval_kw_comp)
-                comp.post_update_internal()
-
-        #Record any changed state in components
-        if isinstance(self,System):
-            self.system_references(recache=True)        
-
+        self.post_update_internal(eval_kw=eval_kw,*args,**kw)
+             
         # Save The Data
         self.save_data(index=self.index)
 
