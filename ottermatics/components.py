@@ -49,7 +49,7 @@ class Component(TabulationMixin):
 
     def update_internal(self,ignore:set=None,**kw):
         """updates internal components with self"""
-        self.debug(f'updating internal')
+        self.debug(f'updating internal {self.__class__.__name__}.{self}')
         for key, config in self.internal_components().items():
             if ignore is not None and config in ignore:
                 continue
@@ -60,11 +60,11 @@ class Component(TabulationMixin):
 
     def post_update_internal(self,ignore:set=None,**kw):
         """updates internal components with self"""
-        self.debug(f'post updating internal')
+        self.debug(f'post updating internal {self.__class__.__name__}.{self}')
         for key, config in self.internal_components().items():
             if ignore is not None and config in ignore:
                 continue
-            self.debug(f'post updating internal component {key}')       
+            self.debug(f'post updating internal component {config.__class__.__name__}.{config}')       
             config.post_update(self)
             config.post_update_internal(ignore)    
         if ignore: ignore.add(self)        

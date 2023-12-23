@@ -157,7 +157,7 @@ class SolverMixin:
         system = cls(**_firsts)
         return system.run(**kwargs, **trs_opts, _cb=_cb)
 
-    def run(self, revert=True, _cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None,**kwargs):
+    def run(self, revert=True, _cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None, force_solve=False,**kwargs):
         """applies a permutation of input parameters for parameters not marked as transient, runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. The run command additionally configures the transient parameters
 
         :param dt: timestep in s, required for transients
@@ -191,7 +191,7 @@ class SolverMixin:
             sequence_keys = sequence_keys.union(set(seq.keys()))
 
         # RUN
-        if not self.solved or self.anything_changed:
+        if force_solve or not self.solved or self.anything_changed:
             _firsts, _input, trs_opts = self.parse_run_kwargs(**kwargs)
 
             if revert:
@@ -245,8 +245,11 @@ class SolverMixin:
                 self.set_system_state(ignore=["index"], **revert_x)
 
             self._solved = True
-        else:
+        elif not self.anything_changed:
+            self.warning(f'nothing changed, not running {self.identity}')
+        elif self.solved:
             raise Exception("Analysis Already Solved")
+            
 
     def run_transient(self, dt, N, _cb=None):
         """integrates the time series over N points at a increment of dt"""
@@ -281,14 +284,20 @@ class SolverMixin:
                 self.info(f"solving {key} with {sys_kw_comp}")
                 comp.evaluate(**sys_kw_comp)
 
+    def update(self,parent,*args,**kwargs):
+        pass
+        
+    def post_update(self,parent,*args,**kwargs):
+        pass        
+        
     def update_internal(self,eval_kw=None,*args,**kw):
         """update internal elements with input arguments"""
         # Solve Each Internal System
-        if hasattr(self,'update'):
-            self.update(self.parent,*args,**kw)
-
+        self.update(self.parent,*args,**kw)
+        self.debug(f'updating internal {self.__class__.__name__}.{self}')
         for key, comp in self.internal_configurations(False).items():
             
+
             #provide add eval_kw
             if eval_kw and key in eval_kw:
                 eval_kw_comp = eval_kw[key]
@@ -296,19 +305,18 @@ class SolverMixin:
                 eval_kw_comp = {}              
             
             #comp update cycle
-            self.debug(f"updating {key}")
+            self.debug(f"updating {key} {comp.__class__.__name__}.{comp}")
             if isinstance(comp, ComponentIter):
                 comp.update(self,**eval_kw_comp)
-            elif isinstance(comp, Component):
+            elif isinstance(comp, (SolverMixin,Component)):
                 comp.update(self,**eval_kw_comp)
                 comp.update_internal()
 
     def post_update_internal(self,eval_kw=None,*args,**kw):
         """Post update all internal components"""
         #Post Update Self
-        if hasattr(self,'post_update'):
-            self.post_update(self.parent,*args,**kw)
-        
+        self.post_update(self.parent,*args,**kw)
+        self.debug(f'post updating internal {self.__class__.__name__}.{self}')
         for key, comp in self.internal_configurations(False).items():
             
             #provide add eval_kw
@@ -317,10 +325,10 @@ class SolverMixin:
             else:
                 eval_kw_comp = {}   
 
-            self.debug(f"post_update {key}")
+            self.debug(f"post updating {key} {comp.__class__.__name__}.{comp}")
             if isinstance(comp, ComponentIter):
                 comp.post_update(self,**eval_kw_comp)
-            elif isinstance(comp, Component):
+            elif isinstance(comp, (SolverMixin,Component)):
                 comp.post_update(self,**eval_kw_comp)
                 comp.post_update_internal()
 

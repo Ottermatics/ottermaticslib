@@ -78,7 +78,7 @@ def signals_slots_handler(
         log.warning(f"{cls.__name__} does not have a name!")
         name = attrs.Attribute(
             name="name",
-            default="none",
+            default=attrs.Factory(lambda inst: str(inst.__class__.__name__).lower(),True),
             validator=None,
             repr=True,
             eq=True,
@@ -328,7 +328,7 @@ def signals_slots_handler(
         if k not in created_fields:
             if k in cls_properties and o.inherited:
                 log.warning(
-                    f"{cls.__name__} overriding inherited attr: {o.name} as a custom type overriding it"
+                    f"{cls.__name__} overriding inherited attr: {o.name} as a system property overriding it"
                 )
             else:
                 log.debug(f'{cls.__name__} adding attr: {o.name}')
@@ -443,7 +443,7 @@ class Configuration(LoggingMixin):
     _temp_vars = None
 
     name: str = attr.ib(
-        default="default",
+        default = attrs.Factory(lambda inst: str(inst.__class__.__name__).lower(),True),
         validator=attr.validators.instance_of(str),
         kw_only=True,
     )
@@ -452,6 +452,7 @@ class Configuration(LoggingMixin):
     log_silo = True
 
     _created_datetime = None
+
 
     # Our Special Init Methodology
     def __on_init__(self):

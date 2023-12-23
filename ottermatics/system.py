@@ -63,7 +63,6 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
     _anything_changed_ = False
 
     parent: typing.Union['Component','System'] = attrs.field(default=None)
-    name: str = attrs.field(default="default")
 
     # Properties!
     @system_property

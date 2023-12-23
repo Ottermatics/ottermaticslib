@@ -41,8 +41,9 @@ def is_uniform(s:pandas.Series):
     return False
 
 #key_func = lambda kv: len(kv[0].split('.'))*len(kv[1])
-#key_func = lambda kv: len(kv[1])/len(kv[0].split('.'))
-key_func = lambda kv: len(kv[1])
+#length of matches / length of key
+key_func = lambda kv: len(kv[1])/len(kv[0].split('.'))
+#key_func = lambda kv: len(kv[1])
 
     
 #TODO: remove duplicate columns
@@ -102,13 +103,25 @@ class DataframeMixin:
         if split_groups==0:
             out['variants'] = vardf
         else:
+            nconst = {}
+            cgrp = determine_split(const,min(split_groups,len(const)-1))
+            for i,grp in enumerate(sorted(cgrp,reverse=True)):
+                columns = set(const)
+                bad_columns = [c for c in columns if not c.startswith(grp)]
+                good_columns = [c for c in columns if c.startswith(grp)]
+                nconst[grp] = {c:const[c] for c in good_columns}
+                for c in good_columns:
+                    if c in columns:
+                        columns.remove(c)
+            out['constants'] = nconst
+
             raw = sorted(set(df.columns))
             grps = determine_split(raw,split_groups,key_f=key_f)
             
             for i,grp in enumerate(sorted(grps,reverse=True)):
                 columns = set(vardf.columns)
-                bad_columns = [c for c in columns if grp not in c]
-                good_columns = [c for c in columns if grp in c]
+                bad_columns = [c for c in columns if not c.startswith(grp)]
+                good_columns = [c for c in columns if c.startswith(grp)]
                 out[grp] = vardf.copy().drop(columns=bad_columns)
                 #remove columns from vardf
                 vardf = vardf.drop(columns=good_columns) 
