@@ -17,6 +17,23 @@ import inspect
 global warned
 warned = set()  # a nice global variable to hold any warnings
 
+FALSE_VALUES = (False, "false", "no", "n")
+TRUE_VALUES = (True, "checked", "true", "yes", "y")
+
+def parse_bool(input: str):
+    if isinstance(input,str):
+        input = input.lower()
+        
+    if not input:
+        return False
+    elif input in TRUE_VALUES:
+        return True
+    elif input in FALSE_VALUES:
+        return False
+    return False
+
+DEFAULT_CONVERTERS = {bool:parse_bool}
+
 
 class EnvVariable(LoggingMixin):
     """A method to wrap SECRETS and in application with a way to get the value using self.secret
@@ -55,7 +72,7 @@ class EnvVariable(LoggingMixin):
         :param desc: a description of the purpose of the variable
         """
         self.var_name = secret_var_name
-        self.type_conv = type_conv
+        self.type_conv = type_conv if type_conv not in DEFAULT_CONVERTERS else DEFAULT_CONVERTERS[type_conv]
         self._dontovrride = dontovrride
 
         if default is not None:

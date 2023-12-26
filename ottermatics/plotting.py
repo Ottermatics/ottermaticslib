@@ -14,6 +14,7 @@ import typing
 from ottermatics.configuration import otterize
 from ottermatics.properties import *
 from ottermatics.env_var import EnvVariable
+from matplotlib.backends.backend_pdf import PdfPages
 
 
 class PlotLog(LoggingMixin):
@@ -127,6 +128,15 @@ def install_seaborn(rc_override=None, **kwargs):
 
 install_seaborn()
 
+def save_all_figures_to_pdf(filename, figs=None, dpi=200,close=True):
+    pp = PdfPages(filename)
+    if figs is None:
+        figs = [plt.figure(n) for n in plt.get_fignums()]
+    for fig in figs:
+        fig.savefig(pp, format='pdf')
+    pp.close() #dont keep pdf open
+    if close:
+        plt.close('all')
 
 class PlottingMixin:
     """Inherited by Systems and Analyses to provide common interface for plotting"""

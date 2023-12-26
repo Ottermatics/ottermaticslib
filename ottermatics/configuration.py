@@ -477,6 +477,7 @@ class Configuration(LoggingMixin):
         #Assign Parents, ensure single componsition
         for compnm,comp in self.internal_configurations(False).items():
             if isinstance(comp,Component):
+                #TODO: allow multiple parents
                 if (not hasattr(comp,'parent')) and (comp.parent is not None):
                     self.warning(f"Component {compnm} already has a parent {comp.parent} copying, and assigning to {self}")
                     setattr(self,compnm,attrs.evolve(comp,parent=self))
