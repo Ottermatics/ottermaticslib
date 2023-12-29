@@ -131,12 +131,12 @@ install_seaborn()
 def save_all_figures_to_pdf(filename, figs=None, dpi=200,close=True):
     pp = PdfPages(filename)
     if figs is None:
-        figs = [plt.figure(n) for n in plt.get_fignums()]
+        figs = [pylab.figure(n) for n in pylab.get_fignums()]
     for fig in figs:
         fig.savefig(pp, format='pdf')
     pp.close() #dont keep pdf open
     if close:
-        plt.close('all')
+        pylab.close('all')
 
 class PlottingMixin:
     """Inherited by Systems and Analyses to provide common interface for plotting"""
