@@ -21,6 +21,7 @@ from ottermatics.eng.solid_materials import *
 from ottermatics.common import *
 from ottermatics.logging import log, LoggingMixin
 from ottermatics.eng.costs import CostModel,cost_property
+from ottermatics.slots import SLOT
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
@@ -177,6 +178,9 @@ def calculate_quad_vonmises(quad, combo) -> dict:
         qvm[(r, s)] = calculate_von_mises_stress(S)
     return qvm
 
+@otterize
+class BeamDict(ComponentDict):
+    component_type:type = attrs.field(default=Beam)
 
 # TODO: Make analysis, where each load case is a row, but how sytactically?
 @otterize
@@ -212,7 +216,8 @@ class Structure(System,CostModel):
     tolerance: float = attrs.field(default=1e-3)
 
     # beam_collection
-    beams: ComponentDict = attrs.field(default=attrs.Factory(beam_collection))
+    #beams: ComponentDict = attrs.field(default=attrs.Factory(beam_collection))
+    beams = SLOT.define_iterator(BeamDict, wide=True)
 
     _always_save_data = True  # we dont respond to inputs so use this
     _meshes = None
