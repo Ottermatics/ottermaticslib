@@ -33,6 +33,7 @@ import collections
 import numpy as np
 import itertools as itert
 import asyncio
+import weakref
 
 from ottermatics.eng.structure_beams import Beam, rotation_matrix_from_vectors
 
@@ -206,6 +207,10 @@ class Structure(System,CostModel):
     # this orchestrates load retrieval
     current_combo: str = attrs.field(default="gravity")
 
+    #merge_duplicate_nodes by default
+    merge_nodes: bool = attrs.field(default=True)
+    tolerance: float = attrs.field(default=1e-3)
+
     # beam_collection
     beams: ComponentDict = attrs.field(default=attrs.Factory(beam_collection))
 
@@ -214,13 +219,13 @@ class Structure(System,CostModel):
     _any_solved = False
 
     def __on_init__(self):
-        self._materials = {}
-        self._meshes = {}
+        self._materials = weakref.WeakValueDictionary()
+        self._meshes = weakref.WeakValueDictionary()
         self.initalize_structure()
         self.frame.add_load_combo("gravity", {"gravity": 1.0}, "gravity")
 
     # Execution
-    def run(self, combos: list = None, *args, **kwargs):
+    def execute(self, combos: list = None, *args, **kwargs):
         """wrapper allowing saving of data by load combo"""
 
         # the string input case, with csv support
@@ -236,7 +241,7 @@ class Structure(System,CostModel):
             self.info(f"running load combo : {combo}")
             self.current_combo = combo
             self.struct_pre_execute(combo)
-            self.analyze(combos=[combo], *args, **kwargs)
+            self.analyze(load_combos=[combo], *args, **kwargs)
             self._any_solved = True #Flag system properties to save
             self.struct_post_execute(combo)
             # backup data saver.
@@ -276,7 +281,8 @@ class Structure(System,CostModel):
                 self._materials[uid] = material
 
     # Merged Feature Calls
-    def add_eng_material(self, material: "SolidMaterial"):
+    def add_eng_material(self, material: "SolidMaterial")->str:
+        """adds the material to the structure and returns the pynite id"""
         if material.unique_id not in self._materials:
             self.add_material(
                 material.unique_id,
@@ -286,6 +292,8 @@ class Structure(System,CostModel):
                 material.rho,
             )
             self._materials[material.unique_id] = material
+
+        return material.unique_id
 
     # TODO: install custom cylilnder ring mesher
     def mesh_extents(self) -> dict:
@@ -361,7 +369,9 @@ class Structure(System,CostModel):
         if meshname not in self.frame.Meshes:
             self.frame.Meshes[meshname] = mesh
 
-        self.merge_duplicate_nodes()
+        if self.merge_nodes:
+            self.merge_duplicate_nodes(tolerance=self.tolerance)
+            
         if self.add_gravity_force:
             self.apply_gravity_to_mesh(meshname)
 

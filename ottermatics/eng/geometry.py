@@ -253,7 +253,11 @@ class HollowCircle(Profile2D):
 
 # ADVANCED CUSTOM SECTIONS
 def get_mesh_size(inst):
-    x, y = inst.shape.exterior.coords.xy
+    if isinstance(inst.shape, Geometry):
+        shape = inst.shape.geom
+    else:
+        shape = inst.shape
+    x, y = shape.exterior.coords.xy
     dx = max(x) - min(x)
     dy = max(y) - min(y)
     ddx = min(np.diff(x))
@@ -263,27 +267,37 @@ def get_mesh_size(inst):
 
 @otterize
 class ShapelySection(Profile2D):
-    """a 2D profile that takes a shapely section to calculate section properties"""
+    """a 2D profile that takes a shapely section to calculate section properties, use a sectionproperties section with hidden variable `_geo` to bypass shape calculation"""
 
     name: str = attrs.field(default="shapely section")
-    shape: shapely.Polygon = attrs.field(
-        validator=attr.validators.instance_of(shapely.Polygon)
-    )
+    shape: shapely.Polygon = attrs.field()
     mesh_size: float = attrs.field(default=attrs.Factory(get_mesh_size, True))
     material: sec_material = attrs.field(default=None)
 
     coarse: bool = attrs.field(default=False)
 
-    _geo: Geometry
+    _sec: Section = None
+    _geo: Geometry  = None
     _A: float
 
     def __on_init__(self):
         self.init_with_material(self.material)
 
     def init_with_material(self, material=None):
-        if hasattr(self, "_sec"):
+        if self._sec is not None:
             raise Exception(f"already initalized!")
-        self._geo = Geometry(self.shape, self.material)
+        
+        if isinstance(self.shape,Geometry):
+            self._geo = self.shape
+            if self._geo.material:
+                self.warning(f'overriding material {self._geo.material} with {self.material}')
+            self._geo.material = self.material
+            self.shape = self._geo.geom
+        elif isinstance(self.shape,shapely.Polygon):
+            self._geo = Geometry(self.shape, self.material)
+        else:
+            raise ValueException(f'got invalid shape: {self.shape}')
+            
         self._mesh = self._geo.create_mesh([self.mesh_size], coarse=self.coarse)
         self._sec = Section(self._geo)
         self._sec.calculate_geometric_properties()
