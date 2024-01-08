@@ -126,6 +126,7 @@ class Beam(Component,CostModel):
 
         self.debug(f"determining {section} properties...")
         if isinstance(self.section, geometry.Geometry):
+            self.warning(f'using deprecated section type {section}')
             # Calculate Sections X/Y Bounds
             xcg, ycg = self.section.calculate_centroid()
             minx, maxx, miny, maxy = self.section.calculate_extents()
@@ -812,14 +813,14 @@ class Beam(Component,CostModel):
         for case in self.structure.gravity_cases:
             total_weight = self.mass * self.structure.gravity_mag
             d = {z_dir: z_mag * total_weight}
-            self.apply_distributed_load(case=case, **d)
+            self.apply_distributed_load(case=self.structure.gravity_name, **d)
 
     def apply_gravity_force(self, x_frac=0.5, z_dir="FZ", z_mag=-1):
         self.debug(f"applying gravity to {self.name}")
         for case in self.structure.gravity_cases:
             total_weight = self.mass * self.structure.gravity_mag
             d = {z_dir: z_mag * total_weight}
-            self.apply_pt_load(x_frac, case=case, **d)
+            self.apply_pt_load(x_frac, case=self.structure.gravity_name, **d)
 
     def __dir__(self) -> Iterable[str]:
         d = set(super().__dir__())

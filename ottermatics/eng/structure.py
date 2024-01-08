@@ -204,12 +204,15 @@ class Structure(System,CostModel):
     gravity_dir: str = attrs.field(default="FZ")
     gravity_mag: float = attrs.field(default=9.81)
     gravity_scalar: float = attrs.field(default=-1)
+    gravity_name: str = attrs.field(default='gravity')
     gravity_cases: list = attrs.field(default=["gravity"])
     default_case: str = attrs.field(default="gravity")
     default_combo: str = attrs.field(default="gravity")
 
     # this orchestrates load retrieval
     current_combo: str = attrs.field(default="gravity")
+    #iteration combos iterates over LoadCombos by default
+    iteration_combos: list = attrs.field(default=None)
 
     #merge_duplicate_nodes by default
     merge_nodes: bool = attrs.field(default=True)
@@ -218,6 +221,12 @@ class Structure(System,CostModel):
     # beam_collection
     #beams: ComponentDict = attrs.field(default=attrs.Factory(beam_collection))
     beams = SLOT.define_iterator(BeamDict, wide=True)
+    
+    #per execute failure analysis
+    #calculate actual failure will estimate then run failure analysis for bad cases
+    #calculate full failure will run failure analysis without stoping at first failure
+    calculate_actual_failure: bool =attrs.field(default=True)
+    calculate_full_failure: bool =attrs.field(default=True)
 
     _always_save_data = True  # we dont respond to inputs so use this
     _meshes = None
@@ -227,7 +236,11 @@ class Structure(System,CostModel):
         self._materials = weakref.WeakValueDictionary()
         self._meshes = weakref.WeakValueDictionary()
         self.initalize_structure()
-        self.frame.add_load_combo("gravity", {"gravity": 1.0}, "gravity")
+        self.frame.add_load_combo(self.default_combo, {self.gravity_name: 1.0}, "gravity" )
+        self.create_structure()
+
+    def create_structure(self):
+        raise NotImplemented(f'use this method to create the structure on init')
 
     # Execution
     def execute(self, combos: list = None, *args, **kwargs):
@@ -237,9 +250,16 @@ class Structure(System,CostModel):
         if isinstance(combos, str):
             combos = combos.split(",")  # will be a list!
 
+        self.current_failure_summary = None
+        self._current_combo_failure_analysis = None
+        
         self.info(f"running with combos: {combos} | {args} | {kwargs} ")
         self._run_id = int(uuid.uuid4())
-        for combo in self.LoadCombos:
+        iteration_combos = self.iteration_combos
+        if iteration_combos is None:
+            iteration_combos = list(self.LoadCombos.keys())
+                
+        for combo in iteration_combos:
             if combos is not None and combo not in combos:
                 continue
             self.index += 1
@@ -416,7 +436,7 @@ class Structure(System,CostModel):
             for case in self.gravity_cases:
                 for nname, disnode in nodes.items():
                     self.add_node_load(
-                        disnode.name, self.gravity_dir, fnode, case=case
+                        disnode.name, self.gravity_dir, fnode, case=self.gravity_name
                     )
 
     def add_member(self, name, node1, node2, section, material=None, **kwargs):
@@ -606,7 +626,7 @@ class Structure(System,CostModel):
         from PyNite import Visualization
 
         if "combo_name" not in kwargs:
-            kwargs["combo_name"] = "gravity"
+            kwargs["combo_name"] = self.default_combo
         Visualization.render_model(self.frame, **kwargs)
 
     # TODO: add mesh stress / deflection info min/max ect.
@@ -736,14 +756,21 @@ class Structure(System,CostModel):
         failures = report_info["failures"]
 
         # gravity case first
-        o = ["gravity"]
+        o = [self.default_combo]
         yield o[0]
         if report_info["fails"]:
             if not run_full:
                 return  # you are weak
+        
+        iteration_combos = self.iteration_combos
+        if iteration_combos is None:
+            iteration_combos = list(self.LoadCombos.keys())        
 
         for combo_name, combo in self.LoadCombos.items():
-            if combo_name != "gravity":
+            if combo_name not in iteration_combos:
+                continue
+                
+            if combo_name != self.default_combo:
                 yield combo_name
 
                 # allow time for combo to run
@@ -823,15 +850,19 @@ class Structure(System,CostModel):
     @solver_cached
     def full_failures(self):
         """return all failure estimates for all combos"""
-        return self.estimated_failures()
+        return self.estimated_failures_report()
 
-    def check_mesh_failures(self, combo, run_full=False, SF=1.0):
+    def check_mesh_failures(self, combo, run_full=False, SF=1.0,return_complete=False)->dict:
         """Returns the von-mises stress / allowable (failure fraction) stresses for each quad in each mesh.
         :param run_full: if false will exit early on first failure
         :returns: a dictinary of quad names and their failure fraction
         """
         self.info(f"checking mesh failure {combo}")
+        
+        stable = {}
         failures = {}
+        summary = {'failures':failures,'stable':stable}
+        
         quad_info = self.quad_info
         for meshname, mesh in self._meshes.items():
             matid = mesh.material
@@ -841,16 +872,23 @@ class Structure(System,CostModel):
                 for r, s in itert.product([-1, 0, 1], [-1, 0, 1]):
                     S = quad_stress_tensor(quad, r, s, combo)
                     vm = calculate_von_mises_stress(S)
+                    fail_frac = vm / allowable
                     if vm * SF > allowable:
-                        failures[quadname] = vm / allowable
+                        failures[quadname] = fail_frac
                         if not run_full:
+                            if return_complete:
+                                return summary                            
                             return failures
+                    else:
+                        stable[quadname] = fail_frac
+        if return_complete:
+            return summary
         return failures
 
     def mesh_stress_dataframe(self):
         """returns a dataframe of each quad, its x,y,z coords, vonmises stress and other mass/cost properties in a dataframe"""
         max_vm = {}
-        for qn, q in vs.Quads.items():
+        for qn, q in self.Quads.items():
             qvm = {}
             for r, s in itert.product([-1, 0, 1], [-1, 0, 1]):
                 S = quad_stress_tensor(q, r, s, combo)
@@ -866,11 +904,11 @@ class Structure(System,CostModel):
 
         return pd.DataFrame(mesh_data)
 
-    def estimated_failures(
+    def estimated_failures_report(
         self,
         concentrationFactor=10,
         methodFactor=2.5,
-        fail_frac=0.9,
+        fail_frac_criteria=0.9,
         combos: list = None,
     ) -> dict:
         """uses the beam estimated stresses with specific adders to account for beam 2D stress concentrations and general inaccuracy as well as a fail_fraction to analyze. The estimated loads are very pessimistic with a 250x overestimate"""
@@ -880,7 +918,7 @@ class Structure(System,CostModel):
             combos = combos.split(",")  # will be a list!
 
         # what fraction of allowable stress is generated for this case
-        fail_1 = fail_frac / (concentrationFactor * methodFactor)
+        fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
 
         failures = collections.defaultdict(dict)
 
@@ -890,12 +928,16 @@ class Structure(System,CostModel):
         failures_count = 0
         cases = 0
 
+        iteration_combos = self.iteration_combos
+        if iteration_combos is None:
+            iteration_combos = list(self.LoadCombos.keys())  
+        
         # gather forces for each beam
         for nm, beam in self.beams.items():
             self.debug(f"estimate beam stress: {beam.name}")
 
             # try each load combo
-            for combo in self.LoadCombos:
+            for combo in iteration_combos:
                 if combo not in run_combos:
                     continue  # theres, no point
 
@@ -904,8 +946,7 @@ class Structure(System,CostModel):
 
                 combo_df = df[df.current_combo == combo]
                 combo_dict = combo_df.to_dict("records")
-                assert len(combo_dict) == 1, "beam bad combo!"
-                combo_dict = combo_dict[0]
+                combo_dict = combo_dict[-1]  # last one is the combo in the case of repeats
                 # loop positions start,mid,end
                 for x in [0, 0.5, 1.0]:
                     cases += 1
@@ -944,6 +985,242 @@ class Structure(System,CostModel):
             )
 
         return failures
+            
+    def current_failures(
+        self,
+        concentrationFactor=5,
+        methodFactor=1.5,
+        fail_frac_criteria=0.9,
+    ) -> dict:
+        """uses the beam estimated stresses with specific adders to account for beam 2D stress concentrations and general inaccuracy as well as a fail_fraction to analyze. The estimated loads are very pessimistic with a 250x overestimate by default for beams. mesh stresses are more accurate and failure is determined by fail_fac (von-mises stress / allowable stress)/fail_frac_criteria
+        
+        """
+
+        # what fraction of allowable stress is generated for this case
+        fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
+
+        failures = collections.defaultdict(dict)
+        stable = collections.defaultdict(dict)
+        summary = {'beam_failures':failures,'beams_stable':stable}
+
+        failures_count = 0
+        checks = 0
+        beams = len(self.beams)
+
+        combo = self.current_combo
+
+        self._lock_est_failures = True
+        data_dict = self.data_dict
+        self._lock_est_failures = False
+
+            
+        # gather forces for each beam
+        for nm, beam in self.beams.items():
+            self.debug(f"estimate beam stress: {beam.name}")
+
+            # loop positions start,mid,end
+            for x in [0, 0.5, 1.0]:
+                checks += 1
+                f = beam.get_forces_at(x, combo=combo)
+                st = beam.estimate_max_stress(**f)
+                beam_fail_frac = st / beam.material.allowable_stress
+
+                # record!
+                if beam_fail_frac >= fail_1:
+                    self.debug(
+                        f"estimated beam {beam.name} failure at L={x*100:3.2f}% | {combo}"
+                    )
+                    failures_count += 1
+
+                    failures[nm][(combo,x)] = _d = {
+                        "beam": nm,
+                        "est_stress": st,
+                        "combo": combo,
+                        "x": x,
+                        "allowable_stress": beam.material.allowable_stress,
+                        "fail_frac": beam_fail_frac,
+                        "loads": f,
+                    }
+
+                    failures[nm][(combo,x)].update(
+                        **{
+                            k.split(nm + ".")[-1] if nm in k else k: v
+                            for k, v in data_dict.items()
+                            if ("beams" not in k or nm in k) and k not in _d
+                        }
+                    )
+                else:
+                    stable[nm][(combo,x)] = _d = {
+                        "beam": nm,
+                        "est_stress": st,
+                        "combo": combo,
+                        "x": x,
+                        "allowable_stress": beam.material.allowable_stress,
+                        "fail_frac": beam_fail_frac,
+                        "loads": f,
+                    }
+            
+        #add mesh failures
+        mesh_summary = self.check_mesh_failures(combo, run_full=True, SF=1.0, return_complete=True)
+        mesh_failures = mesh_summary['failures']
+        mesh_success = mesh_summary['stable']
+        summary['mesh_failures'] = mesh_failures
+        summary['mesh_stable'] = mesh_success
+        
+        #update failures
+        mesh_failures_count = len([v for k,v in mesh_failures.items() if v > fail_frac_criteria])
+
+        max_fail_frac = max([0]+[v['fail_frac'] for beam,fails in failures.items() for k,v in fails.items()])
+        max_stable_frac = max([0]+[v['fail_frac'] for beam,stables in stable.items() for k,v in stables.items()])
+        max_mesh_fail_frac = max([0]+[v for k,v in mesh_failures.items()])
+        max_mesh_stable_frac = max([0]+[v for k,v in mesh_success.items()])
+        #Max mesh failure fracs
+        max_beam_fail_frac = max(max_fail_frac,max_stable_frac)
+        max_mesh_frac = max(max_mesh_fail_frac,max_mesh_stable_frac)
+        max_fail_frac = max(max_beam_fail_frac,max_mesh_frac)  
+
+        if failures_count:
+            self.warning(
+                f"{combo}| {failures_count} @ {failures_count*100/checks:3.2f}% estimated failures: {set(failures.keys())}"
+            )
+        summary['mesh_fail_count'] = mesh_failures_count
+        summary['beam_fail_count'] = failures_count
+        summary['failures_count'] = failures_count + mesh_failures_count
+        summary['beams'] = beams
+        summary['meshs'] = len(mesh_failures)
+        summary['checks'] = checks + len(self.quad_info)
+        summary['max_mesh_fail_frac'] = max_mesh_frac
+        summary['max_beam_fail_frac'] = max_beam_fail_frac
+        summary['max_fail_frac'] = max_fail_frac
+    
+        self.current_failure_summary = summary
+        
+        return summary
+    
+    #Failure Analysis Properties
+    @system_property
+    def max_est_fail_frac(self)->float:
+        """estimated failure fraction for the current result"""
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc['max_fail_frac']
+    
+    @system_property
+    def max_beam_est_fail_frac(self)->float:
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc['max_beam_fail_frac']    
+    
+    @system_property
+    def max_mesh_est_fail_frac(self)->float:
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc['max_mesh_fail_frac']  
+        
+    @system_property
+    def estimated_failure_count(self)->float:
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc['failures_count']
+    
+    @system_property
+    def estimated_beam_failure_count(self)->float:
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc['beam_fail_count']    
+    
+    @system_property
+    def estimated_mesh_failure_count(self)->float:
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc['mesh_fail_count']                    
+
+    @system_property
+    def actual_failure_count(self)->float:
+        if not self.calculate_actual_failure:
+            return np.nan
+
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self._current_combo_failure_analysis is None:
+            if self.current_failure_summary is None:
+                fc = self.current_failures()
+            else:
+                fc = self.current_failure_summary
+            afc = self.run_combo_failure_analysis(combo=self.current_combo,run_full=self.calculate_full_failure, SF=1.0,fail_fast=not self.calculate_full_failure,failures=fc['beam_failures'])
+        else:
+            afc = self._current_combo_failure_analysis
+
+        return afc['failure_count']
+
+    @system_property
+    def actual_beam_failure_count(self)->float:
+        if not self.calculate_actual_failure:
+            return np.nan
+
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self._current_combo_failure_analysis is None:
+            if self.current_failure_summary is None:
+                fc = self.current_failures()
+            else:
+                fc = self.current_failure_summary
+            afc = self.run_combo_failure_analysis(combo=self.current_combo,run_full=self.calculate_full_failure, SF=1.0,fail_fast=not self.calculate_full_failure,failures=fc['beam_failures'])
+        else:
+            afc = self._current_combo_failure_analysis
+
+        return afc['beam_failures_count']    
+
+    @system_property
+    def actual_mesh_failure_count(self)->float:
+        if not self.calculate_actual_failure:
+            return np.nan
+
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        
+        if self._current_combo_failure_analysis is None:
+            if self.current_failure_summary is None:
+                fc = self.current_failures()
+            else:
+                fc = self.current_failure_summary
+            afc = self.run_combo_failure_analysis(combo=self.current_combo,run_full=self.calculate_full_failure, SF=1.0,fail_fast=not self.calculate_full_failure,failures=fc['beam_failures'])
+        else:
+            afc = self._current_combo_failure_analysis
+
+        return afc['mesh_failure_count']                  
 
     def run_combo_failure_analysis(
         self,
@@ -951,19 +1228,28 @@ class Structure(System,CostModel):
         run_full: bool = False,
         SF: float = 1.0,
         run_section_failure=None,
+        fail_fast = True,
+        failures = None
     ):
         """runs a single load combo and adds 2d section failures"""
         self.info(f"determine combo {combo} failures...")
 
-        failures = self.estimated_failures(combos=combo)
+        if failures is None:
+            failures = self.estimated_failures_report(combos=combo)
 
         if run_section_failure is None:
             run_section_failure = self.run_failure_sections
-            args = (failures, run_full, SF)
+            args = (failures, run_full, SF,fail_fast)
         else:
-            args = (self, failures, run_full, SF)
+            args = (self, failures, run_full, SF,fail_fast)
 
         out = {}
+        if combo == self.current_combo:
+            self._current_combo_failure_analysis = out
+
+        out['beam_failures_count'] = 0
+        out['mesh_failure_count'] = 0
+        out['failure_count'] = 0
 
         out["estimate"] = failures
         out["actual"] = check_fail = {}
@@ -977,7 +1263,10 @@ class Structure(System,CostModel):
         elif check_est_failures(failures):
             self.info(f"testing actual failures...")
             out["actual"] = dfail = run_section_failure(*args)
-
+            act_fails = {x:f for beam,cfail in dfail.items() for (c,x),f in cfail.items() if f['fails']}
+            out['beam_failures_count'] = len(act_fails)
+            out['mesh_failure_count'] = len(mesh_failures) 
+            out['failure_count'] = len(act_fails)+len(mesh_failures)
             if dfail and not run_full:
                 self.info(f"found actual failure...")
                 return out
@@ -995,9 +1284,12 @@ class Structure(System,CostModel):
 
         # random beam analysis
         # for beamnm,est_fail_cases in failpairs:
-
+        failed_beams = set()
+        failed_pos = set()
+        fail_count = 0
         for (beamnm, combo, x), dat in sort_max_estimated_failures(failures):
-            self.info(
+            c = combo
+            self.debug(
                 f'running beam sections: {beamnm},{combo} @ {x} {dat["fail_frac"]*100.}%'
             )
             beam = self.beams[beamnm]
@@ -1025,17 +1317,25 @@ class Structure(System,CostModel):
             d_["fails"] = fail = ff > 1 / SF
 
             if fail:
-                self.warning(f"beam {beamnm} failed @ {x*100:3.0f}%| {c}")
+                fail_count += 1
+                failed_beams.add(beamnm)
+                failed_pos.add(x)
+                self.debug(f"beam {beamnm} failed @ {x*100:3.0f}%| {c}")
                 if fail_fast:
                     return secton_results
                 if not run_full:
                     break  # next beam!
             else:
                 self.debug(f"beam {beamnm} ok @ {x*100:3.0f}%| {c}")
+    
+        if failed_beams or failed_pos:
+            self.warning(f"{fail_count:3.0f} across {failed_beams} @ {[f'{p*100:3.0f}' for p in failed_pos]}%| {c}")
 
         return secton_results
 
 
+#TODO: make a multiprocessing version of section failure analysis using shared memory or something
+    
 # Remote Sync Util (locally run with section)
 def run_combo_failure_analysis(
     inst, combo, run_full: bool = False, SF: float = 1.0
@@ -1278,140 +1578,140 @@ def parallel_combo_run(combo, ref_structure, run_full=False, SF=1.0):
     log.info(f"failure analysis done {combo}")
     return ray.get(d)
 
-
-@ray.remote
-class RemoteStructuralAnalysis:
-    """represents a stateful object in a ray cloud contetxt"""
-
-    def __init__(self, structure, *kw):
-        self.struct = structure
-        self.struct.resetSystemLogs()
-        self.struct.prep_remote_analysis()
-
-        # reference tracking
-        self.combos_run = {}
-        self.failed = False
-        self.report = {"fails": self.failed}
-        self.report["failures"] = failures = {}
-        self.failures = failures
-        self.put_beams = {}
-
-        # can run all combos from base
-        self.struct_ref = ray.put(self.struct)
-
-        # put beams sections for quick analysis
-        for beamnm, beam in self.struct.beams.items():
-            beam_ref = ray.put(beam._section_properties)
-            self.put_beams[beamnm] = beam_ref
-
-    def get(self, run_id=None):
-        self.struct.info(f"getting {len(self.table)}")
-        if run_id is None:
-            return self.struct._table
-        else:
-            return [v for v in self.table if v["st_id"] == run_id]
-
-    def put_combo(self, inv):
-        """add the data from remotely running the load combo"""
-
-        self.struct.info(f"adding {len(self.struct.table)+1}")
-        self.struct._table[len(self.struct.table) + 1] = inv["row"]
-        self.struct.merge_displacement_results(inv["combo"], inv["D"])
-        self.combos_run[inv["combo"]] = inv
-        self.struct.info(f'finished analysis of {inv["combo"]}')
-
-    def put_failure(self, combo, fail, run_full=False):
-        self.struct.info(f"finished failure calc of {combo}")
-        self.failures[combo] = fail
-        self.struct.failure_load_exithandler(combo, fail, self.report, run_full)
-
-    async def wait_and_get_failure(self, combo, wait=1, timeout=None):
-        if combo in self.failures:
-            return self.failures[combo]
-
-        timeelapsed = 0
-
-        # wait loop
-        while combo not in self.failures:
-            self.struct.info(f"waiting on {combo}")
-            if timeout is not None and timeelapsed > timeout:
-                raise TimeoutError(f"combo {combo} not found within timeout")
-            await asyncio.sleep(wait)
-            timeelapsed += wait
-
-        return self.failures[combo]
-
-    def get_beam_forces(self, beam_name, combo, x):
-        beam = self.struct.beams[beam_name]
-        return beam.get_forces_at(x, combo)
-
-    def get_beam_info(self, beam_name):
-        r = self.put_beams[beam_name]
-        beam = self.struct.beams[beam_name]
-        out = {"ref": r, "allowable": beam.material.allowable_stress}
-        return out
-
-    def estimated_failures(self, combos):
-        return self.struct.estimated_failures(combos=combos)
-
-    def return_structure(self):
-        return self.struct
-
-    async def ensure(self, combo, wait=1, timeout=None):
-        if combo in self.combos_run:
-            return  # good to go
-
-        timeelapsed = 0
-
-        # wait loop
-        while combo not in self.combos_run:
-            self.struct.info(f"waiting on {combo}")
-            if timeout is not None and timeelapsed > timeout:
-                raise TimeoutError(f"combo {combo} not found within timeout")
-            await asyncio.sleep(wait)
-            timeelapsed += wait
-
-        return  # good to go
-
-    def run_failure_analysis(self, SF=1.0, run_full=False, **kw):
-        """
-        Failure Determination:
-        Beam Stress Estiates are used to determine if a 2D FEA beam/combo analysis should be run. The maximum beam vonmises stress is compared the the beam material allowable stress / saftey factor.
-
-        Override:
-        Depending on number of load cases, this analysis could take a while. Its encouraged to use a similar pattern of check and exit to reduce load combo size in an effort to fail early. Override this function if nessicary.
-
-        Case / Beam Ordering:
-        runs the gravity case first and checks for failure to exit early,
-        then all other combos are run
-        :returns: a dictionary with 2D fea failures and esimated failures as well for each beam
-        """
-        ctx = ray.get_runtime_context()
-        actor_handle = ctx.current_actor
-        try:
-            cases = []
-            ref = {"struct_ref": self.struct_ref, "actor_ref": actor_handle}
-            # Run the rest of the load cases
-            for combo in self.struct.failure_load_combos(
-                self.report, run_full, remote_sync=actor_handle, **kw
-            ):
-                d = parallel_combo_run.remote(
-                    combo, ref, run_full=run_full, SF=SF
-                )
-                cases.append(d)
-
-            for coro in asyncio.as_completed(cases):
-                if self.failed and not run_full:
-                    self.struct.warning(f"structure failed!")
-                    return self.report
-
-        except KeyboardInterrupt:
-            return self.report
-
-        except Exception as e:
-            self.struct.error(e, "issue in failur analysis")
-
-        return self.report  # tada!
+# 
+# @ray.remote
+# class RemoteStructuralAnalysis:
+#     """represents a stateful object in a ray cloud contetxt"""
+# 
+#     def __init__(self, structure, *kw):
+#         self.struct = structure
+#         self.struct.resetSystemLogs()
+#         self.struct.prep_remote_analysis()
+# 
+#         # reference tracking
+#         self.combos_run = {}
+#         self.failed = False
+#         self.report = {"fails": self.failed}
+#         self.report["failures"] = failures = {}
+#         self.failures = failures
+#         self.put_beams = {}
+# 
+#         # can run all combos from base
+#         self.struct_ref = ray.put(self.struct)
+# 
+#         # put beams sections for quick analysis
+#         for beamnm, beam in self.struct.beams.items():
+#             beam_ref = ray.put(beam._section_properties)
+#             self.put_beams[beamnm] = beam_ref
+# 
+#     def get(self, run_id=None):
+#         self.struct.info(f"getting {len(self.table)}")
+#         if run_id is None:
+#             return self.struct._table
+#         else:
+#             return [v for v in self.table if v["st_id"] == run_id]
+# 
+#     def put_combo(self, inv):
+#         """add the data from remotely running the load combo"""
+# 
+#         self.struct.info(f"adding {len(self.struct.table)+1}")
+#         self.struct._table[len(self.struct.table) + 1] = inv["row"]
+#         self.struct.merge_displacement_results(inv["combo"], inv["D"])
+#         self.combos_run[inv["combo"]] = inv
+#         self.struct.info(f'finished analysis of {inv["combo"]}')
+# 
+#     def put_failure(self, combo, fail, run_full=False):
+#         self.struct.info(f"finished failure calc of {combo}")
+#         self.failures[combo] = fail
+#         self.struct.failure_load_exithandler(combo, fail, self.report, run_full)
+# 
+#     async def wait_and_get_failure(self, combo, wait=1, timeout=None):
+#         if combo in self.failures:
+#             return self.failures[combo]
+# 
+#         timeelapsed = 0
+# 
+#         # wait loop
+#         while combo not in self.failures:
+#             self.struct.info(f"waiting on {combo}")
+#             if timeout is not None and timeelapsed > timeout:
+#                 raise TimeoutError(f"combo {combo} not found within timeout")
+#             await asyncio.sleep(wait)
+#             timeelapsed += wait
+# 
+#         return self.failures[combo]
+# 
+#     def get_beam_forces(self, beam_name, combo, x):
+#         beam = self.struct.beams[beam_name]
+#         return beam.get_forces_at(x, combo)
+# 
+#     def get_beam_info(self, beam_name):
+#         r = self.put_beams[beam_name]
+#         beam = self.struct.beams[beam_name]
+#         out = {"ref": r, "allowable": beam.material.allowable_stress}
+#         return out
+# 
+#     def estimated_failures(self, combos):
+#         return self.struct.estimated_failures_report(combos=combos)
+# 
+#     def return_structure(self):
+#         return self.struct
+# 
+#     async def ensure(self, combo, wait=1, timeout=None):
+#         if combo in self.combos_run:
+#             return  # good to go
+# 
+#         timeelapsed = 0
+# 
+#         # wait loop
+#         while combo not in self.combos_run:
+#             self.struct.info(f"waiting on {combo}")
+#             if timeout is not None and timeelapsed > timeout:
+#                 raise TimeoutError(f"combo {combo} not found within timeout")
+#             await asyncio.sleep(wait)
+#             timeelapsed += wait
+# 
+#         return  # good to go
+# 
+#     def run_failure_analysis(self, SF=1.0, run_full=False, **kw):
+#         """
+#         Failure Determination:
+#         Beam Stress Estiates are used to determine if a 2D FEA beam/combo analysis should be run. The maximum beam vonmises stress is compared the the beam material allowable stress / saftey factor.
+# 
+#         Override:
+#         Depending on number of load cases, this analysis could take a while. Its encouraged to use a similar pattern of check and exit to reduce load combo size in an effort to fail early. Override this function if nessicary.
+# 
+#         Case / Beam Ordering:
+#         runs the gravity case first and checks for failure to exit early,
+#         then all other combos are run
+#         :returns: a dictionary with 2D fea failures and esimated failures as well for each beam
+#         """
+#         ctx = ray.get_runtime_context()
+#         actor_handle = ctx.current_actor
+#         try:
+#             cases = []
+#             ref = {"struct_ref": self.struct_ref, "actor_ref": actor_handle}
+#             # Run the rest of the load cases
+#             for combo in self.struct.failure_load_combos(
+#                 self.report, run_full, remote_sync=actor_handle, **kw
+#             ):
+#                 d = parallel_combo_run.remote(
+#                     combo, ref, run_full=run_full, SF=SF
+#                 )
+#                 cases.append(d)
+# 
+#             for coro in asyncio.as_completed(cases):
+#                 if self.failed and not run_full:
+#                     self.struct.warning(f"structure failed!")
+#                     return self.report
+# 
+#         except KeyboardInterrupt:
+#             return self.report
+# 
+#         except Exception as e:
+#             self.struct.error(e, "issue in failur analysis")
+# 
+#         return self.report  # tada!
 
 
 # Remote Sync Util
@@ -1428,7 +1728,7 @@ def remote_combo_failure_analysis(
     log.info(f"determine combo {combo} failures...")
 
     out = {}
-    d = sync.estimated_failures.remote(combos=combo)
+    d = sync.estimated_failures_report.remote(combos=combo)
     failures = ray.get(d)
 
     out["estimate"] = failures

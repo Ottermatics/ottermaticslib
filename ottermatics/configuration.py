@@ -22,14 +22,14 @@ def property_changed(instance, variable, value):
     from ottermatics.tabulation import TabulationMixin
 
     if not isinstance(instance, (TabulationMixin)):
-        return
+        return value
+    
+    if instance._anything_changed:
+        # Bypass Check since we've already flagged for an update
+        return value    
 
     if log.log_level <= 10:
         log.msg(f"checking property changed {instance}{variable.name} {value}")
-
-    if instance._anything_changed:
-        # Bypass Check since we've already flagged for an update
-        return value
 
     # Check if shoudl be updated
     cur = getattr(instance, variable.name)
