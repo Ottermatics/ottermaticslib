@@ -874,10 +874,15 @@ class Configuration(LoggingMixin):
             self.warning("Could Not Change {}".format(",".join(list(bad_vars))))
 
         try:  # Change Variables To Input
-            for arg, var in kwargs.items():
-                setattr(self, arg, var)
+            self.setattrs(kwargs)
             yield self
         finally:
-            for arg in kwargs.keys():
-                var = _temp_vars[arg]
-                setattr(self, arg, var)
+            rstdict = {k:_temp_vars[k] for k,v in kwargs.items()}
+            self.setattrs(rstdict)
+
+    def setattrs(self,dict):
+        """sets attributes from a dictionary"""
+        msg = f"invalid keys {set(dict.keys()) - set(self.input_attrs())}"
+        assert set(dict.keys()).issubset(set(self.input_attrs())), msg
+        for k,v in dict.items():
+            setattr(self,k,v)

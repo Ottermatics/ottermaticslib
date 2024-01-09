@@ -22,12 +22,14 @@ from ottermatics.common import *
 from ottermatics.logging import log, LoggingMixin
 from ottermatics.eng.costs import CostModel,cost_property
 from ottermatics.slots import SLOT
+from ottermatics.eng.prediction import PredictionMixin
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
 import sectionproperties.pre.library.primitive_sections as sections
 import PyNite as pynite
-
+import numpy as np
+from scipy import optimize as sciopt
 import pandas as pd
 import ray
 import collections
@@ -35,6 +37,7 @@ import numpy as np
 import itertools as itert
 import asyncio
 import weakref
+from sklearn import svm
 
 from ottermatics.eng.structure_beams import Beam, rotation_matrix_from_vectors
 
@@ -63,11 +66,6 @@ class StopAnalysis(Exception):
 nonetype = type(None)
 
 norm = np.linalg.norm
-
-
-# Failure Utils
-def beam_collection():
-    return ComponentDict(component_type=Beam, name="beams")
 
 
 def sort_max_estimated_failures(failures):
@@ -159,6 +157,7 @@ def node_info(quad, material):
         V=V,
         mass=mass,
         cost=mass * material.cost_per_kg,
+        allowable_stress = material.allowable_stress,
     )
     return out
 
@@ -184,7 +183,7 @@ class BeamDict(ComponentDict):
 
 # TODO: Make analysis, where each load case is a row, but how sytactically?
 @otterize
-class Structure(System,CostModel):
+class Structure(System,CostModel,PredictionMixin):
     """A integration between sectionproperties and PyNite, with a focus on ease of use
 
     Right now we just need an integration between Sections+Materials and Members, to find, CG, and inertial components
@@ -217,17 +216,27 @@ class Structure(System,CostModel):
     #merge_duplicate_nodes by default
     merge_nodes: bool = attrs.field(default=True)
     tolerance: float = attrs.field(default=1e-3)
-
-    # beam_collection
-    #beams: ComponentDict = attrs.field(default=attrs.Factory(beam_collection))
+    
+    #beams
     beams = SLOT.define_iterator(BeamDict, wide=True)
     
     #per execute failure analysis
     #calculate actual failure will estimate then run failure analysis for bad cases
     #calculate full failure will run failure analysis without stoping at first failure
-    calculate_actual_failure: bool =attrs.field(default=True)
+    calculate_actual_failure: bool =attrs.field(default=False)
     calculate_full_failure: bool =attrs.field(default=True)
+    
+    failure_records: list = attrs.field(default=None)
+    
+    #prediciton calculation
+    prediction: bool = attrs.field(default=True)
+    max_records: int = attrs.field(default=10000)
+    _prediction_parms: list = attrs.field(default=None)
+    analysis_records = attrs.field(default=None)
+    near_margin=0.1
+    max_margin=1.5
 
+    current_failure_summary = None
     _always_save_data = True  # we dont respond to inputs so use this
     _meshes = None
     _any_solved = False
@@ -238,12 +247,18 @@ class Structure(System,CostModel):
         self.initalize_structure()
         self.frame.add_load_combo(self.default_combo, {self.gravity_name: 1.0}, "gravity" )
         self.create_structure()
+        self.analysis_records = []
+        if self.prediction:
+            d={'fails':{'mod':svm.SVC(C=1000,gamma=0.1,probability=True),'N':0},
+            'fail_frac':{'mod':svm.SVR(C=1,gamma=0.1),'N':0},
+            'beam_fail_frac':{'mod':svm.SVR(C=1,gamma=0.1),'N':0},'mesh_fail_frac':{'mod':svm.SVR(C=1,gamma=0.1),'N':0} }
+            self._prediction_models = d
 
     def create_structure(self):
         raise NotImplemented(f'use this method to create the structure on init')
 
     # Execution
-    def execute(self, combos: list = None, *args, **kwargs):
+    def execute(self, combos: list = None,save=True,record=True, *args, **kwargs):
         """wrapper allowing saving of data by load combo"""
 
         # the string input case, with csv support
@@ -269,10 +284,51 @@ class Structure(System,CostModel):
             self.analyze(load_combos=[combo], *args, **kwargs)
             self._any_solved = True #Flag system properties to save
             self.struct_post_execute(combo)
-            # backup data saver.
+            
+            #backup data saver.
             self._anything_changed = True #change costs 
-            self.save_data(index=self.index, force=True)
-            #self._any_solved = False #Flag system properties to save
+            if save:
+                self.save_data(index=self.index, force=True)
+
+            #record results for prediction
+            if record and self.prediction:
+                res = self._analysis_result
+                if res: self.record_result(res)
+
+    @property
+    def _analysis_result(self)->dict:
+        """returns the analysis result for prediction"""
+        if not self.prediction or not self._prediction_parms:
+            return {}
+        d = {k:getattr(self,k) for k in self._prediction_parms}
+        d['fail_frac'] = ff= self.max_est_fail_frac
+        d['beam_fail_frac'] = self.max_beam_est_fail_frac
+        d['mesh_fail_frac'] = self.max_mesh_est_fail_frac
+        d['combo'] = self.current_combo
+        d['fails'] = ff >= 1
+        return d
+
+    def record_result(self,stress_dict):
+        """determines if stress record should be added to stress_records"""
+        if not self.prediction:
+            return
+
+        if len(self.analysis_records) > self.max_records:
+            return
+
+        ff = stress_dict['fail_frac']
+
+        #Add the data to the stress records
+        if self.near_margin and abs(ff-1) < self.near_margin:
+            self.analysis_records.append(stress_dict)
+        elif self.max_margin and ff < self.max_margin:
+            self.analysis_records.append(stress_dict)
+        elif not self.near_margin and not self.max_margin:
+            self.analysis_records.append(stress_dict)
+
+        self.observe_and_predict(stress_dict)
+        self.check_and_retrain(self.analysis_records,min_rec=5)
+     
 
     def save_data(self,*args,**kw):
         if self._any_solved:
@@ -320,7 +376,6 @@ class Structure(System,CostModel):
 
         return material.unique_id
 
-    # TODO: install custom cylilnder ring mesher
     def mesh_extents(self) -> dict:
         mesh_extents = {}
         for mn, m in self.Meshes.items():
@@ -596,12 +651,12 @@ class Structure(System,CostModel):
             quads[quadname] = q["mass"]
         return out
 
-    @cached_system_property
+    @property
     def structure_cost_beams(self) -> float:
         """sum of all beams and quad cost"""
         return sum([sum(self.costs['beams'].values())])
 
-    @cached_system_property
+    @property
     def structure_cost_panels(self) -> float:
         """sum of all panels cost"""
         return sum([sum(self.costs['quads'].values())]) 
@@ -847,7 +902,7 @@ class Structure(System,CostModel):
         """exposes check_est_failures"""
         return check_est_failures(*args, **kwargs)
 
-    @solver_cached
+    @property
     def full_failures(self):
         """return all failure estimates for all combos"""
         return self.estimated_failures_report()
@@ -874,19 +929,29 @@ class Structure(System,CostModel):
                     vm = calculate_von_mises_stress(S)
                     fail_frac = vm / allowable
                     if vm * SF > allowable:
-                        failures[quadname] = fail_frac
+                        if quadname not in failures:
+                            failures[quadname] = fail_frac
+                        elif fail_frac > failures[quadname]:
+                            failures[quadname] = fail_frac
+
                         if not run_full:
                             if return_complete:
                                 return summary                            
                             return failures
                     else:
-                        stable[quadname] = fail_frac
+                        if quadname not in stable:
+                            stable[quadname] = fail_frac
+                        elif fail_frac > stable[quadname]:
+                            stable[quadname] = fail_frac
+
         if return_complete:
             return summary
         return failures
 
-    def mesh_stress_dataframe(self):
+    def mesh_stress_dataframe(self,combo=None):
         """returns a dataframe of each quad, its x,y,z coords, vonmises stress and other mass/cost properties in a dataframe"""
+        if combo is None:
+            combo = self.current_combo
         max_vm = {}
         for qn, q in self.Quads.items():
             qvm = {}
@@ -898,7 +963,7 @@ class Structure(System,CostModel):
         mesh_data = []
 
         for qn, maxvm in max_vm.items():
-            qinfo = quadInfo[qn].copy()
+            qinfo = self.quad_info[qn].copy()
             x, y, z = qinfo.pop("cog").tolist()
             mesh_data.append({"x": x, "y": y, "z": z, "vm": maxvm, **qinfo})
 
@@ -906,9 +971,9 @@ class Structure(System,CostModel):
 
     def estimated_failures_report(
         self,
-        concentrationFactor=10,
-        methodFactor=2.5,
-        fail_frac_criteria=0.9,
+        concentrationFactor=1,
+        methodFactor=1,
+        fail_frac_criteria=None,
         combos: list = None,
     ) -> dict:
         """uses the beam estimated stresses with specific adders to account for beam 2D stress concentrations and general inaccuracy as well as a fail_fraction to analyze. The estimated loads are very pessimistic with a 250x overestimate"""
@@ -918,7 +983,10 @@ class Structure(System,CostModel):
             combos = combos.split(",")  # will be a list!
 
         # what fraction of allowable stress is generated for this case
-        fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
+        if fail_frac_criteria is None:
+            fail_1 = None
+        else:
+            fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
 
         failures = collections.defaultdict(dict)
 
@@ -951,11 +1019,18 @@ class Structure(System,CostModel):
                 for x in [0, 0.5, 1.0]:
                     cases += 1
                     f = beam.get_forces_at(x, combo=combo)
-                    st = beam.estimate_max_stress(**f)
-                    beam_fail_frac = st / beam.material.allowable_stress
+                    beam_fail_frac = beam.estimate_stress(**f)
+                    st = beam_fail_frac * beam.material.allowable_stress
+
+                    fails = False
+                    if fail_1 is None:
+                        deltadf = abs(1-beam_fail_frac)
+                        fails = deltadf <= beam.section.fail_frac_criteria()
+                    elif beam_fail_frac >= fail_1:
+                        fails = True
 
                     # record!
-                    if beam_fail_frac >= fail_1:
+                    if fails:
                         self.debug(
                             f"estimated beam {beam.name} failure at L={x*100:3.2f}% | {combo}"
                         )
@@ -988,16 +1063,21 @@ class Structure(System,CostModel):
             
     def current_failures(
         self,
-        concentrationFactor=5,
-        methodFactor=1.5,
-        fail_frac_criteria=0.9,
+        concentrationFactor=1,
+        methodFactor=1,
+        fail_frac_criteria=None,
     ) -> dict:
         """uses the beam estimated stresses with specific adders to account for beam 2D stress concentrations and general inaccuracy as well as a fail_fraction to analyze. The estimated loads are very pessimistic with a 250x overestimate by default for beams. mesh stresses are more accurate and failure is determined by fail_fac (von-mises stress / allowable stress)/fail_frac_criteria
         
         """
 
         # what fraction of allowable stress is generated for this case
-        fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
+        # what fraction of allowable stress is generated for this case
+        if fail_frac_criteria is None:
+            fail_1 = None
+        else:
+            fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
+
 
         failures = collections.defaultdict(dict)
         stable = collections.defaultdict(dict)
@@ -1022,11 +1102,19 @@ class Structure(System,CostModel):
             for x in [0, 0.5, 1.0]:
                 checks += 1
                 f = beam.get_forces_at(x, combo=combo)
-                st = beam.estimate_max_stress(**f)
+                st = beam.estimate_stress(**f)
                 beam_fail_frac = st / beam.material.allowable_stress
 
-                # record!
-                if beam_fail_frac >= fail_1:
+                fails = False
+                if fail_1 is None:
+                    df = abs(1-beam_fail_frac)
+                    fail_frac_criteria = beam.section.fail_frac_criteria()
+                    fails = df <= fail_frac_criteria
+                elif beam_fail_frac >= fail_1:
+                    fails = True
+                    fail_frac_criteria = fail_1                
+
+                if fails:
                     self.debug(
                         f"estimated beam {beam.name} failure at L={x*100:3.2f}% | {combo}"
                     )
@@ -1039,6 +1127,7 @@ class Structure(System,CostModel):
                         "x": x,
                         "allowable_stress": beam.material.allowable_stress,
                         "fail_frac": beam_fail_frac,
+                        "fail_critera": fail_frac_criteria,
                         "loads": f,
                     }
 
@@ -1057,18 +1146,19 @@ class Structure(System,CostModel):
                         "x": x,
                         "allowable_stress": beam.material.allowable_stress,
                         "fail_frac": beam_fail_frac,
+                        "fail_critera": fail_frac_criteria,
                         "loads": f,
                     }
             
         #add mesh failures
-        mesh_summary = self.check_mesh_failures(combo, run_full=True, SF=1.0, return_complete=True)
+        mesh_summary = self.check_mesh_failures(combo, run_full=self.calculate_full_failure, SF=1.0, return_complete=True)
         mesh_failures = mesh_summary['failures']
         mesh_success = mesh_summary['stable']
         summary['mesh_failures'] = mesh_failures
         summary['mesh_stable'] = mesh_success
         
         #update failures
-        mesh_failures_count = len([v for k,v in mesh_failures.items() if v > fail_frac_criteria])
+        mesh_failures_count = len([v for k,v in mesh_failures.items() if v > 0.99])
 
         max_fail_frac = max([0]+[v['fail_frac'] for beam,fails in failures.items() for k,v in fails.items()])
         max_stable_frac = max([0]+[v['fail_frac'] for beam,stables in stable.items() for k,v in stables.items()])
@@ -1101,110 +1191,79 @@ class Structure(System,CostModel):
     @system_property
     def max_est_fail_frac(self)->float:
         """estimated failure fraction for the current result"""
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self.current_failure_summary is None:
-            fc = self.current_failures()
-        else:
-            fc = self.current_failure_summary
-        return fc['max_fail_frac']
+        fc = self._current_failures
+        if isinstance(fc,dict):
+            return fc['max_fail_frac']
+        return fc
     
     @system_property
     def max_beam_est_fail_frac(self)->float:
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self.current_failure_summary is None:
-            fc = self.current_failures()
-        else:
-            fc = self.current_failure_summary
-        return fc['max_beam_fail_frac']    
+        fc = self._current_failures
+        if isinstance(fc,dict):
+            return fc['max_beam_fail_frac']
+        return fc
     
     @system_property
     def max_mesh_est_fail_frac(self)->float:
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self.current_failure_summary is None:
-            fc = self.current_failures()
-        else:
-            fc = self.current_failure_summary
-        return fc['max_mesh_fail_frac']  
+        fc = self._current_failures
+        if isinstance(fc,dict):
+            return fc['max_mesh_fail_frac']
+        return fc
         
     @system_property
     def estimated_failure_count(self)->float:
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self.current_failure_summary is None:
-            fc = self.current_failures()
-        else:
-            fc = self.current_failure_summary
-        return fc['failures_count']
+        fc = self._current_failures
+        if isinstance(fc,dict):
+            return fc['failures_count']
+        return fc
     
     @system_property
     def estimated_beam_failure_count(self)->float:
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self.current_failure_summary is None:
-            fc = self.current_failures()
-        else:
-            fc = self.current_failure_summary
-        return fc['beam_fail_count']    
-    
+        fc = self._current_failures
+        if isinstance(fc,dict):
+            return fc['beam_fail_count']    
+        return fc
+            
     @system_property
     def estimated_mesh_failure_count(self)->float:
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self.current_failure_summary is None:
-            fc = self.current_failures()
-        else:
-            fc = self.current_failure_summary
-        return fc['mesh_fail_count']                    
-
+        fc = self._current_failures
+        if isinstance(fc,dict):
+            return fc['mesh_fail_count']
+        return fc 
+    
     @system_property
     def actual_failure_count(self)->float:
-        if not self.calculate_actual_failure:
-            return np.nan
-
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self._current_combo_failure_analysis is None:
-            if self.current_failure_summary is None:
-                fc = self.current_failures()
-            else:
-                fc = self.current_failure_summary
-            afc = self.run_combo_failure_analysis(combo=self.current_combo,run_full=self.calculate_full_failure, SF=1.0,fail_fast=not self.calculate_full_failure,failures=fc['beam_failures'])
-        else:
-            afc = self._current_combo_failure_analysis
-
-        return afc['failure_count']
+        afc = self._actual_failures
+        if isinstance(afc,dict):
+            return afc['failure_count']
+        return afc
 
     @system_property
     def actual_beam_failure_count(self)->float:
-        if not self.calculate_actual_failure:
-            return np.nan
-
-        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
-            return np.nan
-        
-        if self._current_combo_failure_analysis is None:
-            if self.current_failure_summary is None:
-                fc = self.current_failures()
-            else:
-                fc = self.current_failure_summary
-            afc = self.run_combo_failure_analysis(combo=self.current_combo,run_full=self.calculate_full_failure, SF=1.0,fail_fast=not self.calculate_full_failure,failures=fc['beam_failures'])
-        else:
-            afc = self._current_combo_failure_analysis
-
-        return afc['beam_failures_count']    
+        afc = self._actual_failures
+        if isinstance(afc,dict):
+            return afc['beam_failures_count']
+        return afc
 
     @system_property
     def actual_mesh_failure_count(self)->float:
+        afc = self._actual_failures
+        if isinstance(afc,dict):
+            return afc['mesh_failure_count']
+        return afc
+
+    @property
+    def _current_failures(self):
+        if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            return np.nan
+        if self.current_failure_summary is None:
+            fc = self.current_failures()
+        else:
+            fc = self.current_failure_summary
+        return fc
+    
+    @property
+    def _actual_failures(self):
         if not self.calculate_actual_failure:
             return np.nan
 
@@ -1219,8 +1278,7 @@ class Structure(System,CostModel):
             afc = self.run_combo_failure_analysis(combo=self.current_combo,run_full=self.calculate_full_failure, SF=1.0,fail_fast=not self.calculate_full_failure,failures=fc['beam_failures'])
         else:
             afc = self._current_combo_failure_analysis
-
-        return afc['mesh_failure_count']                  
+        return afc                       
 
     def run_combo_failure_analysis(
         self,
@@ -1260,7 +1318,7 @@ class Structure(System,CostModel):
         if mesh_failures and not run_full:
             return out
 
-        elif check_est_failures(failures):
+        elif self.calculate_actual_failure and check_est_failures(failures):
             self.info(f"testing actual failures...")
             out["actual"] = dfail = run_section_failure(*args)
             act_fails = {x:f for beam,cfail in dfail.items() for (c,x),f in cfail.items() if f['fails']}
@@ -1333,6 +1391,61 @@ class Structure(System,CostModel):
 
         return secton_results
 
+    #Solver Mechanics
+    def struct_root_failure(self,x,fail_parm,base_kw,mult=1):
+        bkw = base_kw.copy()
+        bkw[fail_parm] = x*mult
+        self.setattrs(bkw)
+        self.info(f'solving root iter: {bkw}')
+        self.execute(save=False)
+        wrong_side = (mult * x)<0
+        ff = self.max_est_fail_frac
+        if wrong_side:
+            #min = 1 with an gradual but exponential value from 0
+            l10 = max(np.log10(abs(ff)+1),1)+1
+            exp = min(abs(ff),l10)**0.5
+            res = max(np.e**exp,1.0)
+        else:
+            res = (1-ff)
+        self.info(f'ran: {bkw} -> {ff:5.4f} | {res:5.4f}')
+        return res
+
+    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3):
+
+        if guess is None:
+            guess = mult*1E5
+            maxx = 1E9 * mult
+
+        with self.revert_X() as rx:
+            ans = sciopt.root_scalar( self.struct_root_failure, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw) )
+            self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
+            if ans.converged:
+                self.setattrs({fail_parm:ans.root})
+                self.execute(save=True)
+                return ans.root
+            return np.nan
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
 
 #TODO: make a multiprocessing version of section failure analysis using shared memory or something
     
@@ -1744,7 +1857,7 @@ def remote_combo_failure_analysis(
             log.info(f"found actual failure...")
             return out
     else:
-        log.info(f"no estimated failurs found")
+        log.info(f"no estimated failures found")
 
     return out
 

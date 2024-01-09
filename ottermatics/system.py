@@ -194,5 +194,8 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         for k, v in kwargs.items():
             if ignore and k in ignore:
                 continue
+            if k not in satr:
+                self.debug(f'skipping {k} not in attributes')
+                continue
             ref = satr[k]
             ref.set_value(v)

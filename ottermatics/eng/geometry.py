@@ -26,6 +26,8 @@ import functools
 import itertools
 import multiprocessing as mp
 import threading
+import random
+import pandas
 
 # generic cross sections from
 # https://mechanicalbase.com/area-moment-of-inertia-calculator-of-certain-cross-sectional-shapes/
@@ -296,7 +298,7 @@ def get_mesh_size(inst):
     ms = max(min(cans),inst.min_mesh_size)
     return max(ms**2.,dAmin) #length to area conversion
 
-def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row=False)->float:
+def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row=False,record=True,value=False)->float:
     """returns the maximum vonmises stress in the section and returns the ratio of the allowable stress, also known as the failure fracion
     :param raw: if raw is true, the stress object is returned, otherwise the failure fraction is returned
     """
@@ -307,7 +309,10 @@ def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row
     inp['fail_stress'] = fail_stress
     inp['fail_frac'] = ff =  fail_stress / section.material.allowable_stress
     inp['fails'] = int(ff >= 1)
-    section.record_stress(inp)
+    if record:
+        section.record_stress(inp)
+    if value:
+        return fail_stress
     if raw:
         return stress
     if row:
@@ -334,11 +339,15 @@ class ShapelySection(Profile2D):
 
     #Stress classification & prediction
     prediction: bool = attr.field(default=True)
-    max_records: list = attr.field(default=1000)
+    prediction_goal_error: float = attrs.field(default=0.025)
+    max_records: list = attr.field(default=10000)
     stress_records: list
+    near_margin=0.1
+    max_margin=1.5
+
     _use_symmetric: bool = attrs.field(default=True)
     _prediction_parms = ['n','vx','vy','mxx','myy','mzz']
-
+    _do_print: bool = attrs.field(default=False)
     _sec: Section = None
     _geo: Geometry  = None
     _A: float
@@ -351,13 +360,27 @@ class ShapelySection(Profile2D):
             self.stress_records = [{'n':0,'vx':0,'vy':0,'mxx':0,'myy':0,'mzz':0,'fails':0,'fail_frac':0}]
             self._symmetric = self.check_symmetric()
             if self._symmetric and self._use_symmetric:
-                self._prediction_models = {'fails':{'mod':svm.SVC(C=1000,gamma=5,probability=True),'N':0},'fail_frac':{'mod':svm.SVR(C=1,gamma=0.1),'N':0}}
+                self._prediction_models = {'fails':{'mod':svm.SVC(C=2000,gamma=0.1,probability=True),'N':0},'fail_frac':{'mod':svm.SVR(C=5,gamma=0.5),'N':0}}
             else:
-                self._prediction_models = {'fails':{'mod':svm.SVC(C=100,gamma=1,probability=True),'N':0},'fail_frac':{'mod':svm.SVR(C=10,gamma=0.5),'N':0}}
-            #self.determine_failure_front()
+                self._prediction_models = {'fails':{'mod':svm.SVC(C=5000,gamma=5,probability=True),'N':0},'fail_frac':{'mod':svm.SVR(C=10,gamma=0.5),'N':0}}
+            # self.determine_failure_front(pareto_front=False)
+            # self.basis_expand(expand_values=[0.75,0.5,0.1],Nparm=3,est=True)
 
-        
+    def prediction_weights(self,df,window,initial_weight=100):
+        weights = numpy.ones(min(len(df),window))
+        weights[0] = initial_weight**2 #zero value is important!
+        weights[:getattr(self,'N_base',100)] = initial_weight #then base values
+        if hasattr(self,'N_pareto'):
+            weights[:getattr(self,'N_pareto')] = initial_weight**0.5 #then pareto values
+        return weights     
 
+    def reset_prediction(self):
+        self._fitted = False
+        self._basis = None
+        self._training_history = None
+        self._running_error = None
+        self.stress_records = [{'n':0,'vx':0,'vy':0,'mxx':0,'myy':0,'mzz':0,'fails':0,'fail_frac':0}]
+        #self._symmetric = self.check_symmetric()
 
     @property
     def mesh_size(self):
@@ -471,28 +494,74 @@ class ShapelySection(Profile2D):
     def calculate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,**kw)->float:
         return calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,**kw)
         
-    def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0)->float:
+    def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,value=False,calc_margin=1.5,min_est_records=100,calc_every=25,pre_train_margin=2)->float:
         """uses a support vector machine to estimate stresses and returns the ratio of the allowable stress, also known as the failure fracion if prediction is set to True, otherwise calculates stress"""
-        if not self.prediction or not self.trained:
-            return calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz)
+        Nrec = len(self.stress_records)
+        under_size = Nrec <= min_est_records
+        if not self.prediction or not self._fitted or under_size:
+            if self._do_print:
+                print(f'calc till {len(self.stress_records)} <= {min_est_records}')
+            stress = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
+            return stress 
         else:
             parms = self._prediction_parms
-            inp = {k:v for k,v in zip(parms,[n,vx,vy,mxx,myy,mzz])}
+            data = dict(n=n,vx=vx,vy=vy,mxx=mxx,myy=myy,mzz=mzz)
+            if self._symmetric and self._use_symmetric:
+                inp = {k:abs(data[k]/v) for k,v in zip(parms,self._basis)}
+            else:
+                inp = {k:data[k]/v for k,v in zip(parms,self._basis)}
             X = pandas.DataFrame([inp])
-            return self._prediction_models['fail_frac']['mod'].predict(X)[0]
+            val = self._prediction_models['fail_frac']['mod'].predict(X)[0]
+
+            #Provide margin of error and use estimate where possible
+            if not self.trained:
+                #calc when in doubt   
+                calc_margin = calc_margin*pre_train_margin 
+                
+            #calculate stress if close to failure within saftey margin
+            err = 1-val
+            mrg = self.fail_frac_criteria(calc_margin=calc_margin)
+            if abs(err)<=mrg or all([calc_every,(Nrec%calc_every)==0]):
+                if self._do_print:
+                    print(f'calc stress {err:5.3f}<= {mrg:5.3f}*{calc_margin}')
+                return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
+            
+            if self._do_print:
+                print(f'est  stress {err:5.3f}>{mrg:5.3f}*{calc_margin}')
+            #otherwise prediction is value
+            if value:
+                return val * self.material.allowable_stress
+            return val
         
+    def fail_frac_criteria(self,calc_margin=2,min_rec=500):
+        MargRec = max(min_rec/len(self.stress_records),1)
+
+        if self._training_history:
+            score = self._training_history[-1]['fail_frac']['scr']
+        else:
+            score = self._prediction_models['fail_frac']['train_score']
+
+        mrg = max(abs((1-score)),self.prediction_goal_error)
+        return mrg*calc_margin*MargRec
+    
     def estimate_failure(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0)->float:
-        """uses a support vector machine to estimate stresses and returns the ratio of the allowable stress, also known as the failure fracion if prediction is set to True, otherwise calculates stress"""
-        if not self.prediction or not self.trained:
+        """uses a support vector machine to estimate stresses and returns a number zero or one to indicate failure, if prediction is set to True, otherwise calculates stress"""
+        if not self.prediction or not self._fitted:
             ff = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,row=True)
             return ff['fails']
         else:
+            #TODO: add logic to determine if calculation should be done close to failure
+          
             parms = self._prediction_parms
-            inp = {k:v for k,v in zip(parms,[n,vx,vy,mxx,myy,mzz])}
+            data = dict(n=n,vx=vx,vy=vy,mxx=mxx,myy=myy,mzz=mzz)
+            if self._symmetric and self._use_symmetric:
+                inp = {k:abs(data[k]/v) for k,v in zip(parms,self._basis)}
+            else:
+                inp = {k:data[k]/v for k,v in zip(parms,self._basis)}
             X = pandas.DataFrame([inp])
             return self._prediction_models['fails']['mod'].predict(X)[0]  
 
-    def record_stress(self,stress_dict,near_margin=0.1,max_margin=2):
+    def record_stress(self,stress_dict,):
         """determines if stress record should be added to stress_records"""
         if not self.prediction:
             return
@@ -504,12 +573,21 @@ class ShapelySection(Profile2D):
         if ff == 0:
             #null included
             return
+
+        #Convert to positive domain
+        if self._symmetric and self._use_symmetric:
+            stress_dict = {k:abs(v) for k,v in stress_dict.items()}
         
-        if near_margin and abs(ff-1) < near_margin:
+        if not getattr(self,'N_base',None):
+            max_margin = None
+        else:
+            max_margin = self.max_margin
+        
+        if self.near_margin and abs(ff-1) < self.near_margin:
             self.stress_records.append(stress_dict)
         elif max_margin and ff < max_margin:
             self.stress_records.append(stress_dict)
-        elif not near_margin and not max_margin:
+        elif not self.near_margin and not max_margin:
             self.stress_records.append(stress_dict)
 
         self.observe_and_predict(stress_dict)
@@ -529,13 +607,14 @@ class ShapelySection(Profile2D):
             raise ValueError(f'invalid failure mode: {self.failure_mode}')
 
     def fail_learning(self,X,parm,base_kw,mult=1):
+        '''optimizes stress until failure, given base_kw arguments for extra parameters'''
         base_kw = base_kw.copy()
         inpt = {parm:mult*X}
         base_kw.update(inpt)
         ff = self.calculate_stress(**base_kw).item()
         return 1 - ff
 
-    def solve_fail(self,fail_parm,base_kw,guess=None,tol=1E-4,mult=1,do_print=True):
+    def solve_fail(self,fail_parm,base_kw,guess=None,tol=1E-4,mult=1):
         if guess is None:
             guess = 1000*random.random()
         kw = {}
@@ -545,27 +624,34 @@ class ShapelySection(Profile2D):
         #     kw['bracket']  = bracket
             
         ans = skopt.root_scalar( self.fail_learning , x0=guess*0.1, x1=guess, xtol = tol, args=(fail_parm,base_kw,mult))#,**kw)
-        if do_print:
+        if self._do_print:
             self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
+        else:
+            self.debug(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
         if ans.converged:
             return ans.root
         return 1E6
 
     #Determine Outer Bound Of Failures
-    def determine_failure_front(self,pareto_inx = [0.75,0.5],pareto_front=True):
+    def determine_failure_front(self,pareto_inx = [0.5,0.1],pareto_front=False):
         self.info(f'determining faulure front for cross section, with pareto inx: {pareto_inx}')
         null_kw = {}
-        res = {}#{2:{}} #two is for alternate signs
         if self._symmetric:
             mvec = [1]
         else:
             mvec = [-1,1]
-        for mult in mvec:
-            res[mult] = {}
-            for p in self._prediction_parms:
-                res[mult][p] = self.solve_fail(p,null_kw,mult)
+        
+        if self._basis is None:
+            self.info(f'determining normalization basis')
+            res = {}
+            for mult in mvec:
+                res[mult] = {}
+                for p in self._prediction_parms:
+                    res[mult][p] = self.solve_fail(p,null_kw,mult)
 
-        self._basis = np.array([max([abs(v.get(p,1E6))  for k,v in res.items() ]) for p in self._prediction_parms])
+            self._basis = np.array([max([abs(v.get(p,1E6))  for k,v in res.items() ]) for p in self._prediction_parms])
+
+            self.N_base = len(self.stress_records)
 
         #Second Pareto Value Calc
         if pareto_front:
@@ -578,24 +664,55 @@ class ShapelySection(Profile2D):
                         base_kw = {aux_parm:aux_val}
                         finx = self._prediction_parms.index(fail_parm)
                         guesstimate = self._basis[finx]*(1-aux_frac)
-                        res[mult][p] = self.solve_fail(fail_parm,base_kw,guess=guesstimate,mult=mult)
+                        self.solve_fail(fail_parm,base_kw,guess=guesstimate,mult=mult)
                         if not self._symmetric:
-                            solve_fail(fail_parm,base_kw,guess=guesstimate,mult=-1*mult) #alternato
-        return res
+                            self.solve_fail(fail_parm,base_kw,guess=guesstimate,mult=-1*mult) #alternato
+    
+            self.N_pareto = len(self.stress_records)
+    
+    def basis_expand(self,expand_values=[0.9,0.75,0.5,0.1,0.01],Nparm=4,est=True,normalize=True):
+        """run combinations of parameters and permutations of weights against the basis values to populate the stress records, by default using estimation logic to speed up the process"""
+        i = 0
+        Nparm = min(min(Nparm,len(self._prediction_parms)),len(expand_values))
+        for parms in itertools.combinations(self._prediction_parms,Nparm):
+            for weight in itertools.permutations(expand_values,Nparm):
+                wt = sum(weight)
+                q = max(wt,1) if normalize else 1
+                inxs = [self._prediction_parms.index(p) for p in parms]
+                base_kw = {p:w*self._basis[i]/q for p,w,i in zip(parms,weight,inxs)}
+                #print(base_kw)
+                if est:
+                    self.estimate_stress(**base_kw)
+                else:
+                    self.calculate_stress(**base_kw)
+                i+=1
+                if i%100 == 0:
+                    self.info(f'basis expansion... {i}')
+                    
 
-    def train_till_valid(self,print_interval=50):
+    def random_force_input(self,exp_mg=12,exp_min=6,min_ex=1,max_ex=3):
+        porp = np.random.random(size=6)**np.random.randint(numpy.random.randint(min_ex,max_ex),numpy.random.randint(exp_min,exp_mg),size=(6,))
+        stress = porp * self._basis
+        return {k:v for k,v in zip(self._prediction_parms,stress)}        
+        
+    def train_until_valid(self,print_interval=50,max_iter=1000,est=False):
         """trains the prediction models until the error is below the goal error"""
         i = 0
-        goal = self._goal_error
-        while not self._training_history or any([(1-ed['scr']) > goal for ed in self._training_history[-1].values()]):
-            porp = np.random.random(size=6)**np.random.randint(1,4,size=(6,))
-            stress = porp * self._basis
-            inp = {k:v for k,v in zip(self._prediction_parms,stress)}
-            ff = self.calculate_stress(**inp)
-
+        goal = self.prediction_goal_error
+        while not self.trained:
+            inp = self.random_force_input()
+            if est:
+                self.estimate_stress(**inp)
+            else:
+                self.calculate_stress(**inp)
+            
             if i % print_interval == 0:
                 self.info(f'training... current error: {self._training_history[-1]}')
             i+= 1
+            if i >= max_iter:
+                self.info(f'training... max iterations reached')
+                return
+            
     
     #Geometric Prediction Solutions
     def check_symmetric(self,precision=3,Nincr=180):
@@ -656,7 +773,22 @@ class ShapelySection(Profile2D):
             syms.append(sym_point)
             
         return np.all(syms)
+    
+
+    def __hash__(self):
+        """uniqueness based on geometry and material"""
+        if isinstance(self.shape, Geometry):
+            shape = self.shape.geom
+        else:
+            shape = self.shape        
+        vals = (shape.geom,self.material,self.goal_elements,self.min_mesh_angle)
+        return hash(vals)
         
+    def hash_id(self):
+        """string for saving to persisting"""
+        h=hashlib.sha256()
+        h.update(str(hash(self)).encode())
+        h.hexdigest()
             
 ALL_CROSSSECTIONS = [
     cs for cs in locals() if type(cs) is type and issubclass(cs, Profile2D)
