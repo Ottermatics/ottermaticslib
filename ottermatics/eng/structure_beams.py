@@ -392,10 +392,10 @@ class Beam(Component,CostModel):
     def show_mesh(self):
         return self.section._sec.plot_mesh()
 
-    def estimate_stress(self, **forces):
+    def estimate_stress(self, force_calc=False,**forces):
         """uses the best available method to determine max stress in the beam, for ShapelySections this is done through a learning process, for other sections it is done through a simple calculation aimed at providing a conservative estimate"""
-        if isinstance(self.section, ottgeo.ShapelySection) and self.section.prediction:
-            return self.section.estimate_stress(**forces)
+        if isinstance(self.section, ottgeo.ShapelySection):
+            return self.section.estimate_stress(**forces,force_calc=force_calc)
         else:
             return self._fallback_estimate_stress(**forces)
         
@@ -473,9 +473,12 @@ class Beam(Component,CostModel):
         """estimates these are proportional to stress but 2D FEA is "truth" since we lack cross section specifics"""
         if not self.structure._any_solved:
             return numpy.nan
-        vals = [ self.estimate_stress(**self.get_forces_at(x),value=True) for x in [0, 0.5, 1]]      
+        
+        vals = [ self.estimate_stress(**self.get_forces_at(x),value=True) for x in [0, 0.5, 1]]
+
         try:
             return max(vals)
+            
         except Exception as e:
             self.warning(f'failed to get max stress estimate {e}| {vals}')
             return numpy.nan

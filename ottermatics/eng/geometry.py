@@ -520,11 +520,12 @@ class ShapelySection(Profile2D):
     def calculate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,**kw)->float:
         return calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,**kw)
         
-    def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,value=False,calc_margin=1.5,min_est_records=100,calc_every=25,pre_train_margin=2)->float:
+    def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,value=False,calc_margin=2,min_est_records=100,calc_every=25,pre_train_margin=2,force_calc=False)->float:
         """uses a support vector machine to estimate stresses and returns the ratio of the allowable stress, also known as the failure fracion if prediction is set to True, otherwise calculates stress"""
         Nrec = len(self._prediction_records)
         under_size = Nrec <= min_est_records
-        if not self.prediction or not self._fitted or under_size:
+        do_calc = not self.prediction or not self._fitted or under_size
+        if do_calc or force_calc:
             if self._do_print:
                 print(f'calc till {len(self._prediction_records)} <= {min_est_records}')
             stress = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
@@ -554,19 +555,21 @@ class ShapelySection(Profile2D):
                     self.info(f'calc stress {err:5.3f}<= {mrg:5.3f}*{calc_margin}')
                 return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
 
-            elif val <= self.max_margin and self.check_out_of_domain(data,2):
+            elif val <= self.max_margin and self.check_out_of_domain(data):
                 if self._do_print:
                     self.info(f'out of domain {val:5.3f}<={self.max_margin:5.3f}')
                 return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
             
             if self._do_print:
                 self.info(f'est  stress {err:5.3f}>{mrg:5.3f}*{calc_margin}')
+                
             #otherwise prediction is value
             if value:
                 return val * self.material.allowable_stress
+
             return val
         
-    def fail_frac_criteria(self,calc_margin=2,min_rec=500):
+    def fail_frac_criteria(self,calc_margin=2,min_rec=1000):
         MargRec = max(min_rec/len(self._prediction_records),1)
 
         if self._training_history:
@@ -666,7 +669,7 @@ class ShapelySection(Profile2D):
 
     #Determine Outer Bound Of Failures
     def determine_failure_front(self,pareto_inx = [0.5,0.1],pareto_front=False):
-        self.info(f'determining faulure front for cross section, with pareto inx: {pareto_inx}')
+        self.info(f'determining failure front for cross section, with pareto inx: {pareto_inx}')
         null_kw = {}
         if self._symmetric:
             mvec = [1]

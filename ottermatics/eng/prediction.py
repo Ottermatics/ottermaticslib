@@ -26,7 +26,7 @@ class PredictionMixin:
     _training_history = None
     _do_print = False
     
-    _sigma_retrain = 1 #retrain when sigma is greater than this
+    _sigma_retrain = 3 #retrain when sigma is greater than this
     _X_prediction_stats: list = None #list of strings to get from dataframe
     _prediction_records: list = None#made lazily, but you can replace this
 
@@ -44,7 +44,7 @@ class PredictionMixin:
     def basis(self):
         return self._basis
     
-    def add_prediction_record(self,record,extra_add=True,mult_sigma=1):
+    def add_prediction_record(self,record,extra_add=True,mult_sigma=1,target_items=1000):
         """adds a record to the prediction records, and calcultes the average and variance of the data
         :param record: a dict of the record
         :param extra_add: if true, the record is added to the prediction records even if the data is inbounds
@@ -53,7 +53,9 @@ class PredictionMixin:
         if self._X_prediction_stats is None:
             self._X_prediction_stats = {p:base_stat.copy() for p in self._prediction_parms}
         
-        N = len(self.prediction_records)+1
+        N = len(self.prediction_records) + 1
+        Pf = (N/target_items )
+        J = len(self._prediction_parms)**0.5
 
         #moving average and variance
         out_of_bounds = extra_add #skip this check
@@ -76,10 +78,11 @@ class PredictionMixin:
 
             #probability of acceptance - narrow distributions are not wanted
             if (not choice or not out_of_bounds) and avg != 0:
-                g = (abs(avg)-std)/abs(avg) #negative when std > avg
-                #TODO: prob accept should be based on difference from average
+                g = (abs(avg)-std)/abs(std) #negative when std > avg
+                a =  abs(dev)/std/J
+                #prob accept should be based on difference from average
                 prob_deny = np.e**g
-                prob_accept = 1/prob_deny
+                prob_accept =  (a/Pf)
                 choice = random.choices([True,False],[prob_accept,prob_deny])
 
             #update stats
@@ -98,7 +101,7 @@ class PredictionMixin:
             except Exception as e:
                 self.warning(f'error in prediction: {e}')
     
-    def check_out_of_domain(self,record,extra_margin=1):
+    def check_out_of_domain(self,record,extra_margin=1,target_items=2500):
         """checks if the record is in bounds of the current data"""
         if self._X_prediction_stats is None:
             return True 
@@ -107,11 +110,15 @@ class PredictionMixin:
             #we're not counting extemities
             if record[self.max_rec_parm] > self.max_margin:
                 return False
-        
+
+        N = len(self.prediction_records) + 1
+        Pf = (N/target_items)
+        J = len(self._prediction_parms)
         for i,parm in enumerate(self._prediction_parms):
             rec_val = record[parm]
             cur_stat = self._X_prediction_stats[parm]
-            dev = (rec_val - cur_stat['avg'])
+            avg = cur_stat['avg']
+            dev = (rec_val - avg)
             var = cur_stat['var']
             std = var**0.5
             std_err = std / len(self.prediction_records)
@@ -121,6 +128,13 @@ class PredictionMixin:
             if  e1 > em:
                 if self._do_print:
                     self.info(f'out of bounds: {e1} > {em} | {dev} | {std_err} | {std} | {record}')
+                return True
+            g = (abs(avg)-std)/abs(std) #negative when std > avg
+            a = abs(dev)/std/J #prob accept based on difference from avg
+            prob_deny = np.e**g
+            prob_accept = (a/Pf) #relative to prob_deny
+            choice = random.choices([True,False],[prob_accept,prob_deny])
+            if choice:
                 return True
         return False
     

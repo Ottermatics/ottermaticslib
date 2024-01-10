@@ -226,7 +226,7 @@ class Structure(System,CostModel,PredictionMixin):
     #calculate full failure will run failure analysis without stoping at first failure
     calculate_actual_failure: bool =attrs.field(default=False)
     calculate_full_failure: bool =attrs.field(default=True)
-    failure_solve_method = Options('bisect','root')
+    failure_solve_method = Options('root','bisect')
     failure_records: list = attrs.field(default=None)
     
     #prediciton calculation
@@ -289,7 +289,8 @@ class Structure(System,CostModel,PredictionMixin):
             self.struct_post_execute(combo)
             
             #backup data saver.
-            self._anything_changed = True #change costs 
+            self.current_failures() #cache failures
+            self._anything_changed = True #change costs
             if save:
                 self.save_data(index=self.index, force=True)
 
@@ -324,47 +325,59 @@ class Structure(System,CostModel,PredictionMixin):
         self.info(f'ran: {bkw} -> {ff:5.4f} | {res:5.4f}')
         return res
 
-    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3,return_sol = False):
+    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3,return_sol = False,max_tries=5):
         
+        #TODO: add reversion logic
+        if not hasattr(self,'_max_parm_dict'):
+            self._max_parm_dict = {}
         tries = 0
-        failure = False
-        while not failure and tries < 5:
-            with self.revert_X() as rx:
-                try:
-                    if guess is None:
-                        guess = mult*1E6
-                        maxx = self.max_guess * mult                
-                    solutions = []
-                    if self.failure_solve_method == 'bisect':
-                        ans = sciopt.root_scalar( self.struct_root_failure, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions),bracket=(0,maxx) )
-                        self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
+        while tries < max_tries:
+            try:
+                if guess is None:
+                    guess = mult*1E6
+                    if fail_parm not in self._max_parm_dict:
+                        self._max_parm_dict[fail_parm] = self.max_guess
+                        maxx = self.max_guess * mult
+                    else:
+                        self.max_guess = self._max_parm_dict[fail_parm]
+                        maxx = self.max_guess * mult
 
-                    else: #root
-                        ans = sciopt.root_scalar( self.struct_root_failure, x0 = 100, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions) )
-                        self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')                        
+                solutions = []
+                if self.failure_solve_method == 'bisect':
+                    ans = sciopt.root_scalar( self.struct_root_failure, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions),bracket=(0,maxx) )
+                    self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
 
-                    if return_sol:
-                        return solutions
+                else: #root
+                    ans = sciopt.root_scalar( self.struct_root_failure, x0 = 100, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions) )
+                    self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')                        
 
-                    if ans.converged:
-                        self.setattrs({fail_parm:ans.root})
-                        self.execute(save=True)
-                        return ans.root
-                    elif solutions:
-                        x = np.array([s['x'] for s in solutions])
-                        f = np.array([s['ff'] for s in solutions])
-                        b = np.array([s['bf'] for s in solutions])
-                        m = np.array([s['mf'] for s in solutions])
-                        return #TODO: fit the best solution using regression
-                    return np.nan
+                if return_sol:
+                    return solutions
 
-                except ValueError as e:
-                    self.max_guess = self.max_guess * 10
-                    tries += 1
-                    failure = True
-                except Exception as e:
-                    self.error(f'unknown error: {e}')
-                    raise e
+                if ans.converged:
+                    self.setattrs({fail_parm:ans.root})
+                    self.execute(save=True)
+                    return ans.root
+
+                elif solutions:
+                    x = np.array([s['x'] for s in solutions])
+                    f = np.array([s['ff'] for s in solutions])
+                    b = np.array([s['bf'] for s in solutions])
+                    m = np.array([s['mf'] for s in solutions])
+                    return #TODO: fit the best solution using regression
+                return np.nan
+
+            except ValueError as e:
+                #increase margin
+                self.info(f'increasing {fail_parm} max guess by 100x')
+                new_max = self._max_parm_dict[fail_parm]*100
+                self._max_parm_dict[fail_parm] = new_max
+                tries += 1
+
+
+            except Exception as e:
+                self.error(f'unknown error: {e}')
+                raise e
 
     def _X_prediction_dict(self,base_obj=None) -> dict:
         if not self.prediction or not self._prediction_parms:
@@ -1093,7 +1106,7 @@ class Structure(System,CostModel,PredictionMixin):
                 for x in [0, 0.5, 1.0]:
                     cases += 1
                     f = beam.get_forces_at(x, combo=combo)
-                    beam_fail_frac = beam.estimate_stress(**f)
+                    beam_fail_frac = beam.estimate_stress(**f,force_calc=self.calculate_actual_failure)
                     st = beam_fail_frac * beam.material.allowable_stress
 
                     fails = False
@@ -1176,7 +1189,7 @@ class Structure(System,CostModel,PredictionMixin):
             for x in [0, 0.5, 1.0]:
                 checks += 1
                 f = beam.get_forces_at(x, combo=combo)
-                st = beam.estimate_stress(**f)
+                st = beam.estimate_stress(**f,force_calc=self.calculate_actual_failure)
                 beam_fail_frac = st / beam.material.allowable_stress
 
                 fails = False
