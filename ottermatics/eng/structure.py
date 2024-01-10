@@ -39,6 +39,7 @@ import asyncio
 import weakref
 from sklearn import svm
 
+from ottermatics.typing import Options
 from ottermatics.eng.structure_beams import Beam, rotation_matrix_from_vectors
 
 
@@ -225,16 +226,18 @@ class Structure(System,CostModel,PredictionMixin):
     #calculate full failure will run failure analysis without stoping at first failure
     calculate_actual_failure: bool =attrs.field(default=False)
     calculate_full_failure: bool =attrs.field(default=True)
-    
+    failure_solve_method = Options('bisect','root')
     failure_records: list = attrs.field(default=None)
     
     #prediciton calculation
     prediction: bool = attrs.field(default=True)
     max_records: int = attrs.field(default=10000)
     _prediction_parms: list = attrs.field(default=None)
-    analysis_records = attrs.field(default=None)
+
+    min_rec = 10
     near_margin=0.1
     max_margin=1.5
+    max_guess = 1E8
 
     current_failure_summary = None
     _always_save_data = True  # we dont respond to inputs so use this
@@ -247,7 +250,7 @@ class Structure(System,CostModel,PredictionMixin):
         self.initalize_structure()
         self.frame.add_load_combo(self.default_combo, {self.gravity_name: 1.0}, "gravity" )
         self.create_structure()
-        self.analysis_records = []
+
         if self.prediction:
             d={'fails':{'mod':svm.SVC(C=1000,gamma=0.1,probability=True),'N':0},
             'fail_frac':{'mod':svm.SVR(C=1,gamma=0.1),'N':0},
@@ -292,42 +295,113 @@ class Structure(System,CostModel,PredictionMixin):
 
             #record results for prediction
             if record and self.prediction:
-                res = self._analysis_result
+                res = self._prediction_record
                 if res: self.record_result(res)
 
-    @property
-    def _analysis_result(self)->dict:
-        """returns the analysis result for prediction"""
+    #Solver Mechanics
+    def struct_root_failure(self,x,fail_parm,base_kw,mult=1,target=1,sols=None):
+        assert target > 0, 'target must be positive'
+        bkw = base_kw.copy()
+        bkw[fail_parm] = x*mult
+        self.setattrs(bkw)
+        self.info(f'solving root iter: {bkw}')
+        self.execute(save=False)
+        wrong_side = (mult * x)<0
+        ff = self.max_est_fail_frac
+        bf = self.max_beam_est_fail_frac
+        mf = self.max_mesh_est_fail_frac
+        if wrong_side:
+            #min = 1 with an gradual but exponential value from 0
+            l10 = max(np.log10(abs(ff)+1),1)+1
+            exp = min(abs(ff),l10)**0.5
+            res = max(target*np.e**exp,target)
+        else:
+            res = (target-ff)
+
+        if sols is not None:
+            sols.append({'x':x,'ff':ff,'obj':res,'kw':bkw,'mf':mf,'bf':bf})
+
+        self.info(f'ran: {bkw} -> {ff:5.4f} | {res:5.4f}')
+        return res
+
+    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3,return_sol = False):
+        
+        tries = 0
+        failure = False
+        while not failure and tries < 5:
+            with self.revert_X() as rx:
+                try:
+                    if guess is None:
+                        guess = mult*1E6
+                        maxx = self.max_guess * mult                
+                    solutions = []
+                    if self.failure_solve_method == 'bisect':
+                        ans = sciopt.root_scalar( self.struct_root_failure, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions),bracket=(0,maxx) )
+                        self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
+
+                    else: #root
+                        ans = sciopt.root_scalar( self.struct_root_failure, x0 = 100, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions) )
+                        self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')                        
+
+                    if return_sol:
+                        return solutions
+
+                    if ans.converged:
+                        self.setattrs({fail_parm:ans.root})
+                        self.execute(save=True)
+                        return ans.root
+                    elif solutions:
+                        x = np.array([s['x'] for s in solutions])
+                        f = np.array([s['ff'] for s in solutions])
+                        b = np.array([s['bf'] for s in solutions])
+                        m = np.array([s['mf'] for s in solutions])
+                        return #TODO: fit the best solution using regression
+                    return np.nan
+
+                except ValueError as e:
+                    self.max_guess = self.max_guess * 10
+                    tries += 1
+                    failure = True
+                except Exception as e:
+                    self.error(f'unknown error: {e}')
+                    raise e
+
+    def _X_prediction_dict(self,base_obj=None) -> dict:
         if not self.prediction or not self._prediction_parms:
             return {}
-        d = {k:getattr(self,k) for k in self._prediction_parms}
+        if base_obj is None:
+            base_obj = self
+        d = {k:getattr(base_obj,k,None) for k in self._prediction_parms}
+        return d
+    
+    @property
+    def _prediction_record(self)->dict:
+        """returns the analysis result for prediction"""
+        d = self._X_prediction_dict(self)
         d['fail_frac'] = ff= self.max_est_fail_frac
         d['beam_fail_frac'] = self.max_beam_est_fail_frac
         d['mesh_fail_frac'] = self.max_mesh_est_fail_frac
-        d['combo'] = self.current_combo
-        d['fails'] = ff >= 1
+        d['fails'] = int(ff >= 1)
         return d
 
     def record_result(self,stress_dict):
-        """determines if stress record should be added to stress_records"""
+        """determines if stress record should be added to prediction_records"""
         if not self.prediction:
             return
 
-        if len(self.analysis_records) > self.max_records:
+        if len(self.prediction_records) > self.max_records:
             return
 
         ff = stress_dict['fail_frac']
 
         #Add the data to the stress records
         if self.near_margin and abs(ff-1) < self.near_margin:
-            self.analysis_records.append(stress_dict)
-        elif self.max_margin and ff < self.max_margin:
-            self.analysis_records.append(stress_dict)
+            self.add_prediction_record(stress_dict)
+        elif self.max_margin and ff < self.max_margin*2:
+            self.add_prediction_record(stress_dict,False)
         elif not self.near_margin and not self.max_margin:
-            self.analysis_records.append(stress_dict)
-
-        self.observe_and_predict(stress_dict)
-        self.check_and_retrain(self.analysis_records,min_rec=5)
+            self.add_prediction_record(stress_dict,False)
+            
      
 
     def save_data(self,*args,**kw):
@@ -1390,40 +1464,6 @@ class Structure(System,CostModel,PredictionMixin):
             self.warning(f"{fail_count:3.0f} across {failed_beams} @ {[f'{p*100:3.0f}' for p in failed_pos]}%| {c}")
 
         return secton_results
-
-    #Solver Mechanics
-    def struct_root_failure(self,x,fail_parm,base_kw,mult=1):
-        bkw = base_kw.copy()
-        bkw[fail_parm] = x*mult
-        self.setattrs(bkw)
-        self.info(f'solving root iter: {bkw}')
-        self.execute(save=False)
-        wrong_side = (mult * x)<0
-        ff = self.max_est_fail_frac
-        if wrong_side:
-            #min = 1 with an gradual but exponential value from 0
-            l10 = max(np.log10(abs(ff)+1),1)+1
-            exp = min(abs(ff),l10)**0.5
-            res = max(np.e**exp,1.0)
-        else:
-            res = (1-ff)
-        self.info(f'ran: {bkw} -> {ff:5.4f} | {res:5.4f}')
-        return res
-
-    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3):
-
-        if guess is None:
-            guess = mult*1E5
-            maxx = 1E9 * mult
-
-        with self.revert_X() as rx:
-            ans = sciopt.root_scalar( self.struct_root_failure, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw) )
-            self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
-            if ans.converged:
-                self.setattrs({fail_parm:ans.root})
-                self.execute(save=True)
-                return ans.root
-            return np.nan
 
 
 

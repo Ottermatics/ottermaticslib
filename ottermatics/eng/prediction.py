@@ -4,6 +4,11 @@ import numpy
 import numpy as np
 import time
 import pandas
+import random
+
+#store average and variance in a dict
+base_stat = {'avg':0,'var':0}
+    
 
 class PredictionMixin:
 
@@ -21,17 +26,116 @@ class PredictionMixin:
     _training_history = None
     _do_print = False
     
+    _sigma_retrain = 1 #retrain when sigma is greater than this
+    _X_prediction_stats: list = None #list of strings to get from dataframe
+    _prediction_records: list = None#made lazily, but you can replace this
+
+    @property
+    def prediction_records(self):
+        if self._prediction_records is None:
+            self._prediction_records = []
+        return self._prediction_records
+    
+    @property
+    def _prediction_record(self):
+        raise NotImplementedError(f'must implement _prediction_record')
+    
+    @property
+    def basis(self):
+        return self._basis
+    
+    def add_prediction_record(self,record,extra_add=True,mult_sigma=1):
+        """adds a record to the prediction records, and calcultes the average and variance of the data
+        :param record: a dict of the record
+        :param extra_add: if true, the record is added to the prediction records even if the data is inbounds
+        :returns: a boolean indicating if the record was out of bounds of current data (therefor should be added)
+        """
+        if self._X_prediction_stats is None:
+            self._X_prediction_stats = {p:base_stat.copy() for p in self._prediction_parms}
+        
+        N = len(self.prediction_records)+1
+
+        #moving average and variance
+        out_of_bounds = extra_add #skip this check
+        choice = False
+        for i,parm in enumerate(self._prediction_parms):
+            rec_val = record[parm]
+            cur_stat = self._X_prediction_stats[parm]
+            avg = cur_stat['avg']
+            dev = (rec_val - avg)
+            var = cur_stat['var']
+            std = var**0.5
+            std_err = std / N
+            #check out of bounds
+            e1 = abs(dev) + std_err
+            em = std * self._sigma_retrain * mult_sigma
+            if not out_of_bounds and e1 > em:
+                if self.trained:
+                    self.info('record out of bounds!')
+                out_of_bounds = True
+
+            #probability of acceptance - narrow distributions are not wanted
+            if (not choice or not out_of_bounds) and avg != 0:
+                g = (abs(avg)-std)/abs(avg) #negative when std > avg
+                #TODO: prob accept should be based on difference from average
+                prob_deny = np.e**g
+                prob_accept = 1/prob_deny
+                choice = random.choices([True,False],[prob_accept,prob_deny])
+
+            #update stats
+            cur_stat['avg'] = cur_stat['avg'] + dev/N
+            cur_stat['var'] = var + (dev**2 - var)/N
+            self._X_prediction_stats[parm] = cur_stat #reassign (in case)
+             
+        if out_of_bounds or extra_add or choice:
+            if self._do_print:
+                self.info(f'add prediction record: {record} | chance: {choice}')
+            self._prediction_records.append(record)
+
+            try:
+                self.observe_and_predict(record)
+                self.check_and_retrain(self.prediction_records)
+            except Exception as e:
+                self.warning(f'error in prediction: {e}')
+    
+    def check_out_of_domain(self,record,extra_margin=1):
+        """checks if the record is in bounds of the current data"""
+        if self._X_prediction_stats is None:
+            return True 
+
+        if hasattr(self,'max_rec_parm') and self.max_rec_parm in record:
+            #we're not counting extemities
+            if record[self.max_rec_parm] > self.max_margin:
+                return False
+        
+        for i,parm in enumerate(self._prediction_parms):
+            rec_val = record[parm]
+            cur_stat = self._X_prediction_stats[parm]
+            dev = (rec_val - cur_stat['avg'])
+            var = cur_stat['var']
+            std = var**0.5
+            std_err = std / len(self.prediction_records)
+            #check out of bounds
+            e1 = abs(dev) + std_err
+            em = std * self._sigma_retrain * extra_margin          
+            if  e1 > em:
+                if self._do_print:
+                    self.info(f'out of bounds: {e1} > {em} | {dev} | {std_err} | {std} | {record}')
+                return True
+        return False
+    
+
 
     def train_compare(self,df,test_frac=2):
-        if self._prediction_models is None:
+        if self._prediction_models is None or self._basis is None:
             return {}
         
         if self._training_history is None:
             train_iter = {}
-            self._training_history = [train_iter]
+            self._training_history = []
         else:
             train_iter = {}
-            self._training_history.append(train_iter)
+            
 
         out = {}
         N = len(df)
@@ -39,7 +143,7 @@ class PredictionMixin:
         if window > (N/test_frac):
             window = max(int(N/test_frac),25)
         
-        MargRec = max(250/len(self.stress_records),1)
+        MargRec = max(250/len(self.prediction_records),1)
 
         self.info(f'training dataset: {N} | training window: {window}')
         for parm,mod_dict in self._prediction_models.items():
@@ -49,11 +153,10 @@ class PredictionMixin:
             N = len(y)
             stl = time.time()
 
-            weights = self.prediction_weights(df,window)
-
-            mod.fit(X[:window],y[:window],weights)
+            weights = self.prediction_weights(df,N)
+            mod.fit(*self._subsample_data(X,y,window,weights))
             etl = time.time()
-            scr = mod.score(X,y)/MargRec
+            scr = mod.score(*self._score_data(X,y,weights))/MargRec
             train_iter[parm] = {'scr':scr,'time':etl-stl,'N':N}
             dt = etl-stl
 
@@ -64,6 +167,9 @@ class PredictionMixin:
         self._running_error = {parm:{'err':0.5,'N':0} for parm in self._prediction_models}
         self._prediction_models = out
         self._fitted = True
+
+        #add training item to history
+        self._training_history.append(train_iter)
 
         #do something when trained
         self.training_callback(self._prediction_models)
@@ -76,6 +182,14 @@ class PredictionMixin:
 
     def prediction_weights(self,df,window):
         return np.ones(min(len(df),window))
+
+    def _subsample_data(self,X,y,window,weights):
+        """subsamples the data to the window size"""
+        return X.iloc[:window],y.iloc[:window],weights[:window]
+
+    def _score_data(self,X,y,weights):
+        """override this, by default, just returns the data to the score"""
+        return X,y,weights
 
     def score_data(self,df):
         """scores a dataframe"""
@@ -141,10 +255,15 @@ class PredictionMixin:
             self._running_error[parm]['N'] = N
 
 
-    def check_and_retrain(self,records,min_rec=50):
+    def check_and_retrain(self,records,min_rec=None):
         """Checks if more data than threshold to train or if error is sufficiently low to ignore retraining, or if more data already exists than window size (no training)"""
         if self._prediction_models is None:
             return        
+
+        if not hasattr(self,'min_rec'):
+            min_rec = 50
+        else:
+            min_rec = self.min_rec
 
         if self.trained:
             if len(records) % min_rec == 0:
@@ -174,6 +293,6 @@ class PredictionMixin:
                 return
 
     def prediction_dataframe(self,records):
-        df = pandas.DataFrame(records)
+        df = pandas.DataFrame(records)._get_numeric_data()
         df[np.isnan(df)] = 0 #zeros baybee
         return df

@@ -298,6 +298,7 @@ def get_mesh_size(inst):
     ms = max(min(cans),inst.min_mesh_size)
     return max(ms**2.,dAmin) #length to area conversion
 
+    
 def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row=False,record=True,value=False)->float:
     """returns the maximum vonmises stress in the section and returns the ratio of the allowable stress, also known as the failure fracion
     :param raw: if raw is true, the stress object is returned, otherwise the failure fraction is returned
@@ -309,8 +310,10 @@ def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row
     inp['fail_stress'] = fail_stress
     inp['fail_frac'] = ff =  fail_stress / section.material.allowable_stress
     inp['fails'] = int(ff >= 1)
+
     if record:
         section.record_stress(inp)
+    
     if value:
         return fail_stress
     if raw:
@@ -341,9 +344,10 @@ class ShapelySection(Profile2D):
     prediction: bool = attr.field(default=True)
     prediction_goal_error: float = attrs.field(default=0.025)
     max_records: list = attr.field(default=10000)
-    stress_records: list
+    prediction_records: list
     near_margin=0.1
     max_margin=1.5
+    max_rec_parm = 'fail_frac'
 
     _use_symmetric: bool = attrs.field(default=True)
     _prediction_parms = ['n','vx','vy','mxx','myy','mzz']
@@ -357,7 +361,7 @@ class ShapelySection(Profile2D):
         self.init_with_material(self.material)
             
         if self.prediction:
-            self.stress_records = [{'n':0,'vx':0,'vy':0,'mxx':0,'myy':0,'mzz':0,'fails':0,'fail_frac':0}]
+            self.add_prediction_record({'n':0,'vx':0,'vy':0,'mxx':0,'myy':0,'mzz':0,'fails':0,'fail_frac':0})
             self._symmetric = self.check_symmetric()
             if self._symmetric and self._use_symmetric:
                 self._prediction_models = {'fails':{'mod':svm.SVC(C=2000,gamma=0.1,probability=True),'N':0},'fail_frac':{'mod':svm.SVR(C=5,gamma=0.5),'N':0}}
@@ -366,25 +370,47 @@ class ShapelySection(Profile2D):
             # self.determine_failure_front(pareto_front=False)
             # self.basis_expand(expand_values=[0.75,0.5,0.1],Nparm=3,est=True)
 
-    def prediction_weights(self,df,window,initial_weight=100):
+    def prediction_weights(self,df,window,initial_weight=10):
         weights = numpy.ones(min(len(df),window))
         weights[0] = initial_weight**2 #zero value is important!
         weights[:getattr(self,'N_base',100)] = initial_weight #then base values
         if hasattr(self,'N_pareto'):
             weights[:getattr(self,'N_pareto')] = initial_weight**0.5 #then pareto values
-        return weights     
+        #Dont emphasise fit above max margin
+        dm = (df.fail_frac - self.max_margin).to_numpy()
+        penalize_inx = (dm>0)
+        weights[penalize_inx] = np.maximum(1.0/((1.0+dm[penalize_inx])),0.1)
+        return weights   
+
+    def _subsample_data(self,X,y,window,weights):
+        """subsamples the data to the window size"""
+        inx = getattr(self,'N_pareto',getattr(self,'N_base',window))
+        x1 = X.iloc[:inx]
+        y1 = y.iloc[:inx]
+        w1 = weights[:inx]
+        if inx != window:
+            x2 = X.iloc[inx:].sample(frac=0.5)
+            y2 = y.iloc[x2.index]
+            w2 = weights[x2.index]
+            return pandas.concat((x1,x2)),pandas.concat((y1,y2)),numpy.concatenate((w1,w2))
+        return X.iloc[:window],y.iloc[:window],weights[:window]      
 
     def reset_prediction(self):
         self._fitted = False
         self._basis = None
         self._training_history = None
         self._running_error = None
-        self.stress_records = [{'n':0,'vx':0,'vy':0,'mxx':0,'myy':0,'mzz':0,'fails':0,'fail_frac':0}]
+        self.add_prediction_record({'n':0,'vx':0,'vy':0,'mxx':0,'myy':0,'mzz':0,'fails':0,'fail_frac':0})
         #self._symmetric = self.check_symmetric()
 
     @property
     def mesh_size(self):
         return self._mesh_size
+    
+    @property
+    def _prediction_record(self):
+        """not a property of state, just return an empty dict, we add record manually"""
+        return {}
     
     @mesh_size.setter
     def mesh_size(self, value):
@@ -496,16 +522,18 @@ class ShapelySection(Profile2D):
         
     def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,value=False,calc_margin=1.5,min_est_records=100,calc_every=25,pre_train_margin=2)->float:
         """uses a support vector machine to estimate stresses and returns the ratio of the allowable stress, also known as the failure fracion if prediction is set to True, otherwise calculates stress"""
-        Nrec = len(self.stress_records)
+        Nrec = len(self._prediction_records)
         under_size = Nrec <= min_est_records
         if not self.prediction or not self._fitted or under_size:
             if self._do_print:
-                print(f'calc till {len(self.stress_records)} <= {min_est_records}')
+                print(f'calc till {len(self._prediction_records)} <= {min_est_records}')
             stress = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
             return stress 
         else:
             parms = self._prediction_parms
             data = dict(n=n,vx=vx,vy=vy,mxx=mxx,myy=myy,mzz=mzz)
+            
+            #Format data for prediction
             if self._symmetric and self._use_symmetric:
                 inp = {k:abs(data[k]/v) for k,v in zip(parms,self._basis)}
             else:
@@ -523,18 +551,23 @@ class ShapelySection(Profile2D):
             mrg = self.fail_frac_criteria(calc_margin=calc_margin)
             if abs(err)<=mrg or all([calc_every,(Nrec%calc_every)==0]):
                 if self._do_print:
-                    print(f'calc stress {err:5.3f}<= {mrg:5.3f}*{calc_margin}')
+                    self.info(f'calc stress {err:5.3f}<= {mrg:5.3f}*{calc_margin}')
+                return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
+
+            elif val <= self.max_margin and self.check_out_of_domain(data,2):
+                if self._do_print:
+                    self.info(f'out of domain {val:5.3f}<={self.max_margin:5.3f}')
                 return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
             
             if self._do_print:
-                print(f'est  stress {err:5.3f}>{mrg:5.3f}*{calc_margin}')
+                self.info(f'est  stress {err:5.3f}>{mrg:5.3f}*{calc_margin}')
             #otherwise prediction is value
             if value:
                 return val * self.material.allowable_stress
             return val
         
     def fail_frac_criteria(self,calc_margin=2,min_rec=500):
-        MargRec = max(min_rec/len(self.stress_records),1)
+        MargRec = max(min_rec/len(self._prediction_records),1)
 
         if self._training_history:
             score = self._training_history[-1]['fail_frac']['scr']
@@ -561,14 +594,14 @@ class ShapelySection(Profile2D):
             X = pandas.DataFrame([inp])
             return self._prediction_models['fails']['mod'].predict(X)[0]  
 
-    def record_stress(self,stress_dict,):
-        """determines if stress record should be added to stress_records"""
+    def record_stress(self,stress_dict):
+        """determines if stress record should be added to prediction_records"""
         if not self.prediction:
             return
-        if len(self.stress_records) > self.max_records:
+        if len(self._prediction_records) > self.max_records:
             return
         #Add the data to the stress records
-        #TODO: add logic to determine if stress record should be added to stress_records
+        #TODO: add logic to determine if stress record should be added to prediction_records
         ff = stress_dict['fail_frac']
         if ff == 0:
             #null included
@@ -584,16 +617,15 @@ class ShapelySection(Profile2D):
             max_margin = self.max_margin
         
         if self.near_margin and abs(ff-1) < self.near_margin:
-            self.stress_records.append(stress_dict)
-        elif max_margin and ff < max_margin:
-            self.stress_records.append(stress_dict)
+            #near failure always add to map resolution
+            self.add_prediction_record(stress_dict)
+        elif max_margin and ff < max_margin*2:
+            #under max marging
+            self.add_prediction_record(stress_dict,False,0.1)
         elif not self.near_margin and not max_margin:
-            self.stress_records.append(stress_dict)
-
-        self.observe_and_predict(stress_dict)
-        self.check_and_retrain(self.stress_records)
-        #TODO: add logic to determine if training should occur
-        #TODO: add logic to compare stress prediciton to actual stress
+            #no checks
+            self.add_prediction_record(stress_dict,False)
+            
 
     def determine_failure_stress(self,stress_obj):
         """uses the failure mode to compare to allowable stress"""
@@ -651,7 +683,7 @@ class ShapelySection(Profile2D):
 
             self._basis = np.array([max([abs(v.get(p,1E6))  for k,v in res.items() ]) for p in self._prediction_parms])
 
-            self.N_base = len(self.stress_records)
+            self.N_base = len(self._prediction_records)
 
         #Second Pareto Value Calc
         if pareto_front:
@@ -668,7 +700,7 @@ class ShapelySection(Profile2D):
                         if not self._symmetric:
                             self.solve_fail(fail_parm,base_kw,guess=guesstimate,mult=-1*mult) #alternato
     
-            self.N_pareto = len(self.stress_records)
+            self.N_pareto = len(self._prediction_records)
     
     def basis_expand(self,expand_values=[0.9,0.75,0.5,0.1,0.01],Nparm=4,est=True,normalize=True):
         """run combinations of parameters and permutations of weights against the basis values to populate the stress records, by default using estimation logic to speed up the process"""
@@ -680,6 +712,7 @@ class ShapelySection(Profile2D):
                 q = max(wt,1) if normalize else 1
                 inxs = [self._prediction_parms.index(p) for p in parms]
                 base_kw = {p:w*self._basis[i]/q for p,w,i in zip(parms,weight,inxs)}
+                
                 #print(base_kw)
                 if est:
                     self.estimate_stress(**base_kw)
