@@ -550,18 +550,20 @@ class ShapelySection(Profile2D):
             #calculate stress if close to failure within saftey margin
             err = 1-val
             mrg = self.fail_frac_criteria(calc_margin=calc_margin)
-            if abs(err)<=mrg or all([calc_every,(Nrec%calc_every)==0]):
-                if self._do_print:
-                    self.info(f'calc stress {err:5.3f}<= {mrg:5.3f}*{calc_margin}')
+            do_calc = abs(err)<=mrg or all([calc_every,(Nrec%calc_every)==0])
+            oob = val <= self.max_margin and self.check_out_of_domain(data,0.1)
+            if self._do_print:
+                self.info(f'{"calc" if do_calc or oob else "est"} stress {abs(err):5.3f}>{mrg*calc_margin:5.3f}| {calc_margin} | oob {oob}')
+
+            if do_calc:
                 return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
 
-            elif val <= self.max_margin and self.check_out_of_domain(data):
-                if self._do_print:
-                    self.info(f'out of domain {val:5.3f}<={self.max_margin:5.3f}')
+            elif oob:
+                # if self._do_print:
+                #     self.info(f'out of domain {val:5.3f}<={self.max_margin:5.3f}')
                 return self.calculate_stress(n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
             
-            if self._do_print:
-                self.info(f'est  stress {err:5.3f}>{mrg:5.3f}*{calc_margin}')
+
                 
             #otherwise prediction is value
             if value:

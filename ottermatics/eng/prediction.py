@@ -54,54 +54,66 @@ class PredictionMixin:
             self._X_prediction_stats = {p:base_stat.copy() for p in self._prediction_parms}
         
         N = len(self.prediction_records) + 1
-        Pf = (N/target_items )
-        J = len(self._prediction_parms)**0.5
+        Pf = max((N/target_items ),0.1)
+        J = len(self._prediction_parms)
 
         #moving average and variance
         out_of_bounds = extra_add #skip this check
         choice = False
+        temp_stat = {}
         for i,parm in enumerate(self._prediction_parms):
             rec_val = record[parm]
             cur_stat = self._X_prediction_stats[parm]
+            temp_stat[parm] = cur_stat = cur_stat.copy()
             avg = cur_stat['avg']
             dev = (rec_val - avg)
             var = cur_stat['var']
             std = var**0.5
             std_err = std / N
             #check out of bounds
-            e1 = abs(dev) + std_err
-            em = std * self._sigma_retrain * mult_sigma
-            if not out_of_bounds and e1 > em:
-                if self.trained:
-                    self.info('record out of bounds!')
-                out_of_bounds = True
-
             #probability of acceptance - narrow distributions are not wanted
-            if (not choice or not out_of_bounds) and avg != 0:
-                g = (abs(avg)-std)/abs(std) #negative when std > avg
-                a =  abs(dev)/std/J
+            near_zero = abs(rec_val)/max(abs(avg),1) <= 0.005
+            if (not choice or not out_of_bounds) and avg != 0 and std != 0 and not near_zero:
+                g = 3*min((abs(avg)-std)/abs(std),1) #negative when std > avg
+                a =  min(abs(dev)/std/J,1)
                 #prob accept should be based on difference from average
                 prob_deny = np.e**g
                 prob_accept =  (a/Pf)
-                choice = random.choices([True,False],[prob_accept,prob_deny])
+                std_choice = std
+                avg_choice = avg
+                dev_choice = dev
+                choice = random.choices([True,False],[prob_accept,prob_deny])[0]
+            cur_stat['avg'] = avg + dev/N
+            cur_stat['var'] = var + (dev**2 - var)/N            
 
-            #update stats
-            cur_stat['avg'] = cur_stat['avg'] + dev/N
-            cur_stat['var'] = var + (dev**2 - var)/N
-            self._X_prediction_stats[parm] = cur_stat #reassign (in case)
-             
-        if out_of_bounds or extra_add or choice:
+        #observe point and predict to get error
+        self.observe_and_predict(record)    
+        
+        #update stats if point accepted
+        accepted = choice or out_of_bounds or extra_add
+        if accepted:
+            for parm,cur_stat in temp_stat.items():
+                self._X_prediction_stats[parm] = cur_stat #reassign (in case)
+
+        #fmt null values
+        if not choice:
+            std_choice = ''
+            avg_choice = ''
+            dev_choice = ''
+            prob_accept = ''
+            prob_deny = ''          
+
+        if accepted:
             if self._do_print:
-                self.info(f'add prediction record: {record} | chance: {choice}')
+                self.info(f'add record | chance: {choice and not extra_add} | {prob_accept:5.3f} | {prob_deny:5.3f} | {std_choice/avg_choice} | {dev_choice/std_choice} | {avg_choice}')
             self._prediction_records.append(record)
 
             try:
-                self.observe_and_predict(record)
                 self.check_and_retrain(self.prediction_records)
             except Exception as e:
                 self.warning(f'error in prediction: {e}')
     
-    def check_out_of_domain(self,record,extra_margin=1,target_items=2500):
+    def check_out_of_domain(self,record,extra_margin=1,target_items=1000):
         """checks if the record is in bounds of the current data"""
         if self._X_prediction_stats is None:
             return True 
@@ -111,30 +123,28 @@ class PredictionMixin:
             if record[self.max_rec_parm] > self.max_margin:
                 return False
 
-        N = len(self.prediction_records) + 1
-        Pf = (N/target_items)
+        N = len(self.prediction_records)
+        Pf = max((N/target_items),0.1)
         J = len(self._prediction_parms)
+
         for i,parm in enumerate(self._prediction_parms):
             rec_val = record[parm]
             cur_stat = self._X_prediction_stats[parm]
             avg = cur_stat['avg']
             dev = (rec_val - avg)
-            var = cur_stat['var']
+            var = max(cur_stat['var'],1)
             std = var**0.5
             std_err = std / len(self.prediction_records)
             #check out of bounds
-            e1 = abs(dev) + std_err
-            em = std * self._sigma_retrain * extra_margin          
-            if  e1 > em:
-                if self._do_print:
-                    self.info(f'out of bounds: {e1} > {em} | {dev} | {std_err} | {std} | {record}')
-                return True
-            g = (abs(avg)-std)/abs(std) #negative when std > avg
-            a = abs(dev)/std/J #prob accept based on difference from avg
+            g = 3*min((abs(avg)-std)/abs(std),1) #negative when std > avg
+            a =  min(abs(dev)/std/J,1)
+            near_zero = abs(rec_val)/max(abs(avg),1) <= 1E-3
             prob_deny = np.e**g
-            prob_accept = (a/Pf) #relative to prob_deny
-            choice = random.choices([True,False],[prob_accept,prob_deny])
-            if choice:
+            prob_accept = (a*extra_margin/Pf) #relative to prob_deny
+            choice = random.choices([True,False],[prob_accept,prob_deny])[0]
+            if choice and not near_zero:
+                if self._do_print:
+                    self.info(f'record oob chance: {choice} | {prob_accept:5.3f} | {prob_deny:5.3f} | {std/abs(avg)} | {dev/std} | {avg} ')
                 return True
         return False
     
