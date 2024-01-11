@@ -165,6 +165,8 @@ class cached_system_property(system_property):
         return f"_{self.gname}"
 
     def __get__(self, instance: "TabulationMixin", objtype=None):
+        if instance is None:
+            return self        
         if not hasattr(instance, self.private_var):
             from ottermatics.tabulation import TabulationMixin
 
@@ -180,9 +182,10 @@ class cached_system_property(system_property):
         raise Exception(f"cannot set {self.gname}")
 
     def set_cache(self, instance, reason="update"):
-        log.debug(
-            f"solver cache for {instance.identity}.{self.private_var}| {reason}"
-        )
+        if log.log_level < 5:
+            log.msg(
+                f"solver cache for {instance.identity}.{self.private_var}| {reason}"
+            )
         val = self.fget(instance)
         setattr(instance, self.private_var, val)
         return val
@@ -216,15 +219,17 @@ class solver_cached(otter_prop):
             return self.set_cache(instance, reason="set")
         elif instance.anything_changed:
             return self.set_cache(instance)
+    
         return getattr(instance, self.private_var)
 
     def __set__(self, instance, value):
         raise Exception(f"cannot set {self.gname}")
 
     def set_cache(self, instance, reason="update"):
-        log.debug(
-            f"caching attr for {instance.identity}.{self.private_var}| {reason}"
-        )
+        if log.log_level < 5:
+            log.debug(
+                f"caching attr for {instance.identity}.{self.private_var}| {reason}"
+            )
         val = self.getter(instance)
         setattr(instance, self.private_var, val)
         return val
@@ -262,9 +267,10 @@ class instance_cached(otter_prop):
         raise Exception(f"cannot set {self.gname}")
 
     def set_cache(self, instance, reason="update"):
-        log.debug(
-            f"caching instance for {instance.identity}.{self.private_var}| {reason}"
-        )
+        if log.log_level < 5:
+            log.debug(
+                f"caching instance for {instance.identity}.{self.private_var}| {reason}"
+            )
         val = self.getter(instance)
         setattr(instance, self.private_var, val)
         return val

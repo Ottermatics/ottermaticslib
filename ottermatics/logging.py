@@ -93,6 +93,7 @@ class LoggingMixin(logging.Filter):
                             self.__class__.log_level = new_level
                             self.info(msg)
                             self._log.setLevel(new_level)
+                            self.resetLog()
 
                 log_change_emitter.add_listener("change_level", _change_log)
 

@@ -57,7 +57,7 @@ class Test(unittest.TestCase):
     def test_attrs_labels(self):
         # Default
         self.assertEqual(
-            self.test_config.attr_labels, ["name", "attrs_prop", "attrs_str"]
+            self.test_config.attr_labels, ["name",'parent',"attrs_prop", "attrs_str"]
         )
 
     def test_attrs_vals(self):

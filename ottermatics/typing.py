@@ -9,11 +9,10 @@ import attrs
 pandas.set_option("use_inf_as_na", True)
 
 # Type Checking
-NUMERIC_TYPES = (float, int)
-NUMERIC_NAN_TYPES = (float, int, type(None))
-STR_TYPES = (str,)
-TABLE_TYPES = (int, float, str, type(None))
-
+NUMERIC_TYPES = (float, int, numpy.int64, numpy.float64)
+NUMERIC_NAN_TYPES = (float, int, type(None), numpy.int64, numpy.float64)
+STR_TYPES = (str,numpy.string_)
+TABLE_TYPES = (int, float, str, type(None), numpy.int64, numpy.float64)
 
 # TODO: add min / max args & attrs boilerplate
 def NUMERIC_VALIDATOR():

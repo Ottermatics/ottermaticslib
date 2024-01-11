@@ -37,7 +37,7 @@ from ottermatics.plotting import PlottingMixin
 
 import copy
 import collections
-
+import typing
 import numpy
 
 
@@ -62,7 +62,7 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
 
     _anything_changed_ = False
 
-    name: str = attrs.field(default="default")
+    parent: typing.Union['Component','System'] = attrs.field(default=None)
 
     # Properties!
     @system_property
@@ -112,7 +112,8 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
         """allows default functionality with new property system"""
         self._anything_changed_ = inpt
 
-    @instance_cached
+    #@instance_cached
+    @property
     def comp_references(self):
         """A cached set of recursive references to any slot component"""
         out = {}
@@ -122,16 +123,19 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
             out[key] = comp
         return out
 
-    @property
-    def system_references(self):
+    #@property
+    def system_references(self,recache=False):
         """gather a list of references to attributes and"""
-        out = self.internal_references
+        if recache == False and hasattr(self,'_prv_system_references'):
+            return self._prv_system_references
+        
+        out = self.internal_references(recache)
         tatr = out["attributes"]
         tprp = out["properties"]
 
         # component iternals
         for key, comp in self.comp_references.items():
-            sout = comp.internal_references
+            sout = comp.internal_references(recache)
             satr = sout["attributes"]
             sprp = sout["properties"]
 
@@ -141,21 +145,23 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
 
             for k, v in sprp.items():
                 tprp[f"{key}.{k}"] = v
-
+        
+        self._prv_system_references = out
         return out
 
     @instance_cached
     def all_references(self) -> dict:
         out = {}
-        out.update(**self.system_references["attributes"])
-        out.update(**self.system_references["properties"])
+        sysref = self.system_references()
+        out.update(**sysref["attributes"])
+        out.update(**sysref["properties"])
         return out
 
     @solver_cached
     def data_dict(self):
         """records properties from the entire system, via system references cache"""
         out = collections.OrderedDict()
-        sref = self.system_references
+        sref = self.system_references()
         for k, v in sref["attributes"].items():
             val = v.value()
             if isinstance(val, TABLE_TYPES):
@@ -174,7 +180,7 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
     def system_state(self):
         """records all attributes"""
         out = collections.OrderedDict()
-        sref = self.system_references
+        sref = self.system_references()
         for k, v in sref["attributes"].items():
             out[k] = v.value()
         self.debug(f"recording system state: {out}")
@@ -182,11 +188,14 @@ class System(TabulationMixin, SolverMixin, PlottingMixin):
 
     def set_system_state(self, ignore=None, **kwargs):
         """accepts parital input scoped from system references"""
-        sref = self.system_references
+        sref = self.system_references()
         satr = sref["attributes"]
         self.debug(f"setting system state: {kwargs}")
         for k, v in kwargs.items():
             if ignore and k in ignore:
+                continue
+            if k not in satr:
+                self.debug(f'skipping {k} not in attributes')
                 continue
             ref = satr[k]
             ref.set_value(v)

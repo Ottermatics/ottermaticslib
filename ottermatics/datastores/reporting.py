@@ -324,7 +324,6 @@ class ResultsRegistry(Configuration, metaclass=SingletonMeta):
     default_args = {"keep_existing": True, "autoload": False}
 
     db = attr.ib()
-    name = attr.ib(default="")
     base = attr.ib(
         default=ReportBase
     )  # ,factory=declarative_base) #slot for sqlalchemy base

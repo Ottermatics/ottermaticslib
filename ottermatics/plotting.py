@@ -14,6 +14,7 @@ import typing
 from ottermatics.configuration import otterize
 from ottermatics.properties import *
 from ottermatics.env_var import EnvVariable
+from matplotlib.backends.backend_pdf import PdfPages
 
 
 class PlotLog(LoggingMixin):
@@ -127,6 +128,15 @@ def install_seaborn(rc_override=None, **kwargs):
 
 install_seaborn()
 
+def save_all_figures_to_pdf(filename, figs=None, dpi=200,close=True):
+    pp = PdfPages(filename)
+    if figs is None:
+        figs = [pylab.figure(n) for n in pylab.get_fignums()]
+    for fig in figs:
+        fig.savefig(pp, format='pdf')
+    pp.close() #dont keep pdf open
+    if close:
+        pylab.close('all')
 
 class PlottingMixin:
     """Inherited by Systems and Analyses to provide common interface for plotting"""
@@ -200,7 +210,7 @@ class PlottingMixin:
                 log.error(e, f"issue in trace {plot}")
 
         # Sub Systems
-        for confnm, conf in self.internal_configurations.items():
+        for confnm, conf in self.internal_configurations().items():
             if isinstance(conf, PlottingMixin):
                 log.info(f"{self.identity} system plotting {confnm} | {conf}")
                 conf.make_plots(analysis, store_figures=store_figures, pre=pre)
@@ -361,7 +371,7 @@ class PLOT_ATTR(attrs.Attribute):
     def validate_plot_args(cls, system: "System"):
         """Checks system.system_references that cls.plot_parms exists"""
         log.info(f"validating: {system}")
-        sys_ref = system.system_references
+        sys_ref = system.system_references()
         attr_keys = set(sys_ref["attributes"].keys())
         prop_keys = set(sys_ref["properties"].keys())
         valid = attr_keys.union(prop_keys)
