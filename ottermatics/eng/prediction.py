@@ -150,7 +150,14 @@ class PredictionMixin:
     
 
 
-    def train_compare(self,df,test_frac=2):
+    def train_compare(self,df,test_frac=2,train_full=False,min_rec=250):
+        """Use the dataframe to train the models, and compare the results to the current models using `train_frac` to divide total samples into training and testing sets, unless `train_full` is set.
+
+        :param df: dataframe to train with
+        :param test_frac: N/train_frac will be size of the training window
+        :param train_full: boolean to use full training data
+        :return: trained models
+        """
         if self._prediction_models is None or self._basis is None:
             return {}
         
@@ -167,7 +174,7 @@ class PredictionMixin:
         if window > (N/test_frac):
             window = max(int(N/test_frac),25)
         
-        MargRec = max(250/len(self.prediction_records),1)
+        MargRec = max(min_rec/len(self.prediction_records),1)
 
         self.info(f'training dataset: {N} | training window: {window}')
         for parm,mod_dict in self._prediction_models.items():
@@ -175,13 +182,20 @@ class PredictionMixin:
             X = df[self._prediction_parms]/self._basis
             y = df[parm]
             N = len(y)
+            
             stl = time.time()
-
             weights = self.prediction_weights(df,N)
-            mod.fit(*self._subsample_data(X,y,window,weights))
-            etl = time.time()
-            scr = mod.score(*self._score_data(X,y,weights))/MargRec
-            train_iter[parm] = {'scr':scr,'time':etl-stl,'N':N}
+            if train_full:
+                mod.fit(X,y,weights)
+                etl = time.time()
+                scr = mod.score(X,y,weights)/MargRec
+                train_iter[parm] = {'scr':scr,'time':etl-stl,'N':N}
+            else:
+                mod.fit(*self._subsample_data(X,y,window,weights))
+                etl = time.time()
+                scr = mod.score(*self._score_data(X,y,weights))/MargRec
+                train_iter[parm] = {'scr':scr,'time':etl-stl,'N':N}
+            
             dt = etl-stl
 
             self.info(f'Prediction: {mod.__class__.__name__}| Score[{parm}] = {scr*100:3.5}% | Training Time: {dt}s')

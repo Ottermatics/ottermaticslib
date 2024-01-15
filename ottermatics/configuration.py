@@ -368,7 +368,7 @@ def otterize(cls=None, **kwargs):
     3) hash is by object identity"""
 
     # Define defaults and handle conflicts
-    dflts = dict(repr=False, eq=False, slots=False, kw_only=True)
+    dflts = dict(repr=False, eq=False, slots=False, kw_only=True,hash=False)
     for k, v in kwargs.items():
         if k in dflts:
             dflts.pop(k)

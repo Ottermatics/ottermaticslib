@@ -1,6 +1,6 @@
 """These exist as in interface to sectionproperties from PyNite"""
 
-from ottermatics.configuration import Configuration, otterize
+from ottermatics.configuration import Configuration, otterize, LoggingMixin
 from ottermatics.properties import (
     cached_system_property,
     system_property,
@@ -8,6 +8,7 @@ from ottermatics.properties import (
 )
 from ottermatics.typing import Options
 from ottermatics.eng.prediction import PredictionMixin
+from ottermatics.env_var import EnvVariable
 import numpy
 import attr, attrs
 
@@ -28,9 +29,23 @@ import multiprocessing as mp
 import threading
 import random
 import pandas
+import pickle
+import hashlib
+import tempfile,os
+import json
 
 # generic cross sections from
 # https://mechanicalbase.com/area-moment-of-inertia-calculator-of-certain-cross-sectional-shapes/
+temp_path = os.path.join(tempfile.gettempdir(),'shapely_sections')
+section_cache = EnvVariable('OTTR_SECTION_CACHE',default = temp_path,desc='directory to cache section properties')
+if 'OTTR_SECTION_CACHE' not in os.environ and not os.path.exists(temp_path):
+    os.mkdir(temp_path)
+
+section_cache.info(f'loading section from {section_cache.secret}')
+
+class GeometryLog(LoggingMixin):
+    pass
+log = GeometryLog()
 
 
 def conver_np(inpt):
@@ -309,7 +324,7 @@ def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row
     fail_stress = section.determine_failure_stress(stress)
     inp['fail_stress'] = fail_stress
     inp['fail_frac'] = ff =  fail_stress / section.material.allowable_stress
-    inp['fails'] = int(ff >= 1)
+    inp['fails'] = int(ff >= 1-1E-6)
 
     if record:
         section.record_stress(inp)
@@ -322,7 +337,7 @@ def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row
         return inp
     return ff
 
-@otterize
+@otterize(hash=False)
 class ShapelySection(Profile2D):
     """a 2D profile that takes a shapely section to calculate section properties, use a sectionproperties section with hidden variable `_geo` to bypass shape calculation"""
 
@@ -347,6 +362,7 @@ class ShapelySection(Profile2D):
     prediction_records: list
     near_margin=0.1
     max_margin=1.5
+    save_threshold=0.90
     max_rec_parm = 'fail_frac'
 
     _use_symmetric: bool = attrs.field(default=True)
@@ -369,6 +385,66 @@ class ShapelySection(Profile2D):
                 self._prediction_models = {'fails':{'mod':svm.SVC(C=5000,gamma=5,probability=True),'N':0},'fail_frac':{'mod':svm.SVR(C=10,gamma=0.5),'N':0}}
             # self.determine_failure_front(pareto_front=False)
             # self.basis_expand(expand_values=[0.75,0.5,0.1],Nparm=3,est=True)
+
+    def training_callback(self,models):
+        """when training is complete save the model to a pickle with `ShapelySection_<hash>.pkl`"""
+        score = models['fail_frac']['train_score']
+        Nscore = models['fail_frac']['N']
+        test_score = score * Nscore #compare to meta file
+
+        #Opt out of saving if score is below threshold
+        if score < self.save_threshold:
+            return
+        #Opt out of saving if score is worse than previous
+        if os.path.exists(self.meta_path):
+            with open(self.meta_path,'r') as f:
+                meta = json.load(f)
+            if test_score < meta['test_score']:
+                self.info(f'new model score {test_score} is worse than {meta["test_score"]}, not saving')
+                return
+
+        new_meta = {'test_score':test_score,'N':Nscore,'train_score':score}
+        #add a meta json file to show info regarding data (num points better ect)
+        with open(self.meta_path,'w') as f:
+            json.dump(new_meta,f)
+
+        #Finally save the geometry
+        self.info(f'saving model with score: {Nscore}x{score}=>{test_score}')
+        fil = self.cache_path
+        with open(fil,'wb') as f:
+            pickle.dump(self,f)
+        self.info(f'saved section to {fil}')
+
+    
+
+    @property
+    def section_cache(self) -> str:
+        return section_cache.secret
+
+    @property
+    def cache_name(self) -> str:
+        return f'ShapelySection_{self.hash_id()}.pkl'
+
+    @property
+    def meta_name(self) -> str:
+        return f'ShapelySection_meta_{self.hash_id()}.json'        
+
+    @property
+    def cache_path(self):
+        return os.path.join(self.section_cache,self.cache_name)
+
+    @property
+    def meta_path(self):
+        return os.path.join(self.section_cache,self.meta_name)
+
+    @classmethod
+    def from_cache(cls,hash_id):
+        cchc = section_cache.secret
+        log.info(f'loading section {hash_id} from cache {cchc}')
+        fil = os.path.join(cchc,f'ShapelySection_{hash_id}.pkl')
+        with open(fil,'rb') as f:
+            model = pickle.load(f)
+        return model
 
     def prediction_weights(self,df,window,initial_weight=10):
         weights = numpy.ones(min(len(df),window))
@@ -815,18 +891,20 @@ class ShapelySection(Profile2D):
 
     def __hash__(self):
         """uniqueness based on geometry and material"""
+        #print('hash shape...')
         if isinstance(self.shape, Geometry):
             shape = self.shape.geom
         else:
             shape = self.shape        
-        vals = (shape.geom,self.material,self.goal_elements,self.min_mesh_angle)
-        return hash(vals)
+        vals = (shape.wkb_hex,str(hash(self.material)),str(self.goal_elements),str(self.min_mesh_angle) )
+        h=hashlib.md5()
+        for hv in vals:
+            h.update(hv.encode())
+        return int(h.hexdigest(),16)  
         
-    def hash_id(self):
+    def hash_id(self)->str:
         """string for saving to persisting"""
-        h=hashlib.sha256()
-        h.update(str(hash(self)).encode())
-        h.hexdigest()
+        return str(hash(self))
             
 ALL_CROSSSECTIONS = [
     cs for cs in locals() if type(cs) is type and issubclass(cs, Profile2D)

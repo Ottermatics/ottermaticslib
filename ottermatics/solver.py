@@ -190,8 +190,8 @@ class SolverMixin:
         for seq in sequence:
             sequence_keys = sequence_keys.union(set(seq.keys()))
 
-        # RUN
-        if force_solve or not self.solved or self.anything_changed:
+        # RUN when not solved, or anything changed, or arguments or if forced
+        if force_solve or not self.solved or self.anything_changed or kwargs:
             _firsts, _input, trs_opts = self.parse_run_kwargs(**kwargs)
 
             if revert:
@@ -204,6 +204,8 @@ class SolverMixin:
                 refs[k] = self.locate_ref(k)
             for k in sequence_keys:
                 refs[k] = self.locate_ref(k)
+
+            self.pre_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
 
             # Premute the input as per SS or Transient Logic
             ingrp = list(_input.values())
@@ -240,16 +242,30 @@ class SolverMixin:
                                 self._run_id = int(uuid.uuid4())
                             #Recache system references
                             self.evaluate(_cb=_cb,eval_kw=eval_kw,sys_kw=sys_kw)
+            
+            #run callback pre-revert
+            self._solved = True
+            self.post_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
 
             if revert and revert_x:
                 self.set_system_state(ignore=["index"], **revert_x)
-
+            
+            #reapply solved state
             self._solved = True
+            
+
         elif not self.anything_changed:
             self.warning(f'nothing changed, not running {self.identity}')
         elif self.solved:
             raise Exception("Analysis Already Solved")
-            
+    
+    def post_run_callback(self,**kwargs):
+        """user callback for when run is complete"""
+        pass
+
+    def pre_run_callback(self,**kwargs):
+        """user callback for when run is beginning"""
+        pass    
 
     def run_transient(self, dt, N, _cb=None):
         """integrates the time series over N points at a increment of dt"""
@@ -368,7 +384,7 @@ class SolverMixin:
         self.save_data(index=self.index)
 
         if _cb:
-            _cb(self)
+            _cb(self,*args,**kw)
 
         return out
 

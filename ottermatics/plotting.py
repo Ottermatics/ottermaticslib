@@ -128,15 +128,42 @@ def install_seaborn(rc_override=None, **kwargs):
 
 install_seaborn()
 
-def save_all_figures_to_pdf(filename, figs=None, dpi=200,close=True):
-    pp = PdfPages(filename)
+def save_all_figures_to_pdf(filename, figs=None, dpi=200, close=True, pdf=None, return_pdf=False):
+    """
+    Save all figures to a PDF file.
+
+    :param filename: The name of the PDF file to save.
+    :type filename: str
+    :param figs: List of figures to save. If None, all open figures will be saved.
+    :type figs: list, optional
+    :param dpi: The resolution of the saved figures in dots per inch.
+    :type dpi: int, optional
+    :param close: Whether to close all figures after saving.
+    :type close: bool, optional
+    :param pdf: An existing PdfPages object to append the figures to. If None, a new PdfPages object will be created.
+    :type pdf: PdfPages, optional
+    :param return_pdf: Whether to return the PdfPages object after saving.
+    :type return_pdf: bool, optional
+    :return: The PdfPages object if return_pdf is True, else None.
+    :rtype: PdfPages or None
+    """
+    if pdf is None:
+        pp = PdfPages(filename)
+    else:
+        pp = pdf
+
     if figs is None:
         figs = [pylab.figure(n) for n in pylab.get_fignums()]
+
     for fig in figs:
-        fig.savefig(pp, format='pdf')
-    pp.close() #dont keep pdf open
+        fig.savefig(pp, format='pdf', dpi=dpi)
+
     if close:
         pylab.close('all')
+    if return_pdf:
+        return pp
+    else:
+        pp.close()  # Don't keep the PDF file open
 
 class PlottingMixin:
     """Inherited by Systems and Analyses to provide common interface for plotting"""

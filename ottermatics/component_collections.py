@@ -56,7 +56,7 @@ class ComponentIter(Component):
     data: iter
 
     # current item keu, non table type, this triggers `anything_changed` in `system._iterate_component()`
-    current_item: iter_tkn = attr.ib(factory=lambda: None)
+    current_item: iter_tkn = attr.ib(factory=lambda: None,hash=False,eq=False)
     _first_item_key: iter_tkn
 
     @property

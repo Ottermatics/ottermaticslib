@@ -199,6 +199,8 @@ class Structure(System,CostModel,PredictionMixin):
 
     default_material: SolidMaterial = attrs.field(default=None)
 
+    solve_method = Options('linear','normal','pdelta')
+
     # Default Loading!
     add_gravity_force: bool = attrs.field(default=True)
     gravity_dir: str = attrs.field(default="FZ")
@@ -226,7 +228,7 @@ class Structure(System,CostModel,PredictionMixin):
     #calculate full failure will run failure analysis without stoping at first failure
     calculate_actual_failure: bool =attrs.field(default=False)
     calculate_full_failure: bool =attrs.field(default=True)
-    failure_solve_method = Options('root','bisect')
+    failure_solve_method = Options('bisect','root')
     failure_records: list = attrs.field(default=None)
     
     #prediciton calculation
@@ -268,8 +270,7 @@ class Structure(System,CostModel,PredictionMixin):
         if isinstance(combos, str):
             combos = combos.split(",")  # will be a list!
 
-        self.current_failure_summary = None
-        self._current_combo_failure_analysis = None
+
         
         self.info(f"running with combos: {combos} | {args} | {kwargs} ")
         self._run_id = int(uuid.uuid4())
@@ -280,11 +281,28 @@ class Structure(System,CostModel,PredictionMixin):
         for combo in iteration_combos:
             if combos is not None and combo not in combos:
                 continue
+            #reset cached failures
+            self.current_failure_summary = None
+            self._current_combo_failure_analysis = None            
+            
+            #run the analysis
             self.index += 1
-            self.info(f"running load combo : {combo}")
-            self.current_combo = combo
-            self.struct_pre_execute(combo)
-            self.analyze(load_combos=[combo], *args, **kwargs)
+            combo_possible = self.struct_pre_execute(combo) #can change combo
+            if combo_possible:
+                self.current_combo = combo_possible
+            else:
+                self.current_combo = combo
+            combo = self.current_combo
+            
+            self.info(f"running load combo : {combo} with solver {self.solve_method}")
+
+            if self.solve_method == 'linear':
+                self.analyze_linear(load_combos=[combo], *args, **kwargs)
+            elif self.solve_method == 'normal':  
+                self.analyze(load_combos=[combo], *args, **kwargs)
+            elif self.solve_method == 'pdelta':
+                self.analyze_PDelta(load_combos=[combo], *args, **kwargs)
+
             self._any_solved = True #Flag system properties to save
             self.struct_post_execute(combo)
             
@@ -300,13 +318,15 @@ class Structure(System,CostModel,PredictionMixin):
                 if res: self.record_result(res)
 
     #Solver Mechanics
-    def struct_root_failure(self,x,fail_parm,base_kw,mult=1,target=1,sols=None):
+    def struct_root_failure(self,x,fail_parm,base_kw,mult=1,target=1,sols=None,save=False,*args,**kw):
         assert target > 0, 'target must be positive'
         bkw = base_kw.copy()
         bkw[fail_parm] = x*mult
         self.setattrs(bkw)
         self.info(f'solving root iter: {bkw}')
-        self.execute(save=False)
+        if args or kw:
+            self.info(f'adding args to solver: {args} | {kw}')        
+        self.execute(save=save,*args,**kw)
         wrong_side = (mult * x)<0
         ff = self.max_est_fail_frac
         bf = self.max_beam_est_fail_frac
@@ -325,7 +345,7 @@ class Structure(System,CostModel,PredictionMixin):
         self.info(f'ran: {bkw} -> {ff:5.4f} | {res:5.4f}')
         return res
 
-    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3,return_sol = False,max_tries=5):
+    def determine_failure_load(self,fail_parm,base_kw,mult=1,target_failure_frac=1.0,guess=None,tol=5E-3,return_sol = False,max_tries=5,*args,**kw):
         
         #TODO: add reversion logic
         if not hasattr(self,'_max_parm_dict'):
@@ -343,12 +363,18 @@ class Structure(System,CostModel,PredictionMixin):
                         maxx = self.max_guess * mult
 
                 solutions = []
+
+                #allow passing of args to solver
+                if args or kw:
+                    self.info(f'adding args to solver: {args} | {kw}')
+                func = lambda x,*argsolv: self.struct_root_failure(x,*argsolv,*args,**kw)    
+
                 if self.failure_solve_method == 'bisect':
-                    ans = sciopt.root_scalar( self.struct_root_failure, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions),bracket=(0,maxx) )
+                    ans = sciopt.root_scalar(func, x0 = 1000, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions),bracket=(0,maxx) )
                     self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')
 
                 else: #root
-                    ans = sciopt.root_scalar( self.struct_root_failure, x0 = 100, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions) )
+                    ans = sciopt.root_scalar( func, x0 = 100, x1 = guess, rtol=tol, xtol = tol,args=(fail_parm,base_kw,mult,target_failure_frac,solutions) )
                     self.info(f'{mult}x{fail_parm:<6}| success: {ans.converged} , ans:{ans.root}, base: {base_kw}')                        
 
                 if return_sol:
@@ -356,7 +382,7 @@ class Structure(System,CostModel,PredictionMixin):
 
                 if ans.converged:
                     self.setattrs({fail_parm:ans.root})
-                    self.execute(save=True)
+                    self.execute(save=True,*args,**{k:v for k,v in kw.items() if k != 'save'})
                     return ans.root
 
                 elif solutions:
@@ -394,7 +420,7 @@ class Structure(System,CostModel,PredictionMixin):
         d['fail_frac'] = ff= self.max_est_fail_frac
         d['beam_fail_frac'] = self.max_beam_est_fail_frac
         d['mesh_fail_frac'] = self.max_mesh_est_fail_frac
-        d['fails'] = int(ff >= 1)
+        d['fails'] = int(ff >= 1-1E-6)
         return d
 
     def record_result(self,stress_dict):
@@ -425,7 +451,9 @@ class Structure(System,CostModel,PredictionMixin):
             self.info(f'nothing to save, run() structure first')
 
     def struct_pre_execute(self, combo=None):
-        """yours to override to prep solver or dataframe"""
+        """yours to override to prep solver or dataframe
+        :returns: combo to run, or None if want to continue with current iteration combos
+        """
         pass
 
     def struct_post_execute(self, combo=None):
@@ -681,34 +709,48 @@ class Structure(System,CostModel,PredictionMixin):
         return beam
 
     # OUTPUT
-    def beam_dataframe(self, univ_parms: dict = None):
+    def beam_dataframe(self, univ_parms: list = None,add_columns:list=None):
         """creates a dataframe entry for each beam and combo
         :param univ_parms: keys represent the dataframe parm, and the values represent the lookup value
         """
+
         df = self.dataframe
-        beam_col = set([c for c in df.columns if c.startswith("beams.")])
+        beam_col = set([c for c in df.columns if c.startswith("beams.") and len(c.split(".")) > 2]) 
         beams = set([c.split(".")[1] for c in beam_col])
         parms = set([".".join(c.split(".")[2:]) for c in beam_col])
 
         # defaults
         if univ_parms is None:
-            univ_parms = {}
+            univ_parms_ = df.columns[df.columns.str.startswith("beams.")].tolist()
+            univ_parms = [(c.split(".")[-1],c) for c in univ_parms_]
+            uniq_parms = set([c.split(".")[-1] for c in univ_parms_])
 
-        blade_data = []
+        if add_columns is None:
+            add_columns = []
+
+        beam_data = []
         for i in range(len(df)):
             row = df.iloc[i]
-            out = {k: row[v] for k, v in univ_parms.items()}
+            add_dat = {k: row[k] for k in add_columns}
             for beam in beams:
-                bc = out.copy()  # this is the data entry
+                bc = add_dat.copy()  # this is the data entry
                 bc["name"] = bc
                 for parm in parms:
+
+                    if parm not in uniq_parms:
+                        continue
+                    #if parm not in row:
+                        #continue
                     k = f"beams.{beam}.{parm}"
-                    v = row[k]
-                    bc[parm] = v
+                    if k in row:
+                        v = row[k]
+                    #if 'Z1' in k:
+                        #print(v)
+                        bc[parm] = v
 
-                blade_data.append(bc)  # uno mas
+                beam_data.append(bc)  # uno mas
 
-        dfb = pd.DataFrame(blade_data)
+        dfb = pd.DataFrame(beam_data)
         return dfb
 
     @property
@@ -773,12 +815,15 @@ class Structure(System,CostModel,PredictionMixin):
 
     # TODO: add mesh stress / deflection info min/max ect.
     @property
-    def node_dataframes(self):
-        out = {}
+    def node_dataframe(self):
+        #out = {}
+        rows = []
         for case in self.frame.LoadCombos:
-            rows = []
             for node in self.nodes.values():
+                if case not in node.DX:
+                    continue
                 row = {
+                    "case": case,
                     "name": node.name,
                     "dx": node.DX[case],
                     "dy": node.DY[case],
@@ -795,8 +840,10 @@ class Structure(System,CostModel,PredictionMixin):
                 }
                 rows.append(row)
 
-            out[case] = pandas.DataFrame(rows)
-        return out
+            #out[case] = pandas.DataFrame(rows)
+        df = pandas.DataFrame(rows)
+        df.set_index(['case','name'],inplace=True)            
+        return df
 
     @property
     def INERTIA(self):
@@ -1077,7 +1124,7 @@ class Structure(System,CostModel,PredictionMixin):
 
         failures = collections.defaultdict(dict)
 
-        df = self.dataframe
+        #df = self.dataframe
         run_combos = df.current_combo.to_list()
 
         failures_count = 0
@@ -1098,10 +1145,11 @@ class Structure(System,CostModel,PredictionMixin):
 
                 if combos and combo not in combos:
                     continue  # you are not the chose one(s)
-
-                combo_df = df[df.current_combo == combo]
-                combo_dict = combo_df.to_dict("records")
-                combo_dict = combo_dict[-1]  # last one is the combo in the case of repeats
+                
+                #MUST Loop over beams pos and combos to get the correct data for general case of all combos
+                # combo_df = df[df.current_combo == combo]
+                # combo_dict = combo_df.to_dict("records")
+                # combo_dict = combo_dict[-1]  # last one is the combo in the case of repeats
                 # loop positions start,mid,end
                 for x in [0, 0.5, 1.0]:
                     cases += 1
@@ -1127,19 +1175,19 @@ class Structure(System,CostModel,PredictionMixin):
                             "beam": nm,
                             "est_stress": st,
                             "combo": combo,
-                            "x": x,
+                            #"x": x,
                             "allowable_stress": beam.material.allowable_stress,
                             "fail_frac": beam_fail_frac,
                             "loads": f,
                         }
 
-                        failures[nm][(combo, x)].update(
-                            **{
-                                k.split(nm + ".")[-1] if nm in k else k: v
-                                for k, v in combo_dict.items()
-                                if ("beams" not in k or nm in k) and k not in _d
-                            }
-                        )
+                        # failures[nm][(combo, x)].update(
+                        #     **{
+                        #         k.split(nm + ".")[-1] if nm in k else k: v
+                        #         for k, v in combo_dict.items()
+                        #         if ("beams" not in k or nm in k) and k not in _d
+                        #     }
+                        # )
 
         if failures_count:
             self.warning(
@@ -1152,7 +1200,7 @@ class Structure(System,CostModel,PredictionMixin):
         self,
         concentrationFactor=1,
         methodFactor=1,
-        fail_frac_criteria=None,
+        fail_frac_criteria=0.999,
     ) -> dict:
         """uses the beam estimated stresses with specific adders to account for beam 2D stress concentrations and general inaccuracy as well as a fail_fraction to analyze. The estimated loads are very pessimistic with a 250x overestimate by default for beams. mesh stresses are more accurate and failure is determined by fail_fac (von-mises stress / allowable stress)/fail_frac_criteria
         
@@ -1160,12 +1208,10 @@ class Structure(System,CostModel,PredictionMixin):
 
         # what fraction of allowable stress is generated for this case
         # what fraction of allowable stress is generated for this case
-        if fail_frac_criteria is None:
-            fail_1 = None
-        else:
-            fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
 
+        fail_1 = fail_frac_criteria / (concentrationFactor * methodFactor)
 
+        #FIXME: only run current combo (remove combo storage)
         failures = collections.defaultdict(dict)
         stable = collections.defaultdict(dict)
         summary = {'beam_failures':failures,'beams_stable':stable}
@@ -1175,9 +1221,10 @@ class Structure(System,CostModel,PredictionMixin):
         beams = len(self.beams)
 
         combo = self.current_combo
+        self.info(f'determining failures for {self.current_combo}')
 
-        self._lock_est_failures = True
-        data_dict = self.data_dict
+        #self._lock_est_failures = True
+        #data_dict = self.data_dict
         self._lock_est_failures = False
 
             
@@ -1185,58 +1232,49 @@ class Structure(System,CostModel,PredictionMixin):
         for nm, beam in self.beams.items():
             self.debug(f"estimate beam stress: {beam.name}")
 
-            # loop positions start,mid,end
-            for x in [0, 0.5, 1.0]:
-                checks += 1
-                f = beam.get_forces_at(x, combo=combo)
-                st = beam.estimate_stress(**f,force_calc=self.calculate_actual_failure)
-                beam_fail_frac = st / beam.material.allowable_stress
+            checks += 1
+            beam_fail_frac = beam.fail_factor_estimate
 
-                fails = False
-                if fail_1 is None:
-                    df = abs(1-beam_fail_frac)
-                    fail_frac_criteria = beam.section.fail_frac_criteria()
-                    fails = df <= fail_frac_criteria
-                elif beam_fail_frac >= fail_1:
-                    fails = True
-                    fail_frac_criteria = fail_1                
+            fails = False
+            if beam_fail_frac >= fail_1:              
+                fails = True
 
-                if fails:
-                    self.debug(
-                        f"estimated beam {beam.name} failure at L={x*100:3.2f}% | {combo}"
-                    )
-                    failures_count += 1
+            if fails:
+                self.debug(
+                    f"estimated beam {beam.name} failure"
+                )
+                failures_count += 1
 
-                    failures[nm][(combo,x)] = _d = {
-                        "beam": nm,
-                        "est_stress": st,
-                        "combo": combo,
-                        "x": x,
-                        "allowable_stress": beam.material.allowable_stress,
-                        "fail_frac": beam_fail_frac,
-                        "fail_critera": fail_frac_criteria,
-                        "loads": f,
-                    }
+                failures[nm][combo] = _d = {
+                    "beam": nm,
+                    #"est_stress": st,
+                    "combo": combo,
+                    #"x": x,
+                    #"allowable_stress": beam.material.allowable_stress,
+                    "fail_frac": beam_fail_frac,
+                    "fail_critera": fail_frac_criteria,
+                    #"loads": f,
+                }
 
-                    failures[nm][(combo,x)].update(
-                        **{
-                            k.split(nm + ".")[-1] if nm in k else k: v
-                            for k, v in data_dict.items()
-                            if ("beams" not in k or nm in k) and k not in _d
-                        }
-                    )
-                else:
-                    stable[nm][(combo,x)] = _d = {
-                        "beam": nm,
-                        "est_stress": st,
-                        "combo": combo,
-                        "x": x,
-                        "allowable_stress": beam.material.allowable_stress,
-                        "fail_frac": beam_fail_frac,
-                        "fail_critera": fail_frac_criteria,
-                        "loads": f,
-                    }
-            
+                # failures[nm][combo].update(
+                #     **{
+                #         k.split(nm + ".")[-1] if nm in k else k: v
+                #         for k, v in data_dict.items()
+                #         if ("beams" not in k or nm in k) and k not in _d
+                #     }
+                # )
+            else:
+                stable[nm][combo] = _d = {
+                    "beam": nm,
+                    #"est_stress": st,
+                    "combo": combo,
+                    #"x": x,
+                    #"allowable_stress": beam.material.allowable_stress,
+                    "fail_frac": beam_fail_frac,
+                    "fail_critera": fail_frac_criteria,
+                    #"loads": f,
+                }
+        
         #add mesh failures
         mesh_summary = self.check_mesh_failures(combo, run_full=self.calculate_full_failure, SF=1.0, return_complete=True)
         mesh_failures = mesh_summary['failures']
@@ -1281,6 +1319,7 @@ class Structure(System,CostModel,PredictionMixin):
         fc = self._current_failures
         if isinstance(fc,dict):
             return fc['max_fail_frac']
+        self.warning(f'could not get estimated beam failure frac')
         return fc
     
     @system_property
@@ -1288,6 +1327,7 @@ class Structure(System,CostModel,PredictionMixin):
         fc = self._current_failures
         if isinstance(fc,dict):
             return fc['max_beam_fail_frac']
+        self.warning(f'could not get estimated beam failure frac')
         return fc
     
     @system_property
@@ -1295,6 +1335,7 @@ class Structure(System,CostModel,PredictionMixin):
         fc = self._current_failures
         if isinstance(fc,dict):
             return fc['max_mesh_fail_frac']
+        self.warning(f'could not get estimated failure frac')
         return fc
         
     @system_property
@@ -1302,6 +1343,7 @@ class Structure(System,CostModel,PredictionMixin):
         fc = self._current_failures
         if isinstance(fc,dict):
             return fc['failures_count']
+        self.warning('could not get estimated failure count')
         return fc
     
     @system_property
@@ -1309,6 +1351,7 @@ class Structure(System,CostModel,PredictionMixin):
         fc = self._current_failures
         if isinstance(fc,dict):
             return fc['beam_fail_count']    
+        self.warning(f'could not get estimated beam failure count')
         return fc
             
     @system_property
@@ -1316,32 +1359,46 @@ class Structure(System,CostModel,PredictionMixin):
         fc = self._current_failures
         if isinstance(fc,dict):
             return fc['mesh_fail_count']
+        self.warning(f'could not get estimated mesh failure count')
         return fc 
     
     @system_property
     def actual_failure_count(self)->float:
+        if not self.calculate_actual_failure:
+            return None
+
         afc = self._actual_failures
         if isinstance(afc,dict):
             return afc['failure_count']
+        self.warning(f'could not get actual failure count')            
         return afc
 
     @system_property
     def actual_beam_failure_count(self)->float:
+        if not self.calculate_actual_failure:
+            return None
+
         afc = self._actual_failures
         if isinstance(afc,dict):
             return afc['beam_failures_count']
+        self.warning(f'could not get actual beam failure count')
         return afc
 
     @system_property
     def actual_mesh_failure_count(self)->float:
+        if not self.calculate_actual_failure:
+            return None
+
         afc = self._actual_failures
         if isinstance(afc,dict):
             return afc['mesh_failure_count']
+        self.warning(f'could not get actual mesh failure count')
         return afc
 
     @property
     def _current_failures(self):
         if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
+            self.info(f'current failures locked')
             return np.nan
         if self.current_failure_summary is None:
             fc = self.current_failures()
@@ -1352,7 +1409,7 @@ class Structure(System,CostModel,PredictionMixin):
     @property
     def _actual_failures(self):
         if not self.calculate_actual_failure:
-            return np.nan
+            return None
 
         if hasattr(self,'_lock_est_failures') and self._lock_est_failures:
             return np.nan
