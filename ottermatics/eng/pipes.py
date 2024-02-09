@@ -45,7 +45,7 @@ class PipeLog(LoggingMixin):
 
 log = PipeLog()
 
-
+#TODO: add compressibility effects
 @otterize
 class PipeNode(Component):
     x: float = attrs.field()
@@ -293,6 +293,8 @@ class PipeFitting(FlowNode, PipeFlow):
 
 
 # TODO: Add in fitting numbers:
+#https://neutrium.net/fluid-flow/pressure-loss-from-fittings-excess-head-k-method/
+# https://neutrium.net/fluid-flow/discharge-coefficient-for-nozzles-and-orifices/
 """                          Fitting                      Types       K
 0                       45° Elbow         Standard (R/D = 1)    0.35
 1                       45° Elbow    Long Radius (R/D = 1.5)    0.20
@@ -540,6 +542,573 @@ class PipeSystem(System):
             pos = pos = nx.spring_layout(self.graph)
             nx.draw(self.graph, pos=pos)
             labels = nx.draw_networkx_labels(self.graph, pos=pos)
+
+
+
+
+#TODO: update compressibility:
+# 
+# import control as ct
+# import numpy as np
+# from ottermatics.components import Component, otterize
+# from matplotlib.pylab import *
+# 
+# DT_DFLT = 1E-3
+# @otterize(auto_attribs=True)
+# class Accumulator(Component):
+# 
+#     Rt: float = 5000
+#     Pref: float = 1E6
+#     Lref: float = 5
+#     Aact: float = 5
+#     Cact: float = 0.1
+#     Mact: float = 0.1
+#     Pmax: float = 7E8
+#     tlast: float = 0
+#     Kwall: float = 1
+# 
+#     lim_marg: float = 0.01
+#     min_dt: float = DT_DFLT
+# 
+#     model: 'InputOutputSystem' = None
+# 
+#     discrete: bool = True
+#     pressure_mode: bool = False #false is flow based
+# 
+#     def __on_init__(self):
+#         #handle defined pressure mode
+#         if self.pressure_mode:
+#             if not self.discrete:
+#                 self.model =  ct.NonlinearIOSystem(self.pr_update_accumulator,self.pr_accumulator_output,inputs=('Pi',),outputs=('Pc','Qc','Pout'),states=('x','v'),name= self.name if self.name else 'accumul    ator')
+#             else:
+#                 self.model =  ct.NonlinearIOSystem(self.pr_discrete_update_accumulator,self.pr_accumulator_output,inputs=('Pi',),outputs=('Pc','Qc','Pout'),states=('x','v'),name= self.name if self.name else 'accumulator',dt=True)
+#         else:
+#             if not self.discrete:
+#                 self.model =  ct.NonlinearIOSystem(self.w_update_accumulator,self.w_output,inputs=('Qc',),outputs=('Pc','Pout'),states=('x'),name= self.name if self.name else 'accumulator')
+#             else:
+#                 self.model =  ct.NonlinearIOSystem(self.w_discrete_update_accumulator, self.w_output,inputs=('Qc',),outputs=('Pc','Pout'),states=('x'),name= self.name if self.name else 'accumulator',dt=True)                
+#                 
+#     def w_update_accumulator(self,t,x,u,params):
+#         Rt = params.get('Rt',self.Rt) #Pa/(m3/s)
+#         Pref = params.get('Pref',self.Pref)
+#         Lref = params.get('Lref',self.Lref)
+#         Aact = params.get('Aact',self.Aact)
+#         Cact = params.get('Cact',self.Cact)
+#         Mact = params.get('Mact',self.Mact)
+#         Kwall = params.get('Kwall',self.Kwall)
+#         Pmax = params.get('Pmax',self.Pmax)
+# 
+#         qin  = u[0]
+#         
+#         xact   = x[0]
+#         #Pi  = x[0]
+#         
+#         if self.discrete and isinstance(self.model.dt,float):
+#             self.dt = dt = self.model.dt
+# 
+#         else: #infer dt
+#             if t >= self.tlast+self.min_dt:
+#                 self.dt = dt = max(abs(t - self.tlast),self.min_dt)
+#                 self.tlast = t
+#             else:
+#                 self.dt = dt = getattr(self,'dt',self.min_dt)
+# 
+#         #determine rate of x change (positive compresses accumulator (x->0))
+#         xdot = -qin/Aact
+# 
+#         xmin = Pref*Lref/Pmax
+# 
+#         #limit xdot to prevent over/under shoot
+#         if xact + dt * xdot > Lref*(1-self.lim_marg):
+#             xdot = (Lref-xact)/dt
+#         elif xact + dt * xdot < xmin:
+#             xdot = (xmin-xact)/dt
+# 
+#         return xdot
+#     
+#     def w_discrete_update_accumulator(self,t,x,u,params):
+#         v = self.w_update_accumulator(t,x,u,params)
+#         dt = self.model.dt
+# 
+#         if self.discrete and isinstance(self.model.dt,float):
+#             dt = self.model.dt
+#         else:
+#             dt = self.dt
+# 
+#         xnew= x[0] + v*dt
+# 
+#         return xnew
+#     
+#     def w_output(self,t,x,u,params):
+#         Rt = params.get('Rt',self.Rt) #Pa/(m3/s)
+#         Pref = params.get('Pref',self.Pref)
+#         Lref = params.get('Lref',self.Lref)
+#         Aact = params.get('Aact',self.Aact)
+#         Cact = params.get('Cact',self.Cact)
+#         Mact = params.get('Mact',self.Mact)
+#         Kwall = params.get('Kwall',self.Kwall)
+#         Pmax = params.get('Pmax',self.Pmax)
+# 
+#         qin  = u[0]
+#         
+#         xact   = x[0]   
+# 
+#         xmin = Pref*Lref/Pmax
+# 
+#         Pcomp = Pref*Lref / max(xmin,xact)             
+# 
+#         #junction pressure is higher than pcomp when accumulator is compressed
+#         Pi = Pcomp + qin*Rt
+# 
+#         return [Pcomp,Pi]
+#         
+# 
+#                 
+# 
+#     def pr_update_accumulator(self,t,x,u,params):
+#         """takes the current accumulator position, external pressure, and accumulator constants to determine the rate of change of accumulator position"""
+#         Rt = params.get('Rt',self.Rt) #Pa/(m3/s)
+#         Pref = params.get('Pref',self.Pref)
+#         Lref = params.get('Lref',self.Lref)
+#         Aact = params.get('Aact',self.Aact)
+#         Cact = params.get('Cact',self.Cact)
+#         Mact = params.get('Mact',self.Mact)
+#         Kwall = params.get('Kwall',self.Kwall)
+#         Pmax = params.get('Pmax',self.Pmax)
+# 
+#         Pi = u[0]
+#         #print(x,u)
+#         xact = x[0]
+#         v    = x[1]
+# 
+#         if self.discrete and isinstance(self.model.dt,float):
+#             self.dt = dt = self.model.dt
+# 
+#         else: #infer dt
+#             if t >= self.tlast+self.min_dt:
+#                 self.dt = dt = max(abs(t - self.tlast),self.min_dt)
+#                 self.tlast = t
+#             else:
+#                 self.dt = dt = getattr(self,'dt',self.min_dt)
+# 
+#         xmin = Pref*Lref/Pmax
+# 
+#         Pcomp = Pref*Lref / max(max(xmin,xact),Lref)
+#         dP = Pcomp-Pi
+#         sgn = np.sign(dP)
+# 
+#         #FIXME: remove since dP is based on equillibritum
+#         #xeq = max(min(Pref*Lref/Pi,Lref),xmin)
+#         #K = 0*self.Kwall*(xeq-xact)/Lref
+#         K = 0
+# 
+#         xdot =  sgn * ( abs(dP) / ( Rt * Aact**2.))**0.5/Lref
+#         dvdt = ((xdot-v) - K)/Mact - Cact*Aact*v*abs(v)/Mact
+# 
+#         x_proj = v * dt + xact
+# 
+#         #Consider projected limits
+#         if x_proj >= Lref*(1-self.lim_marg):
+#             vin = v
+#             v = (Lref-xact)/dt#,-1*Lref/10/dt)
+#             dvdt = (v-vin)/dt
+# 
+#         elif x_proj <= xmin: 
+#             vin = v
+#             v = (0 - xact)/dt
+#             dvdt = (v-vin)/dt
+# 
+#         return v,dvdt
+# 
+#     def pr_discrete_update_accumulator(self,t,x,u,params):
+#         v,dvdt = self.pr_update_accumulator(t,x,u,params)
+#         dt = self.model.dt
+# 
+#         if self.discrete and isinstance(self.model.dt,float):
+#             dt = self.model.dt
+#         else:
+#             dt = self.dt
+# 
+#         xnew= x[0] + v*dt
+#         vnew = x[1] + dvdt*dt
+# 
+#         return xnew,vnew
+# 
+#     def pr_accumulator_output(self,t,x,u,params):
+#         """returns accumulator pressure and flow (in positive)"""    
+#         Rt = params.get('Rt',self.Rt) #Pa/(m3/s)
+#         Pref = params.get('Pref',self.Pref)
+#         Lref = params.get('Lref',self.Lref)
+#         Aact = params.get('Aact',self.Aact)
+#         Cact = params.get('Cact',self.Cact)
+#         Mact = params.get('Mact',self.Mact)
+#         Pmax = params.get('Pmax',self.Pmax)
+#         #dt = params.get('dt',self.dt)
+# 
+#         Pi = u[0]
+#         xact = x[0]
+#         v    = x[1]
+# 
+#         xmin = Pref*Lref/Pmax
+#         Pcomp = Pref*Lref / max(xmin,xact)
+#         Q = v*Aact
+#         return [Pcomp,Q,Pi]
+#     
+# @otterize(auto_attribs=True)
+# class Motor(Component):
+#     """Nonlinear motor with parasitics with fixed displacement"""
+# 
+#     I: float = 1
+#     D: float = 1E-6
+#     Cd: float = 0.0
+#     Ckloss: float = 0
+#     f: float = 0.0
+#     N: float = 1000
+# 
+#     min_dt: float = DT_DFLT
+#     model: 'InputOutputSystem' = None
+#     discrete: bool = True
+#     tlast = 0   
+# 
+#     def __on_init__(self):
+#         #print(self.name)
+#         if not self.discrete:
+#             self.model = ct.NonlinearIOSystem(self.update_motor, self.motor_output, inputs=('P1','P2'), outputs=('Trq','Q','Pwr','Pin','Pout'), state=('w',), name=self.name if self.name else 'motor')         
+#         else:
+#             self.model = ct.NonlinearIOSystem(self.discrete_update_motor, self.motor_output, inputs=('P1','P2'), outputs=('Trq','Q','Pwr','Pin','Pout'), state=('w',), name=self.name if self.name else 'motor',dt=True) 
+#             self.tlast = 0   
+# 
+#     def update_motor(self,t,x,u,params):
+#         """updates the motor acceleration based on pressure differential and nonlinear parasitics"""
+#         I = params.get('I',self.I)
+#         D = params.get('D',self.D)
+#         Cd = params.get('Cd',self.Cd)
+#         Ckloss = params.get('Ckloss',self.Ckloss)
+#         f = params.get('f',self.f)
+#         N = params.get('N',self.N)
+#         
+#         P1 = u[0]
+#         P2 = u[1]
+#         w = x[0]
+# 
+#         Q = D*(w/(2*3.14159))
+#         dPq = np.sign(Q)*Ckloss*Q**2
+#         
+#         dw_torque = (D/(2*np.pi))* ((P1 - P2)-dPq)
+#         dw_friction = w*f*N
+#         dw_drag = w*abs(w)*Cd
+#         
+#         return (dw_torque - dw_friction - dw_drag)/I
+#     
+#     def discrete_update_motor(self,t,x,u,params):
+#         dw = self.update_motor(t,x,u,params)
+# 
+# 
+#         if self.discrete and isinstance(self.model.dt,float):
+#             self.dt = dt = self.model.dt
+# 
+#         else: #infer dt
+#             if t >= self.tlast+self.min_dt:
+#                 self.dt = dt = max(abs(t - self.tlast),self.min_dt)
+#                 self.tlast = t
+#             else:
+#                 self.dt = dt = getattr(self,'dt',self.min_dt)
+# 
+#         return x[0] + dw*self.dt
+#         
+#     def motor_output(self,t,x,u,params):
+#         """calculates torque, flow and power output"""
+#         I = params.get('I',self.I)
+#         D = params.get('D',self.D)
+#         Cd = params.get('Cd',self.Cd)
+#         Ckloss = params.get('Ckloss',self.Ckloss)
+#         f = params.get('f',self.f)
+#         N = params.get('N',self.N)
+#         
+#         P1 = u[0]
+#         P2 = u[1]
+#         w = x[0]
+#         
+#         Q = (w/2*3.14159)*D
+#         dPq = np.sign(Q)*Ckloss*Q**2
+# 
+#         dP = (P1 - P2) - dPq
+# 
+#         Trq = D * dP / (2*3.14159)
+#         Pwr = dP * Q
+#         return [Trq, Q, Pwr,P1,P2]   
+# 
+# 
+# @otterize(auto_attribs=True)
+# class Actuator(Component):
+#     Ap: float = 1
+#     mp: float = 0.5
+#     bp: float = 0.1
+#     Kwall: float = 1000
+#     Lstroke: float = 1   
+#     
+#     min_dt = DT_DFLT
+#     lim_marg = 0.01
+#     
+#     lim = None # true if high, false if low and none otherwise
+# 
+#     model: 'InterConnectedSystem' = None
+# 
+#     discrete: bool = True
+# 
+#     tlast = 0
+# 
+#     def __on_init__(self):
+#         if self.discrete:
+#             self.model = ct.NonlinearIOSystem(self.discrete_update_fnc,self.output_fnc,state=('x','v'),outputs=('Q1','Q2','P1','P2'),inputs=('F','P1','P2'),dt=True,name=self.name if self.name else 'actuator')
+# 
+#         else:
+#             self.model = ct.NonlinearIOSystem(self.update_fnc,self.output_fnc,state=('x','v'),outputs=('Q1','Q2','P1','P2'),inputs=('F','P1','P2'),name=self.name if self.name else 'actuator')
+# 
+#             
+# 
+#     def update_fnc(self,t,x,u,params):
+#         Ap = params.get('Ap',self.Ap)
+#         mp = params.get('mp',self.mp)
+#         bp = params.get('bp',self.bp)
+#         Kwall = params.get('Kwall',self.Kwall)
+#         Lstroke = params.get('Lstroke',self.Lstroke)
+# 
+#         xpos = x[0]
+#         v = x[1]
+# 
+#         f = u[0]
+#         p1 = u[1]
+#         p2 = u[2]
+#         
+#         if self.discrete and isinstance(self.model.dt,float):
+#             dt = self.model.dt
+#             self.dt = dt
+# 
+#         else: #infer dt
+#             if t >= self.tlast+self.min_dt:
+#                 self.dt = dt = max(abs(t - self.tlast),self.min_dt)
+#                 self.tlast = t
+#             else:
+#                 self.dt = dt = getattr(self,'dt',self.min_dt)
+# 
+#         if xpos > Lstroke:
+#             #print('kpos')
+#             K = self.Kwall*(xpos-Lstroke)
+#         elif xpos < 0:
+#             #print('kneg')
+#             K = self.Kwall*(xpos - 0)
+#         else:
+#             K = 0
+#         
+#         daf = f - (p1-p2)*Ap
+#         dad = bp*v*abs(v)
+#         dvdt = (daf - dad - K*daf)/mp    
+# 
+#         x_proj = v * dt + xpos
+#         
+#         if x_proj >= Lstroke*(1-self.lim_marg):
+#             vin = v
+#             v = (Lstroke-xpos)/dt
+#             dvdt = min((v-vin)/dt,dvdt)
+#     
+#         elif x_proj <= self.lim_marg: 
+#             vin = v
+#             v = (0 - xpos)/dt
+#             dvdt = max((v-vin)/dt,dvdt)
+# 
+# 
+#         return [v,dvdt]
+#     
+#     def discrete_update_fnc(self,t,x,u,params):
+#         v,dvdt = self.update_fnc(t,x,u,params)
+#         if self.discrete and isinstance(self.model.dt,float):
+#             dt = self.model.dt
+#         else:
+#             dt = self.dt
+# 
+#         if hasattr(self,'last_a'):
+#             dvdt = (self.last_a + dvdt)/2
+#             v = (self.last_v + v)/2
+# 
+#         vnew = v + dvdt*dt
+#         newx = x[0] + v*dt
+# 
+#         if newx < 0:
+#             newx = 0
+#             if vnew < 0:
+#                 vnew = 0
+# 
+#         elif newx > self.Lstroke:
+#             newx = self.Lstroke
+#             if vnew > 0:
+#                 vnew = 0
+# 
+#         self.last_x = newx
+#         self.last_v = vnew
+#         self.last_a = dvdt
+# 
+#         return newx, vnew
+# 
+#     def output_fnc(self,t,x,u,params):
+#         Ap = params.get('Ap',self.Ap)
+# 
+#         v = x[1]
+# 
+#         Q1 = -1*v * Ap
+#         Q2 = v * Ap
+# 
+#         return [Q1,Q2,u[1],u[2]]
+#         
+# 
+# @otterize(auto_attribs=True)
+# class Pipe(Component):
+#     '''models pressure change and flow Q from nodes with pressure P1->P2'''
+#     Kp:float = 1 #TODO: better friction model
+#     
+#     flow_input: bool = False
+#     model: 'InputOutputSystem' = None
+# 
+#     def __on_init__(self):
+#         if not self.flow_input:
+#             self.model = ct.NonlinearIOSystem(self.pipe_flow,self.pipe_flow_output,state=('Q'),inputs=('P1','P2'),outputs=('P1o','P2o','Q'),dt=True,name=self.name if self.name else 'pipe')
+#         else:
+#             self.model = ct.NonlinearIOSystem(self.pipe_pressure,self.pipe_pressure_output,state=('P2'),inputs=('P1','Q'),outputs=('P1o','P2','Q'),dt=True,name=self.name if self.name else 'pipe')
+# 
+#     def pipe_flow(self,t,x,u,params):
+#         Kp = params.get('Kp',self.Kp)
+#         p1 = u[0]
+#         p2 = u[1]
+#         dP = (p2-p1)
+#         return -1*np.sign(dP)*(abs(dP)/Kp)**0.5
+#         
+#     def pipe_pressure(self,t,x,u,params):
+#         Kp = params.get('Kp',self.Kp)
+#         p1 = u[0]
+#         q = u[1]
+#         return -1*np.sign(q)*Kp*q**2 + p1
+#         
+#     def pipe_flow_output(self,t,x,u,params):
+#         return [u[0],u[1],x[0]]
+#         
+#     def pipe_pressure_output(self,t,x,u,params):
+#         return [u[0],x[0],u[1]]
+# 
+# 
+# @otterize(auto_attribs=True)
+# class Valve(Component):
+#     Ao: float = 0.1 #area
+#     ts: float = 30/1000. #seconds
+#     rho: float = 1000
+#     Cd: float = 0.1
+#     discrete_control: bool = True    # contorl signal is zero or one, vs a goal
+#     
+#     tlast = 0
+#     min_dt:float = 1E-3
+# 
+#     def update_alpha(self,t,x,u,params):        
+#         ts = params.get('ts',self.ts)
+#         uctl = u[0]
+#         alpha = x[0]
+#         
+#         if t >= self.tlast+self.min_dt:
+#             self.dt = dt = max(abs(t - self.tlast),self.min_dt)
+#             self.tlast = t
+#         else:
+#             self.dt = dt = getattr(self,'dt',self.min_dt)
+# 
+#         dA = 1.0 / ts
+#         
+#         if self.discrete_control:
+#             if uctl==1:
+#                 if alpha < 1-dA*dt:
+#                     return dA
+#                 else:
+#                     return 1-alpha
+#             elif uctl==0:
+#                 if alpha > dA*dt:
+#                     return dA
+#                 else:
+#                     return 0-alpha
+#         else:
+#             vctl = min(max(uctl,0),1)
+#             d = (uctl-alpha)/dt
+#             dv = max(min(d,dA),-dA)
+#             return dv
+#                 
+#         
+#     def get_flow(self,t,x,u,params):
+#         rho = params.get('rho',self.rho)
+#         ts = params.get('ts',self.ts)
+#         Cd = params.get('Cd',self.Cd)
+#         Ao = params.get('Ao',self.Ao)
+# 
+#         alpha = x[0]
+#         if alpha < 0.05:
+#             return 0.0 #avoid divide by zero in area
+#         
+#         dP = u[1] 
+#         Av = Ao*min(max(alpha,0),1)
+#         return np.sign(dP)*Cd*Av*((2/rho)*abs(dP))**0.5
+# 
+# @otterize(auto_attribs=True)
+# class PipeJunction(Component):
+#     
+#     n_pipes: int = 2
+#     Vi: float = 1
+#     B: float = 300E3
+#     
+#     min_dt = DT_DFLT
+#     model: 'InputOutputSystem' = None
+#     discrete:bool = True
+#     
+#     def __on_init__(self):
+#         state = ('P',)
+#         inputs = tuple(f'Q{i+1}' for i in range(self.n_pipes))
+#         outins = tuple(f'Qout{i+1}' for i in range(self.n_pipes))
+#         outputs = tuple(list(state)+list(outins)+['dQ'])
+#         if self.discrete:
+#             self.model = ct.NonlinearIOSystem(self.discrete_pressure_update,self.output,inputs=inputs,outputs=outputs,state=state,dt=True,name=self.name if self.name else 'junction')
+#             self.tlast = 0
+#         else:
+#             self.model = ct.NonlinearIOSystem(self.pressure_update,self.output,inputs=inputs,outputs=outputs,state=state,name=self.name if self.name else 'junction')
+#             
+#     def pressure_update(self,t,x,u,params):
+#         #TODO: update compressibility from temp / pressure ect.
+#         B = params.get('B',self.B)
+#         Vi = params.get('Vi',self.Vi)
+#         sumQ = sum(u)
+#         dPdt = (B/Vi)*sumQ
+#         return dPdt
+#         
+#     def discrete_pressure_update(self,t,x,u,params):
+#         dPdt = self.pressure_update(t,x,u,params)
+#         if self.discrete and isinstance(self.model.dt,float):
+#             dt = self.model.dt
+#             self.dt = dt
+# 
+#         else: #infer dt
+#             if t >= self.tlast+self.min_dt:
+#                 self.dt = dt = max(abs(t - self.tlast),self.min_dt)
+#                 self.tlast = t
+#             else:
+#                 self.dt = dt = getattr(self,'dt',self.min_dt)
+#         return self.dt*dPdt + x[0]
+#         
+#     def output(self,t,x,u,parms):
+#         return tuple([x[0]]+list(u)+[sum(u)])
+#       
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":

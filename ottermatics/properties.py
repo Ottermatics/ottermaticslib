@@ -20,10 +20,97 @@ log = PropertyLog()
 
 
 class otter_prop:
-    """an interface for extension and identification"""
+    """an interface for extension and identification and class return support"""
+    must_return = False
 
-    pass
+    def __init__(
+        self,
+        fget=None,
+        fset=None,
+        fdel=None,
+        *args,
+        **kwargs
+    ):
+        """
+        """
 
+        self.fget = fget
+        if fget:
+            self.gname = fget.__name__
+            self.get_func_return(fget)
+        self.fset = fset
+        self.fdel = fdel
+
+
+    def __call__(self, fget=None, fset=None, fdel=None, doc=None,*args,**kwargs):
+        """this will be called when input is provided before property is set"""
+        if fget and self.fget is None:
+            self.gname = fget.__name__
+            self.get_func_return(fget)
+            self.fget = fget
+            
+        
+        if self.fset is None:
+            self.fset = fset
+        
+        if self.fdel is None:
+            self.fdel = fdel
+
+        return self
+
+    def get_func_return(self, func):
+        """ensures that the function has a return annotation, and that return annotation is in valid sort types"""
+        anno = func.__annotations__
+        typ = anno.get("return", None)
+        if not typ in (int, str, float) and self.must_return:
+            raise Exception(
+                f"system_property input: function {func.__name__} must have valid return annotation of type: {(int,str,float)}"
+            )
+        else:
+            self.return_type = typ
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self #class support
+        if self.fget is None:
+            raise AttributeError("unreadable attribute")
+        return self.fget(obj)
+
+    def __set__(self, obj, value):
+        if self.fset is None:
+            raise AttributeError("can't set attribute")
+        self.fset(obj, value)
+
+    def __delete__(self, obj):
+        if self.fdel is None:
+            raise AttributeError("can't delete attribute")
+        self.fdel(obj)
+
+    def getter(self, fget):
+        return type(self)(fget, self.fset, self.fdel, self.__doc__)
+
+    def setter(self, fset):
+        return type(self)(self.fget, fset, self.fdel, self.__doc__)
+
+    def deleter(self, fdel):
+        return type(self)(self.fget, self.fset, fdel, self.__doc__)
+
+class cache_prop(otter_prop):
+
+    allow_set: bool = False #keep this flag false to maintain current persistent value
+
+    def __init__(self,*args,**kwargs):
+        self.allow_set = True
+        super().__init__(*args,**kwargs)
+    
+    def __set__(self, instance, value):
+        if self.allow_set:
+            self.set_cache(instance,reason='change',val=value)
+        else:
+            raise Exception(f"cannot set {self.gname}")
+
+    def set_cache(self, instance, reason="update",val=None):
+        raise NotImplementedError("cache_prop must be subclassed and set_cache method defined")
 
 class system_property(otter_prop):
     """
@@ -45,6 +132,7 @@ class system_property(otter_prop):
     stochastic = False
     get_func_return: type = None
     return_type = None
+    must_return = True
 
     def __init__(
         self,
@@ -119,7 +207,7 @@ class system_property(otter_prop):
 
     def __get__(self, obj, objtype=None):
         if obj is None:
-            return self
+            return self #class support
         if self.fget is None:
             raise AttributeError("unreadable attribute")
         return self.fget(obj)
@@ -143,15 +231,14 @@ class system_property(otter_prop):
     def deleter(self, fdel):
         return type(self)(self.fget, self.fset, fdel, self.__doc__)
 
-
 class cached_system_property(system_property):
     """A system property that caches the result when nothing changes. Use for expensive functions since the checking adds some overhead"""
 
     gname: str
-
+    
     def get_func_return(self, func):
+        """ensures that the function has a return annotation, and that return annotation is in valid sort types"""
         anno = func.__annotations__
-        self.gname = func.__name__
         typ = anno.get("return", None)
         if not typ in (int, str, float):
             raise Exception(
@@ -159,7 +246,6 @@ class cached_system_property(system_property):
             )
         else:
             self.return_type = typ
-
     @property
     def private_var(self):
         return f"_{self.gname}"
@@ -178,32 +264,23 @@ class cached_system_property(system_property):
             return self.set_cache(instance)
         return getattr(instance, self.private_var)
 
-    def __set__(self, instance, value):
-        raise Exception(f"cannot set {self.gname}")
 
-    def set_cache(self, instance, reason="update"):
+    def set_cache(self, instance, reason="update",val=None):
         if log.log_level < 5:
             log.msg(
                 f"solver cache for {instance.identity}.{self.private_var}| {reason}"
             )
-        val = self.fget(instance)
+        if val is None:
+            val = self.fget(instance)
         setattr(instance, self.private_var, val)
         return val
 
 
 # TODO: install solver reset / declarative instance cache+
-class solver_cached(otter_prop):
+class solver_cached(cache_prop):
     """
     A property that updates a first time and then anytime time the input data changed, as signaled by attrs.on_setattr callback
     """
-
-    def __init__(self, getter):
-        # prevent runtime error by checking correct class
-
-        self.gname = getter.__name__
-        self.getter = getter
-        self.setter = None
-        self.deleter = None
 
     @property
     def private_var(self):
@@ -213,41 +290,33 @@ class solver_cached(otter_prop):
         if not hasattr(instance, self.private_var):
             from ottermatics.tabulation import TabulationMixin
 
-            assert issubclass(
+            assert instance.__class__ is None or issubclass(
                 instance.__class__, TabulationMixin
             ), f"incorrect class: {instance.__class__.__name__}"
             return self.set_cache(instance, reason="set")
+        
         elif instance.anything_changed:
             return self.set_cache(instance)
     
         return getattr(instance, self.private_var)
 
-    def __set__(self, instance, value):
-        raise Exception(f"cannot set {self.gname}")
-
-    def set_cache(self, instance, reason="update"):
+    def set_cache(self, instance, reason="update",val=None):
         if log.log_level < 5:
             log.debug(
                 f"caching attr for {instance.identity}.{self.private_var}| {reason}"
             )
-        val = self.getter(instance)
+        if val is None:
+            val = self.fget(instance) #default!
         setattr(instance, self.private_var, val)
         return val
 
 
 # TODO: install solver reset / declarative instance cache+
-class instance_cached(otter_prop):
+class instance_cached(cache_prop):
     """
     A property that caches a result to an instance the first call then returns that each successive call
     """
 
-    def __init__(self, getter):
-        # prevent runtime error by checking correct class
-
-        self.gname = getter.__name__
-        self.getter = getter
-        self.setter = None
-        self.deleter = None
 
     @property
     def private_var(self):
@@ -257,34 +326,30 @@ class instance_cached(otter_prop):
         if not hasattr(instance, self.private_var):
             from ottermatics.tabulation import TabulationMixin
 
-            assert issubclass(
-                instance.__class__, TabulationMixin
-            ), f"incorrect class: {instance.__class__.__name__}"
-            return self.set_cache(instance, reason="set")
+            if instance.__class__ is not None: #its an instance
+                assert issubclass(
+                    instance.__class__, TabulationMixin
+                ), f"incorrect class: {instance.__class__.__name__}"
+                return self.set_cache(instance, reason="set")
+            else:
+                return self.fget(instance)
         return getattr(instance, self.private_var)
 
-    def __set__(self, instance, value):
-        raise Exception(f"cannot set {self.gname}")
 
-    def set_cache(self, instance, reason="update"):
+    def set_cache(self, instance, reason="update",val=None):
         if log.log_level < 5:
             log.debug(
                 f"caching instance for {instance.identity}.{self.private_var}| {reason}"
             )
-        val = self.getter(instance)
+        if val is None:
+            val = self.fget(instance) #default!
         setattr(instance, self.private_var, val)
         return val
 
 
 # TODO: make a system_property_cache = system_property + solver_cache
-class class_cache(otter_prop):
+class class_cache(cache_prop):
     """a property that caches a value on the class at runtime, and then maintains that value for the duration of the program. A flag with the class name ensures the class is correct. Intended for instance methods"""
-
-    def __init__(self, getter):
-        self.gname = getter.__name__
-        self.getter = getter
-        self.setter = None
-        self.deleter = None
 
     @property
     def private_var(self):
@@ -313,13 +378,10 @@ class class_cache(otter_prop):
 
     def set_cache(self, instance, cls):
         log.debug(f"cls caching for {cls.__name__}.{self.private_var}")
-        val = self.getter(instance)
+        val = self.fget(instance)
         setattr(cls, self.private_var, val)
         setattr(cls, self.id_var, cls.__name__)
         return val
-
-    def __set__(self, instance, value):
-        raise Exception(f"cannot set {self.gname}")
 
 
 # #TODO: make a `solver_context` that exposes a ray python remote funciton with wait & other provisions... add to a call graph and optimize later

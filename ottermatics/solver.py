@@ -52,7 +52,7 @@ class SolverMixin:
     def solvers(self):
         return {k: getattr(self, k) for k in self.solvers_attributes()}
 
-    @instance_cached
+    @instance_cached(allow_set=True)
     def transients(self):
         return {k: getattr(self, k) for k in self.transients_attributes()}
 
