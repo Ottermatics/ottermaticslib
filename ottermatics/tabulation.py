@@ -8,11 +8,11 @@ save_data() is called after item.evaluate() is called.
 from contextlib import contextmanager
 import attr
 
-from ottermatics.common import inst_vectorize, chunks
-from ottermatics.configuration import Configuration, otterize
-from ottermatics.logging import LoggingMixin
-from ottermatics.typing import *
-from ottermatics.properties import *
+from engforge.common import inst_vectorize, chunks
+from engforge.configuration import Configuration, forge
+from engforge.logging import LoggingMixin
+from engforge.typing import *
+from engforge.properties import *
 from typing import Callable
 
 import numpy
@@ -86,10 +86,13 @@ def split_dataframe(df:pandas.DataFrame)->tuple:
             uniform[s] = c[0]
 
     df_unique = df.copy().drop(columns=list(uniform))
-    return uniform,df_unique
+    return uniform,df_unique[0] if len(df_unique)>0 else df_unique
 
 class DataframeMixin:
     dataframe: pandas.DataFrame
+
+    _split_dataframe_func = split_dataframe
+    _determine_split_func = determine_split
 
     def smart_split_dataframe(self,df=None,split_groups=0,key_f = key_func):
         """splits dataframe between constant values and variants"""
@@ -217,7 +220,7 @@ class TabulationMixin(Configuration,DataframeMixin):
         """get all the internal components"""
         if recache == False and hasattr(self,'_prv_internal_components'):
             return self._prv_internal_components 
-        from ottermatics.components import Component
+        from engforge.components import Component
         o = {k: getattr(self, k) for k in self.slots_attributes()}
         o = {k: v for k, v in o.items() if isinstance(v, Component)}
         self._prv_internal_components = o
@@ -227,7 +230,7 @@ class TabulationMixin(Configuration,DataframeMixin):
         """get all the internal components"""
         if recache == False and hasattr(self,'_prv_internal_systems'):
             return self._prv_internal_systems 
-        from ottermatics.system import System
+        from engforge.system import System
         o = {k: getattr(self, k) for k in self.slots_attributes()}
         o = {k: v for k, v in o.items() if isinstance(v, System)}
         self._prv_internal_systems = o
@@ -247,7 +250,7 @@ class TabulationMixin(Configuration,DataframeMixin):
     @instance_cached
     def iterable_components(self) -> dict:
         """Finds ComponentIter internal_components that are not 'wide'"""
-        from ottermatics.component_collections import ComponentIter
+        from engforge.component_collections import ComponentIter
 
         return {
             k: v
@@ -512,7 +515,7 @@ class TabulationMixin(Configuration,DataframeMixin):
             log.debug(f"adding system properties from {mrv.__name__}")
             if (
                 issubclass(mrv, TabulationMixin)
-                # and "ottermatics" not in mrv.__module__
+                # and "engforge" not in mrv.__module__
             ):
                 for k, obj in mrv.__dict__.items():
                     if k not in __system_properties and isinstance(

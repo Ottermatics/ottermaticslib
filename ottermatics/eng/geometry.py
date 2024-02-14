@@ -1,14 +1,14 @@
 """These exist as in interface to sectionproperties from PyNite"""
 
-from ottermatics.configuration import Configuration, otterize, LoggingMixin
-from ottermatics.properties import (
+from engforge.configuration import Configuration, forge, LoggingMixin
+from engforge.properties import (
     cached_system_property,
     system_property,
     instance_cached,
 )
-from ottermatics.typing import Options
-from ottermatics.eng.prediction import PredictionMixin
-from ottermatics.env_var import EnvVariable
+from engforge.typing import Options
+from engforge.eng.prediction import PredictionMixin
+from engforge.env_var import EnvVariable
 import numpy
 import attr, attrs
 
@@ -110,7 +110,7 @@ class ParametricSpline:
 
 # TODO: cache SectionProperty sections and develop auto-mesh refinement system.
 
-@otterize
+@forge
 class Profile2D(Configuration,PredictionMixin):
     name: str = attr.ib(default="generic cross section")
 
@@ -162,7 +162,7 @@ class Profile2D(Configuration,PredictionMixin):
         return np.nan
 
 
-@otterize
+@forge
 class Rectangle(Profile2D):
     """models rectangle with base b, and height h"""
 
@@ -191,7 +191,7 @@ class Rectangle(Profile2D):
         return (self.h * self.b) * (self.b**2.0 + self.h**2.0) / 12
 
 
-@otterize
+@forge
 class Triangle(Profile2D):
     """models a triangle with base, b and height h"""
 
@@ -220,7 +220,7 @@ class Triangle(Profile2D):
         return (self.h * self.b) * (self.b**2.0 + self.h**2.0) / 12
 
 
-@otterize
+@forge
 class Circle(Profile2D):
     """models a solid circle with diameter d"""
 
@@ -247,7 +247,7 @@ class Circle(Profile2D):
         return numpy.pi * (self.d**4.0 / 32.0)
 
 
-@otterize
+@forge
 class HollowCircle(Profile2D):
     """models a hollow circle with diameter d and thickness t"""
 
@@ -337,7 +337,7 @@ def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row
         return inp
     return ff
 
-@otterize(hash=False)
+@forge(hash=False)
 class ShapelySection(Profile2D):
     """a 2D profile that takes a shapely section to calculate section properties, use a sectionproperties section with hidden variable `_geo` to bypass shape calculation"""
 

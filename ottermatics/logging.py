@@ -68,7 +68,7 @@ class LoggingMixin(logging.Filter):
             # Apply Filter Info
             self._log.addFilter(self)
             self.installSTDLogger()
-            from ottermatics.env_var import EnvVariable, SLACK_WEBHOOK
+            from engforge.env_var import EnvVariable, SLACK_WEBHOOK
 
             # Hot Patch Class (EnvVar is logging mixin... soo... here we are)
             if LoggingMixin.slack_webhook_url is None:
@@ -194,7 +194,7 @@ class LoggingMixin(logging.Filter):
         self.slack_notification(self.identity.title(), msg)
 
     def slack_notification(self, category, message):
-        from ottermatics.env_var import SLACK_WEBHOOK, HOSTNAME
+        from engforge.env_var import SLACK_WEBHOOK, HOSTNAME
 
         if SLACK_WEBHOOK.var_name in os.environ:
             self.info("getting slack webhook")

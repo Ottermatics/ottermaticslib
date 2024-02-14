@@ -9,7 +9,7 @@ For example add: `db_driver(DB_HOST.secret,DB_PASSWORD.secret,...)
 
 
 import os
-from ottermatics.logging import LoggingMixin
+from engforge.logging import LoggingMixin
 from typing import Any
 import socket
 import inspect
@@ -95,7 +95,7 @@ class EnvVariable(LoggingMixin):
         else:
             self.__class__._secrets[secret_var_name] = self
 
-        # FIXME: prevent ottermatics var from replacing other module instnace
+        # FIXME: prevent engforge var from replacing other module instnace
         # not possible to locate where other instances
         # if secret_var_name in self.__class__._secrets:
         #     cur = self.__class__._secrets[secret_var_name]

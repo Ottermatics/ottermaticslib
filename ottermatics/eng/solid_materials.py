@@ -1,6 +1,6 @@
-from ottermatics.configuration import Configuration, otterize
-from ottermatics.properties import *
-from ottermatics.common import *
+from engforge.configuration import Configuration, forge
+from engforge.properties import *
+from engforge.common import *
 import matplotlib
 import random
 import attr
@@ -33,7 +33,7 @@ def ih(val):
     return ''
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
     """A class to hold physical properties of solid structural materials and act as both a section property material and a pynite material"""
 
@@ -130,7 +130,7 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
         d = hashlib.sha1(json.dumps(ict, sort_keys=True).encode())
         return int(d.hexdigest(),16)    
 
-@otterize(hash=False)
+@forge(hash=False)
 class SS_316(SolidMaterial):
     name: str = attr.ib(default="stainless steel 316")
 
@@ -155,7 +155,7 @@ class SS_316(SolidMaterial):
     cost_per_kg: float = attr.ib(default=3.26)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class ANSI_4130(SolidMaterial):
     name: str = attr.ib(default="steel 4130")
 
@@ -180,7 +180,7 @@ class ANSI_4130(SolidMaterial):
     cost_per_kg: float = attr.ib(default=2.92)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class ANSI_4340(SolidMaterial):
     name: str = attr.ib(default="steel 4340")
 
@@ -205,7 +205,7 @@ class ANSI_4340(SolidMaterial):
     cost_per_kg: float = attr.ib(default=2.23)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class Aluminum(SolidMaterial):
     name: str = attr.ib(default="aluminum generic")
 
@@ -230,7 +230,7 @@ class Aluminum(SolidMaterial):
     cost_per_kg: float = attr.ib(default=1.90)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class CarbonFiber(SolidMaterial):
     name: str = attr.ib(default="carbon fiber")
 
@@ -255,7 +255,7 @@ class CarbonFiber(SolidMaterial):
     cost_per_kg: float = attr.ib(default=1.90)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class Concrete(SolidMaterial):
     name: str = attr.ib(default="concrete")
 
@@ -280,7 +280,7 @@ class Concrete(SolidMaterial):
     cost_per_kg: float = attr.ib(default=95.44 / 1000.0)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class DrySoil(SolidMaterial):
     name: str = attr.ib(default="dry soil")
 
@@ -305,7 +305,7 @@ class DrySoil(SolidMaterial):
     cost_per_kg: float = attr.ib(default=44.78 / 1000.0)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class WetSoil(SolidMaterial):
     name: str = attr.ib(default="wet soil")
 
@@ -330,7 +330,7 @@ class WetSoil(SolidMaterial):
     cost_per_kg: float = attr.ib(default=34.44 / 1000.0)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class Rock(SolidMaterial):
     name: str = attr.ib(default="wet soil")
 
@@ -355,7 +355,7 @@ class Rock(SolidMaterial):
     cost_per_kg: float = attr.ib(default=50.44 / 1000.0)  # dollar per kg
 
 
-@otterize(hash=False)
+@forge(hash=False)
 class Rubber(SolidMaterial):
     name: str = attr.ib(default="rubber")
 

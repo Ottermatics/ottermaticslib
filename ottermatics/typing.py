@@ -2,7 +2,7 @@
 
 """
 import pandas, attr, numpy
-from ottermatics.properties import *
+from engforge.properties import *
 import attrs
 
 # import matplotlib.pyplot as plt

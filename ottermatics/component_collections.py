@@ -13,12 +13,12 @@ Types:
 """
 
 from collections import UserDict, UserList
-from ottermatics.components import Component
-from ottermatics.slots import SLOT
-from ottermatics.configuration import otterize
-from ottermatics.typing import *
-from ottermatics.tabulation import Ref, system_property
-from ottermatics.properties import *
+from engforge.components import Component
+from engforge.slots import SLOT
+from engforge.configuration import forge
+from engforge.typing import *
+from engforge.tabulation import Ref, system_property
+from engforge.properties import *
 
 
 import attrs
@@ -26,7 +26,7 @@ import attrs
 
 def check_comp_type(instance, attr, value):
     """ensures the input component type is a Component"""
-    from ottermatics.eng.costs import CostModel
+    from engforge.eng.costs import CostModel
 
     if  not instance.wide and isinstance(value, type) and issubclass(value, CostModel):
         raise TypeError(f"Cost Mixin Not Supported As Iter Type! {value}")
@@ -43,7 +43,7 @@ class iter_tkn:
     pass
 
 
-@otterize
+@forge
 class ComponentIter(Component):
     """Iterable components are designed to evaluate a large selection of components either one-by-one or all at once at the system level depending on if `wide` property is set."""
 
@@ -162,7 +162,7 @@ class ComponentIter(Component):
         return hash(id(self))
 
 
-@otterize
+@forge
 class ComponentDict(ComponentIter, UserDict):
     """Stores components by name, and allows tabulation of them"""
 
@@ -183,7 +183,7 @@ class ComponentDict(ComponentIter, UserDict):
         return str(self)
 
 
-@otterize
+@forge
 class ComponentIterator(ComponentIter, UserList):
     """Stores components by name, and allows tabulation of them"""
 

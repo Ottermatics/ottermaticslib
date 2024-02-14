@@ -1,14 +1,14 @@
 """test transient cases and match against real world results"""
 import unittest
 
-from ottermatics.configuration import otterize
-from ottermatics.system import System
-from ottermatics.components import Component
-from ottermatics.solver import SOLVER, TRANSIENT
-from ottermatics.signals import SIGNAL
-from ottermatics.slots import SLOT
-from ottermatics.properties import *
-from ottermatics.plotting import *
+from engforge.configuration import forge
+from engforge.system import System
+from engforge.components import Component
+from engforge.solver import SOLVER, TRANSIENT
+from engforge.signals import SIGNAL
+from engforge.slots import SLOT
+from engforge.properties import *
+from engforge.plotting import *
 
 from scipy.optimize import curve_fit, least_squares
 import numpy as np
@@ -17,7 +17,7 @@ from matplotlib.pyplot import *
 import attrs
 
 
-@otterize
+@forge
 class SpringMass(System):
     k: float = attrs.field(default=50)
     m: float = attrs.field(default=1)

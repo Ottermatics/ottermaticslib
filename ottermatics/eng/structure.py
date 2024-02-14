@@ -5,24 +5,24 @@ import shapely
 import pandas
 from shapely.geometry import Polygon, Point
 
-from ottermatics.tabulation import (
+from engforge.tabulation import (
     TABLE_TYPES,
     NUMERIC_VALIDATOR,
     system_property,
 )
-from ottermatics.configuration import otterize, Configuration
-from ottermatics.components import Component
+from engforge.configuration import forge, Configuration
+from engforge.components import Component
 
-# from ottermatics.analysis import Analysis
-from ottermatics.properties import system_property
-from ottermatics.system import System
-from ottermatics.component_collections import ComponentDict
-from ottermatics.eng.solid_materials import *
-from ottermatics.common import *
-from ottermatics.logging import log, LoggingMixin
-from ottermatics.eng.costs import CostModel,cost_property
-from ottermatics.slots import SLOT
-from ottermatics.eng.prediction import PredictionMixin
+# from engforge.analysis import Analysis
+from engforge.properties import system_property
+from engforge.system import System
+from engforge.component_collections import ComponentDict
+from engforge.eng.solid_materials import *
+from engforge.common import *
+from engforge.logging import log, LoggingMixin
+from engforge.eng.costs import CostModel,cost_property
+from engforge.slots import SLOT
+from engforge.eng.prediction import PredictionMixin
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
@@ -39,8 +39,8 @@ import asyncio
 import weakref
 from sklearn import svm
 
-from ottermatics.typing import Options
-from ottermatics.eng.structure_beams import Beam, rotation_matrix_from_vectors
+from engforge.typing import Options
+from engforge.eng.structure_beams import Beam, rotation_matrix_from_vectors
 
 
 class StructureLog(LoggingMixin):
@@ -178,12 +178,12 @@ def calculate_quad_vonmises(quad, combo) -> dict:
         qvm[(r, s)] = calculate_von_mises_stress(S)
     return qvm
 
-@otterize
+@forge
 class BeamDict(ComponentDict):
     component_type:type = attrs.field(default=Beam)
 
 # TODO: Make analysis, where each load case is a row, but how sytactically?
-@otterize
+@forge
 class Structure(System,CostModel,PredictionMixin):
     """A integration between sectionproperties and PyNite, with a focus on ease of use
 
@@ -212,6 +212,7 @@ class Structure(System,CostModel,PredictionMixin):
     default_combo: str = attrs.field(default="gravity")
 
     # this orchestrates load retrieval
+    check_statics: bool = attrs.field(default=True)
     current_combo: str = attrs.field(default="gravity")
     #iteration combos iterates over LoadCombos by default
     iteration_combos: list = attrs.field(default=None)
@@ -226,13 +227,13 @@ class Structure(System,CostModel,PredictionMixin):
     #per execute failure analysis
     #calculate actual failure will estimate then run failure analysis for bad cases
     #calculate full failure will run failure analysis without stoping at first failure
-    calculate_actual_failure: bool =attrs.field(default=False)
-    calculate_full_failure: bool =attrs.field(default=True)
+    calculate_actual_failure: bool =attrs.field(default=True)
+    calculate_full_failure: bool =attrs.field(default=False)
     failure_solve_method = Options('bisect','root')
     failure_records: list = attrs.field(default=None)
     
     #prediciton calculation
-    prediction: bool = attrs.field(default=True)
+    prediction: bool = attrs.field(default=False)
     max_records: int = attrs.field(default=10000)
     _prediction_parms: list = attrs.field(default=None)
 
@@ -260,7 +261,32 @@ class Structure(System,CostModel,PredictionMixin):
             self._prediction_models = d
 
     def create_structure(self):
-        raise NotImplemented(f'use this method to create the structure on init')
+        '''
+        Use this method to create a structure on init.
+
+        # Example code for creating a structure
+        frame = Structure()
+        frame.add_material("default_material", 2E9, 8E8, 0.3, 7850)
+
+        # Add nodes
+        node1 = frame.add_node("Node1", 0, 0, 0)
+        node2 = frame.add_node("Node2", 0, 0, 10)
+
+        # Add elements
+        element = frame.add_member("Element1", "Node1", "Node2", "default_material")
+
+        # Add supports
+        frame.def_support("Node1", True, True, True, True, True, True)
+        frame.def_support("Node2", True, True, True, True, True, True)
+
+        # Add loads
+        self.add_node_load("Node2", "FZ", -100)
+
+        # Solve the structure
+        self.run() #calls execute!
+        '''
+        pass
+
 
     # Execution
     def execute(self, combos: list = None,save=True,record=True, *args, **kwargs):
@@ -295,6 +321,9 @@ class Structure(System,CostModel,PredictionMixin):
             combo = self.current_combo
             
             self.info(f"running load combo : {combo} with solver {self.solve_method}")
+
+            if 'check_statics' not in kwargs:
+                kwargs['check_statics'] = self.check_statics
 
             if self.solve_method == 'linear':
                 self.analyze_linear(load_combos=[combo], *args, **kwargs)

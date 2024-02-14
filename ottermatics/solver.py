@@ -9,10 +9,12 @@ import numpy
 import scipy.optimize as scopt
 from contextlib import contextmanager
 import copy
-from ottermatics.components import Component
-from ottermatics.component_collections import ComponentIter
-from ottermatics.configuration import otterize
-from ottermatics.properties import *
+import datetime
+
+from engforge.components import Component
+from engforge.component_collections import ComponentIter
+from engforge.configuration import forge
+from engforge.properties import *
 
 import itertools
 
@@ -60,29 +62,28 @@ class SolverMixin:
     def solved(self):
         return self._solved
 
-    @classmethod
-    def parse_run_kwargs(cls, **kwargs):
+    def parse_run_kwargs(self, **kwargs):
         """ensures correct input for simulation.
         :returns: first set of input for initalization, and all input dictionaries as tuple.
 
         """
 
-        # TODO: handle slot argument and sub-system argumentsconda
+        # TODO: handle slot argument and sub-system arguments
 
         # Configure Extra Transient Arguments
         _trans_opts = None
-        if cls.transients_attributes():
+        if self.transients:
             # Get Timestep
 
             # timestep
             if "dt" not in kwargs:
-                pass
+                raise Exception("transients require `dt` to run")
             # f"transients require timestep input `dt`"
             dt = float(kwargs.pop("dt"))
 
             # endtime
             if "endtime" not in kwargs:
-                pass
+                raise Exception("transients require `endtime` to run")
 
             # add data
             _trans_opts = {"dt": None, "endtime": None}
@@ -97,13 +98,13 @@ class SolverMixin:
         comp_args = {k: v for k, v in kwargs.items() if "." in k}
 
         # check parms
-        inpossible = set.union(set(cls.input_fields()),set(cls.slots_attributes()))
+        inpossible = set.union(set(self.input_fields()),set(self.slots_attributes()))
         argdiff = set(parm_args).difference(inpossible)
         assert not argdiff, f"bad input {argdiff}"
 
         # check components
         comps = set([k.split(".")[0] for k in comp_args.keys()])
-        compdiff = comps.difference(set(cls.slots_attributes()))
+        compdiff = comps.difference(set(self.slots_attributes()))
         assert not compdiff, f"bad slot references {compdiff}"
 
         _input = {}
@@ -114,7 +115,7 @@ class SolverMixin:
         for k, v in kwargs.items():
             
             #If a slot check the type is applicable
-            subslot = cls.check_ref_slot_type(k)
+            subslot = self.check_ref_slot_type(k)
             if subslot is not None:
                 #log.debug(f'found subslot {k}: {subslot}')
                 addty = subslot
@@ -141,21 +142,21 @@ class SolverMixin:
 
         
 
-    @classmethod
-    def sim(cls, _cb=None, **kwargs):
-        """applies a permutation of input parameters for parameters not marked as transient, creates a system instance and returns the results of run()
-        :param dt: timestep in s, required for transients
-        :param endtime: when to end the simulation
-        :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
-        """
-        prev_item = None
-        log.info(f"simulating analysis: {cls.__name__} with input {kwargs}")
-
-        _firsts, _input, trs_opts = cls.parse_run_kwargs(**kwargs)
-
-        # Create The System
-        system = cls(**_firsts)
-        return system.run(**kwargs, **trs_opts, _cb=_cb)
+#     @classmethod
+#     def sim(cls, _cb=None, **kwargs):
+#         """applies a permutation of input parameters for parameters not marked as transient, creates a system instance and returns the results of run()
+#         :param dt: timestep in s, required for transients
+#         :param endtime: when to end the simulation
+#         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
+#         """
+#         prev_item = None
+#         log.info(f"simulating analysis: {cls.__name__} with input {kwargs}")
+# 
+#         _firsts, _input, trs_opts = cls.parse_run_kwargs(**kwargs)
+# 
+#         # Create The System
+#         system = cls(**_firsts)
+#         return system.run(**kwargs, **trs_opts, _cb=_cb)
 
     def run(self, revert=True, _cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None, force_solve=False,**kwargs):
         """applies a permutation of input parameters for parameters not marked as transient, runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. The run command additionally configures the transient parameters
@@ -172,7 +173,7 @@ class SolverMixin:
 
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
         """
-        from ottermatics.system import System
+        from engforge.system import System
         self.debug(f"running system {self.identity} with input {kwargs}")
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
@@ -222,18 +223,20 @@ class SolverMixin:
                         icur = cur.copy()
                         if seq:
                             icur.update(**seq)
-
+                        
+                        #set the values
                         for k, v in icur.items():
                             refs[k].set_value(v)
                     
                         # Transeint
+                        self._run_start = datetime.datetime.now()
                         if isinstance(self,System):
                             self.system_references(recache=True)
                         if self.transients and trs_opts:
                             self._run_id = int(uuid.uuid4())
                             self.time = 0
                             self.run_transient(
-                                dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb
+                                dt=trs_opts["dt"], N=trs_opts["Nrun"], _cb=_cb,eval_kw=eval_kw,sys_kw=sys_kw
                             )
 
                         else:
@@ -242,6 +245,10 @@ class SolverMixin:
                                 self._run_id = int(uuid.uuid4())
                             #Recache system references
                             self.evaluate(_cb=_cb,eval_kw=eval_kw,sys_kw=sys_kw)
+
+                        self._run_end = datetime.datetime.now()
+                        self._run_time = self._run_end - self._run_start
+                        self.debug(f"{icur} run time: {self._run_time}")
             
             #run callback pre-revert
             self._solved = True
@@ -267,7 +274,7 @@ class SolverMixin:
         """user callback for when run is beginning"""
         pass    
 
-    def run_transient(self, dt, N, _cb=None):
+    def run_transient(self, dt, N, _cb=None,eval_kw=None,sys_kw=None):
         """integrates the time series over N points at a increment of dt"""
         for i in range(N):
             #TODO: adapt timestep & integrate ODE system integrator
@@ -282,7 +289,7 @@ class SolverMixin:
     def run_internal_systems(self,sys_kw=None):
         """runs internal systems with potentially scoped kwargs"""
         # Pre Execute Which Sets Fields And PRE Signals
-        from ottermatics.system import System
+        from engforge.system import System
         #Record any changed state in components
         if isinstance(self,System):
             self.system_references(recache=True)                              
@@ -313,7 +320,6 @@ class SolverMixin:
         self.debug(f'updating internal {self.__class__.__name__}.{self}')
         for key, comp in self.internal_configurations(False).items():
             
-
             #provide add eval_kw
             if eval_kw and key in eval_kw:
                 eval_kw_comp = eval_kw[key]
@@ -351,7 +357,7 @@ class SolverMixin:
     # Single Point Flow
     def evaluate(self, _cb=None,eval_kw:dict=None,sys_kw:dict=None, *args,**kw):
         """Evaluates the system with additional inputs for execute()
-        :param _cb: an optional callback taking the system as an argument
+        :param _cb: an optional callback taking the system as an argument of the form (self,eval_kw,sys_kw,*args,**kw)
         """
 
         if self.log_level < 20:
@@ -372,6 +378,7 @@ class SolverMixin:
         #Update Internal Elements
         self.update_internal(eval_kw=eval_kw,*args,**kw)
         
+        #run components and systems
         self.run_internal_systems(sys_kw=sys_kw)
 
         # Post Execute
@@ -384,7 +391,7 @@ class SolverMixin:
         self.save_data(index=self.index)
 
         if _cb:
-            _cb(self,*args,**kw)
+            _cb(self,eval_kw,sys_kw,*args,**kw)
 
         return out
 
@@ -799,7 +806,7 @@ class SOLVER(SOLVER_ATTR):
 
     @classmethod
     def validate_parms(cls):
-        from ottermatics.properties import system_property
+        from engforge.properties import system_property
 
         system = cls.on_system
 
@@ -930,7 +937,7 @@ class TRANSIENT(SOLVER_ATTR):
 
     @classmethod
     def validate_parms(cls):
-        from ottermatics.properties import system_property
+        from engforge.properties import system_property
 
         system = cls.on_system
 

@@ -1,6 +1,6 @@
 import numpy, functools
 
-from ottermatics.logging import LoggingMixin, logging
+from engforge.logging import LoggingMixin, logging
 
 
 class inst_vectorize(numpy.vectorize):

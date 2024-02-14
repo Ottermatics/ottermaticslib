@@ -1,4 +1,4 @@
-from ottermatics.env_var import EnvVariable
+from engforge.env_var import EnvVariable
 
 OTTR_PATH_VAR = EnvVariable("OTTR_REPORT_PATH", default=None, dontovrride=True)
 

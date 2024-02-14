@@ -16,7 +16,7 @@ from matplotlib import pylab
 import numpy as n
 import unittest
 
-import ottermatics
+import engforge
 
 
 import copy, traceback
@@ -31,46 +31,46 @@ class ImportTest(unittest.TestCase):
     """We test the compilation of all included modules"""
 
     def test_import_analysis(self):
-        import ottermatics.analysis
+        import engforge.analysis
 
     def test_import_common(self):
-        import ottermatics.common
+        import engforge.common
 
     def test_import_components(self):
-        import ottermatics.components
+        import engforge.components
 
     def test_import_configuration(self):
-        import ottermatics.configuration
+        import engforge.configuration
 
     def test_import_data(self):
-        import ottermatics.datastores.data
+        import engforge.datastores.data
 
     # def test_import_gdocs(self):
-    #     import ottermatics.datastores.gdocs
+    #     import engforge.datastores.gdocs
 
     def test_import_locations(self):
-        import ottermatics.locations
+        import engforge.locations
 
     def test_import_logging(self):
-        import ottermatics.logging
+        import engforge.logging
 
     def test_import_plotting(self):
-        import ottermatics.plotting
+        import engforge.plotting
 
     # def test_import_process(self):
-    #     import ottermatics.process
+    #     import engforge.process
 
     def test_import_patterns(self):
-        import ottermatics.patterns
+        import engforge.patterns
 
     def test_import_solid_materials(self):
-        import ottermatics.eng.solid_materials
+        import engforge.eng.solid_materials
 
     def test_import_tabulation(self):
-        import ottermatics.tabulation
+        import engforge.tabulation
 
     def test_import_thermodynamics(self):
-        import ottermatics.eng.thermodynamics
+        import engforge.eng.thermodynamics
 
 
 if __name__ == "__main__":

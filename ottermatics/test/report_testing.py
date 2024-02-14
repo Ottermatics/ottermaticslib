@@ -1,8 +1,8 @@
-from ottermatics.datastores.reporting import *
-from ottermatics.configuration import otterize
-from ottermatics.tabulation import system_property
-from ottermatics.components import Component
-from ottermatics.analysis import Analysis
+from engforge.datastores.reporting import *
+from engforge.configuration import forge
+from engforge.tabulation import system_property
+from engforge.components import Component
+from engforge.analysis import Analysis
 from logging import *
 
 import numpy
@@ -13,7 +13,7 @@ import numpy
 suprise = False
 
 
-@otterize
+@forge
 class TestComponent(Component):
     blank = attr.ib(default=None, validator=None)  # no validator
 
@@ -44,7 +44,7 @@ class TestComponent(Component):
             return 13
 
 
-@otterize
+@forge
 class OtherComponent(Component):
     arg1 = attr.ib(default="mmmm", validator=STR_VALIDATOR())
     arg2 = attr.ib(default="word", validator=STR_VALIDATOR())
@@ -72,7 +72,7 @@ class OtherComponent(Component):
 
 if suprise:
 
-    @otterize
+    @forge
     class SupriseComponent(Component):
         arg3 = attr.ib(default="mmmm", validator=STR_VALIDATOR())
         arg4 = attr.ib(default="word", validator=STR_VALIDATOR())
@@ -88,7 +88,7 @@ if suprise:
             return self.argque * random.random() / random.random()
 
 
-@otterize
+@forge
 class TestAnalysis(Analysis):
     if suprise:
         surprise = attr.ib(factory=SupriseComponent)

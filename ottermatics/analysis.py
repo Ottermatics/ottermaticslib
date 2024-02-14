@@ -1,11 +1,11 @@
 import attr
-from ottermatics.configuration import otterize, Configuration
-from ottermatics.components import Component
-from ottermatics.tabulation import TabulationMixin,DataframeMixin
-from ottermatics.system import System
-from ottermatics.typing import *
-from ottermatics.reporting import *
-from ottermatics.plotting import PlottingMixin
+from engforge.configuration import forge, Configuration
+from engforge.components import Component
+from engforge.tabulation import TabulationMixin,DataframeMixin
+from engforge.system import System
+from engforge.typing import *
+from engforge.reporting import *
+from engforge.plotting import PlottingMixin
 
 
 # import datetime
@@ -34,7 +34,7 @@ def make_reporter_check(type_to_check):
     return reporter_type_check
 
 
-@otterize
+@forge
 class Analysis(TabulationMixin, PlottingMixin, DataframeMixin):
     """Analysis takes a system and many reporters, runs the system, adds its own system properties to the dataframe and post processes the results
 
@@ -67,7 +67,7 @@ class Analysis(TabulationMixin, PlottingMixin, DataframeMixin):
         self.info(
             f"running analysis {self.identity} with input {args} {kwargs}"
         )
-        cb = lambda sys: self.save_data(force=True, subforce=True)
+        cb = lambda *args,**kw: self.save_data(force=True, subforce=True)
         out = self.system.run(*args, **kwargs, _cb=cb)
         self.post_process(*args, **kwargs)
 

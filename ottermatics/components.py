@@ -2,10 +2,10 @@ from contextlib import contextmanager
 import attr
 import typing
 
-# from ottermatics.logging import LoggingMixin, log
-from ottermatics.tabulation import TabulationMixin, system_property
-from ottermatics.configuration import otterize, Configuration
-from ottermatics.properties import class_cache
+# from engforge.logging import LoggingMixin, log
+from engforge.tabulation import TabulationMixin, system_property
+from engforge.configuration import forge, Configuration
+from engforge.properties import class_cache
 
 
 import os, sys
@@ -16,7 +16,7 @@ import random
 import matplotlib.pyplot as plt
 
 
-@otterize
+@forge
 class Component(TabulationMixin):
     """Component is an Evaluatable configuration with tabulation and reporting functionality"""
 
@@ -76,14 +76,14 @@ class Component(TabulationMixin):
 
 # @classmethod
 # def component_subclasses(cls):
-#     # We find any components in ottermatics and will exclude them
+#     # We find any components in engforge and will exclude them
 #     OTTER_ITEMS = set(
 #         list(
 #             flatten(
 #                 [
 #                     inspect.getmembers(mod, inspect.isclass)
 #                     for mkey, mod in sys.modules.items()
-#                     if "ottermatics" in mkey
+#                     if "engforge" in mkey
 #                 ]
 #             )
 #         )
@@ -111,7 +111,7 @@ class Component(TabulationMixin):
 
 
 #
-# @otterize
+# @forge
 # class ComponentIterator(Component):
 #     """An object to loop through a list of components as the system is evaluated,
 #

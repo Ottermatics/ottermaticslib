@@ -1,8 +1,8 @@
 """The set of reporters define an interface to report plots or tables"""
 
-from ottermatics.configuration import Configuration, otterize
-from ottermatics.typing import Options
-from ottermatics.logging import LoggingMixin
+from engforge.configuration import Configuration, forge
+from engforge.typing import Options
+from engforge.logging import LoggingMixin
 import attrs
 import abc
 

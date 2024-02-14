@@ -1,5 +1,5 @@
-from ottermatics.configuration import Configuration, otterize
-from ottermatics.components import Component, system_property, otterize
+from engforge.configuration import Configuration, forge
+from engforge.components import Component, system_property, forge
 
 
 import matplotlib
@@ -21,7 +21,7 @@ STD_PRESSURE = 1e5  # pa
 STD_TEMP = 273 + 15
 
 
-@otterize
+@forge
 class FluidMaterial(Component):
     """Placeholder for pressure dependent material, defaults to ideal water"""
 
@@ -45,7 +45,7 @@ class FluidMaterial(Component):
     # TODO: enthalpy
 
 
-@otterize
+@forge
 class IdealGas(FluidMaterial):
     """Material Defaults To Gas Properties, so eq_of_state is just Rgas, no viscosity, defaults to air"""
 
@@ -71,7 +71,7 @@ IdealH2 = type("IdealH2", (IdealGas,), {"gas_constant": 4124.2})
 IdealOxygen = type("IdealOxygen", (IdealGas,), {"gas_constant": 259.8})
 IdealSteam = type("IdealSteam", (IdealGas,), {"gas_constant": 461.5})
 
-# @otterize
+# @forge
 # class PerfectGas(FluidMaterial):
 #     '''A Calorically Perfect gas with viscosity'''
 #     eq_of_state = attrs.field()
@@ -88,7 +88,7 @@ IdealSteam = type("IdealSteam", (IdealGas,), {"gas_constant": 461.5})
 #         return self.eq_of_state.viscosity(T=self.T,P=self.P)
 
 
-@otterize
+@forge
 class CoolPropMaterial(FluidMaterial):
     """Uses coolprop equation of state"""
 
@@ -238,7 +238,7 @@ SeaWater = type(
 # Create some useful mixed models
 
 
-@otterize
+@forge
 class CoolPropMixture(CoolPropMaterial):
     """coolprop mixture of two elements... can only use T/Q, P/Q, T/P calls to coolprop"""
 

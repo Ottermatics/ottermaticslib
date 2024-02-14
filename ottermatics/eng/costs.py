@@ -6,7 +6,7 @@ CostModels can have a `cost_per_item` and additionally calculate a `cumulative_c
 CostModel's can have cost_property's which detail how and when a cost should be applied & grouped. By default each CostModel has a `cost_per_item` which is reflected in `item_cost` cost_property set on the `initial` term as a `unit` category. Multiple categories of cost are also able to be set on cost_properties as follows
 
 ```
-@otterize
+@forge
 class Widget(Component,CostModel):
 
     @cost_property(mode='initial',category='capex,manufacturing')
@@ -18,7 +18,7 @@ Economics models sum CostModel.cost_properties recursively on the parent they ar
 
 The economics term_length applies costs over the term, using the `cost_property.mode` to determine at which terms a cost should be applied.
 
-@otterize
+@forge
 class Parent(System,CostModel)
 
     econ = SLOT.define(Economics) #will calculate parent costs as well
@@ -29,12 +29,12 @@ Parent(econ=Economics(term_length=25,discount_rate=0.05,fixed_output=1000))
 
 """
 
-from ottermatics.components import Component
-from ottermatics.configuration import otterize,Configuration
-from ottermatics.tabulation import TabulationMixin, system_property, Ref
-from ottermatics.properties import instance_cached,solver_cached,cached_system_property
-from ottermatics.logging import LoggingMixin
-from ottermatics.component_collections import ComponentIter
+from engforge.components import Component
+from engforge.configuration import forge,Configuration
+from engforge.tabulation import TabulationMixin, system_property, Ref
+from engforge.properties import instance_cached,solver_cached,cached_system_property
+from engforge.logging import LoggingMixin
+from engforge.component_collections import ComponentIter
 import typing
 import attrs
 import uuid
@@ -123,7 +123,7 @@ class cost_property(system_property):
         else:
             self.return_type = float
 
-@otterize
+@forge
 class CostModel(TabulationMixin): 
     """CostModel is a mixin for components or systems that reports its costs through the `cost` system property, which by default sums the `item_cost` and `sub_items_cost`.
 
@@ -385,7 +385,7 @@ def gend(deect:dict):
         else:
             yield k,v
 parent_types = typing.Union[Component,'System']
-@otterize
+@forge
 class Economics(Component): 
     """Economics is a component that summarizes costs and reports the economics of a system and its components in a recursive format"""
 

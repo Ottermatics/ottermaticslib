@@ -1,9 +1,9 @@
-from ottermatics.components import Component
-from ottermatics.component_collections import ComponentDict, ComponentIter
-from ottermatics.system import System
-from ottermatics.slots import SLOT
-from ottermatics.configuration import otterize
-from ottermatics.tabulation import system_property
+from engforge.components import Component
+from engforge.component_collections import ComponentDict, ComponentIter
+from engforge.system import System
+from engforge.slots import SLOT
+from engforge.configuration import forge
+from engforge.tabulation import system_property
 
 import attrs, attr
 
@@ -11,11 +11,11 @@ import random
 import unittest
 import itertools
 
-# from ottermatics.logging import LoggingMixin, change_all_log_levels
+# from engforge.logging import LoggingMixin, change_all_log_levels
 # change_all_log_levels(10)
 
 
-@otterize
+@forge
 class TestConfig(Component):
     attrs_prop: float = attr.ib(1.0)
     attrs_str: str = attr.ib("hey now")
@@ -37,23 +37,23 @@ class TestConfig(Component):
         return random.random()
 
 
-@otterize
+@forge
 class DictComp(ComponentDict):
     component_type = TestConfig
 
 
-@otterize
+@forge
 class ListComp(ComponentDict):
     component_type = TestConfig
 
 
-@otterize
+@forge
 class WideSystem(System):
     cdict = SLOT.define_iterator(DictComp)
     citer = SLOT.define_iterator(ComponentIter)
 
 
-@otterize
+@forge
 class NarrowSystem(System):
     cdict = SLOT.define_iterator(DictComp, wide=False)
     citer = SLOT.define_iterator(ComponentIter, wide=False)

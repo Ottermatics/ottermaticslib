@@ -1,15 +1,15 @@
 """tests airfilter system operation by solving for airflow between filter and and fan"""
 import unittest
 
-from ottermatics.configuration import otterize
-from ottermatics.system import System
-from ottermatics.components import Component
-from ottermatics.solver import SOLVER, TRANSIENT
-from ottermatics.signals import SIGNAL
-from ottermatics.slots import SLOT
-from ottermatics.properties import *
-from ottermatics.plotting import *
-from ottermatics.analysis import Analysis
+from engforge.configuration import forge
+from engforge.system import System
+from engforge.components import Component
+from engforge.solver import SOLVER, TRANSIENT
+from engforge.signals import SIGNAL
+from engforge.slots import SLOT
+from engforge.properties import *
+from engforge.plotting import *
+from engforge.analysis import Analysis
 
 from scipy.optimize import curve_fit, least_squares
 import numpy as np
@@ -18,7 +18,7 @@ from matplotlib.pyplot import *
 import attrs
 
 
-@otterize
+@forge
 class Fan(Component):
     n: float = attrs.field(default=1)
     dp_design = attrs.field(default=100)
@@ -29,7 +29,7 @@ class Fan(Component):
         return self.dp_design * (self.n * self.w_design) ** 2.0
 
 
-@otterize
+@forge
 class Filter(Component):
     w: float = attrs.field(default=0)
     k_loss: float = attrs.field(default=50)
@@ -39,7 +39,7 @@ class Filter(Component):
         return self.k_loss * self.w
 
 
-@otterize
+@forge
 class Airfilter(System):
     throttle: float = attrs.field(default=1)
     w: float = attrs.field(default=1)
@@ -71,7 +71,7 @@ class Airfilter(System):
         return self.dP_parasitic - self.filt.dP_filter
 
 
-@otterize
+@forge
 class AirFilterAnalysis(Analysis):
     efficiency: float = attrs.field(default=0.9)
     system = SLOT.define(Airfilter, default_ok=True)
@@ -106,8 +106,8 @@ class TestAnalysis(unittest.TestCase):
         self.assertIsNotNone(ofig)
 
 
-# from ottermatics.logging import change_all_log_levels
-# from ottermatics.test.test_airfilter import *
+# from engforge.logging import change_all_log_levels
+# from engforge.test.test_airfilter import *
 # from matplotlib.pylab import *
 #
 # fan = Fan()

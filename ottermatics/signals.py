@@ -5,7 +5,7 @@
 
 
 import attrs
-from ottermatics.slots import SLOT_TYPES
+from engforge.slots import SLOT_TYPES
 
 VALID_MODES = ["pre", "post", "both"]
 
@@ -43,7 +43,7 @@ class SIGNAL(attrs.Attribute):
     # FIXME: move to
     @classmethod
     def validate_parms(cls):
-        from ottermatics.properties import system_property
+        from engforge.properties import system_property
 
         system = cls.on_system
 

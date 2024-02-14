@@ -12,21 +12,21 @@ start with single phase and move to others
 8) Filtration dP = k x Vxc x (Afrontal/Asurface) "linear"
 """
 
-from ottermatics.components import Component
-from ottermatics.configuration import otterize
-from ottermatics.tabulation import (
+from engforge.components import Component
+from engforge.configuration import forge
+from engforge.tabulation import (
     system_property,
     NUMERIC_VALIDATOR,
     STR_VALIDATOR,
     Ref,
 )
-from ottermatics.eng.fluid_material import FluidMaterial
-from ottermatics.common import G_grav_constant
-from ottermatics.slots import *
-from ottermatics.signals import *
-from ottermatics.logging import LoggingMixin
-from ottermatics.system import System
-from ottermatics.properties import *
+from engforge.eng.fluid_material import FluidMaterial
+from engforge.common import G_grav_constant
+from engforge.slots import *
+from engforge.signals import *
+from engforge.logging import LoggingMixin
+from engforge.system import System
+from engforge.properties import *
 
 
 import networkx as nx
@@ -46,7 +46,7 @@ class PipeLog(LoggingMixin):
 log = PipeLog()
 
 #TODO: add compressibility effects
-@otterize
+@forge
 class PipeNode(Component):
     x: float = attrs.field()
     y: float = attrs.field()
@@ -78,7 +78,7 @@ class PipeNode(Component):
         return out
 
 
-@otterize
+@forge
 class PipeFlow(Component):
     D: float = attrs.field()
     v: float = attrs.field(default=0)
@@ -170,7 +170,7 @@ class PipeFlow(Component):
         ]  # TODO: include Txx
 
 
-@otterize
+@forge
 class Pipe(PipeFlow, Component):
     node_s = SLOT.define(PipeNode, default_ok=False)
     node_e = SLOT.define(PipeNode, default_ok=False)
@@ -273,7 +273,7 @@ class FlowNode(PipeNode):
         return 0.0
 
 
-@otterize
+@forge
 class PipeFitting(FlowNode, PipeFlow):
     Kfitting = attr.ib(default=0.1, type=float)
 
@@ -347,7 +347,7 @@ class PipeFitting(FlowNode, PipeFlow):
 
 
 #
-@otterize
+@forge
 class FlowInput(FlowNode):
     flow_in: float = attrs.field(default=0.0)
 
@@ -370,7 +370,7 @@ class FlowInput(FlowNode):
 #     pressure_out: float = attrs.field()
 
 
-@otterize
+@forge
 class Pump(Component):
     """Simulates a pump with power input, max flow, and max pressure by assuming a flow characteristic"""
 
@@ -396,7 +396,7 @@ class Pump(Component):
         return self.dPressure(current_flow) * current_flow
 
 
-@otterize
+@forge
 class PipeSystem(System):
     in_node = SLOT.define(PipeNode)
     graph: nx.Graph
@@ -550,11 +550,11 @@ class PipeSystem(System):
 # 
 # import control as ct
 # import numpy as np
-# from ottermatics.components import Component, otterize
+# from engforge.components import Component, forge
 # from matplotlib.pylab import *
 # 
 # DT_DFLT = 1E-3
-# @otterize(auto_attribs=True)
+# @forge(auto_attribs=True)
 # class Accumulator(Component):
 # 
 #     Rt: float = 5000
@@ -754,7 +754,7 @@ class PipeSystem(System):
 #         Q = v*Aact
 #         return [Pcomp,Q,Pi]
 #     
-# @otterize(auto_attribs=True)
+# @forge(auto_attribs=True)
 # class Motor(Component):
 #     """Nonlinear motor with parasitics with fixed displacement"""
 # 
@@ -839,7 +839,7 @@ class PipeSystem(System):
 #         return [Trq, Q, Pwr,P1,P2]   
 # 
 # 
-# @otterize(auto_attribs=True)
+# @forge(auto_attribs=True)
 # class Actuator(Component):
 #     Ap: float = 1
 #     mp: float = 0.5
@@ -961,7 +961,7 @@ class PipeSystem(System):
 #         return [Q1,Q2,u[1],u[2]]
 #         
 # 
-# @otterize(auto_attribs=True)
+# @forge(auto_attribs=True)
 # class Pipe(Component):
 #     '''models pressure change and flow Q from nodes with pressure P1->P2'''
 #     Kp:float = 1 #TODO: better friction model
@@ -995,7 +995,7 @@ class PipeSystem(System):
 #         return [u[0],x[0],u[1]]
 # 
 # 
-# @otterize(auto_attribs=True)
+# @forge(auto_attribs=True)
 # class Valve(Component):
 #     Ao: float = 0.1 #area
 #     ts: float = 30/1000. #seconds
@@ -1051,7 +1051,7 @@ class PipeSystem(System):
 #         Av = Ao*min(max(alpha,0),1)
 #         return np.sign(dP)*Cd*Av*((2/rho)*abs(dP))**0.5
 # 
-# @otterize(auto_attribs=True)
+# @forge(auto_attribs=True)
 # class PipeJunction(Component):
 #     
 #     n_pipes: int = 2

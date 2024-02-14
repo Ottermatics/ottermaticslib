@@ -1,17 +1,17 @@
 import unittest
 
-from ottermatics.configuration import otterize
-from ottermatics.system import System
-from ottermatics.components import Component
-from ottermatics.solver import SOLVER, TRANSIENT
-from ottermatics.signals import SIGNAL
-from ottermatics.slots import SLOT
-from ottermatics.properties import *
+from engforge.configuration import forge
+from engforge.system import System
+from engforge.components import Component
+from engforge.solver import SOLVER, TRANSIENT
+from engforge.signals import SIGNAL
+from engforge.slots import SLOT
+from engforge.properties import *
 
 import attrs
 
 
-@otterize
+@forge
 class MockComponent(Component):
     input: float = attrs.field(default=0)
     # use to test input from system
@@ -28,7 +28,7 @@ def limit_max(system):
     return 4 - system.input
 
 
-@otterize
+@forge
 class MockSystem(System):
     input: float = attrs.field(default=0)
     output: float = attrs.field(default=0)

@@ -1,11 +1,11 @@
 # # FIXME: tighten up interface
-# from ottermatics.common import *
-# from ottermatics.typing import *
-# from ottermatics.properties import system_property, solver_cached, class_cache
-# from ottermatics.configuration import Configuration, otterize
-# from ottermatics.components import Component
-# from ottermatics.analysis import Analysis
+# from engforge.common import *
+# from engforge.typing import *
+# from engforge.properties import system_property, solver_cached, class_cache
+# from engforge.configuration import Configuration, forge
+# from engforge.components import Component
+# from engforge.analysis import Analysis
 #
 # # TODO: implement this functionality
-# # from ottermatics.eng import *
-# # from ottermatics.datastores import *
+# # from engforge.eng import *
+# # from engforge.datastores import *

@@ -1,5 +1,5 @@
 from posix import environ
-from ottermatics.configuration import otterize, Configuration
+from engforge.configuration import forge, Configuration
 
 import attr
 import os
@@ -45,7 +45,7 @@ SLACK_WEBHOOK_NOTIFICATION = None  # TOOD: Make a default slack webhook!
 
 
 # TODO: Remove this and use aws copilot concepts
-@otterize
+@forge
 class Secrets(Configuration, metaclass=InputSingletonMeta):
     """Secrets handles an explicit user manage input and output of secrets
 
@@ -257,7 +257,7 @@ class Secrets(Configuration, metaclass=InputSingletonMeta):
         return f"secrets-{self.credential_key}"
 
 
-@otterize
+@forge
 class ClientSecrets(Secrets, ClientInfoMixin):
     """Automatically handles client secrets for managing application credentials between bash, env-vars, and aws secret manager
 

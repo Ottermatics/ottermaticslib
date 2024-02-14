@@ -5,7 +5,7 @@ this_file = pathlib.Path(__file__)
 this_dir = this_file.parent
 req_file = os.path.join(this_dir, "datastores_requirements.txt")
 try:
-    import ottermatics.datastores.data
+    import engforge.datastores.data
 
 except ImportError as e:
     print(f"got import error {e}")

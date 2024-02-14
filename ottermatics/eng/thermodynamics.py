@@ -1,9 +1,9 @@
 import attr
 
-# from ottermatics.configuration import Configuration, otterize
-from ottermatics.components import Component, system_property, otterize
+# from engforge.configuration import Configuration, forge
+from engforge.components import Component, system_property, forge
 
-from ottermatics.eng.fluid_material import Water, Air, Steam
+from engforge.eng.fluid_material import Water, Air, Steam
 from CoolProp.CoolProp import PropsSI
 import CoolProp.CoolProp as CP
 import numpy
@@ -90,7 +90,7 @@ def fanning_friction_factor(Re, method="turbulent"):
 
 
 # Simple Elements
-@otterize
+@forge
 class SimpleHeatExchanger(Component):
     Thi = attr.ib()
     mdot_h = attr.ib()
@@ -140,7 +140,7 @@ class SimpleHeatExchanger(Component):
 
 
 # Compression
-@otterize
+@forge
 class SimpleCompressor(Component):
     pressure_ratio = attr.ib()
 
@@ -171,7 +171,7 @@ class SimpleCompressor(Component):
         return self.pressure_ratio * pressure_in
 
 
-@otterize
+@forge
 class SimpleTurbine(Component):
     Pout = attr.ib()
 
@@ -209,7 +209,7 @@ class SimpleTurbine(Component):
 
 
 # Compression
-@otterize
+@forge
 class SimplePump(Component):
     MFin = attr.field()  # kg/s
     pressure_ratio = attr.field()  # nd

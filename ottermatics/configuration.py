@@ -1,8 +1,8 @@
 from contextlib import contextmanager
 import attr, attrs
 
-from ottermatics.logging import LoggingMixin, log
-from ottermatics.properties import *
+from engforge.logging import LoggingMixin, log
+from engforge.properties import *
 
 import deepdiff
 import typing
@@ -19,7 +19,7 @@ log = ConfigLog()
 
 # Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
-    from ottermatics.tabulation import TabulationMixin
+    from engforge.tabulation import TabulationMixin
 
     if not isinstance(instance, (TabulationMixin)):
         return value
@@ -310,7 +310,7 @@ def signals_slots_handler(
     created_fields = set([o.name for o in out])
     # print options
     if cls.log_level < 10:
-        from ottermatics.plotting import PLOT
+        from engforge.plotting import PLOT
 
         for o in out:
             if isinstance(o.type, PLOT):
@@ -361,7 +361,7 @@ comp_transform = lambda c, f: signals_slots_handler(
 
 
 # This one should wrap all configuraitons to track changes, and special methods
-def otterize(cls=None, **kwargs):
+def forge(cls=None, **kwargs):
     """Wrap all Configurations with this decorator with the following behavior
     1) we use the callback when any property changes
     2) repr is default
@@ -411,7 +411,7 @@ def otterize(cls=None, **kwargs):
     else:
 
         def f(cls, *args):
-            return otterize(cls, **kwargs)
+            return forge(cls, **kwargs)
 
         return f
 
@@ -428,10 +428,10 @@ def meta(title, desc=None, **kwargs):
     return out
 
 
-# TODO: Make A MetaClass for Configuration, and provide otterize interface there. Problem with replaceing metaclass later, as in the case of a singleton.
+# TODO: Make A MetaClass for Configuration, and provide forge interface there. Problem with replaceing metaclass later, as in the case of a singleton.
 
 
-@otterize
+@forge
 class Configuration(LoggingMixin):
     """Configuration is a pattern for storing attributes that might change frequently, and proivdes the core functionality for a host of different applications.
 
@@ -467,7 +467,7 @@ class Configuration(LoggingMixin):
         """This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!"""
         # Store abs path On Creation, in case we change
         
-        from ottermatics.components import Component
+        from engforge.components import Component
 
         self._log = None
         self._anything_changed = True  # save by default first go!
@@ -490,7 +490,7 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def validate_class(cls):
-        """A customizeable validator at the end of class creation in otterize"""
+        """A customizeable validator at the end of class creation in forge"""
         return
 
     @classmethod
@@ -636,7 +636,7 @@ class Configuration(LoggingMixin):
     @classmethod
     def _extract_type(cls,typ):
         """gathers valid types for an attribute.type"""
-        from ottermatics.slots import SLOT
+        from engforge.slots import SLOT
             
         if not isinstance(typ,type) or typ is None:
             return list()
@@ -704,42 +704,42 @@ class Configuration(LoggingMixin):
     @classmethod
     def slots_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all slots attributes for class"""
-        from ottermatics.slots import SLOT
+        from engforge.slots import SLOT
 
         return cls._get_init_attrs_data(SLOT)
 
     @classmethod
     def signals_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        from ottermatics.signals import SIGNAL
+        from engforge.signals import SIGNAL
 
         return cls._get_init_attrs_data(SIGNAL)
 
     @classmethod
     def solvers_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        from ottermatics.solver import SOLVER, TRANSIENT
+        from engforge.solver import SOLVER, TRANSIENT
 
         return cls._get_init_attrs_data(SOLVER)
 
     @classmethod
     def transients_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        from ottermatics.solver import SOLVER, TRANSIENT
+        from engforge.solver import SOLVER, TRANSIENT
 
         return cls._get_init_attrs_data(TRANSIENT)
 
     @classmethod
     def trace_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all trace attributes for class"""
-        from ottermatics.plotting import TRACE
+        from engforge.plotting import TRACE
 
         return cls._get_init_attrs_data(TRACE)
 
     @classmethod
     def plot_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all plot attributes for class"""
-        from ottermatics.plotting import PLOT
+        from engforge.plotting import PLOT
 
         return cls._get_init_attrs_data(PLOT)
 
@@ -749,10 +749,10 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def input_fields(cls):
-        from ottermatics.solver import SOLVER, TRANSIENT
-        from ottermatics.signals import SIGNAL
-        from ottermatics.slots import SLOT
-        from ottermatics.plotting import PLOT, TRACE
+        from engforge.solver import SOLVER, TRANSIENT
+        from engforge.signals import SIGNAL
+        from engforge.slots import SLOT
+        from engforge.plotting import PLOT, TRACE
 
         ignore_types = (
             SLOT,
@@ -768,10 +768,10 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def numeric_fields(cls):
-        from ottermatics.solver import SOLVER, TRANSIENT
-        from ottermatics.signals import SIGNAL
-        from ottermatics.slots import SLOT
-        from ottermatics.plotting import PLOT, TRACE
+        from engforge.solver import SOLVER, TRANSIENT
+        from engforge.signals import SIGNAL
+        from engforge.slots import SLOT
+        from engforge.plotting import PLOT, TRACE
 
         ignore_types = (
             SLOT,
@@ -789,9 +789,9 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def table_fields(cls):
-        from ottermatics.solver import SOLVER, TRANSIENT
-        from ottermatics.signals import SIGNAL
-        from ottermatics.slots import SLOT
+        from engforge.solver import SOLVER, TRANSIENT
+        from engforge.signals import SIGNAL
+        from engforge.slots import SLOT
 
         keeps = (str, float, int)  # TODO: add numpy fields
         typ = cls._get_init_attrs_data(keeps)

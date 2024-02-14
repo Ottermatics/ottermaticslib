@@ -2,20 +2,20 @@ import unittest
 import io
 import tempfile
 
-from ottermatics.configuration import otterize
-from ottermatics.tabulation import system_property
-from ottermatics.components import Component
-from ottermatics.component_collections import ComponentIterator, ComponentDict
+from engforge.configuration import forge
+from engforge.tabulation import system_property
+from engforge.components import Component
+from engforge.component_collections import ComponentIterator, ComponentDict
 import attr
 import os
 import numpy
 import random
 
-# from ottermatics.logging import LoggingMixin, change_all_log_levels
+# from engforge.logging import LoggingMixin, change_all_log_levels
 # change_all_log_levels(10)
 
 
-@otterize
+@forge
 class TestConfig(Component):
     attrs_prop: float = attr.ib(1.0)
     attrs_str: str = attr.ib("hey now")
@@ -61,7 +61,7 @@ class Test(unittest.TestCase):
         )
 
     def test_attrs_vals(self):
-        self.assertEqual(self.test_config.attr_row, ["default", 1.0, "hey now"])
+        self.assertEqual(self.test_config.attr_row, ["testconfig", 1.0, "hey now"])
 
     def test_property_labels(self):
         ans = set(["four", "test_two", "test_one", "three"])
@@ -185,7 +185,7 @@ class Test(unittest.TestCase):
 #         pass
 
 
-@otterize
+@forge
 class Static(Component):
     attrs_prop: float = attr.ib(1.0)
     attrs_str: str = attr.ib("hey now")

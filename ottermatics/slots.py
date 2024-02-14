@@ -31,10 +31,10 @@ class SLOT(attrs.Attribute):
         :param default_ok: will create the slot class with no input if true, which is the behavior by default
         #TODO: add default_args,default_kwargs
         """
-        from ottermatics.components import Component
-        from ottermatics.component_collections import ComponentIter
-        from ottermatics.system import System
-        from ottermatics.eng.costs import CostModel
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+        from engforge.system import System
+        from engforge.eng.costs import CostModel
 
         # Format THe Accepted Component Types
         assert (
@@ -85,9 +85,9 @@ class SLOT(attrs.Attribute):
         :param default_ok: will create the slot class with no input if true, which is the behavior by default
         :param wide: default is true, will determine if wide dataframe format, or outerproduct format when `System.run()` is called
         """
-        from ottermatics.components import Component
-        from ottermatics.component_collections import ComponentIter
-        from ottermatics.system import System
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+        from engforge.system import System
 
         # Format THe Accepted Component Types
         assert (
@@ -116,7 +116,7 @@ class SLOT(attrs.Attribute):
     # Create a validator function
     @classmethod
     def validate_slot(cls, instance, attribute, value):
-        from ottermatics.component_collections import ComponentIter
+        from engforge.component_collections import ComponentIter
 
         
 

@@ -8,8 +8,8 @@ Like typical python properties, normal functions are embelished with additional 
 `solver_cache` a property that is recalculated any time there is an update to any attrs variable.
 """
 
-from ottermatics.logging import LoggingMixin
-from ottermatics.typing import TABLE_TYPES
+from engforge.logging import LoggingMixin
+from engforge.typing import TABLE_TYPES
 
 
 class PropertyLog(LoggingMixin):
@@ -254,7 +254,7 @@ class cached_system_property(system_property):
         if instance is None:
             return self        
         if not hasattr(instance, self.private_var):
-            from ottermatics.tabulation import TabulationMixin
+            from engforge.tabulation import TabulationMixin
 
             assert issubclass(
                 instance.__class__, TabulationMixin
@@ -288,7 +288,7 @@ class solver_cached(cache_prop):
 
     def __get__(self, instance: "TabulationMixin", objtype=None):
         if not hasattr(instance, self.private_var):
-            from ottermatics.tabulation import TabulationMixin
+            from engforge.tabulation import TabulationMixin
 
             assert instance.__class__ is None or issubclass(
                 instance.__class__, TabulationMixin
@@ -324,7 +324,7 @@ class instance_cached(cache_prop):
 
     def __get__(self, instance: "TabulationMixin", objtype=None):
         if not hasattr(instance, self.private_var):
-            from ottermatics.tabulation import TabulationMixin
+            from engforge.tabulation import TabulationMixin
 
             if instance.__class__ is not None: #its an instance
                 assert issubclass(
@@ -386,7 +386,7 @@ class class_cache(cache_prop):
 
 # #TODO: make a `solver_context` that exposes a ray python remote funciton with wait & other provisions... add to a call graph and optimize later
 # NOTE: challenge to handle class/instance/functions with same code
-# from ottermatics.properties import otter_prop
+# from engforge.properties import otter_prop
 # class solver_context(otter_prop):
 #
 #     fget = None

@@ -21,16 +21,16 @@ import psycopg2
 
 import cachetools
 
-from ottermatics.env_var import EnvVariable
-from ottermatics.patterns import SingletonMeta, InputSingletonMeta
-from ottermatics.logging import (
+from engforge.env_var import EnvVariable
+from engforge.patterns import SingletonMeta, InputSingletonMeta
+from engforge.logging import (
     LoggingMixin,
     change_all_log_levels,
 )
-from ottermatics.locations import client_path
+from engforge.locations import client_path
 
-from ottermatics.common import is_ec2_instance
-from ottermatics.tabulation import *  # This should be considered a module of data
+from engforge.common import is_ec2_instance
+from engforge.tabulation import *  # This should be considered a module of data
 
 from sqlalchemy_batch_inserts import enable_batch_inserting
 

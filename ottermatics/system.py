@@ -28,12 +28,12 @@ SIGNALS can be limited with constrains via `min or max` values on `NumericProper
 """
 import attrs
 
-from ottermatics.properties import *
-from ottermatics.logging import LoggingMixin
-from ottermatics.configuration import Configuration, otterize
-from ottermatics.tabulation import TabulationMixin
-from ottermatics.solver import SolverMixin, SOLVER, TRANSIENT
-from ottermatics.plotting import PlottingMixin
+from engforge.properties import *
+from engforge.logging import LoggingMixin
+from engforge.configuration import Configuration, forge
+from engforge.tabulation import TabulationMixin
+from engforge.solver import SolverMixin, SOLVER, TRANSIENT
+from engforge.plotting import PlottingMixin
 
 import copy
 import collections
@@ -49,7 +49,7 @@ class SystemsLog(LoggingMixin):
 log = SystemsLog()
 
 
-@otterize
+@forge
 class System(TabulationMixin, SolverMixin, PlottingMixin):
     """A system defines SLOTS for Components, and data flow between them using SIGNALS
 

@@ -5,33 +5,33 @@
 
 
 import unittest
-from ottermatics.configuration import otterize
-from ottermatics.eng.costs import CostModel, Economics, cost_property
-from ottermatics.slots import SLOT
-from ottermatics.system import System
-from ottermatics.components import Component
-from ottermatics.component_collections import ComponentIterator
+from engforge.configuration import forge
+from engforge.eng.costs import CostModel, Economics, cost_property
+from engforge.slots import SLOT
+from engforge.system import System
+from engforge.components import Component
+from engforge.component_collections import ComponentIterator
 
-from ottermatics.properties import system_property
+from engforge.properties import system_property
 
 import numpy as np
 import attrs
-@otterize
+@forge
 class Norm(Component,CostModel):
     pass
 
-@otterize
+@forge
 class Comp1(Component,CostModel):
     norm = SLOT.define(Norm,none_ok=True)
     not_cost = SLOT.define(Component)
 
-@otterize
+@forge
 class Comp2(Norm,CostModel):
 
     comp1 = SLOT.define(Comp1,none_ok=True,default_ok=False)
 
 quarterly = lambda inst,term: True if (term+1)%3==0 else False
-@otterize
+@forge
 class TermCosts(Comp1,CostModel):
 
     @cost_property(category='capex')
@@ -51,13 +51,13 @@ class TermCosts(Comp1,CostModel):
         return 5*3
     
 
-@otterize
+@forge
 class EconDefault(System,CostModel):
     econ = SLOT.define(Economics)
     comp = SLOT.define(Component,none_ok=True)
     comp1 = SLOT.define(Comp1,none_ok=True)
 
-@otterize
+@forge
 class EconRecursive(System,CostModel):
     econ = SLOT.define(Economics)
     comp1 = SLOT.define(Comp1,none_ok=True)
@@ -331,7 +331,7 @@ class TestCostModel(unittest.TestCase):
 
 
 #FAN System test
-@otterize
+@forge
 class Fan(Component,CostModel):
     """a fan component"""
     blade_cost_com: float = attrs.field(default=100.0)
@@ -350,7 +350,7 @@ class Fan(Component,CostModel):
     def repair_cost(self):
         return self.volumetric_flow * 0.1     
     
-@otterize
+@forge
 class Motor(Component,CostModel):
     """a fan component"""
     spc_motor_cost: float = attrs.field(default=100.0)
@@ -367,12 +367,12 @@ class Motor(Component,CostModel):
     def repair_cost(self):
         return self.power * 0.1    
 
-@otterize
+@forge
 class MetalBase(Component,CostModel):
 
     cost_per_item = 1000
         
-@otterize
+@forge
 class SysEcon(Economics):
 
     terms_per_year = 12
@@ -380,7 +380,7 @@ class SysEcon(Economics):
     def calculate_production(self,parent,term):
         return self.parent.fan.volumetric_flow
 
-@otterize
+@forge
 class FanSystem(System,CostModel):
 
     base = SLOT.define(Component)
@@ -410,19 +410,19 @@ class TestFanSystemDataFrame(unittest.TestCase):
 
 #TODO: get cost accounting working for ComponentIter components
 
-# @otterize
+# @forge
 # class CompGroup(ComponentIterator):
 #     pass
-# # @otterize
+# # @forge
 # # class CostGroup(CompGroup,CostModel):
 # #     pass
 
-# @otterize
+# @forge
 # class EconWide(System):
 #     econ = SLOT.define(Economics)
 #     comp_set = SLOT.define_iterator(CompGroup,wide=True)
 # 
-# @otterize
+# @forge
 # class EconNarrow(System):
 #     econ = SLOT.define(Economics)
 #     comp_set = SLOT.define_iterator(CompGroup,wide=False)

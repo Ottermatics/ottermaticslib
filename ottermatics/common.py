@@ -3,8 +3,8 @@ import sys
 import functools
 
 # Common Modules
-from ottermatics.configuration import *
-from ottermatics.logging import LoggingMixin
+from engforge.configuration import *
+from engforge.logging import LoggingMixin
 from urllib.request import urlopen
 
 import numpy
@@ -15,7 +15,7 @@ class OtterLog(LoggingMixin):
 
 
 log = OtterLog()
-log.info("Starting Ottermatics Enviornment")
+log.info("Starting engforge Enviornment")
 
 
 class inst_vectorize(numpy.vectorize):

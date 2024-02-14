@@ -1,11 +1,11 @@
 import os, sys
 
-from ottermatics.common import *
-import ottermatics
+from engforge.common import *
+import engforge
 
 
-from ottermatics.logging import LoggingMixin, logging
-from ottermatics.locations import client_path
+from engforge.logging import LoggingMixin, logging
+from engforge.locations import client_path
 
 from concurrent.futures import ThreadPoolExecutor
 import threading
@@ -43,7 +43,7 @@ GoogleAuth.DEFAULT_SETTINGS["client_config_file"] = google_api_token()
 STANDARD_FOLDERS = {
     "ClientFolders": None,
     "InternalClientDocuments": None,
-    "Ottermatics": None,
+    "engforge": None,
     "Research": None,
 }
 
@@ -548,8 +548,8 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     # defaults
     default_shared_drive = "shared:OTTERBOX"
     default_sync_path = "ClientFolders"
-    default_service_id = "ottermatics@ottermaticsgdocs.iam.gserviceaccount.com"
-    creds_file_name = "ottermaticsgdocs_serviceid.json"
+    default_service_id = "{engforge}@{role}.iam.gserviceaccount.com"
+    creds_file_name = "engforge_gdocs_serviceid.json"
 
     filepath_inferred = False  # sets on filepath_root.setter
 
@@ -588,7 +588,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         :param shared_drive: share drive to use as a root directory
         :param sync_root: the relative directory from shared_drive root to the place where sync occurs
         :param filepath_root: the local machine file path to sync to google drive
-        :param creds_path: can be none if filesys if configured, otherwise you can input a path to a json, or a folder to look for `ottermaticsgdocs_serviceid.json`
+        :param creds_path: can be none if filesys if configured, otherwise you can input a path to a json, or a folder to look for `engforgegdocs_serviceid.json`
         """
 
         self.initial_args = dict(
@@ -1120,7 +1120,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
 
     def initalize_google_drive_root(self):
         # BUG: This can creates duplicates
-        self.info("initalizing ottermatics on gdrive")
+        self.info("initalizing engforge on gdrive")
 
         # Only do this when we're in our main shared drive
         assert self.shared_drive == self.default_shared_drive
@@ -1129,7 +1129,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
         for sfol, sref in STANDARD_FOLDERS.items():
             fol = self.get_or_create_folder(sfol, parent_id=parent_id)
             if "client" in sfol.lower():
-                for clientname in ottermatics_clients():
+                for clientname in engforge_clients():
                     if clientname.lower() != "archive":
                         self.get_or_create_folder(
                             clientname, parent_id=fol["id"]
@@ -2323,7 +2323,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     self._filepath_root = client_path(skip_wsl=False)
                 self.filepath_inferred = True
                 self.debug(
-                    f"using infered ottermatics path: {self._filepath_root}"
+                    f"using infered engforge path: {self._filepath_root}"
                 )
 
         if do_reinitalize:
@@ -2496,7 +2496,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     if self.shared_drive == self.default_shared_drive:
                         # Map to ClientFolders/Client/matching/path...
                         relpath = os.path.relpath(
-                            guessfilepath, ottermatics_projects()
+                            guessfilepath, engforge_projects()
                         )
                         self._sync_root = os.path.join(
                             self.default_sync_path, relpath
@@ -2516,7 +2516,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
                     if self.shared_drive == self.default_shared_drive:
                         # Map to Dropbox/whatever/path
                         self._sync_root = os.path.relpath(
-                            guessfilepath, ottermatics_dropbox()
+                            guessfilepath, engforge_dropbox()
                         )
                     else:
                         # Its Root!

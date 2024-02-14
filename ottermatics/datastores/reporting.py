@@ -1,13 +1,13 @@
 import logging
 
-from ottermatics.datastores.datastores.data import *
-from ottermatics.tabulation import *
-from ottermatics.configuration import *
-from ottermatics.components import *
+from engforge.datastores.datastores.data import *
+from engforge.tabulation import *
+from engforge.configuration import *
+from engforge.components import *
 
-# from ottermatics.patterns import SingletonMeta
+# from engforge.patterns import SingletonMeta
 
-from ottermatics.analysis import *
+from engforge.analysis import *
 
 import attr
 import random
@@ -44,7 +44,7 @@ DEFAULT_STRING_LENGTH = 256
 
 """A Module in which we reflect changing schema in components or other tabulationmixin instances when solved by an an analysis. 
 
-To use, add `ReporingMixin` to any Ottermatics `Analysis` class
+To use, add `ReporingMixin` to any engforge `Analysis` class
 
 There are two major components to this module, that follow from the working plan:
 1) Investigate the existing database and create the tables nessicary
@@ -52,7 +52,7 @@ There are two major components to this module, that follow from the working plan
 3) If nessicary update or create a view for each component and analysis (hard part!)
 
 
-At the time of creation attributes with ottermatics validators will be created as columns in the component table, where as only numeric key value pairs will be added to the components Vertical Attribute Mapping table (VAM)
+At the time of creation attributes with engforge validators will be created as columns in the component table, where as only numeric key value pairs will be added to the components Vertical Attribute Mapping table (VAM)
 
 """
 
@@ -317,7 +317,7 @@ class ReportingMixin:
             self.warning("No Report Database Initated")
 
 
-@otterize
+@forge
 class ResultsRegistry(Configuration, metaclass=SingletonMeta):
     """An instance to manage the various database mappings to this live code repository"""
 

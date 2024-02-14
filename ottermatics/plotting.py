@@ -11,9 +11,9 @@ from matplotlib.font_manager import get_font_names
 import inspect
 
 import typing
-from ottermatics.configuration import otterize
-from ottermatics.properties import *
-from ottermatics.env_var import EnvVariable
+from engforge.configuration import forge
+from engforge.properties import *
+from engforge.env_var import EnvVariable
 from matplotlib.backends.backend_pdf import PdfPages
 
 

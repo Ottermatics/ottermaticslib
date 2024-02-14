@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
-project = "OttermaticsLib"
+project = "engforgeLib"
 copyright = "2022, Kevin Russell"
 author = "Kevin Russell"
 
