@@ -19,11 +19,11 @@ def parse_requirements(filename):
 install_reqs = parse_requirements("requirements.txt")
 
 setup(
-    name="ottermatics",
+    name="engforge",
     version="0.9.1",
-    description="The Ottermatic's Python Lib!",
-    url="https://github.com/SoundsSerious/ottermaticslib",
-    author="kevin russell",
+    description="The Engineer's Framework",
+    url="https://github.com/SoundsSerious/engforge",
+    author="Kevin russell",
     # packages=["ottermatics"],
     packages=setuptools.find_packages(),
     author_email="kevin@ottermatics.com",
@@ -31,9 +31,9 @@ setup(
     entry_points={
         "console_scripts": [
             # command = package.module:function
-            "condaenvset=ottermatics.common:main_cli",
-            "ollymakes=ottermatics.locations:main_cli",
-            "otterdrive=ottermatics.gdocs:main_cli",
+            "condaenvset=engforge.common:main_cli",
+            "ollymakes=engforge.locations:main_cli",
+            "otterdrive=engforge.gdocs:main_cli",
         ]
     },
     install_requires=install_reqs,

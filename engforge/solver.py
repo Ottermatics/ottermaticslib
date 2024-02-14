@@ -14,6 +14,7 @@ import datetime
 from engforge.components import Component
 from engforge.component_collections import ComponentIter
 from engforge.configuration import forge
+from engforge.attributes import ATTR_BASE,AttributeInstance
 from engforge.properties import *
 
 import itertools
@@ -738,18 +739,9 @@ class SolverMixin:
             return cons
 
 
-# Solver Attributes
-class SOLVER_ATTR(attrs.Attribute):
-    name: str
-    on_system: "System"
-
-    @classmethod
-    def create_instance(cls, system: "System"):
-        raise NotImplemented("need to implement on subclass")
-
 
 # Solver minimizes residual by changing independents
-class SolverInstance:
+class SolverInstance(AttributeInstance):
     """A decoupled signal instance to perform operations on a system instance"""
 
     system: "System"
@@ -772,7 +764,7 @@ class SolverInstance:
         self.system.info(f"solving {self.dependent} with {self.independent}")
 
 
-class SOLVER(SOLVER_ATTR):
+class SOLVER(ATTR_BASE):
     """solver creates subclasses per solver balance"""
 
     dependent: str
@@ -798,17 +790,12 @@ class SOLVER(SOLVER_ATTR):
         new_slot = type(new_name, (SOLVER,), new_dict)
         return new_slot
 
-    @classmethod
-    def configure_for_system(cls, name, system):
-        """#TODO: add the system class, and check the dependent and independent values"""
-        cls.name = name
-        cls.on_system = system
 
     @classmethod
-    def validate_parms(cls):
+    def instance_validate(cls,instance,**kwargs):
         from engforge.properties import system_property
 
-        system = cls.on_system
+        system = cls.config_obj
 
         parm_type = system.locate(cls.independent)
         if parm_type is None:
@@ -831,10 +818,6 @@ class SOLVER(SOLVER_ATTR):
             int,
             float,
         ), f"bad parm {cls.dependent} not numeric"
-
-    @classmethod
-    def make_solver_factory(cls):
-        return attrs.Factory(cls.create_instance, takes_self=True)
 
     @classmethod
     def create_instance(cls, system: "System") -> SolverInstance:
@@ -863,110 +846,3 @@ class SOLVER(SOLVER_ATTR):
         cls.constraints[type_] = value
 
 
-# DYnamics
-# Solver minimizes residual by changing independents
-class IntegratorInstance:
-    """A decoupled signal instance to perform operations on a system instance"""
-
-    system: "System"
-    transient: "TRANSIENT"
-
-    # compiled info
-    parameter: "Ref"
-    derivative: "Ref"
-
-    __slots__ = ["system", "solver", "parameter", "derivative"]
-
-    # TODO: add forward implicit solver
-
-    def __init__(self, solver: "TRANSIENT", system: "System") -> None:
-        self.solver = solver
-        self.system = system
-        self.compile()
-
-    def compile(self):
-        self.parameter = self.system.locate_ref(self.solver.parameter)
-        self.derivative = self.system.locate_ref(self.solver.derivative)
-        self.system.info(f"integrating {self.parameter} with {self.derivative}")
-
-    def integrate(self, dt):
-        # TODO: support different integrator modes
-        assert (
-            self.solver.mode == "euler"
-        ), "only euler integration supported currently"
-        new_val = self.parameter.value() + self.derivative.value() * dt
-        self.parameter.set_value(new_val)
-
-
-class TRANSIENT(SOLVER_ATTR):
-    """Transient is a base class for integrators over time"""
-
-    mode: str
-    parameter: str
-    derivative: str
-
-    @classmethod
-    def define(
-        cls,
-        parameter: "attrs.Attribute",
-        derivative: "system_property",
-        mode: str = "euler",
-    ):
-        """Defines an ODE like integrator that will be integrated over time with the defined integration rule.
-
-        Input should be of strings to look up the particular property or field
-        """
-        # Create A New Signals Class
-        new_name = f"TRANSIENT_{mode}_{parameter}_{derivative}".replace(
-            ".", "_"
-        )
-        new_dict = dict(
-            mode=mode,
-            name=new_name,
-            parameter=parameter,
-            derivative=derivative,
-        )
-        new_slot = type(new_name, (TRANSIENT,), new_dict)
-        return new_slot
-
-    @classmethod
-    def configure_for_system(cls, name, system):
-        """add the system class, and check the dependent and independent values"""
-        cls.name = name
-        cls.on_system = system
-
-    @classmethod
-    def validate_parms(cls):
-        from engforge.properties import system_property
-
-        system = cls.on_system
-
-        parm_type = system.locate(cls.parameter)
-        if parm_type is None:
-            raise Exception(f"parameter not found: {cls.parameter}")
-        assert isinstance(
-            parm_type, attrs.Attribute
-        ), f"bad parm {cls.parameter} not attribute: {parm_type}"
-        assert parm_type.type in (
-            int,
-            float,
-        ), f"bad parm {cls.parameter} not numeric"
-
-        driv_type = system.locate(cls.derivative)
-        if parm_type is None:
-            raise Exception(f"derivative not found: {cls.derivative}")
-        assert isinstance(
-            driv_type, system_property
-        ), f"bad derivative {cls.derivative} type: {driv_type}"
-        assert driv_type.return_type in (
-            int,
-            float,
-        ), f"bad parm {cls.derivative} not numeric"
-
-    @classmethod
-    def make_solver_factory(cls):
-        return attrs.Factory(cls.create_instance, takes_self=True)
-
-    @classmethod
-    def create_instance(cls, system: "System") -> IntegratorInstance:
-        return IntegratorInstance(cls, system)

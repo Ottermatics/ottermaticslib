@@ -3,7 +3,8 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.solver import SOLVER, TRANSIENT
+from engforge.dynamics import TRANSIENT
+from engforge.solver import SOLVER
 from engforge.signals import SIGNAL
 from engforge.slots import SLOT
 from engforge.properties import *
@@ -50,8 +51,6 @@ class MockSystem(System):
     sol2 = SOLVER.define("in2out2", "in2")
     sol2.add_constraint("max", limit_max)
     sol2.add_constraint("min", 0)
-
-    # trans = TRANSIENT.define("x", "dxdt")
 
     comp = SLOT.define(MockComponent)
 

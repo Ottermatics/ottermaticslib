@@ -16,7 +16,7 @@ source:
   # Additional properties that further specify the location of the artifacts.
   properties:
     branch: aws_pipeline
-    repository: https://github.com/Ottermatics/ottermaticslib
+    repository: https://github.com/Ottermatics/engforge
     # Optional: specify the name of an existing CodeStar Connections connection.
     # connection_name: a-connection
 

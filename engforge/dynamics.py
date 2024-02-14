@@ -12,13 +12,15 @@ As opposed to the TRANSIENT attribute, which modifies the state of the system, t
 """
 
 from engforge.components import Component, forge
-from engforge.systems import System
 from engforge.tabulation import TabulationMixin
 from engforge import properties as prop
+from engforge.attributes import ATTR_BASE
 
 import numpy as np
 import attr, attrs
 
+
+#Index maps are used to translate between different indexes (local & global)
 class INDEX_MAP:
     oppo = {str:int,int:str}
     def __init__(self,data:list):
@@ -40,14 +42,112 @@ class INDEX_MAP:
     def indify(arr,*args):
         return [arr[arg] if isinstance(arg,int) else arr.index(arg) for arg in args]
 
-    def reindify(self,new_index,*args,invert=False,old_data=None):
-            if old_data is None:
-                old_data = self.data
-            opt1 = {arg: self.indify(old_data,arg)[0] for arg in args}
-            opt2 = {arg: self.indify(old_data,val)[0] if (not isinstance(val,str)) else val for arg,val in opt1.items()}
-            oop1 = {arg: self.indify(new_index,val)[0]  for arg,val in opt2.items()}
-            oop2 = {arg: self.indify(new_index,val)[0] if (invert != isinstance(val,self.oppo[arg.__class__])) else val for arg,val in oop1.items()}
-            return oop2
+    def remap_indexes_to(self,new_index,*args,invert=False,old_data=None):
+        if old_data is None:
+            old_data = self.data
+        opt1 = {arg: self.indify(old_data,arg)[0] for arg in args}
+        opt2 = {arg: self.indify(old_data,val)[0] if (not isinstance(val,str)) else val for arg,val in opt1.items()}
+        oop1 = {arg: self.indify(new_index,val)[0]  for arg,val in opt2.items()}
+        oop2 = {arg: self.indify(new_index,val)[0] if (invert != isinstance(val,self.oppo[arg.__class__])) else val for arg,val in oop1.items()}
+        return oop2
+    
+#Instance & Attribute definition for integration parameters
+# Solver minimizes residual by changing independents
+class IntegratorInstance:
+    """A decoupled signal instance to perform operations on a system instance"""
+
+    system: "System"
+    transient: "TRANSIENT"
+
+    # compiled info
+    parameter: "Ref"
+    derivative: "Ref"
+
+    __slots__ = ["system", "solver", "parameter", "derivative"]
+
+    # TODO: add forward implicit solver
+
+    def __init__(self, solver: "TRANSIENT", system: "System") -> None:
+        self.solver = solver
+        self.system = system
+        self.compile()
+
+    def compile(self):
+        self.parameter = self.system.locate_ref(self.solver.parameter)
+        self.derivative = self.system.locate_ref(self.solver.derivative)
+        self.system.info(f"integrating {self.parameter} with {self.derivative}")
+
+    def integrate(self, dt):
+        # TODO: support different integrator modes
+        assert (
+            self.solver.mode == "euler"
+        ), "only euler integration supported currently"
+        new_val = self.parameter.value() + self.derivative.value() * dt
+        self.parameter.set_value(new_val)
+
+
+class TRANSIENT(ATTR_BASE):
+    """Transient is a base class for integrators over time"""
+
+    mode: str
+    parameter: str
+    derivative: str
+    instance_class = IntegratorInstance
+
+    @classmethod
+    def integrate(
+        cls,
+        parameter: "attrs.Attribute",
+        derivative: "system_property",
+        mode: str = "euler",
+    ):
+        """Defines an ODE like integrator that will be integrated over time with the defined integration rule.
+
+        Input should be of strings to look up the particular property or field
+        """
+        # Create A New Signals Class
+        new_name = f"TRANSIENT_{mode}_{parameter}_{derivative}".replace(
+            ".", "_"
+        )
+        new_dict = dict(
+            mode=mode,
+            name=new_name,
+            parameter=parameter,
+            derivative=derivative,
+        )
+        new_slot = type(new_name, (TRANSIENT,), new_dict)
+        return new_slot
+    #make define the same as integrate
+    define = integrate
+
+    @classmethod
+    def instance_validate(cls,**kwargs):
+        from engforge.properties import system_property
+
+        system = cls.config_obj
+
+        parm_type = system.locate(cls.parameter)
+        if parm_type is None:
+            raise Exception(f"parameter not found: {cls.parameter}")
+        assert isinstance(
+            parm_type, attrs.Attribute
+        ), f"bad parm {cls.parameter} not attribute: {parm_type}"
+        assert parm_type.type in (
+            int,
+            float,
+        ), f"bad parm {cls.parameter} not numeric"
+
+        driv_type = system.locate(cls.derivative)
+        if parm_type is None:
+            raise Exception(f"derivative not found: {cls.derivative}")
+        assert isinstance(
+            driv_type, system_property
+        ), f"bad derivative {cls.derivative} type: {driv_type}"
+        assert driv_type.return_type in (
+            int,
+            float,
+        ), f"bad parm {cls.derivative} not numeric"
+
 
 @forge(auto_attribs=True)
 class DynamicsIntegrator(TabulationMixin):
@@ -69,13 +169,13 @@ class DynamicsIntegrator(TabulationMixin):
             return self.simulate_linear(dt,endtime,*args,**kwargs)
 
     def simulate_linear(self,dt,endtime,subsystems=True,*args,**kwargs):
-    
+        pass
 
     def simulate_nonlinear(self,dt,endtime,subsystems=True,*args,**kwargs):
         pass
 
 @forge(auto_attribs=True)
-class DynamicsMixin(TabulationMixin):
+class DynamicsMixin(DynamicsIntegrator):
     """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the TRANSIENT integrating attributes, and will raise an error if a conflict is detected #TODO.
     """
 
@@ -164,22 +264,24 @@ class DynamicsMixin(TabulationMixin):
 
     def update_output_constants(self,t,O,X)->np.ndarray:
         """override """
-        return D
+        return O
 
 
-@forge
-class DynamicsComponent(Component,DynamicsMixin):
-    pass
 
-
-@forge
-class DynamicSystem(System,DynamicsMixin):
-    pass
 
 
 
 
 if __name__ == "__main__":
+    from engforge.system import System
+    @forge
+    class DynamicsComponent(Component,DynamicsMixin):
+        pass
+
+
+    @forge
+    class DynamicSystem(System,DynamicsMixin):
+        pass    
     
     N_test = 2
 

@@ -26,7 +26,7 @@ fi
 ~/dropbox -> '/mnt/c/Users/Sup/Ottermatics Dropbox'
 ~/nept_proj -> /home/olly/dropbox/Projects/Neptunya/
 ~/ottermatics -> /home/olly/dropbox/Ottermatics
-~/ottermaticslib -> /home/olly/dropbox/Ottermatics/ottermaticslib/
+~/engforge -> /home/olly/dropbox/Ottermatics/engforge/
 ~/smx_proj -> /home/olly/dropbox/Projects/SMART_X/
 ~/.aws -> /mnt/c/Users/Sup/.aws
 ~/.azure -> /mnt/c/Users/Sup/.azure

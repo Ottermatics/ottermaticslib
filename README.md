@@ -1,10 +1,10 @@
-[![build](https://github.com/Ottermatics/ottermaticslib/actions/workflows/build.yml/badge.svg)](https://github.com/Ottermatics/ottermaticslib/actions/workflows/build.yml)
-# ottermaticslib
+[![build](https://github.com/Ottermatics/engforge/actions/workflows/build.yml/badge.svg)](https://github.com/Ottermatics/engforge/actions/workflows/build.yml)
+# engforge
 A library to tabulate information from complex systems with various ways to store data and act as glue code for tough engineering problems.
 
 ### Installation
 ```bash
-pip install git+https://github.com/Ottermatics/ottermaticslib.git
+pip install git+https://github.com/Ottermatics/engforge.git
 ```
 
 ### Core Functions
@@ -164,8 +164,8 @@ class SpringMass(System):
     res = SOLVER.define('sumF','a')
 
 	#a is integrated to provide v, similar to v integrated to supply x
-    vtx = TRANSIENT.define('v','a')
-    xtx = TRANSIENT.define('x','v')
+    vtx = TRANSIENT.integrate('v','a')
+    xtx = TRANSIENT.integrate('x','v')
 
     @system_property
     def dx(self)-> float:
@@ -271,7 +271,7 @@ sa.run(throttle=list(np.arange(0.1,1.1,0.1)))
 
 
 ## Documentation:
-https://ottermatics.github.io/ottermaticslib/build/html/index.html
+https://ottermatics.github.io/engforge/build/html/index.html
 
 ### DataStores
 Datastores are a work in progress feature to provide a zero configuration library for storage of tabulated data and report generated artifacts. No garuntee is provided as to their stability yet.

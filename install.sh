@@ -64,8 +64,8 @@ fi
 read -p "Press enter to continue"
 
 echo 'Installing Ottermatics Lib'
-git clone git@github.com:SoundsSerious/ottermaticslib.git
-cd ottermaticslib
+git clone git@github.com:SoundsSerious/engforge.git
+cd engforge
 ~/miniconda3/bin/python3 -m pip install -r requirements.txt
 ~/miniconda3/bin/python3 setup.py install
 

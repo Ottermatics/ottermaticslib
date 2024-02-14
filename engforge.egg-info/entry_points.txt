@@ -1,0 +1,4 @@
+[console_scripts]
+condaenvset = engforge.common:main_cli
+ollymakes = engforge.locations:main_cli
+otterdrive = engforge.gdocs:main_cli

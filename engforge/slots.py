@@ -2,24 +2,26 @@
 
 import attrs
 import uuid
+from engforge.attributes import ATTR_BASE,AttributeInstance
 import typing as typ
 
 SLOT_TYPES = typ.Union["Component", "System"]
 ITERATOR = typ.Union["ComponentIterator"]
 
 
-class SLOT(attrs.Attribute):
+class SLOT(ATTR_BASE):
     """Slot defines a way to accept different components or systems in a system"""
 
     # These are added on System signals_slots_handler aka attrs field_transformer
     name: str
     accepted: SLOT_TYPES
-    on_system: "System"
+    config_obj: "System"
     none_ok: bool
     default_ok = True
 
     is_iter: bool
     wide: bool  # only for component iterator
+    default_options = ATTR_BASE.default_options.copy()
 
     @classmethod
     def define(
@@ -118,8 +120,6 @@ class SLOT(attrs.Attribute):
     def validate_slot(cls, instance, attribute, value):
         from engforge.component_collections import ComponentIter
 
-        
-
         # apply wide behavior to componentiter instance
         if isinstance(value, ComponentIter) and attribute.type.wide == False:
             #print(f'validate {instance} {attribute} {value}')
@@ -132,10 +132,11 @@ class SLOT(attrs.Attribute):
             return True
 
         raise ValueError(
-            f"value {value} is not an accepted type for slot: {cls.on_system.__name__}.{cls.name}"
+            f"value {value} is not an accepted type for slot: {cls.config_obj.__name__}.{cls.name}"
         )
 
-    @classmethod
-    def configure_for_system(cls, name, system):
-        cls.name = name
-        cls.on_system = system
+    #apply validator to the class
+    default_options['validator'] = validate_slot
+
+    def make_factory(cls,**kwargs):
+        return attrs.Factory(cls.accepted,False) if cls.default_ok else None,

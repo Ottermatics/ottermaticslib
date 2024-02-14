@@ -4,7 +4,8 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.solver import SOLVER, TRANSIENT
+from engforge.dynamics import TRANSIENT
+from engforge.solver import SOLVER
 from engforge.signals import SIGNAL
 from engforge.slots import SLOT
 from engforge.properties import *
@@ -33,8 +34,8 @@ class SpringMass(System):
 
     res = SOLVER.define("sumF", "a")
 
-    vtx = TRANSIENT.define("v", "a")
-    xtx = TRANSIENT.define("x", "v")
+    vtx = TRANSIENT.integrate("v", "a")
+    xtx = TRANSIENT.integrate("x", "v")
 
     pos = TRACE.define(y="x", y2=["v", "a"])
 

@@ -14,26 +14,23 @@ import typing
 from engforge.configuration import forge
 from engforge.properties import *
 from engforge.env_var import EnvVariable
+from engforge.attributes import ATTR_BASE,AttributeInstance
 from matplotlib.backends.backend_pdf import PdfPages
 
 
 class PlotLog(LoggingMixin):
     pass
 
-
 log = PlotLog()
-
 
 # Seaborn Config Options
 SEABORN_CONTEXTS = ["paper", "talk", "poster", "notebook"]
 SEABORN_THEMES = ["darkgrid", "whitegrid", "dark", "white", "ticks"]
 
-
 def conv_ctx(ctx):
     if ctx.lower() not in SEABORN_CONTEXTS:
         raise ValueError(f"theme must be one of {SEABORN_CONTEXTS}")
     return ctx.lower()
-
 
 def conv_theme(theme):
     if theme.lower() not in SEABORN_THEMES:
@@ -245,7 +242,7 @@ class PlottingMixin:
         return imgstore
 
 
-class PlotInstance:
+class PlotInstance(AttributeInstance):
     """combine plotclass parms with system info"""
 
     plot_cls: "PLOT"
@@ -346,24 +343,15 @@ class PlotInstance:
         return f"{self.plot_cls.type}.{self.plot_cls.kind}"
 
 
-class PLOT_ATTR(attrs.Attribute):
+class PLOT_ATTR(ATTR_BASE):
     """base class for plot attributes"""
 
     name: str
-    on_system: "System"
+    config_obj: "System"
     title: str = None
     kind: str
     cls_parms = {"x", "y"}
-
-    @classmethod
-    def create_instance(cls, system: "System"):
-        raise NotImplemented("need to implement on subclass")
-
-    @classmethod
-    def configure_for_system(cls, name, system):
-        """add the system class, and check the dependent and independent values"""
-        cls.name = name
-        cls.on_system = system
+    instance_class = PlotInstance
 
     @classmethod
     def plot_parms(cls) -> dict:
@@ -552,6 +540,7 @@ class TRACE(PLOT_ATTR):
 
     types = ["scatter", "line"]
     type = "scatter"
+    instance_class = TraceInstance
 
     # mainem
     y2: trace_type
@@ -705,11 +694,6 @@ class TRACE(PLOT_ATTR):
 
             pa["y2"] = list(c)
         return pa
-
-    @classmethod
-    def create_instance(cls, system: "System") -> TraceInstance:
-        cls.validate_plot_args(system)
-        return TraceInstance(system, cls)
 
 
 class PLOT(PLOT_ATTR):
