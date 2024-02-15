@@ -102,7 +102,7 @@ class Beam(Component,CostModel):
         validator=attr.validators.instance_of((int, float, nonetype)),
     )
 
-    in_mesh_size: float = attrs.field(default=0.01)
+    min_mesh_size: float = attrs.field(default=0.01)
     analysis_intervals: int = attrs.field(default=3)
 
     _L = None
@@ -392,7 +392,7 @@ class Beam(Component,CostModel):
     def show_mesh(self):
         return self.section._sec.plot_mesh()
 
-    def estimate_stress(self, force_calc=False,**forces):
+    def estimate_stress(self, force_calc=True,**forces):
         """uses the best available method to determine max stress in the beam, for ShapelySections this is done through a learning process, for other sections it is done through a simple calculation aimed at providing a conservative estimate"""
         if isinstance(self.section, ottgeo.ShapelySection):
             return self.section.estimate_stress(**forces,force_calc=force_calc)
@@ -456,10 +456,19 @@ class Beam(Component,CostModel):
             combo = self.structure.current_combo
 
         inp = self.get_forces_at(x, combo)
+        
+        #preferr real stresses to fail fraction
+        if 'value' not in kw:
+            kw['value'] = True
+
         return self.calculate_stress(**inp,**kw)
 
     def calculate_stress(self, **forces):
         """takes force input and runs stress calculation as a fraction of material properties, see ShapelySection.calculate_stress() for more details"""
+        #preferr real stresses to fail fraction
+        if 'value' not in forces:
+            forces['value'] = True        
+            
         return self.section.calculate_stress(**forces)
 
     @property
@@ -743,30 +752,24 @@ class Beam(Component,CostModel):
     def von_mises_stress_l(self):
         """Max von-mises stress"""
         out = {}
+        sect_stresses = self.section_stresses()
         for combo in self.structure.frame.LoadCombos:
             rows = []
             for i in numpy.linspace(0, 1, self.analysis_intervals):
-                max_vm = self.section_stresses[combo][i]#.get_stress()
-                # max_vm = numpy.nanmax(
-                #     [
-                #         numpy.nanmax(stresses["sig_vm"])
-                #         for stresses in mat_stresses
-                #     ]
-                # )
+                max_vm = sect_stresses[combo][i]
                 rows.append(max_vm)
             out[combo] = numpy.array(rows)
         return out
     
     
-    @solver_cached
-    def section_stresses(self):
+    def section_stresses(self,**kwargs):
         # FIXME: enable: assert self.structure.solved, f'must be solved first!'
         combos = {}
         for combo in self.structure.frame.LoadCombos:
             combos[combo] = spans = {}
             for i in numpy.linspace(0, 1, self.analysis_intervals):
-                self.info(f"evaluating stresses for {combo} @ {i}")
-                sol = self.get_stress_at(i, combo)
+                self.info(f"evaluating stresses for {combo} @ {i} w {kwargs}")
+                sol = self.get_stress_at(i, combo,**kwargs)
                 spans[i] = sol
         return combos               
         

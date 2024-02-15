@@ -15,22 +15,39 @@ class SLOT(ATTR_BASE):
     # These are added on System signals_slots_handler aka attrs field_transformer
     name: str
     accepted: SLOT_TYPES
-    config_obj: "System"
+    config_cls: "System"
+    attr_prefix = 'SLOT'
     none_ok: bool
-    default_ok = True
+    
+    dflt_kw: dict = None #a dictionary of input in factory for custom inits
+    default_ok = True #otherwise accept class with defaults
 
     is_iter: bool
     wide: bool  # only for component iterator
-    default_options = ATTR_BASE.default_options.copy()
+    #default_options = ATTR_BASE.default_options.copy()
+    default_options = dict( repr=True,
+                            validator=None,
+                            cmp=None,
+                            hash=None,
+                            init=True,
+                            metadata=None,
+                            converter=None,
+                            kw_only=True,
+                            eq=None,
+                            order=None,
+                            on_setattr=None,
+                            inherited=False)
 
     @classmethod
     def define(
-        cls, *component_or_systems: SLOT_TYPES, none_ok=False, default_ok=True
+        cls, *component_or_systems: SLOT_TYPES, none_ok=False, default_ok=True,
+        dflt_kw:dict=None
     ):
         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass
 
         :param none_ok: will allow no component on that item, oterwise will fail
-        :param default_ok: will create the slot class with no input if true, which is the behavior by default
+        :param default_ok: will create the slot class with no input if true
+        :param dflt_kw: a dictionary of input in factory for custom inits overrides defaults_ok
         #TODO: add default_args,default_kwargs
         """
         from engforge.components import Component
@@ -67,24 +84,32 @@ class SLOT(ATTR_BASE):
                 accepted=component_or_systems,
                 none_ok=none_ok,
                 default_ok=default_ok,
+                dflt_kw=dflt_kw,
+                default_options = cls.default_options.copy()
             ),
         )
+        #new_slot.default_options['validator'] = new_slot.validate_instance
+        #new_slot.default_options['default'] = new_slot.make_factory()
+        print(new_slot)
+        
         return new_slot
 
     @classmethod
     def define_iterator(
         cls,
         *component_or_systems: ITERATOR,
-        none_ok=False,
-        default_ok=True,
-        wide=True,
+        none_ok:bool=False,
+        default_ok:bool=True,
+        wide:bool=True,
+        dflt_kw:dict=None,
     ):
         """taking a type of component iterator, defines an interface that can be 'wide' where all items are executed in the same row on `System.run()`.
 
         Conversely if `wide` is false the system will loop over each item as if it was included in System.run(). Multiple ComponentIterators with wide=False will result in a `outer join` of the items.
 
         :param none_ok: will allow no component on that item, otherwise will fail
-        :param default_ok: will create the slot class with no input if true, which is the behavior by default
+        :param default_ok: will create the slot class with no input if true
+        :param dflt_kw: a dictionary of input in factory for custom inits
         :param wide: default is true, will determine if wide dataframe format, or outerproduct format when `System.run()` is called
         """
         from engforge.components import Component
@@ -105,20 +130,27 @@ class SLOT(ATTR_BASE):
             new_name,
             (SLOT,),
             dict(
+                #default=cls.make_factory(),
                 name=new_name,
                 accepted=component_or_systems,
                 none_ok=none_ok,
                 default_ok=default_ok,
+                dflt_kw=dflt_kw,
                 is_iter=True,
                 wide=wide,
+                default_options = cls.default_options.copy()
             ),
         )
+        #new_slot.default_options['validator'] = new_slot.validate_instance
+        #new_slot.default_options['default'] =  new_slot.make_factory()
         return new_slot
 
     # Create a validator function
     @classmethod
-    def validate_slot(cls, instance, attribute, value):
+    def validate_instance(cls, instance, attribute, value):
         from engforge.component_collections import ComponentIter
+
+        comp_cls = cls.config_cls
 
         # apply wide behavior to componentiter instance
         if isinstance(value, ComponentIter) and attribute.type.wide == False:
@@ -130,13 +162,27 @@ class SLOT(ATTR_BASE):
 
         if any([isinstance(value, a) for a in cls.accepted]):
             return True
+        
+        if cls.default_ok and value is None:
+            return True
 
         raise ValueError(
-            f"value {value} is not an accepted type for slot: {cls.config_obj.__name__}.{cls.name}"
+            f"{instance} value {value} is not an accepted type for slot: {comp_cls.__name__}.{cls.name}"
         )
 
-    #apply validator to the class
-    default_options['validator'] = validate_slot
-
+    @classmethod
     def make_factory(cls,**kwargs):
-        return attrs.Factory(cls.accepted,False) if cls.default_ok else None,
+        accepted = cls.accepted
+        print(f'slot instance factory: {cls} {accepted}, {kwargs}')
+
+        if isinstance(accepted,(tuple,list)) and len(accepted) > 0:
+            accepted = accepted[0]
+
+        #print(accepted,cls.dflt_kw,cls.default_ok)
+        if cls.dflt_kw:
+            return attrs.Factory(lambda: accepted(**cls.dflt_kw),False)
+        elif cls.default_ok:
+            return attrs.Factory(accepted,False)
+        else:
+            return None
+    

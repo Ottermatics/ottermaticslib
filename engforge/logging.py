@@ -60,7 +60,7 @@ class LoggingMixin(logging.Filter):
     def logger(self):
         if self._log is None:
             inst_log_name = (
-                "otterlog_" + self.identity + "_" + str(uuid.uuid4())
+                "engforgelog_" + self.identity + "_" + str(uuid.uuid4())
             )
             self._log = logging.getLogger(inst_log_name)
             self._log.setLevel(level=self.__class__.log_level)
@@ -290,7 +290,7 @@ log = Log()
 #
 #     loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
 #     for logger in loggers:
-#         if logger.__class__.__name__.lower().startswith('otter'):
+#         if logger.__class__.__name__.lower().startswith('engforge'):
 #             logger.log(LOG_LEVEL,'setting log level: {}'.format(LOG_LEVEL))
 #             logger.setLevel(LOG_LEVEL)
 #         elif all_loggers:

@@ -38,7 +38,7 @@ from contextlib import contextmanager
 
 import diskcache
 
-log = logging.getLogger("otterlib-data")
+log = logging.getLogger("engforge-data")
 
 # Env Vars
 DB_NAME = EnvVariable("OTTR_DB_NAME", dontovrride=True)

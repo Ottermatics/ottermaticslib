@@ -118,15 +118,15 @@ class TRANSIENT(ATTR_BASE):
         new_slot = type(new_name, (TRANSIENT,), new_dict)
         return new_slot
     #make define the same as integrate
-    define = integrate
+    #define = integrate
 
     @classmethod
-    def instance_validate(cls,**kwargs):
+    def class_validate(cls,instance,**kwargs):
         from engforge.properties import system_property
 
-        system = cls.config_obj
+        system = cls.config_cls
 
-        parm_type = system.locate(cls.parameter)
+        parm_type = instance.locate(cls.parameter)
         if parm_type is None:
             raise Exception(f"parameter not found: {cls.parameter}")
         assert isinstance(
@@ -137,20 +137,24 @@ class TRANSIENT(ATTR_BASE):
             float,
         ), f"bad parm {cls.parameter} not numeric"
 
-        driv_type = system.locate(cls.derivative)
-        if parm_type is None:
+        driv_type = instance.locate(cls.derivative)
+        if driv_type is None:
             raise Exception(f"derivative not found: {cls.derivative}")
         assert isinstance(
-            driv_type, system_property
+            driv_type, (system_property,attrs.Attribute)
         ), f"bad derivative {cls.derivative} type: {driv_type}"
-        assert driv_type.return_type in (
-            int,
-            float,
-        ), f"bad parm {cls.derivative} not numeric"
-
+        if isinstance(driv_type, system_property):
+            assert driv_type.return_type in (
+                int,
+                float,
+            ), f"bad parm {cls.derivative} not numeric"
+        
+        #else: attributes are not checked, youre in command
 
 @forge(auto_attribs=True)
 class DynamicsIntegrator(TabulationMixin):
+    
+    nonlinear:bool = True #enables matrix modification for nonlinear dynamics
 
     def simulate(self,dt,endtime,subsystems=True,*args,**kwargs):
         """simulate the system over the course of time.

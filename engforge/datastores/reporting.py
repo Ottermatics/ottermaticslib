@@ -56,7 +56,7 @@ At the time of creation attributes with engforge validators will be created as c
 
 """
 
-log = logging.getLogger("otterlib-report")
+log = logging.getLogger("engforge-report")
 
 
 # ignore duplicates

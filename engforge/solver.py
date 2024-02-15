@@ -746,7 +746,7 @@ class SolverInstance(AttributeInstance):
 
     system: "System"
     solver: "SOLVER"
-
+    
     # compiled info
     dependent: "Ref"
     independent: "Ref"
@@ -772,6 +772,10 @@ class SOLVER(ATTR_BASE):
 
     constraints: dict
 
+    attr_prefix = 'SOLVER'
+
+    instance_class = SolverInstance
+
     @classmethod
     def define(
         cls, dependent: "system_property", independent: "attrs.Attribute"
@@ -786,16 +790,19 @@ class SOLVER(ATTR_BASE):
             dependent=dependent,
             independent=independent,
             constraints=constraints,
+            default_options=cls.default_options.copy(),
         )
         new_slot = type(new_name, (SOLVER,), new_dict)
+        #new_slot.default_options['default'] = new_slot.make_factory()
+#        new_slot.default_options['validator'] = new_slot.validate_instance
         return new_slot
 
 
     @classmethod
-    def instance_validate(cls,instance,**kwargs):
+    def class_validate(cls,instance,**kwargs):
         from engforge.properties import system_property
 
-        system = cls.config_obj
+        system = cls.config_cls
 
         parm_type = system.locate(cls.independent)
         if parm_type is None:

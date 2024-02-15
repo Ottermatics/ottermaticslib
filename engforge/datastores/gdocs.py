@@ -35,7 +35,7 @@ from expiringdict import (
 import concurrent
 from ray.runtime_context import get_runtime_context
 
-log = logging.getLogger("otterlib-gdocs")
+log = logging.getLogger("engforge-gdocs")
 
 GoogleAuth.DEFAULT_SETTINGS["client_config_file"] = google_api_token()
 
@@ -2606,7 +2606,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     @property
     def fs_cache_filename(self):
         """a property to provide a default local filesystem name for caching"""
-        return f".otterdrive_fs_{ self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk"
+        return f".engforgedrive_fs_{ self.full_sync_root.replace('shared:','').replace(os.sep,'_') }.pk"
 
     def save(self):
         try:

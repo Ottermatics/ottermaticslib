@@ -314,7 +314,7 @@ def get_mesh_size(inst):
     return max(ms**2.,dAmin) #length to area conversion
 
     
-def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row=False,record=True,value=False)->float:
+def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row=False,record=True,value=True)->float:
     """returns the maximum vonmises stress in the section and returns the ratio of the allowable stress, also known as the failure fracion
     :param raw: if raw is true, the stress object is returned, otherwise the failure fraction is returned
     """
@@ -324,17 +324,20 @@ def calculate_stress(section, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,raw=False,row
     fail_stress = section.determine_failure_stress(stress)
     inp['fail_stress'] = fail_stress
     inp['fail_frac'] = ff =  fail_stress / section.material.allowable_stress
-    inp['fails'] = int(ff >= 1-1E-6)
+    inp['fails'] = int(ff >= 1)
 
     if record:
         section.record_stress(inp)
     
     if value:
         return fail_stress
+    
     if raw:
         return stress
+    
     if row:
         return inp
+    
     return ff
 
 @forge(hash=False)
@@ -356,7 +359,7 @@ class ShapelySection(Profile2D):
     failure_mode = Options('von_mises','max_norm','maximum_strain')
 
     #Stress classification & prediction
-    prediction: bool = attr.field(default=True)
+    prediction: bool = attr.field(default=False)
     prediction_goal_error: float = attrs.field(default=0.025)
     max_records: list = attr.field(default=10000)
     prediction_records: list
@@ -542,7 +545,7 @@ class ShapelySection(Profile2D):
 
         self._A = self._sec.get_area()
         if self.material:
-            self._Ixx, self._Iyy, self._Ixy = self._sec.get_eic()
+            self._Ixx, self._Iyy, self._Ixy = self._sec.get_eic(e_ref=self.material)
             self._J = self._sec.get_ej()
         else:
             self._Ixx, self._Iyy, self._Ixy = self._sec.get_ic()
@@ -598,7 +601,7 @@ class ShapelySection(Profile2D):
         
     def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,value=False,calc_margin=2,min_est_records=100,calc_every=25,pre_train_margin=2,force_calc=False)->float:
         """uses a support vector machine to estimate stresses and returns the ratio of the allowable stress, also known as the failure fracion if prediction is set to True, otherwise calculates stress"""
-        Nrec = len(self._prediction_records)
+        Nrec = len(self._prediction_records) if self._prediction_records else 0
         under_size = Nrec <= min_est_records
         do_calc = not self.prediction or not self._fitted or under_size
         if do_calc or force_calc:
@@ -661,7 +664,7 @@ class ShapelySection(Profile2D):
     def estimate_failure(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0)->float:
         """uses a support vector machine to estimate stresses and returns a number zero or one to indicate failure, if prediction is set to True, otherwise calculates stress"""
         if not self.prediction or not self._fitted:
-            ff = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,row=True)
+            ff = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,row=True,value=False)
             return ff['fails']
         else:
             #TODO: add logic to determine if calculation should be done close to failure
@@ -724,6 +727,8 @@ class ShapelySection(Profile2D):
         base_kw = base_kw.copy()
         inpt = {parm:mult*X}
         base_kw.update(inpt)
+        
+        base_kw['value'] = False #override value for calcstress to fail frac
         ff = self.calculate_stress(**base_kw).item()
         return 1 - ff
 

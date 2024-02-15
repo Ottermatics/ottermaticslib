@@ -524,8 +524,8 @@ class Economics(Component):
         summary['years'] = lc.year.max()+1
         LC = lc.levalized_cost.sum()
         LO = lc.levalized_output.sum()
-        summary['levalized_cost'] =  LC / LO
-        summary['levalized_output'] = LO / LC
+        summary['levalized_cost'] =  LC / LO if LO != 0 else numpy.nan
+        summary['levalized_output'] = LO / LC if LC != 0 else numpy.nan
         
 
         out2 = dict(gend(out))

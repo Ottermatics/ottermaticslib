@@ -4,7 +4,7 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.solver import TRANSIENT
+from engforge.dynamics import TRANSIENT
 from engforge.solver import SOLVER
 from engforge.signals import SIGNAL
 from engforge.slots import SLOT
@@ -22,8 +22,8 @@ import attrs
 @forge
 class Fan(Component):
     n: float = attrs.field(default=1)
-    dp_design = attrs.field(default=100)
-    w_design = attrs.field(default=2)
+    dp_design:float = attrs.field(default=100)
+    w_design:float = attrs.field(default=2)
 
     @system_property
     def dP_fan(self) -> float:

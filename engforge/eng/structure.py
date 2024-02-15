@@ -642,8 +642,13 @@ class Structure(System,CostModel,PredictionMixin):
         assert node1 in self.nodes
         assert node2 in self.nodes
 
-        if material is None:
+        if material is None and self.default_material:
             material = self.default_material
+        elif hasattr(section, "material"):
+            material = section.material
+        else:
+            raise ValueError("material not defined as input or from default sources!")
+
 
         uid = material.unique_id
         if uid not in self._materials:

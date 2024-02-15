@@ -19,7 +19,7 @@ class PropertyLog(LoggingMixin):
 log = PropertyLog()
 
 
-class otter_prop:
+class engforge_prop:
     """an interface for extension and identification and class return support"""
     must_return = False
 
@@ -95,7 +95,7 @@ class otter_prop:
     def deleter(self, fdel):
         return type(self)(self.fget, self.fset, fdel, self.__doc__)
 
-class cache_prop(otter_prop):
+class cache_prop(engforge_prop):
 
     allow_set: bool = False #keep this flag false to maintain current persistent value
 
@@ -112,7 +112,7 @@ class cache_prop(otter_prop):
     def set_cache(self, instance, reason="update",val=None):
         raise NotImplementedError("cache_prop must be subclassed and set_cache method defined")
 
-class system_property(otter_prop):
+class system_property(engforge_prop):
     """
     this property notifies the system this is a property to be tabulated in the dataframe output.
 
@@ -386,8 +386,8 @@ class class_cache(cache_prop):
 
 # #TODO: make a `solver_context` that exposes a ray python remote funciton with wait & other provisions... add to a call graph and optimize later
 # NOTE: challenge to handle class/instance/functions with same code
-# from engforge.properties import otter_prop
-# class solver_context(otter_prop):
+# from engforge.properties import engforge_prop
+# class solver_context(engforge_prop):
 #
 #     fget = None
 #

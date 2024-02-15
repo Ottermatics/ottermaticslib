@@ -28,7 +28,7 @@ class SignalInstance(AttributeInstance):
         self.system = system
         self.compile()
 
-    def compile(self):
+    def compile(self,**kwargs):
         self.source = self.system.locate_ref(self.signal.source)
         self.target = self.system.locate_ref(self.signal.target)
         self.system.info(f"setting {self.target} with {self.source}")
@@ -51,41 +51,44 @@ class SIGNAL(ATTR_BASE):
     mode: str
     target: str
     source: str
-    config_obj: "System"
+    config_cls: "System"
     attr_prefix = 'SIGNAL'
     instance_class = SignalInstance
 
-#     @classmethod
-#     def define(cls, target: str, source: str, mode="pre"):
-#         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass"""
-#         assert mode in VALID_MODES, f"invalid mode: {mode}"
-# 
-#         # Create A New Signals Class
-#         new_name = f"SIGNAL_{mode}_{source}_to_{target}".replace(".", "_")
-#         new_dict = dict(
-#             name=new_name,
-#             mode=mode,
-#             target=target,
-#             source=source,
-#         )
-#         new_slot = type(new_name, (SIGNAL,), new_dict)
-#         return new_slot
-
     @classmethod
-    def define_validate(cls, **kwargs):
-        """A method to validate the kwargs passed to the define method"""
-        assert 'target' in kwargs
-        assert 'source' in kwargs
-        assert 'mode' in kwargs
-        mode = kwargs['mode']
+    def define(cls, target: str, source: str, mode="pre"):
+        """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass"""
         assert mode in VALID_MODES, f"invalid mode: {mode}"
+
+        # Create A New Signals Class
+        new_name = f"SIGNAL_{mode}_{source}_to_{target}".replace(".", "_")
+        new_dict = dict(
+            name=new_name,
+            mode=mode,
+            target=target,
+            source=source,
+            default_options=cls.default_options.copy(),
+        )
+        new_slot = type(new_name, (SIGNAL,), new_dict)
+        #new_slot.default_options['default'] = new_slot.make_factory()
+        #new_slot.default_options['validator'] = new_slot.validate_instance
+        return new_slot
+
+    # @classmethod
+    # def define_validate(cls, **kwargs):
+    #     """A method to validate the kwargs passed to the define method"""
+    #     assert 'target' in kwargs
+    #     assert 'source' in kwargs
+    #     assert 'mode' in kwargs
+    #     mode = kwargs['mode']
+    #     assert mode in VALID_MODES, f"invalid mode: {mode}"
 
     # FIXME: move to
     @classmethod
-    def instance_validate(cls,instance,**kwargs):
+    def class_validate(cls,instance,**kwargs):
         from engforge.properties import system_property
 
-        system = cls.config_obj
+        system = cls.config_cls
 
         parm_type = system.locate(cls.target)
         if parm_type is None:
@@ -95,7 +98,7 @@ class SIGNAL(ATTR_BASE):
         ), f"bad parm {cls.target} not attribute: {parm_type}"
 
         driv_type = system.locate(cls.source)
-        if parm_type is None:
+        if driv_type is None:
             raise Exception(f"source not found: {cls.source}")
 
 

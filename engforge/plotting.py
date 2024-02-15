@@ -347,7 +347,7 @@ class PLOT_ATTR(ATTR_BASE):
     """base class for plot attributes"""
 
     name: str
-    config_obj: "System"
+    config_cls: "System"
     title: str = None
     kind: str
     cls_parms = {"x", "y"}
@@ -409,11 +409,6 @@ class PLOT_ATTR(ATTR_BASE):
             raise KeyError(
                 f"bad plot parms: {diff} do not exist in system: {valid}"
             )
-
-    # TODO: there's a pattern here with these attrs.Attributes
-    @classmethod
-    def make_plot_factory(cls):
-        return attrs.Factory(cls.create_instance, takes_self=True)
 
     @classmethod
     def create_instance(cls, system: "System") -> PlotInstance:

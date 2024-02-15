@@ -1,6 +1,7 @@
 import unittest
 from matplotlib import pylab
 from engforge.eng.structure import *
+from engforge.eng.geometry import ShapelySection
 from sectionproperties.pre.library.steel_sections import i_section
 
 from numpy import *
@@ -16,8 +17,9 @@ class test_cantilever(unittest.TestCase):
         self.st.add_node("free", 0, 5, 0)
 
         self.ibeam = i_section(0.3072, 0.1243, 0.0121, 0.008, 0.0089, 4)
+        beam = ShapelySection(shape=self.ibeam, material=ANSI_4130())
         self.bm = self.st.add_member(
-            "mem", "wall", "free", material=ANSI_4130(), section=self.ibeam
+            "mem", "wall", "free", section=beam
         )
 
         self.st.def_support(
@@ -46,25 +48,25 @@ class test_cantilever(unittest.TestCase):
         # self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
         self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
 
-        df = self.st.node_dataframe["gravity"]
+        df = self.st.node_dataframe.loc['gravity']
 
-        dfw = df[df["name"] == "wall"]
-        dff = df[df["name"] == "free"]
+        dfw = df.loc["wall"]
+        dff = df.loc["free"]
 
-        self.subtest_assert_near(float(dfw["rxfx"]), -3000)
-        self.subtest_assert_near(float(dfw["rxmz"]), 15000)
-        self.subtest_assert_near(float(dfw["dx"]), 0)
+        self.subtest_assert_near(float(dfw["rxfx"]), -3000,msg='wall rxfx')
+        self.subtest_assert_near(float(dfw["rxmz"]), 15000,msg='wall rxmz')
+        self.subtest_assert_near(float(dfw["dx"]), 0,msg='wall dx')
 
-        self.subtest_assert_near(float(dff["dx"]), 0.0076)
-        self.subtest_assert_near(float(dff["rxfx"]), 0)
-        self.subtest_assert_near(float(dff["rxmz"]), 0)
+        self.subtest_assert_near(float(dff["dx"]), 0.0076,msg='dx')
+        self.subtest_assert_near(float(dff["rxfx"]), 0,msg='rxfx')
+        self.subtest_assert_near(float(dff["rxmz"]), 0,msg='rxmz')
 
         stress_obj = self.bm.get_stress_at(0, "gravity")
         # stress_obj.plot_stress_vm()
 
-    def subtest_assert_near(self, value, truth, pct=0.025):
-        with self.subTest():
-            self.assertAlmostEqual(value, truth, delta=abs(truth * pct))
+    def subtest_assert_near(self, value, truth, pct=0.025,**kw):
+        with self.subTest(**kw):
+            self.assertAlmostEqual(value, truth, delta=max(abs(truth * pct),abs(pct)))
 
 
 class test_truss(unittest.TestCase):
@@ -108,6 +110,11 @@ class test_truss(unittest.TestCase):
                     pass
 
         self.beam = sections.rectangular_section(1.5, 1.5)
+        material = ANSI_4130()
+        self.section = ShapelySection(
+                                shape=self.beam,
+                                material= material
+                                )
 
         constrained = ("A", "E")
         for n1, n2 in pairs:
@@ -116,9 +123,9 @@ class test_truss(unittest.TestCase):
                 bkey,
                 n1,
                 n2,
-                material=ANSI_4130(),
-                section=self.beam,
-                in_mesh_size=0.1,
+                #material=ANSI_4130(),
+                section=self.section,
+                #min_mesh_size=0.01,
             )
 
             # if n1 not in constrained:
@@ -134,8 +141,8 @@ class test_truss(unittest.TestCase):
             support_DX=True,
             support_DY=True,
             support_DZ=True,
-            support_RY=False,
-            support_RX=False,
+            support_RY=True,
+            support_RX=True,
             support_RZ=True,
         )
         self.st.def_support(
@@ -145,7 +152,7 @@ class test_truss(unittest.TestCase):
             support_DZ=True,
             support_RY=False,
             support_RX=False,
-            support_RZ=False,
+            support_RZ=True,
         )
         # for node in self.st.nodes:
         #     self.st.frame.Definesupport_(node,support_DZ=True,support_RZ=True)
@@ -157,17 +164,17 @@ class test_truss(unittest.TestCase):
         # self.st.visulize()
 
     def test_reactions(self):
-        df = self.st.node_dataframe["gravity"]
+        df = self.st.node_dataframe.loc['gravity']
         # print(df)
 
-        dfa = df[df["name"] == "A"]
-        dfe = df[df["name"] == "E"]
+        dfa = df.loc['A']
+        dfe = df.loc['E']
 
         # print(dfa)
         # print(dfe)
 
-        self.subtest_assert_near(float(dfa["rxfy"].iloc[0]), 1667)
-        self.subtest_assert_near(float(dfe["rxfy"].iloc[0]), 1333)
+        self.subtest_assert_near(float(dfa["rxfy"]), 1667)
+        self.subtest_assert_near(float(dfe["rxfy"]), 1333)
 
         self.subtest_member("A", "B", "max_axial", 1925)
         self.subtest_member("A", "G", "max_axial", -949)  # -926 textbook

@@ -33,7 +33,7 @@ setup(
             # command = package.module:function
             "condaenvset=engforge.common:main_cli",
             "ollymakes=engforge.locations:main_cli",
-            "otterdrive=engforge.gdocs:main_cli",
+            "engforgedrive=engforge.gdocs:main_cli",
         ]
     },
     install_requires=install_reqs,

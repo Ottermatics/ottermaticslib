@@ -127,203 +127,60 @@ def signals_slots_handler(
 
         # Add Time Parm
         #TODO: remove after formulated in testing
-        # if cls.transients_attributes():
-        #     time = attrs.Attribute(
-        #         name="time",
-        #         default=0,
-        #         validator=None,
-        #         repr=True,
-        #         cmp=None,
-        #         hash=None,
-        #         init=False,
-        #         metadata=None,
-        #         type=float,
-        #         converter=None,
-        #         kw_only=True,
-        #         eq=None,
-        #         order=None,
-        #         on_setattr=None,
-        #         inherited=False,
-        #     )
-        #     out.append(time)
+        if cls.transients_attributes():
+            time = attrs.Attribute(
+                name="time",
+                default=0,
+                validator=None,
+                repr=True,
+                cmp=None,
+                hash=None,
+                init=False,
+                metadata=None,
+                type=float,
+                converter=None,
+                kw_only=True,
+                eq=None,
+                order=None,
+                on_setattr=None,
+                inherited=False,
+            )
+            out.append(time)
 
     # Add Slots
     if slots:
         for slot_name, slot in cls.slots_attributes().items():
-            at = slot.make_attribute(slot,slot_name)
+            at = slot.make_attribute(slot_name,cls)
             out.append(at)
-
-            # add from cls since not accessible from attrs
-#             slot.configure_for_system(slot_name, cls)
-# 
-#             log.info(f"{cls.__name__} adding SLOT {slot_name}")
-#             stype = slot.accepted
-#             
-#             #TODO: expand default options with kwargs and multiple types
-#             if isinstance(stype, (list, tuple)):
-#                 stype = stype[0]
-            
-            # 
-            # at = attrs.Attribute(
-            #     name=slot_name,
-            #     default=attrs.Factory(stype,False) if slot.default_ok else None,
-            #     validator=slot.validate_slot,
-            #     repr=True,
-            #     cmp=None,
-            #     hash=None,
-            #     init=True,
-            #     metadata=None,
-            #     type=slot,
-            #     converter=None,
-            #     kw_only=True,
-            #     eq=None,
-            #     order=None,
-            #     on_setattr=None,
-            #     inherited=False,
-            # )
-            
 
     # Add Signals
     if signals:
         for signal_name, signal in cls.signals_attributes().items():
-            at = signal.make_attribute(signal,signal_name)
+            at = signal.make_attribute(signal_name,cls)
             out.append(at)
-
-            # add from cls since not accessible from attrs
-            #signal.configure_for_system(signal_name, cls)
-
-            #log.info(f"{cls.__name__} adding SIGNAL {signal_name}")
-            # at = attrs.Attribute(
-            #     name=signal_name,
-            #     default=signal.make_factory(),
-            #     validator=None,
-            #     repr=False,
-            #     cmp=None,
-            #     hash=None,
-            #     init=False,
-            #     metadata=None,
-            #     type=signal,
-            #     converter=None,
-            #     kw_only=True,
-            #     eq=None,
-            #     order=None,
-            #     on_setattr=None,
-            #     inherited=False,
-            # )
-            
-
+    
     # Add SOLVERS
     if solvers:
         for solver_name, solver in cls.solvers_attributes().items():
 
-            at = solver.make_attribute(solver,solver_name)
+            at = solver.make_attribute(solver_name,cls)
             out.append(at)
-            #add from cls since not accessible from attrs
-            #solver.configure_for_system(solver_name, cls)
-
-#             log.info(f"{cls.__name__} adding SOLVER {solver_name}")
-# 
-#             at = attrs.Attribute(
-#                 name=solver_name,
-#                 default=solver.make_solver_factory(),
-#                 validator=None,
-#                 repr=False,
-#                 cmp=None,
-#                 hash=None,
-#                 init=False,
-#                 metadata=None,
-#                 type=solver,
-#                 converter=None,
-#                 kw_only=True,
-#                 eq=None,
-#                 order=None,
-#                 on_setattr=None,
-#                 inherited=False,
-#             )
-#             out.append(at)
 
         # Add TRANSIENT
         for solver_name, solver in cls.transients_attributes().items():
             # add from cls since not accessible from attrs
-            at = solver.make_attribute(solver,solver_name)
+            at = solver.make_attribute(solver_name,cls)
             out.append(at)
-#             solver.configure_for_system(solver_name, cls)
-# 
-#             log.info(f"{cls.__name__} adding SOLVER {solver_name}")
-# 
-#             at = attrs.Attribute(
-#                 name=solver_name,
-#                 default=solver.make_solver_factory(),
-#                 validator=None,
-#                 repr=False,
-#                 cmp=None,
-#                 hash=None,
-#                 init=False,
-#                 metadata=None,
-#                 type=solver,
-#                 converter=None,
-#                 kw_only=True,
-#                 eq=None,
-#                 order=None,
-#                 on_setattr=None,
-#                 inherited=False,
-#             )
-#             out.append(at)
 
     if plots:
         for pltname, plot in cls.plot_attributes().items():
-            at = plot.make_attribute(plot,pltname)
+            at = plot.make_attribute(pltname,cls)
             out.append(at)
             
-#             plot.configure_for_system(pltname, cls)
-# 
-#             log.info(f"{cls.__name__} adding PLOT {pltname}")
-# 
-#             at = attrs.Attribute(
-#                 name=pltname,
-#                 default=plot.make_plot_factory(),
-#                 validator=None,
-#                 repr=False,
-#                 cmp=None,
-#                 hash=None,
-#                 init=False,
-#                 metadata=None,
-#                 type=plot,
-#                 converter=None,
-#                 kw_only=True,
-#                 eq=None,
-#                 order=None,
-#                 on_setattr=None,
-#                 inherited=False,
-#             )
-#             out.append(at)
 
         for pltname, plot in cls.trace_attributes().items():
-            at = plot.make_attribute(plot,pltname)
+            at = plot.make_attribute(pltname,cls)
             out.append(at)
-
-#             plot.configure_for_system(pltname, cls)
-# 
-#             log.info(f"{cls.__name__} adding TRACE {pltname}")
-# 
-#             at = attrs.Attribute(
-#                 name=pltname,
-#                 default=plot.make_plot_factory(),
-#                 validator=None,
-#                 repr=False,
-#                 cmp=None,
-#                 hash=None,
-#                 init=False,
-#                 metadata=None,
-#                 type=plot,
-#                 converter=None,
-#                 kw_only=True,
-#                 eq=None,
-#                 order=None,
-#                 on_setattr=None,
-#                 inherited=False,
-#             )
-#             out.append(at)
 
     created_fields = set([o.name for o in out])
     # print options
