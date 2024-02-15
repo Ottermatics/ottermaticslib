@@ -20,7 +20,7 @@ install_reqs = parse_requirements("requirements.txt")
 
 setup(
     name="engforge",
-    version="0.9.1",
+    version="0.9.2",
     description="The Engineer's Framework",
     url="https://github.com/SoundsSerious/engforge",
     author="Kevin russell",

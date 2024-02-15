@@ -30,7 +30,7 @@ author = "Kevin Russell"
 
 
 # The full version, including alpha/beta/rc tags
-release = "0.9.1"
+release = "0.9.2"
 
 
 extensions = ["sphinx.ext.autodoc", "myst_parser"]
