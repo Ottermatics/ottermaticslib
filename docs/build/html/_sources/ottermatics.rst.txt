@@ -1,167 +1,167 @@
-ottermatics package
+engforge package
 ===================
 
 Submodules
 ----------
 
-ottermatics.analysis module
+engforge.analysis module
 ---------------------------
 
-.. automodule:: ottermatics.analysis
+.. automodule:: engforge.analysis
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-ottermatics.common module
+engforge.common module
 -------------------------
 
-.. automodule:: ottermatics.common
+.. automodule:: engforge.common
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.components module
+engforge.components module
 -----------------------------
 
-.. automodule:: ottermatics.components
+.. automodule:: engforge.components
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.component_collections module
+engforge.component_collections module
 -----------------------------
 
-.. automodule:: ottermatics.component_collections
+.. automodule:: engforge.component_collections
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.configuration module
+engforge.configuration module
 --------------------------------
 
-.. automodule:: ottermatics.configuration
+.. automodule:: engforge.configuration
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.datastores.data module
+engforge.datastores.data module
 -----------------------
 
-.. automodule:: ottermatics.datastores.data
+.. automodule:: engforge.datastores.data
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.datastores.gdocs module
+engforge.datastores.gdocs module
 ------------------------
 
-.. automodule:: ottermatics.datastores.gdocs
+.. automodule:: engforge.datastores.gdocs
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.eng.geometry module
+engforge.eng.geometry module
 ---------------------------
 
-.. automodule:: ottermatics.geometry
+.. automodule:: engforge.geometry
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.locations module
+engforge.locations module
 ----------------------------
 
-.. automodule:: ottermatics.locations
+.. automodule:: engforge.locations
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.logging module
+engforge.logging module
 --------------------------
 
-.. automodule:: ottermatics.logging
+.. automodule:: engforge.logging
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.patterns module
+engforge.patterns module
 ---------------------------
 
-.. automodule:: ottermatics.patterns
+.. automodule:: engforge.patterns
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.eng.pipes module
+engforge.eng.pipes module
 ------------------------
 
-.. automodule:: ottermatics.eng.pipes
+.. automodule:: engforge.eng.pipes
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.plotting module
+engforge.plotting module
 ---------------------------
 
-.. automodule:: ottermatics.plotting
+.. automodule:: engforge.plotting
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.process module
+engforge.process module
 --------------------------
 
-.. automodule:: ottermatics.process
+.. automodule:: engforge.process
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.reporting module
+engforge.reporting module
 ----------------------------
 
-.. automodule:: ottermatics.reporting
+.. automodule:: engforge.reporting
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-ottermatics.env_var module
+engforge.env_var module
 --------------------------
 
-.. automodule:: ottermatics.env_var
+.. automodule:: engforge.env_var
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.eng.solid\_materials module
+engforge.eng.solid\_materials module
 -----------------------------------
 
-.. automodule:: ottermatics.eng.solid_materials
+.. automodule:: engforge.eng.solid_materials
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.eng.structure module
+engforge.eng.structure module
 ----------------------------
 
-.. automodule:: ottermatics.eng.structure
+.. automodule:: engforge.eng.structure
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.tabulation module
+engforge.tabulation module
 -----------------------------
 
-.. automodule:: ottermatics.tabulation
+.. automodule:: engforge.tabulation
    :members:
    :undoc-members:
    :show-inheritance:
 
-ottermatics.eng.thermodynamics module
+engforge.eng.thermodynamics module
 ---------------------------------
 
-.. automodule:: ottermatics.eng.thermodynamics
+.. automodule:: engforge.eng.thermodynamics
    :members:
    :undoc-members:
    :show-inheritance:
@@ -169,7 +169,7 @@ ottermatics.eng.thermodynamics module
 Module contents
 ---------------
 
-.. automodule:: ottermatics
+.. automodule:: engforge
    :members:
    :undoc-members:
    :show-inheritance:

@@ -11,7 +11,7 @@
 FROM python:3.9
 
 #Application Specific Constants
-WORKDIR /ottermatics
+WORKDIR /engforge
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -25,12 +25,12 @@ RUN apt-get install -y make automake gcc g++ subversion python3-dev libblas-dev 
 
 RUN pip install --upgrade pip
 
-COPY ["./ottermatics", "./ottermatics"]
+COPY ["./engforge", "./engforge"]
 COPY ["./docs/build/html","/docs"]
 
-COPY ["./setup.py", "/ottermatics/"]
-COPY ["./README.md", "/ottermatics/"]
-COPY ["./requirements.txt", "/ottermatics/"]
-RUN pip install -e /ottermatics/
+COPY ["./setup.py", "/engforge/"]
+COPY ["./README.md", "/engforge/"]
+COPY ["./requirements.txt", "/engforge/"]
+RUN pip install -e /engforge/
 
 ENTRYPOINT ["/bin/bash"]

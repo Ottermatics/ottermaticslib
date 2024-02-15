@@ -1,6 +1,6 @@
 [![build](https://github.com/Ottermatics/engforge/actions/workflows/build.yml/badge.svg)](https://github.com/Ottermatics/engforge/actions/workflows/build.yml)
-# engforge
-A library to tabulate information from complex systems with various ways to store data and act as glue code for tough engineering problems.
+# EngForge
+A library to tabulate information from complex systems with various ways to store data and act as glue code for complex systems & engineering problems.
 
 ### Installation
 ```bash
@@ -14,7 +14,7 @@ pip install git+https://github.com/Ottermatics/engforge.git
 4. Workflows for core engineering problemes (structures + cost, thermal+fluids solve)
 
 ### MVP Features (WIP)
-1. Tabulation, use `attrs.field` and `system_property` to capture `y=f(x)` [Done]
+1. Tabulation, use `attrs.field` and `system_property` to capture `y=f(x)` where `fields` are the state from which `system_property` derives results [Done]
 2. Dynamic Programing ensures work is only done when new data is available with `cached_system_property`. [Done]
 3. Quick Calculation provided by direct cached references to attribues and properties [Done]
 4. Solver based on `NPSS` strategy of balances and integrators [Done]
@@ -27,6 +27,7 @@ By default the system calls a `default_solver()` method in its `execute()` funct
 
 To use the default solver & constraints 
 ```python
+@forge
 SolverSystem(System):
     sol2 = SOLVER.define("dep", "indep")
     sol2.add_constraint("max", limit_max) #indep should never go above this value (or function)
@@ -46,21 +47,21 @@ These problems demonstrate functionality
 #### Air Filter
 run a throttle sweep with filter loss characteristic and fan afinity law based pressure based off of a design point.
 ```python
-from ottermatics.analysis import Analysis
-from ottermatics.reporting import CSVReporter,DiskPlotReporter
-from ottermatics.properties import system_property
-from ottermatics.components import Component
-from ottermatics.system import System
-from ottermatics.plotting import PLOT
-from ottermatics.slots import SLOT
-from ottermatics.solver import SOLVER
-from ottermatics.signals import SIGNAL
-from ottermatics.configuration import otterize
+from engforge.analysis import Analysis
+from engforge.reporting import CSVReporter,DiskPlotReporter
+from engforge.properties import system_property
+from engforge.components import Component
+from engforge.system import System
+from engforge.plotting import PLOT
+from engforge.slots import SLOT
+from engforge.solver import SOLVER
+from engforge.signals import SIGNAL
+from engforge.configuration import forge
 import numpy as np
 import os,pathlib
 import attrs
 
-@otterize
+@forge
 class Fan(Component):
 
     n:float = attrs.field(default=1)
@@ -72,7 +73,7 @@ class Fan(Component):
     def dP_fan(self) -> float:
         return self.dp_design*(self.n*self.w_design)**2.0
     
-@otterize
+@forge
 class Filter(Component):
 
     w:float = attrs.field(default=0)
@@ -82,7 +83,7 @@ class Filter(Component):
     def dP_filter(self) -> float:
         return self.k_loss*self.w
 
-@otterize
+@forge
 class Airfilter(System):
 
     throttle:float = attrs.field(default=1)
@@ -112,7 +113,7 @@ class Airfilter(System):
 
 
 #Run the system
-from ottermatics.logging import change_all_log_levels
+from engforge.logging import change_all_log_levels
 from matplotlib.pylab import *
 
 fan = Fan()
@@ -145,7 +146,7 @@ ax2.set_xlabel(f'throttle%')
 ##### Overview
 Test case results in accurate resonance frequency calculation
 ```python
-@otterize
+@forge
 class SpringMass(System):
 
     k:float = attrs.field(default=50)
@@ -216,9 +217,9 @@ For plots reporting is supported in disk storage.
 
 ```python
 
-from ottermatics.analysis import Analysis
-from ottermatics.reporting import CSVReporter,DiskPlotReporter
-from ottermatics.properties import system_property
+from engforge.analysis import Analysis
+from engforge.reporting import CSVReporter,DiskPlotReporter
+from engforge.properties import system_property
 import numpy as np
 import os,pathlib
 
@@ -234,7 +235,7 @@ plots = DiskPlotReporter(path=this_dir,report_mode='monthly')
 plots_latest = DiskPlotReporter(path=this_dir,report_mode='single')
 
 
-@otterize
+@forge
 class AirfilterAnalysis(Analysis):
     """Does post processing on a system"""
     
@@ -271,11 +272,11 @@ sa.run(throttle=list(np.arange(0.1,1.1,0.1)))
 
 
 ## Documentation:
-https://ottermatics.github.io/engforge/build/html/index.html
+https://engforge.github.io/engforge/build/html/index.html
 
 ### DataStores
 Datastores are a work in progress feature to provide a zero configuration library for storage of tabulated data and report generated artifacts. No garuntee is provided as to their stability yet.
-Requirements for datasources are attempted upon access of `ottermatics.datastores` and entering of a `CONFIRM` prompt.
+Requirements for datasources are attempted upon access of `engforge.datastores` and entering of a `CONFIRM` prompt.
 
 ### Environmental Variables
 To allow a write-once implement anywhere interface `EnvVariable` is provided for both open (the default) and secret variables. Allowance for type conversion, and defaults are provided.

@@ -37,11 +37,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install flake8 pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi 
-        if [ -f ./ottermatics/datastores/datastores_requirements.txt ]; then pip install -r ./ottermatics/datastores/datastores_requirements.txt; fi    
+        if [ -f ./engforge/datastores/datastores_requirements.txt ]; then pip install -r ./engforge/datastores/datastores_requirements.txt; fi    
 
     - name: Display Python Version
       run: python -c "import sys; print(sys.version)"
 
     - name: Run tests
-      run: python -m unittest discover ottermatics.test
+      run: python -m unittest discover engforge.test
       
