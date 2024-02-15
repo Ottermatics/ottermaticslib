@@ -37,8 +37,8 @@ import json
 # generic cross sections from
 # https://mechanicalbase.com/area-moment-of-inertia-calculator-of-certain-cross-sectional-shapes/
 temp_path = os.path.join(tempfile.gettempdir(),'shapely_sections')
-section_cache = EnvVariable('OTTR_SECTION_CACHE',default = temp_path,desc='directory to cache section properties')
-if 'OTTR_SECTION_CACHE' not in os.environ and not os.path.exists(temp_path):
+section_cache = EnvVariable('FORGE_SECTION_CACHE',default = temp_path,desc='directory to cache section properties')
+if 'FORGE_SECTION_CACHE' not in os.environ and not os.path.exists(temp_path):
     os.mkdir(temp_path)
 
 section_cache.info(f'loading section from {section_cache.secret}')

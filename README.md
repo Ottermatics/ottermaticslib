@@ -283,14 +283,14 @@ To allow a write-once implement anywhere interface `EnvVariable` is provided for
 
 The current variable slots in memory are listed by `EnvVariable.print_env_vars()`
 ```bash
-OTTR_DB_HOST                            |SECRETS[OTTR_DB_HOST]                    = localhost
-OTTR_DB_NAME                            |SECRETS[OTTR_DB_NAME]                    = 
-OTTR_DB_PASS                            |SECRETS[OTTR_DB_PASS]                    = postgres
-OTTR_DB_PORT                            |SECRETS[OTTR_DB_PORT]                    = 5432
-OTTR_DB_USER                            |SECRETS[OTTR_DB_USER]                    = postgres
-OTTR_HOSTNAME                           |SECRETS[OTTR_HOSTNAME]                   = DEATHRAY
-OTTR_REPORT_PATH                        |SECRETS[OTTR_REPORT_PATH]                = 
-OTTR_SLACK_LOG_WEBHOOK                  |SECRETS[OTTR_SLACK_LOG_WEBHOOK]          = 
+FORGE_DB_HOST                            |SECRETS[FORGE_DB_HOST]                    = localhost
+FORGE_DB_NAME                            |SECRETS[FORGE_DB_NAME]                    = 
+FORGE_DB_PASS                            |SECRETS[FORGE_DB_PASS]                    = postgres
+FORGE_DB_PORT                            |SECRETS[FORGE_DB_PORT]                    = 5432
+FORGE_DB_USER                            |SECRETS[FORGE_DB_USER]                    = postgres
+FORGE_HOSTNAME                           |SECRETS[FORGE_HOSTNAME]                   = DEATHRAY
+FORGE_REPORT_PATH                        |SECRETS[FORGE_REPORT_PATH]                = 
+FORGE_SLACK_LOG_WEBHOOK                  |SECRETS[FORGE_SLACK_LOG_WEBHOOK]          = 
 SEABORN_CONTEXT                         |SECRETS[SEABORN_CONTEXT]                 = paper
 SEABORN_PALETTE                         |SECRETS[SEABORN_PALETTE]                 = deep
 SEABORN_THEME                           |SECRETS[SEABORN_THEME]                   = darkgrid

@@ -208,8 +208,8 @@ except:
 global HOSTNAME, SLACK_WEBHOOK
 
 HOSTNAME = EnvVariable(
-    "OTTR_HOSTNAME", default=host, obscure=False, dontovrride=True
+    "FORGE_HOSTNAME", default=host, obscure=False, dontovrride=True
 )
 SLACK_WEBHOOK = EnvVariable(
-    "OTTR_SLACK_LOG_WEBHOOK", default=None, obscure=False, dontovrride=True
+    "FORGE_SLACK_LOG_WEBHOOK", default=None, obscure=False, dontovrride=True
 )
