@@ -11,8 +11,9 @@ from matplotlib.font_manager import get_font_names
 import inspect
 
 import typing
-from engforge.configuration import forge
+#from engforge.configuration import forge
 from engforge.properties import *
+from engforge.logging import LoggingMixin
 from engforge.env_var import EnvVariable
 from engforge.attributes import ATTR_BASE,AttributeInstance
 from matplotlib.backends.backend_pdf import PdfPages

@@ -11,9 +11,6 @@ from contextlib import contextmanager
 import copy
 import datetime
 
-from engforge.components import Component
-from engforge.component_collections import ComponentIter
-from engforge.configuration import forge
 from engforge.attributes import ATTR_BASE,AttributeInstance
 from engforge.properties import *
 
@@ -317,6 +314,9 @@ class SolverMixin:
     def update_internal(self,eval_kw=None,*args,**kw):
         """update internal elements with input arguments"""
         # Solve Each Internal System
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+        
         self.update(self.parent,*args,**kw)
         self.debug(f'updating internal {self.__class__.__name__}.{self}')
         for key, comp in self.internal_configurations(False).items():
@@ -338,6 +338,9 @@ class SolverMixin:
     def post_update_internal(self,eval_kw=None,*args,**kw):
         """Post update all internal components"""
         #Post Update Self
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+
         self.post_update(self.parent,*args,**kw)
         self.debug(f'post updating internal {self.__class__.__name__}.{self}')
         for key, comp in self.internal_configurations(False).items():

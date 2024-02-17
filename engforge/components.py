@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 @forge
-class Component(TabulationMixin):
+class Component(Configuration,TabulationMixin):
     """Component is an Evaluatable configuration with tabulation and reporting functionality"""
 
     parent: typing.Union['Component','System'] = attr.ib(default=None)

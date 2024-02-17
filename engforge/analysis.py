@@ -5,7 +5,7 @@ from engforge.tabulation import TabulationMixin,DataframeMixin
 from engforge.system import System
 from engforge.typing import *
 from engforge.reporting import *
-from engforge.plotting import PlottingMixin
+from engforge.attr_plotting import PlottingMixin
 
 
 # import datetime
@@ -35,7 +35,7 @@ def make_reporter_check(type_to_check):
 
 
 @forge
-class Analysis(TabulationMixin, PlottingMixin, DataframeMixin):
+class Analysis(Configuration,TabulationMixin, PlottingMixin, DataframeMixin):
     """Analysis takes a system and many reporters, runs the system, adds its own system properties to the dataframe and post processes the results
 
     make_plots() makes plots from the analysis, and stores figure

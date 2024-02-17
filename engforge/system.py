@@ -32,8 +32,8 @@ from engforge.properties import *
 from engforge.logging import LoggingMixin
 from engforge.configuration import Configuration, forge
 from engforge.tabulation import TabulationMixin
-from engforge.solver import SolverMixin
-from engforge.plotting import PlottingMixin
+from engforge.attr_solver import SolverMixin
+from engforge.attr_plotting import PlottingMixin
 
 import copy
 import collections
@@ -50,7 +50,7 @@ log = SystemsLog()
 
 
 @forge
-class System(TabulationMixin, SolverMixin, PlottingMixin):
+class System(Configuration,TabulationMixin, SolverMixin, PlottingMixin):
     """A system defines SLOTS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.

@@ -21,7 +21,7 @@ from engforge.eng.solid_materials import *
 from engforge.common import *
 from engforge.logging import log, LoggingMixin
 from engforge.eng.costs import CostModel,cost_property
-from engforge.slots import SLOT
+from engforge.attr_slots import SLOT
 from engforge.eng.prediction import PredictionMixin
 
 import sectionproperties

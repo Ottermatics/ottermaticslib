@@ -6,7 +6,7 @@
 
 import attrs
 from engforge.attributes import ATTR_BASE, AttributeInstance
-from engforge.slots import SLOT_TYPES
+from engforge.attr_slots import SLOT_TYPES
 
 VALID_MODES = ["pre", "post", "both"]
 

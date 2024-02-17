@@ -9,7 +9,8 @@ from contextlib import contextmanager
 import attr
 
 from engforge.common import inst_vectorize, chunks
-from engforge.configuration import Configuration, forge
+#from engforge.configuration import Configuration, forge
+from engforge.engforge_attributes import AttributedBaseMixin
 from engforge.logging import LoggingMixin
 from engforge.typing import *
 from engforge.properties import *
@@ -153,7 +154,7 @@ class DataframeMixin:
             return [var.lower() for var in self._skip_plot_vars]
         return []
 
-class TabulationMixin(Configuration,DataframeMixin):
+class TabulationMixin(AttributedBaseMixin,DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
@@ -490,7 +491,7 @@ class TabulationMixin(Configuration,DataframeMixin):
     @classmethod
     def classmethod_system_properties(cls,recache=False):
         """Combine other classes table properties into this one, in the case of subclassed system_properties"""
-
+        from engforge.tabulation import TabulationMixin
         #Use a cache for deep recursion
         if not recache and hasattr(cls,'_{cls.__name__}_system_properties'):
             res=getattr(cls,'_{cls.__name__}_system_properties')

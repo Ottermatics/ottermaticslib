@@ -4,12 +4,12 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.dynamics import TRANSIENT
-from engforge.solver import SOLVER
-from engforge.signals import SIGNAL
-from engforge.slots import SLOT
+from engforge.attr_transient import TRANSIENT
+from engforge.attr_solver import SOLVER
+from engforge.attr_signals import SIGNAL
+from engforge.attr_slots import SLOT
 from engforge.properties import *
-from engforge.plotting import *
+from engforge.attr_plotting import *
 
 from scipy.optimize import curve_fit, least_squares
 import numpy as np

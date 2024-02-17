@@ -7,7 +7,7 @@
 import unittest
 from engforge.configuration import forge
 from engforge.eng.costs import CostModel, Economics, cost_property
-from engforge.slots import SLOT
+from engforge.attr_slots import SLOT
 from engforge.system import System
 from engforge.components import Component
 from engforge.component_collections import ComponentIterator

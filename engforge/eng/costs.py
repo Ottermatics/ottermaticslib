@@ -124,7 +124,7 @@ class cost_property(system_property):
             self.return_type = float
 
 @forge
-class CostModel(TabulationMixin): 
+class CostModel(Configuration,TabulationMixin): 
     """CostModel is a mixin for components or systems that reports its costs through the `cost` system property, which by default sums the `item_cost` and `sub_items_cost`.
 
     `item_cost` is determined by `calculate_item_cost()` which by default uses: `cost_per_item` field to return the item cost, which defaults to `numpy.nan` if not set. Nan values are ignored and replaced with 0.

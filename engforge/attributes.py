@@ -2,7 +2,7 @@
 
 on init an instance of `Instance` type for any ATTR_BASE subclass is created """
 
-import attrs
+import attrs,attr
 from engforge.logging import LoggingMixin, log
 
 class ATTRLog(LoggingMixin):
@@ -141,3 +141,4 @@ ATTR_BASE.default_options = dict(
         on_setattr=None,
         inherited=False,
 )        
+

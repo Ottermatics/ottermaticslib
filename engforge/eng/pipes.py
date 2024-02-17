@@ -22,8 +22,8 @@ from engforge.tabulation import (
 )
 from engforge.eng.fluid_material import FluidMaterial
 from engforge.common import G_grav_constant
-from engforge.slots import *
-from engforge.signals import *
+from engforge.attr_slots import *
+from engforge.attr_signals import *
 from engforge.logging import LoggingMixin
 from engforge.system import System
 from engforge.properties import *

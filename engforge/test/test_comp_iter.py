@@ -1,7 +1,7 @@
 from engforge.components import Component
 from engforge.component_collections import ComponentDict, ComponentIter
 from engforge.system import System
-from engforge.slots import SLOT
+from engforge.attr_slots import SLOT
 from engforge.configuration import forge
 from engforge.tabulation import system_property
 

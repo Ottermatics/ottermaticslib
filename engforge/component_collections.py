@@ -14,7 +14,7 @@ Types:
 
 from collections import UserDict, UserList
 from engforge.components import Component
-from engforge.slots import SLOT
+from engforge.attr_slots import SLOT
 from engforge.configuration import forge
 from engforge.typing import *
 from engforge.tabulation import Ref, system_property

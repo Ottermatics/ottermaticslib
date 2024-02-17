@@ -55,7 +55,7 @@ class ImportTest(unittest.TestCase):
         import engforge.logging
 
     def test_import_plotting(self):
-        import engforge.plotting
+        import engforge.attr_plotting
 
     # def test_import_process(self):
     #     import engforge.process
