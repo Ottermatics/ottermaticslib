@@ -32,7 +32,7 @@ from engforge.properties import *
 from engforge.logging import LoggingMixin
 from engforge.configuration import Configuration, forge
 from engforge.tabulation import TabulationMixin
-from engforge.attr_solver import SolverMixin
+from engforge.solver import SolverMixin
 from engforge.attr_plotting import PlottingMixin
 
 import copy

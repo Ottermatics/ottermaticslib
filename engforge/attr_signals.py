@@ -4,7 +4,7 @@
 """
 
 
-import attrs
+import attrs,uuid
 from engforge.attributes import ATTR_BASE, AttributeInstance
 from engforge.attr_slots import SLOT_TYPES
 
@@ -62,6 +62,7 @@ class SIGNAL(ATTR_BASE):
 
         # Create A New Signals Class
         new_name = f"SIGNAL_{mode}_{source}_to_{target}".replace(".", "_")
+        new_name = new_name + '_' + str(uuid.uuid4()).replace('-','')[0:16]
         new_dict = dict(
             name=new_name,
             mode=mode,
@@ -70,8 +71,8 @@ class SIGNAL(ATTR_BASE):
             default_options=cls.default_options.copy(),
         )
         new_slot = type(new_name, (SIGNAL,), new_dict)
-        #new_slot.default_options['default'] = new_slot.make_factory()
-        #new_slot.default_options['validator'] = new_slot.validate_instance
+        new_slot.default_options['default'] = new_slot.make_factory()
+        new_slot.default_options['validator'] = new_slot.configure_instance
         return new_slot
 
     # @classmethod

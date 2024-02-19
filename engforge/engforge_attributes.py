@@ -1,6 +1,6 @@
 
 from engforge.attributes import ATTR_BASE,AttributeInstance
-from engforge.attr_transient import TRANSIENT
+from engforge.attr_dynamics import TRANSIENT
 from engforge.attr_solver import SOLVER
 from engforge.attr_signals import SIGNAL
 from engforge.attr_slots import SLOT
@@ -47,61 +47,6 @@ def get_attributes_of(cls, subclass_of: type=None, exclude=False):
 
 class AttributedBaseMixin(LoggingMixin):
     """A mixin that adds the ability to configure all engforge.core attributes of a class"""
-
-    @property
-    def attrs_fields(self) -> set:
-        return set(attr.fields(self.__class__))
-    
-    # Configuration Information
-    def internal_configurations(self,check_config=True)->dict:
-        """go through all attributes determining which are configuration objects
-        additionally this skip any configuration that start with an underscore (private variable)
-        """
-        from engforge.configuration import Configuration
-
-        if check_config:
-            chk = lambda k,v: isinstance(v, Configuration)
-        else:
-            chk = lambda k,v: k in self.slots_attributes()
-
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if chk(k,v) and not k.startswith("_")
-        }
-
-    def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0,**kw
-    ):
-        """A generator that will go through all internal configurations up to a certain level
-        if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
-        only go through this configuration
-
-        :return: level,config"""
-        from engforge.configuration import Configuration
-
-        should_yield_level = lambda level: all(
-            [
-                level >= parent_level,
-                any([levels_to_descend < 0, level <= levels_to_descend]),
-            ]
-        )
-
-        if should_yield_level(level):
-            yield "", level, self
-
-        level += 1
-        if 'check_config' not in kw:
-            kw['check_config'] = False
-        for key, config in self.internal_configurations(**kw).items():
-
-            if isinstance(config,Configuration):
-                for skey, level, iconf in config.go_through_configurations(
-                    level, levels_to_descend, parent_level
-                ):
-                    yield f"{key}.{skey}" if skey else key, level, iconf
-            else:
-                yield key,level,config
 
     @property
     def attrs_fields(self) -> set:
@@ -201,43 +146,31 @@ class AttributedBaseMixin(LoggingMixin):
     @classmethod
     def slots_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all slots attributes for class"""
-        #from engforge.slots import SLOT
-
         return cls._get_init_attrs_data(SLOT)
 
     @classmethod
     def signals_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        #from engforge.signals import SIGNAL
-
         return cls._get_init_attrs_data(SIGNAL)
 
     @classmethod
     def solvers_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        #from engforge.solver import SOLVER
-
         return cls._get_init_attrs_data(SOLVER)
 
     @classmethod
     def transients_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        #from engforge.attr_transient import TRANSIENT
-
         return cls._get_init_attrs_data(TRANSIENT)
 
     @classmethod
     def trace_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all trace attributes for class"""
-        #from engforge.plotting import TRACE
-
         return cls._get_init_attrs_data(TRACE)
 
     @classmethod
     def plot_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all plot attributes for class"""
-        #from engforge.plotting import PLOT
-
         return cls._get_init_attrs_data(PLOT)
 
     @classmethod
@@ -246,12 +179,6 @@ class AttributedBaseMixin(LoggingMixin):
 
     @classmethod
     def input_fields(cls):
-        # from engforge.attr_transient import TRANSIENT
-        # from engforge.solver import SOLVER
-        # from engforge.signals import SIGNAL
-        # from engforge.slots import SLOT
-        # from engforge.plotting import PLOT, TRACE
-
         ignore_types = (
             SLOT,
             SIGNAL,
@@ -266,12 +193,6 @@ class AttributedBaseMixin(LoggingMixin):
 
     @classmethod
     def numeric_fields(cls):
-        # from engforge.attr_transient import TRANSIENT
-        # from engforge.solver import SOLVER
-        # from engforge.signals import SIGNAL
-        # from engforge.slots import SLOT
-        # from engforge.plotting import PLOT, TRACE
-
         ignore_types = (
             SLOT,
             SIGNAL,
@@ -296,16 +217,21 @@ class AttributedBaseMixin(LoggingMixin):
     # Dictonaries
     @property
     def as_dict(self):
+        """returns values as they are in the class instance"""
         from engforge.configuration import Configuration
-        o = {k: getattr(self, k, None) for k, v in self.input_attrs().items()}
-        o = {
-            k: v if not isinstance(v, Configuration) else v.as_dict
-            for k, v in o.items()
-        }
+        
+        inputs = self.input_attrs()
+        #TODO: add signals?
+        properties = getattr(self,'system_properties_classdef',None)
+        if properties:
+            inputs.update(properties())
+
+        o = {k: getattr(self, k, None) for k, v in inputs.items()}
         return o
 
     @property
     def input_as_dict(self):
+        """returns values as they are in the class instance, but converts classes inputs to their input_as_dict"""
         from engforge.configuration import Configuration
         o = {k: getattr(self, k, None) for k in self.input_fields()}
         o = {
@@ -317,7 +243,7 @@ class AttributedBaseMixin(LoggingMixin):
     @property
     def numeric_as_dict(self):
         from engforge.configuration import Configuration
-        o = {k: getattr(self, k, None) for k in self.numeric_fields}
+        o = {k: getattr(self, k, None) for k in self.numeric_fields()}
         o = {
             k: v if not isinstance(v, Configuration) else v.numeric_as_dict
             for k, v in o.items()
@@ -387,3 +313,10 @@ class AttributedBaseMixin(LoggingMixin):
             rstdict = {k:_temp_vars[k] for k,v in kwargs.items()}
             self.setattrs(rstdict)    
 
+    #Auto Configuration Method
+    @classmethod
+    def auto_configure(cls,**kwargs):
+        """automatically configures a class with the given inputs"""
+        pass
+        #TODO: loop through all the attributes and configure them for the class with the given inputs
+        #TODO: give each attribute a routine to configure itself if it has applicable inputs / type TBD

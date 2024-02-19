@@ -2,7 +2,7 @@
 
 on init an instance of `Instance` type for any ATTR_BASE subclass is created """
 
-import attrs,attr
+import attrs,attr,uuid
 from engforge.logging import LoggingMixin, log
 
 class ATTRLog(LoggingMixin):
@@ -11,6 +11,7 @@ class ATTRLog(LoggingMixin):
 
 log = ATTRLog()
 
+#TODO: develop a base class system for each config class to idenity the use of attributes throughout all systems, useful for `auto_configure` method
 
 class AttributeInstance:
     class_attr: "ATTR_BASE"
@@ -39,13 +40,17 @@ class ATTR_BASE(attrs.Attribute):
     default_options: dict
     
     @classmethod
-    def configure_for_system(cls, name, config_class,**kwargs):
+    def configure_for_system(cls, name, config_class,cb=None,**kwargs):
         """add the config class, and perform checks with `class_validate)
         :returns: [optional] a dictionary of options to be used in the make_attribute method
         """
         log.info(f'{cls.__name__} is being configured for {cls.attr_prefix}')
         cls.name = name
         cls.config_cls = config_class
+
+        if cb is not None:
+            cb(cls,config_cls,**kwargs)
+
 
         return {} #OVERWRITE ME "custom_options":False
 
@@ -61,11 +66,15 @@ class ATTR_BASE(attrs.Attribute):
         return cls.instance_class(cls,instance)
     
     @classmethod
+    def configure_instance(cls,instance,attribute,value):
+        """validates the instance given attr's init routine"""
+        pass
+
+    @classmethod
     def class_validate(cls,instance,**kwargs):
         """validates onetime A method to validate the kwargs passed to the define method"""
         pass
         
-
     @classmethod
     def define_validate(cls, **kwargs):
         """A method to validate the kwargs passed to the define method"""
@@ -79,6 +88,8 @@ class ATTR_BASE(attrs.Attribute):
         # Create A New Signals Class
         kw_pairs = [f"{k}_{v}" for k,v in kwargs.items()]
         new_name = f"{cls.attr_prefix}_{('_'.join(kw_pairs))}".replace(".", "_")
+        new_name = new_name + '_' + str(uuid.uuid4()).replace('-','')[0:16]
+        #define the class dictionary
         new_dict = dict(
             name=new_name,
             default_options=cls.default_options.copy()
@@ -88,7 +99,7 @@ class ATTR_BASE(attrs.Attribute):
         new_slot = type(new_name, (cls,), new_dict)
         #Prep options in case of copying, do this in subclasses
         new_slot.default_options['default'] = new_slot.make_factory()
-        new_slot.default_options['validator'] = new_slot.validate_instance
+        new_slot.default_options['validator'] = new_slot.configure_instance
 
         log.info(f'defined {new_slot} with {kwargs}| {new_slot.default_options}')
 
@@ -118,17 +129,13 @@ class ATTR_BASE(attrs.Attribute):
         if 'default' not in kwargs:
             opts['default'] = cls.make_factory()
         if 'validator' not in kwargs:
-            opts['validator'] = cls.validate_instance
+            opts['validator'] = cls.configure_instance
 
         return attrs.Attribute(**opts)
-    
-    @classmethod
-    def validate_instance(cls,instance,attribute,value):
-        """validates the instance given attr's init routine"""
-        pass
+
     
 ATTR_BASE.default_options = dict(
-        #validator=ATTR_BASE.validate_instance,
+        #validator=ATTR_BASE.configure_instance,
         repr=False,
         cmp=None,
         hash=None,

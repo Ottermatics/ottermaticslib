@@ -43,7 +43,7 @@ def forge(cls=None, **kwargs):
             acls.pre_compile() #custom class compiler
             acls.validate_class()
             if acls.__name__ != 'Configuration': #prevent configuration lookup
-                acls.cls_compile() #compile subclasses
+                acls.compile_classes() #compile subclasses
             return acls
 
         # Component/Config Flow
@@ -59,7 +59,7 @@ def forge(cls=None, **kwargs):
         acls.pre_compile() #custom class compiler
         acls.validate_class()
         if acls.__name__ != 'Configuration': #prevent configuration lookup
-            acls.cls_compile() #compile subclasses
+            acls.compile_classes() #compile subclasses
         return acls
 
     else:
@@ -255,13 +255,14 @@ def signals_slots_handler(
 
         for o in out:
             if isinstance(o.type, PLOT):
-                print(o)
+                #print(o)
+                pass
 
     # Merge Fields Checking if we are overriding an attribute with system_property
     #hack since TabulationMixin isn't available yet
     #print(cls.mro())
     if 'TabulationMixin' in str(cls.mro()):   
-        cls_properties = cls.classmethod_system_properties(True)
+        cls_properties = cls.system_properties_classdef(True)
     else:
         cls_properties = {}
     #print(f'tab found!! {cls_properties.keys()}')
@@ -322,6 +323,104 @@ class Configuration(AttributedBaseMixin):
     _created_datetime = None
 
 
+    # Configuration Information
+    def internal_configurations(self,check_config=True,use_dict=True)->dict:
+        """go through all attributes determining which are configuration objects
+        additionally this skip any configuration that start with an underscore (private variable)
+        """
+        from engforge.configuration import Configuration
+
+        if check_config:
+            chk = lambda k,v: isinstance(v, Configuration)
+        else:
+            chk = lambda k,v: k in self.slots_attributes()
+        
+        obj = self.__dict__
+        if not use_dict: #slots
+            obj = {k: obj.get(k,None) for k in self.slots_attributes()}
+
+        return {
+            k: v
+            for k, v in obj.items()
+            if chk(k,v) and not k.startswith("_")
+        }
+
+    def copy_config_at_state(self,level=None,levels_deep:int=-1,changed:dict=None,**kw):
+        """copy the system at the current state recrusively to a certain level, by default copying everything
+        :param levels_deep: how many levels deep to copy, -1 is all
+        :param level: the current level, defaults to 0 if not set
+        """
+        from engforge.configuration import Configuration
+        
+        if changed is None:
+            changed = {}
+
+        if self in changed:
+            self.info(f'already changed {self}')
+            return changed[self]
+
+        if level is None:
+            level = 0
+            #at top level add parent to changed to prevent infinte parent recursion
+            changed[self] = None
+
+        #exit early if below the level 
+        if level >= levels_deep and levels_deep > 0:
+            self.info(f'below level {level} {levels_deep} {self}')
+            new_sys = attrs.evolve(self) #copy as is
+            changed[self] = new_sys
+            return new_sys
+        
+        #copy the internal configurations
+        kwcomps = {}
+        for key, config in self.internal_configurations().items():
+            self.info(f'copying {key} {config} {level} {changed}')
+            #copy the system
+            if config in changed:
+                ccomp = changed[config]
+            else:
+                ccomp = config.copy_config_at_state(level+1,levels_deep,changed)
+            kwcomps[key] = ccomp
+        
+        #Finally make the new system with changed internals
+        self.info(f'changing with changes {self} {kwcomps} {kw}')
+        new_sys = attrs.evolve(self,**kwcomps,**kw)
+        changed[self] = new_sys
+        return new_sys
+
+    def go_through_configurations(
+        self, level=0, levels_to_descend=-1, parent_level=0,**kw
+    ):
+        """A generator that will go through all internal configurations up to a certain level
+        if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
+        only go through this configuration
+
+        :return: level,config"""
+        from engforge.configuration import Configuration
+
+        should_yield_level = lambda level: all(
+            [
+                level >= parent_level,
+                any([levels_to_descend < 0, level <= levels_to_descend]),
+            ]
+        )
+
+        if should_yield_level(level):
+            yield "", level, self
+
+        level += 1
+        if 'check_config' not in kw:
+            kw['check_config'] = False
+        for key, config in self.internal_configurations(**kw).items():
+
+            if isinstance(config,Configuration):
+                for skey, level, iconf in config.go_through_configurations(
+                    level, levels_to_descend, parent_level
+                ):
+                    yield f"{key}.{skey}" if skey else key, level, iconf
+            else:
+                yield key,level,config
+
     # Our Special Init Methodology
     def __on_init__(self):
         """Override this when creating your special init functionality, you must use attrs for input variables, this is called after parents are assigned"""
@@ -343,6 +442,7 @@ class Configuration(AttributedBaseMixin):
         self.__pre_init__()
                 
         #Assign Parents, ensure single componsition
+        #TODO: allow multi-parent, w/wo keeping state, state swap on update()?
         for compnm,comp in self.internal_configurations(False).items():
             if isinstance(comp,Component):
                 #TODO: allow multiple parents
@@ -367,13 +467,18 @@ class Configuration(AttributedBaseMixin):
         pass
 
     @classmethod
-    def cls_compile(cls):
+    def compile_classes(cls):
         """compiles all subclass functionality"""
-        
+        cls.cls_compile()
         for subcls in cls.parent_configurations_cls():
             if subcls.subcls_compile is not Configuration:
                 log.debug(f'{cls.__name__} compiling {subcls.__name__}')
             subcls.subcls_compile()
+
+    @classmethod
+    def cls_compile(cls):
+        """compiles this class, override this to compile functionality for this class"""
+        pass
 
     @classmethod
     def subcls_compile(cls):

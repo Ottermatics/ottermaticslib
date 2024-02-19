@@ -273,7 +273,7 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         out["attributes"] = at = {}
         out["properties"] = pr = {}
 
-        for key in self.classmethod_system_properties():
+        for key in self.system_properties_classdef():
             pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
@@ -423,14 +423,14 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         # We use __get__ to emulate the property, we could call regularly from self but this is more straightforward
         return {
             k.lower(): obj.__get__(self)
-            for k, obj in self.class_system_properties.items()
+            for k, obj in self.system_properties_def.items()
         }
 
     @solver_cached
     def system_properties(self):
         # We use __get__ to emulate the property, we could call regularly from self but this is more straightforward
         tabulated_properties = [
-            obj.__get__(self) for k, obj in self.class_system_properties.items()
+            obj.__get__(self) for k, obj in self.system_properties_def.items()
         ]
         return tabulated_properties
 
@@ -439,7 +439,7 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         """Returns the labels from table properties"""
         class_dict = self.__class__.__dict__
         tabulated_properties = [
-            obj.label.lower() for k, obj in self.class_system_properties.items()
+            obj.label.lower() for k, obj in self.system_properties_def.items()
         ]
         return tabulated_properties
 
@@ -448,7 +448,7 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         """Returns the types from table properties"""
         class_dict = self.__class__.__dict__
         tabulated_properties = [
-            obj.return_type for k, obj in self.class_system_properties.items()
+            obj.return_type for k, obj in self.system_properties_def.items()
         ]
         return tabulated_properties
 
@@ -456,7 +456,7 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
     def system_properties_keys(self) -> list:
         """Returns the table property keys"""
         tabulated_properties = [
-            k for k, obj in self.class_system_properties.items()
+            k for k, obj in self.system_properties_def.items()
         ]
         return tabulated_properties
 
@@ -465,31 +465,31 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         """returns system_property descriptions if they exist"""
         class_dict = self.__class__.__dict__
         tabulated_properties = [
-            obj.desc for k, obj in self.class_system_properties.items()
+            obj.desc for k, obj in self.system_properties_def.items()
         ]
         return tabulated_properties
 
     @classmethod
     def cls_all_property_labels(cls):
         return [
-            obj.label for k, obj in cls.classmethod_system_properties().items()
+            obj.label for k, obj in cls.system_properties_classdef().items()
         ]
 
     @classmethod
     def cls_all_property_keys(cls):
-        return [k for k, obj in cls.classmethod_system_properties().items()]
+        return [k for k, obj in cls.system_properties_classdef().items()]
 
     @classmethod
     def cls_all_attrs_fields(cls):
         return attr.fields_dict(cls)
 
     @solver_cached
-    def class_system_properties(self):
-        """Combine other classes table properties into this one, in the case of subclassed system_properties"""
-        return self.__class__.classmethod_system_properties()
+    def system_properties_def(self):
+        """Combine other classes table properties into this one, in the case of subclassed system_properties as a property that is cached"""
+        return self.__class__.system_properties_classdef()
 
     @classmethod
-    def classmethod_system_properties(cls,recache=False):
+    def system_properties_classdef(cls,recache=False):
         """Combine other classes table properties into this one, in the case of subclassed system_properties"""
         from engforge.tabulation import TabulationMixin
         #Use a cache for deep recursion
@@ -540,7 +540,7 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         if any(
             [
                 v.stochastic
-                for k, v in cls.classmethod_system_properties(True).items()
+                for k, v in cls.system_properties_classdef(True).items()
             ]
         ):
             log.info(f"setting always save on {cls.__name__}")
@@ -562,8 +562,8 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         elif key in cls.input_fields():
             val = cls.input_fields()[key]
 
-        elif key in cls.classmethod_system_properties():
-            val = cls.classmethod_system_properties()[key]
+        elif key in cls.system_properties_classdef():
+            val = cls.system_properties_classdef()[key]
 
         # Fail on comand but otherwise return val
         if val is None:
@@ -592,8 +592,8 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
             # val= cls.input_fields()[key]
             return Ref(self, key)
 
-        elif key in self.classmethod_system_properties():
-            # val= cls.classmethod_system_properties()[key]
+        elif key in self.system_properties_classdef():
+            # val= cls.system_properties_classdef()[key]
             return Ref(self, key)
         
         elif key in self.internal_configurations() or key in self.slots_attributes():

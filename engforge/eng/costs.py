@@ -333,7 +333,7 @@ class CostModel(Configuration,TabulationMixin):
     @classmethod
     def class_cost_properties(cls)->dict:
         """returns cost_property objects from this class & subclasses"""
-        return {k:v for k,v in cls.classmethod_system_properties().items() if isinstance(v,cost_property)}     
+        return {k:v for k,v in cls.system_properties_classdef().items() if isinstance(v,cost_property)}     
     
     @property
     def cost_properties(self)->dict:
@@ -452,8 +452,8 @@ class Economics(Component):
             return ref.key
         elif ref.key in ref.comp.class_cost_properties():
             return ref.comp.class_cost_properties()[ref.key]
-        # elif ref.key in ref.comp.classmethod_system_properties():
-        #     return ref.comp.classmethod_system_properties()[ref.key]
+        # elif ref.key in ref.comp.system_properties_classdef():
+        #     return ref.comp.system_properties_classdef()[ref.key]
         # else:
         #     raise KeyError(f'ref key doesnt exist as property: {ref.key}')
 

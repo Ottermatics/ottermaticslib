@@ -88,9 +88,9 @@ class SLOT(ATTR_BASE):
                 default_options = cls.default_options.copy()
             ),
         )
-        #new_slot.default_options['validator'] = new_slot.validate_instance
-        #new_slot.default_options['default'] = new_slot.make_factory()
-        print(new_slot)
+        new_slot.default_options['validator'] = new_slot.configure_instance
+        new_slot.default_options['default'] = new_slot.make_factory()
+        #print(new_slot)
         
         return new_slot
 
@@ -141,13 +141,13 @@ class SLOT(ATTR_BASE):
                 default_options = cls.default_options.copy()
             ),
         )
-        #new_slot.default_options['validator'] = new_slot.validate_instance
+        #new_slot.default_options['validator'] = new_slot.configure_instance
         #new_slot.default_options['default'] =  new_slot.make_factory()
         return new_slot
 
     # Create a validator function
     @classmethod
-    def validate_instance(cls, instance, attribute, value):
+    def configure_instance(cls, instance, attribute, value):
         from engforge.component_collections import ComponentIter
 
         comp_cls = cls.config_cls
@@ -173,7 +173,7 @@ class SLOT(ATTR_BASE):
     @classmethod
     def make_factory(cls,**kwargs):
         accepted = cls.accepted
-        print(f'slot instance factory: {cls} {accepted}, {kwargs}')
+        #print(f'slot instance factory: {cls} {accepted}, {kwargs}')
 
         if isinstance(accepted,(tuple,list)) and len(accepted) > 0:
             accepted = accepted[0]

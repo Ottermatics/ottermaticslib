@@ -4,7 +4,7 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.attr_transient import TRANSIENT
+from engforge.attr_dynamics import TRANSIENT
 from engforge.attr_solver import SOLVER
 from engforge.attr_signals import SIGNAL
 from engforge.attr_slots import SLOT

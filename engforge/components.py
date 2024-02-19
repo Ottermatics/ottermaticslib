@@ -5,6 +5,7 @@ import typing
 # from engforge.logging import LoggingMixin, log
 from engforge.tabulation import TabulationMixin, system_property
 from engforge.configuration import forge, Configuration
+from engforge.solver import SolveableMixin
 from engforge.properties import class_cache
 
 
@@ -17,7 +18,7 @@ import matplotlib.pyplot as plt
 
 
 @forge
-class Component(Configuration,TabulationMixin):
+class Component(Configuration,TabulationMixin,SolveableMixin):
     """Component is an Evaluatable configuration with tabulation and reporting functionality"""
 
     parent: typing.Union['Component','System'] = attr.ib(default=None)
@@ -39,35 +40,31 @@ class Component(Configuration,TabulationMixin):
         return out
 
     #UPDATE & POST UPDATE recieve the same kw args
-    def update(self, system,**kw):
-        """override with custom system interaction"""
-        pass
+#     def update(self, system,**kw):
+#         """override with custom system interaction"""
+#         pass
+# 
+#     def post_update(self, system,**kw):
+#         """override with custom system interaction, will execute after all components have been updated"""
+#         pass    
 
-    def post_update(self, system,**kw):
-        """override with custom system interaction, will execute after all components have been updated"""
-        pass    
-
-    def update_internal(self,ignore:set=None,**kw):
-        """updates internal components with self"""
-        self.debug(f'updating internal {self.__class__.__name__}.{self}')
-        for key, config in self.internal_components().items():
-            if ignore is not None and config in ignore:
-                continue
-            self.debug(f'updating internal component {key}')
-            config.update(self)
-            config.update_internal(ignore)
-        if ignore: ignore.add(self)
-
-    def post_update_internal(self,ignore:set=None,**kw):
-        """updates internal components with self"""
-        self.debug(f'post updating internal {self.__class__.__name__}.{self}')
-        for key, config in self.internal_components().items():
-            if ignore is not None and config in ignore:
-                continue
-            self.debug(f'post updating internal component {config.__class__.__name__}.{config}')       
-            config.post_update(self)
-            config.post_update_internal(ignore)    
-        if ignore: ignore.add(self)        
+#     def update_internal(self,ignore:set=None,**kw):
+#         """updates internal components with self"""
+#         self.debug(f'updating internal {self.__class__.__name__}.{self}')
+#             config.update(self)
+#             config.update_internal(ignore)
+#         if ignore: ignore.add(self)
+# 
+#     def post_update_internal(self,ignore:set=None,**kw):
+#         """updates internal components with self"""
+#         self.debug(f'post updating internal {self.__class__.__name__}.{self}')
+#         for key, config in self.internal_components().items():
+#             if ignore is not None and config in ignore:
+#                 continue
+#             self.debug(f'post updating internal component {config.__class__.__name__}.{config}')       
+#             config.post_update(self)
+#             config.post_update_internal(ignore)    
+#         if ignore: ignore.add(self)        
 
 
 # TODO: move inspection for components to mixin for inspection of slots

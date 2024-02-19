@@ -68,7 +68,7 @@ class Analysis(Configuration,TabulationMixin, PlottingMixin, DataframeMixin):
             f"running analysis {self.identity} with input {args} {kwargs}"
         )
         cb = lambda *args,**kw: self.save_data(force=True, subforce=True)
-        out = self.system.run(*args, **kwargs, _cb=cb)
+        out = self.system.run(*args, **kwargs, cb=cb)
         self.post_process(*args, **kwargs)
 
         self._stored_plots = {}

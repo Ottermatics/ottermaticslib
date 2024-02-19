@@ -1,6 +1,6 @@
 from engforge.attributes import ATTR_BASE, AttributeInstance
 
-import attrs, attr
+import attrs, attr,uuid
 
 #Instance & Attribute definition for integration parameters
 # Solver minimizes residual by changing independents
@@ -60,6 +60,7 @@ class TRANSIENT(ATTR_BASE):
         new_name = f"TRANSIENT_{mode}_{parameter}_{derivative}".replace(
             ".", "_"
         )
+        new_name = new_name + '_' + str(uuid.uuid4()).replace('-','')[0:16]
         new_dict = dict(
             mode=mode,
             name=new_name,
@@ -69,13 +70,17 @@ class TRANSIENT(ATTR_BASE):
         new_slot = type(new_name, (TRANSIENT,), new_dict)
         return new_slot
     #make define the same as integrate
-    #define = integrate
+    @classmethod
+    def subcls_compile(cls,**kwargs):
+        cls.define = cls.integrate
 
     @classmethod
     def class_validate(cls,instance,**kwargs):
         from engforge.properties import system_property
+        from engforge.solver import SolveableMixin
 
         system = cls.config_cls
+        assert issubclass(system,SolveableMixin), f"must be a solveable system"
 
         parm_type = instance.locate(cls.parameter)
         if parm_type is None:

@@ -111,7 +111,7 @@ class ComponentIter(Component):
         out["attributes"] = at = {}
         out["properties"] = pr = {}
 
-        for key in self.classmethod_system_properties():
+        for key in self.system_properties_classdef():
             pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
@@ -140,7 +140,7 @@ class ComponentIter(Component):
             prr = ir["properties"]  # = prr = {}
 
             # set property refs
-            for key in item.classmethod_system_properties():
+            for key in item.system_properties_classdef():
                 k = f"{it_base_key}.{key}"
                 rc = Ref(item, key,True,False)
                 pr[k] = rc
@@ -224,7 +224,7 @@ class ComponentIterator(ComponentIter, UserList):
 #         for itkey,item in self._item_gen():
 #             it_base_key = f'{itkey}'
 #
-#             for key in item.classmethod_system_properties():
+#             for key in item.system_properties_classdef():
 #                 k = f'{it_base_key}.{key}'
 #                 pr[k] = Ref(item, key)
 #
@@ -251,7 +251,7 @@ class ComponentIterator(ComponentIter, UserList):
 #         for it,item in self._item_gen():
 #             it_base_key = f'{self.component_type.__name__.lower()}.{it}'
 #
-#             for key in item.classmethod_system_properties():
+#             for key in item.system_properties_classdef():
 #                 k = f'{it_base_key}.{key}'
 #                 pr[k] = Ref(item, key)
 #
