@@ -15,6 +15,7 @@ PyNiteFEA@ git+https://github.com/Ottermatics/PyNite.git@v1nept
 control
 fluids
 CoolProp
+expiringdict~=1.2.2
 zipp==3.1.0
 jinja2>=2.11.3
 freezegun>=0.3.12

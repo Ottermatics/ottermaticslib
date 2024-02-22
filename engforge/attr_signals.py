@@ -44,6 +44,9 @@ class SignalInstance(AttributeInstance):
     def mode(self) -> str:
         return self.signal.mode
 
+
+
+
 class SIGNAL(ATTR_BASE):
     """A base class that handles initalization in the attrs meta class scheme by ultimately createing a SignalInstance"""
 

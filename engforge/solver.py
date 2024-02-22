@@ -11,11 +11,11 @@ from contextlib import contextmanager
 import copy
 import datetime
 
+#from engforge.dynamics import DynamicsMixin
 from engforge.properties import *
+from engforge.solveable import SolveableMixin,refmin_solve,refset_get,refset_input
+import itertools,collections
 
-import itertools
-
-INTEGRATION_MODES = ["euler", "trapezoid", "implicit"]
 SOLVER_OPTIONS = ["root", "minimize"]
 
 
@@ -24,189 +24,6 @@ class SolverLog(LoggingMixin):
 
 
 log = SolverLog()
-
-class SolveableMixin:
-
-    #TODO: add parent state storage
-    parent: 'Configuration'
-
-    def update(self,parent,*args,**kwargs):
-        pass
-        
-    def post_update(self,parent,*args,**kwargs):
-        pass        
-        
-    def update_internal(self,eval_kw=None,ignore=None,*args,**kw):
-        """update internal elements with input arguments"""
-        # Solve Each Internal System
-        from engforge.components import Component
-        from engforge.component_collections import ComponentIter
-        
-        #Ignore 
-        if ignore is None:
-            ignore = set()
-        elif self in ignore:
-            return
-        
-        self.update(self.parent,*args,**kw)
-        self.debug(f'updating internal {self.__class__.__name__}.{self}')
-        for key, comp in self.internal_configurations(False).items():
-            
-            if ignore is not None and comp in ignore:
-                continue
-
-            #provide add eval_kw
-            if eval_kw and key in eval_kw:
-                eval_kw_comp = eval_kw[key]
-            else:
-                eval_kw_comp = {}              
-            
-            #comp update cycle
-            self.debug(f"updating {key} {comp.__class__.__name__}.{comp}")
-            if isinstance(comp, ComponentIter):
-                comp.update(self,**eval_kw_comp)
-            elif isinstance(comp, (SolverMixin,Component)):
-                comp.update(self,**eval_kw_comp)
-                comp.update_internal(eval_kw=eval_kw_comp,ignore=ignore)
-        ignore.add(self) #add self to ignore list
-
-    def post_update_internal(self,eval_kw=None,ignore=None,*args,**kw):
-        """Post update all internal components"""
-        #Post Update Self
-        from engforge.components import Component
-        from engforge.component_collections import ComponentIter
-
-        #Ignore 
-        if ignore is None:
-            ignore = set()
-        elif self in ignore:
-            return
-
-        self.post_update(self.parent,*args,**kw)
-        self.debug(f'post updating internal {self.__class__.__name__}.{self}')
-        for key, comp in self.internal_configurations(False).items():
-            
-            if ignore is not None and comp in ignore:
-                continue
-
-            #provide add eval_kw
-            if eval_kw and key in eval_kw:
-                eval_kw_comp = eval_kw[key]
-            else:
-                eval_kw_comp = {}   
-
-            self.debug(f"post updating {key} {comp.__class__.__name__}.{comp}")
-            if isinstance(comp, ComponentIter):
-                comp.post_update(self,**eval_kw_comp)
-            elif isinstance(comp, (SolverMixin,Component)):
-                comp.post_update(self,**eval_kw_comp)
-                comp.post_update_internal(eval_kw=eval_kw_comp,ignore=ignore)
-        ignore.add(self)
-
-    #Genearl method to distribute input to internal components
-    def _iterate_input_matrix(self,method,revert=True, cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None, force_solve=False,return_results=False,**kwargs):
-        """applies a permutation of input parameters for parameters. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. 
-
-        :param revert: will reset the values of X that were recorded at the beginning of the run.
-        :param cb: a callback function that takes the system as an argument cb(system)
-        :param sequence: a list of dictionaries that should be run in order per the outer-product of kwargs
-        :param eval_kw: a dictionary of keyword arguments to pass to the evaluate function of each component by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
-        :param sys_kw: a dictionary of keyword arguments to pass to the evaluate function of each system by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
-        :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
-
-
-        :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
-        """
-        from engforge.system import System
-        self.debug(f"running [SOLVER].{method} {self.identity} with input {kwargs}")
-
-        # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
-        
-        #Recache system references
-        if isinstance(self,System):
-            self.system_references(recache=True)
-
-        #create iterable null for sequence
-        if sequence is None or not sequence:
-            sequence = [{}]
-
-        #Create Keys List
-        sequence_keys = set()
-        for seq in sequence:
-            sequence_keys = sequence_keys.union(set(seq.keys()))
-
-        # RUN when not solved, or anything changed, or arguments or if forced
-        if force_solve or not self.solved or self.anything_changed or kwargs:
-            _input = self.parse_run_kwargs(**kwargs)
-            
-            output = {}
-            inputs = {}
-            result = {'output':output,'input_sets':inputs}
-
-            if revert:
-                # TODO: revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
-                revert_x = self.system_state
-
-            # prep references for keys
-            refs = {}
-            for k, v in _input.items():
-                refs[k] = self.locate_ref(k)
-            for k in sequence_keys:
-                refs[k] = self.locate_ref(k)
-
-            #Pre Run Callback
-            self.pre_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
-
-            # Premute the input as per SS or Transient Logic
-            ingrp = list(_input.values())
-            keys = list(_input.keys())
-            #Iterate over components (they are assigned to the system by call)
-            for itercomp in self._iterate_components():
-                #Iterate over inputs
-                for parms in itertools.product(*ingrp):
-                    # Set the reference aliases
-                    cur = {k: v for k, v in zip(keys, parms)}
-                    #Iterate over Sequence (or run once)
-                    for seq in sequence:
-                        #apply sequenc evalues
-                        icur = cur.copy()
-                        if seq:
-                            icur.update(**seq)
-                        
-                        #Run The Method with inputs provisioned
-                        out = method(refs,icur,eval_kw,sys_kw,cb=cb)
-
-                        if return_results:
-                            #store the output
-                            output[max(output)+1 if output else 0] = out
-                            #store the input
-                            inputs[max(inputs)+1 if inputs else 0] = icur
-            
-            #nice
-            self._solved = True
-            
-            #Pre Run Callback with current state
-            self.post_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
-            
-            #pre-revert by default
-            if revert and revert_x:
-                self.set_system_state(ignore=["index"], **revert_x)
-            
-            #reapply solved state
-            self._solved = True
-            
-            if return_results:
-                return result
-
-        elif not self.anything_changed:
-            self.warning(f'nothing changed, not running {self.identity}')
-            return
-        elif self.solved:
-            raise Exception("Analysis Already Solved")
-        
-        
-
-
 class SolverMixin(SolveableMixin):
     _run_id: str = None
     _solved = None
@@ -224,75 +41,9 @@ class SolverMixin(SolveableMixin):
     solver_option = "root"
 
     # Configuration Information
-    @instance_cached
-    def signals(self):
-        return {k: getattr(self, k) for k in self.signals_attributes()}
-
-    @instance_cached
-    def solvers(self):
-        return {k: getattr(self, k) for k in self.solvers_attributes()}
-
-    @instance_cached(allow_set=True)
-    def transients(self):
-        #TODO: add dynamics internals
-        return {k: getattr(self, k) for k in self.transients_attributes()}
-
     @property
     def solved(self):
         return self._solved
-
-    def parse_run_kwargs(self, **kwargs):
-        """ensures correct input for simulation.
-        :returns: first set of input for initalization, and all input dictionaries as tuple.
-
-        """
-
-        #use eval_kw and sys_kw to handle slot argument and sub-system arguments
-
-        # Validate OTher Arguments By Parameter Or Comp-Recursive
-        parm_args = {k: v for k, v in kwargs.items() if "." not in k}
-        comp_args = {k: v for k, v in kwargs.items() if "." in k}
-
-        # check parms
-        inpossible = set.union(set(self.input_fields()),set(self.slots_attributes()))
-        argdiff = set(parm_args).difference(inpossible)
-        assert not argdiff, f"bad input {argdiff}"
-
-        # check components
-        comps = set([k.split(".")[0] for k in comp_args.keys()])
-        compdiff = comps.difference(set(self.slots_attributes()))
-        assert not compdiff, f"bad slot references {compdiff}"
-
-        _input = {}
-        test = lambda v,add: isinstance(v, (int, float, str,*add)) or v is None
-
-        # parameters input
-        for k, v in kwargs.items():
-            
-            #If a slot check the type is applicable
-            subslot = self.check_ref_slot_type(k)
-            if subslot is not None:
-                #log.debug(f'found subslot {k}: {subslot}')
-                addty = subslot
-            else:
-                addty = []
-
-            # Ensure Its a List
-            if isinstance(v, numpy.ndarray):
-                v = v.tolist()
-
-            if not isinstance(v, list):
-                assert test(v,addty), f"bad values {k}:{v}"
-                v = [v]
-            else:
-                assert all([test(vi,addty) for vi in v]), f"bad values: {k}:{v}"
-
-            if k not in _input:
-                _input[k] = v
-            else:
-                _input[k].extend(v)
-
-        return _input
 
     def run(self,*args,**kwargs):
         """the steady state run method for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
@@ -304,14 +55,10 @@ class SolverMixin(SolveableMixin):
         
         #TODO: what to do with eval / sys kw
         #TODO: option to preserve state
-        self.refset_input(refs,icur)
+        refset_input(refs,icur)
         self.info(f"running with {icur}|{kwargs}")
         self.run_method(*args,**kwargs)
         self.debug(f"{icur} run time: {self._run_time}")
-
-    def refset_input(self,refs,delta_dict):
-        for k, v in delta_dict.items():
-            refs[k].set_value(v)
 
     def run_method(self,eval_kw=None,sys_kw=None,cb=None):
         """runs the case as currently defined by the system. This is the method that is called by the solver matrix to run the system with the input parameters. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
@@ -446,6 +193,8 @@ class SolverMixin(SolveableMixin):
         self.system_solver()
 
     def system_solver(self):
+        #TODO: use ref algorithm to solve system
+        #TODO: add transient balances to the system with constraints ect.
         # Check independents to run system
         if not self.X.size > 0:
             if self.log_level < 10:
@@ -760,4 +509,23 @@ class SolverMixin(SolveableMixin):
             cons = {"type": "ineq", "fun": fun}
             return cons
 
+    #Replaces Tabulation Method
+    @solver_cached
+    def data_dict(self):
+        """records properties from the entire system, via system references cache"""
+        out = collections.OrderedDict()
+        sref = self.system_references()
+        for k, v in sref["attributes"].items():
+            val = v.value()
+            if isinstance(val, TABLE_TYPES):
+                out[k] = val
+            else:
+                out[k] = numpy.nan
+        for k, v in sref["properties"].items():
+            val = v.value()
+            if isinstance(val, TABLE_TYPES):
+                out[k] = val
+            else:
+                out[k] = numpy.nan
+        return out
 

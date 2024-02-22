@@ -16,28 +16,40 @@ from engforge.tabulation import TabulationMixin
 from engforge import properties as prop
 from engforge.attributes import ATTR_BASE
 from engforge.properties import instance_cached
+from engforge.tabulation import Ref
+from engforge.solveable import SolveableMixin,refmin_solve,refset_get,refset_input
 
+
+from collections import OrderedDict
 import numpy as np
 import pandas
+import expiringdict
 import attr, attrs
+from scipy.integrate import solve_ivp
 
 
 #Index maps are used to translate between different indexes (local & global)
 class INDEX_MAP:
     oppo = {str:int,int:str}
-    def __init__(self,data:list):
-        self.data = data
+    def __init__(self,datas:list):
+        self.data = [data if not data.startswith('.') else data[1:] for data in datas]
         self.index = {}
 
     def get(self,key):
+        if key.startswith('.'):
+            key = key[1:]
         if key not in self.index:
             self.index[key] = self.data.index(key)
         return self.index[key]
 
     def __getitem__(self,key):
+        if key.startswith('.'):
+            key = key[1:]        
         return self.get(key)
 
     def __call__(self, key):
+        if key.startswith('.'):
+            key = key[1:]        
         return self.get(key)
 
     @staticmethod
@@ -54,11 +66,13 @@ class INDEX_MAP:
         return oop2
     
 
-class DynamicsIntegratorMixin:
+class DynamicsIntegratorMixin(SolveableMixin):
     
     nonlinear:bool = True #enables matrix modification for nonlinear dynamics
 
-    def integrate(self,dt,X,U,*args,**kwargs):
+    time: float = 0.0
+
+    def rate(self,t,dt,X,U,*args,**kwargs):
         """simulate the system over the course of time.
 
         Args:
@@ -71,19 +85,25 @@ class DynamicsIntegratorMixin:
             dataframe: tabulated data
         """
         if self.nonlinear:
-            return self.simulate_nonlinear(dt,*args,**kwargs)
+            return self.rate_nonlinear(t,dt,X,U,*args,**kwargs)
         else:
-            return self.simulate_linear(dt,*args,**kwargs)
+            return self.rate_linear(t,dt,X,U,*args,**kwargs)
 
-    def integrate_linear(self,dt,X,U,*args,**kwargs):
+    def rate_linear(self,t,dt,X,U,*args,**kwargs):
         pass
 
-    def integrate_nonlinear(self,dt,X,U,*args,**kwargs):
+    def rate_nonlinear(self,t,dt,X,U,*args,**kwargs):
         pass
 
+    def reset_sim(self):
+        """reset the system to the initial state"""
+        self.time = 0.0
+        
+    
 #Quickly create a state space model
 #TODO: How to add delay, and feedback?
 #TODO: How to add control and limits in general?
+#TODO: add time as a state variable
 @forge(auto_attribs=True)
 class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
     """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the TRANSIENT integrating attributes, and will raise an error if a conflict is detected #TODO.
@@ -94,27 +114,44 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
     dynamic_output_parms:list = attrs.field(factory=list)
 
     #state variables
-    dynamic_A:np.ndarray = None
-    dynamic_B:np.ndarray = None
-    dynamic_C:np.ndarray = None
-    dynamic_D:np.ndarray = None
-    dynamic_F:np.ndarray = None
-    dynamic_K:np.ndarray = None
+    dynamic_A:list = None
+    dynamic_B:list = None
+    dynamic_C:list = None
+    dynamic_D:list = None
+    dynamic_F:list = None
+    dynamic_K:list = None
     
     #Static linear state
-    static_A:np.ndarray = None
-    static_B:np.ndarray = None
-    static_C:np.ndarray = None
-    static_D:np.ndarray = None
-    static_F:np.ndarray = None
-    static_K:np.ndarray = None    
+    static_A:list = None
+    static_B:list = None
+    static_C:list = None
+    static_D:list = None
+    static_F:list = None
+    static_K:list = None    
 
+    #TODO:
     #dynamic_control_module = None
-    #control_interval:float = 0.0 #how often to update the physics
-    update_interval:float = 0.0 #how often to update the physics, 0 is everytime
-    delay_ms:float = None #delay in milliseconds for output buffering
+    #control_interval:float = 0.0 ##TODO: how often to update the control
+    
+    update_interval:float = 0.0 #TODO: how often to update the physics, 0 is everytime
+    delay_ms:float = None #TODO: delay in milliseconds for output buffering
     nonlinear:bool = False
+
+    #TODO: add integration state dynamic cache to handle relative time steps
     #TODO: add control module with PID control and pole placement design
+
+    
+    def __pre_init__(self,**kwargs):
+        """override this method to define the class"""
+        #fields = 
+        fields = attrs.fields_dict(self.__class__)
+        system_property = self.system_properties_def
+        for p in self.dynamic_state_parms:
+            assert p in fields, f"state parameter {p} not in attr: {fields}"
+        for p in self.dynamic_output_parms:
+            assert p in fields, f"output parameter {p} not in attr: {fields}"
+        for p in self.dynamic_input_parms:
+            assert p in fields, f"input parameter {p} not in attr: {fields}"
 
     @instance_cached
     def state_size(self):
@@ -139,6 +176,24 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
     @property
     def output(self)->np.array:
         return np.array([getattr(self,parm,np.nan) for parm in self.dynamic_output_parms])
+    
+    @property
+    def Xt_ref(self):
+        '''alias for state values'''
+        d = [(parm,Ref(self,parm)) for parm in self.dynamic_state_parms]
+        return OrderedDict(d)
+    
+    @property
+    def Yt_ref(self):
+        '''alias for output values'''
+        d = [(parm,Ref(self,parm)) for parm in self.dynamic_output_parms]
+        return OrderedDict(d)
+
+    @property
+    def Ut_ref(self):
+        '''alias for input values'''
+        d = [(parm,Ref(self,parm)) for parm in self.dynamic_input_parms]
+        return OrderedDict(d)    
     
     #TODO: add sparse mode
     def create_state_matrix(self,**kwargs) -> np.ndarray:
@@ -205,6 +260,7 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
 
     def update_dynamics(self,t,X,U):
         """Updates dynamics when nonlinear is enabled, otherwise it will do nothing"""
+        self.time = t
         if not self.nonlinear:
             return
         
@@ -220,11 +276,22 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         self.dynamic_F = self.update_state_constants(t,self.static_F,X)
         self.dynamic_K = self.update_output_constants(t,self.static_K,X)
 
-    def integrate_linear(self,t,dt,X,U,*args,**kwargs):
+    #linear and nonlinear system level IO
+    def rate_linear(self,t,dt,X,U=None):
+        """simulate the system over the course of time. Return time differential of the state.
+        """
+    
+        O = self.static_A @ X
+        if U is not None and self.static_B.size and U.size:
+            O += self.static_B @ U
+        if self.static_F.size:
+            O += self.static_F
+        return  O    
+
+    def linear_output(self,t,dt,X,U=None):
         """simulate the system over the course of time. Return time differential of the state.
 
         Args:
-            t (float): time
             dt (float): interval to integrate over in time
             X (np.ndarray): state input
             U (np.ndarray): control input
@@ -232,22 +299,15 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         Returns:
             np.array: time differential of the state
         """
-        return self.static_A @ X + self.static_B @ U + self.static_F
 
-    def linear_output(self,t,dt,X,U):
-        """simulate the system over the course of time. Return time differential of the state.
+        O = self.static_C @ X
+        if U is not None and self.static_D.size and U.size:
+            O += self.static_D @ U
+        if self.static_K.size:
+            O += self.static_K
+        return  O
 
-        Args:
-            dt (float): interval to integrate over in time
-            X (np.ndarray): state input
-            U (np.ndarray): control input
-
-        Returns:
-            np.array: time differential of the state
-        """
-        return self.static_C @ X + self.static_D @ U + self.static_K
-
-    def integrate_nonlinear(self,t,dt,X,U,update=True):
+    def rate_nonlinear(self,t,dt,X,U=None,update=True):
         """simulate the system over the course of time. Return time differential of the state.
 
         Args:
@@ -260,9 +320,15 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
             np.array: time differential of the state
         """
         if update: self.update_dynamics(t,X,U)
-        return self.dynamics_A @ X + self.dynamics_B @ U + self.dynamics_F
+        O = self.dynamic_A @ X
+        if U is not None and self.dynamic_B.size and U.size:
+            O += self.dynamic_B @ U
+        
+        if self.dynamic_F.size:
+            O += self.dynamic_F
+        return  O    
 
-    def nonlinear_output(self,t,dt,X,U,update=True):
+    def nonlinear_output(self,t,dt,X,U=None,update=True):
         """simulate the system over the course of time. Return time differential of the state.
 
         Args:
@@ -274,7 +340,42 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
             np.array: time differential of the state
         """
         if update: self.update_dynamics(t,X,U)
-        return self.dynamics_C @ X + self.dynamics_D @ U + self.dynamics_K
+        O = self.dynamic_C @ X
+        if U is not None and self.dynamic_D.size and U.size:
+            O += self.dynamic_D @ U
+        if self.dynamic_K.size:
+            O += self.dynamic_K
+        return  O
+
+    #optimized convience funcitons
+    def nonlinear_step(self,t,dt,X,U=None):
+        """Optimal nonlinear steps"""
+        self.update_dynamics(t,X,U)
+        #print(self.dynamic_A,self.dynamic_B,X,U)
+        dXdt = self.rate_nonlinear(t,dt,X,U,update=False)
+        out = self.nonlinear_output(t,dt,X,U,update=False)
+        
+        for i,p in enumerate(self.dynamic_output_parms):
+            self.Yt[p] = out[p]
+
+        return dXdt
+    
+    def linear_step(self,t,dt,X,U=None):
+        """Optimal nonlinear steps"""
+        self.update_dynamics(t,X,U)
+        dXdt = self.rate_linear(t,dt,X,U)
+        out = self.linear_output(t,dt,X,U)
+        
+        for i,p in enumerate(self.dynamic_output_parms):
+            self.Yt[p] = out[p]
+
+        return dXdt 
+
+    def step(self,t,dt,X,U=None):
+        if self.nonlinear:
+            return self.nonlinear_step(t,dt,X,U)
+        else:
+            return self.linear_step(t,dt,X,U)
 
     def determine_nearest_stationary_state(self,t=0,X=None,U=None)->np.ndarray:
         """determine the nearest stationary state"""
@@ -286,14 +387,17 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
 
         if self.nonlinear:
             self.update_dynamics(t,X,U)
-            Mb = self.dynamics_B @ U if self.input_size > 0 else 0
-            Mx =  self.dynamics_F + Mb
-            return np.linalg.solve(self.dynamics_A,-Mx)
+            Mb = self.dynamic_B @ U if self.input_size > 0 else 0
+            Mx =  self.dynamic_F + Mb
+            return np.linalg.solve(self.dynamic_A,-Mx)
 
         #static state
         Mb = self.static_B @ U if self.input_size > 0 else 0
         Mx = Mb + self.static_F
         return np.linalg.solve(self.static_A,-Mx)
+    
+    def __hash__(self):
+        return hash(id(self))
 
 @forge(auto_attribs=True)
 class GlobalDynamics(DynamicsMixin):
@@ -302,80 +406,6 @@ class GlobalDynamics(DynamicsMixin):
     #TODO: establish bounds in solver
     #TODO: establish steady date analysis
     """
-
-    def collect_internal_dynamics(self,conf:"ConfigurationMixin"=None)->dict:
-        """collects the dynamics of the systems"""
-        if conf is None:
-            conf = self
-        
-        dynamics = {}
-        traces = {}
-        signals = {}
-        solvers = {}  
-        out = dict(
-            dynamics = dynamics,
-            traces = traces,
-            signals = signals,
-            solvers = solvers
-            )
-        
-        for key,lvl,conf in conf.go_through_configurations():
-
-            if isinstance(conf,DynamicsMixin):
-                dynamics[key] = {'lvl':lvl,'conf':conf}
-
-            tra = conf.transients_attributes()
-            if tra:
-                trec = {k:at.type for k,at in tra.items()}
-                traces[key] = {'lvl':lvl,'conf':conf,
-                               'transients':trec}
-
-            #TODO: map signals and slots
-            sig = conf.signals_attributes()
-            if sig:
-                sigc = {k:at.type for k,at in sig.items()}
-                signals[key] = {'lvl':lvl,'conf':conf,
-                                'signals':sigc}
-
-            solv = conf.solvers_attributes()
-            if solv:
-                solvc = {k:at.type for k,at in solv.items()}
-                solvers[key] = {'lvl':lvl,'conf':conf,
-                                'solvers':solvc}
-
-        return out
-
-    def parse_simulation_input(self,**kwargs):
-        """parses the simulation input
-        
-        :param dt: timestep in s, required for transients
-        :param endtime: when to end the simulation
-        """
-        # timestep
-        if "dt" not in kwargs:
-            raise Exception("transients require `dt` to run")
-        # f"transients require timestep input `dt`"
-        dt = float(kwargs.pop("dt"))
-
-        # endtime
-        if "endtime" not in kwargs:
-            raise Exception("transients require `endtime` to run")
-
-        # add data
-        _trans_opts = {"dt": None, "endtime": None}
-        _trans_opts["dt"] = dt
-
-        # f"transients require `endtime` to specify "
-        _trans_opts["endtime"] = endtime = float(kwargs.pop("endtime"))
-        _trans_opts["Nrun"] = max(int(endtime / dt) + 1, 1)
-
-        #TODO: expose integrator choices
-        #TODO: add delay and signal & feedback options
-
-        return _trans_opts        
-
-
-
     def sim_matrix(self,eval_kw=None,sys_kw=None,*args,**kwargs):
         """simulate the system over the course of time.
 
@@ -393,60 +423,127 @@ class GlobalDynamics(DynamicsMixin):
         endtime = tr_opts['endtime']
 
         if isinstance(self,SolveableMixin):
-            sim = lambda *args,**kw: self.simulate(dt,endtime,*args,**kw)
+            sim = lambda *args,**kw: self.simulate(dt,endtime,eval_kw=eval_kw,sys_kw=sys_kw,*args,**kw)
             self._iterate_input_matrix(sim,dt,endtime,eval_kw=eval_kw,sys_kw=sys_kw,return_results=True,*args,**kwargs)
         else:
             self.simulate(dt,endtime,eval_kw=eval_kw,sys_kw=sys_kw)
 
 
-    def simulate(self,dt,endtime,cb=None,eval_kw=None,sys_kw=None)->pandas.DataFrame:
+    def simulate(self,dt,endtime,X0=None,cb=None,eval_kw=None,sys_kw=None,min_kw=None,run_solver=True,return_system=False)->pandas.DataFrame:
         """runs a simulation over the course of time, and returns a dataframe of the results.
         
         A copy of this system is made, and the simulation is run on the copy, so as to not affect the state of the original system.
         """
+        min_kw_dflt = {'method':'SLSQP','doset':True,'reset':False,'fail':True}
+        #'tol':1e-6,'options':{'maxiter':100}}
+        #min_kw_dflt = {'doset':True,'reset':False,'fail':True}
+        if min_kw is None:
+            min_kw = min_kw_dflt
+        else:
+            min_kw_dflt.update(min_kw)
+        mkw = min_kw_dflt
 
+        #Data Storage {time: data}
+        data = {} #output storage
+        solver = expiringdict.ExpiringDict(100,600) #temp solver storage
         Time = np.arange(0, endtime+dt, dt)
 
-        #Prep for Simulation
-        scopy = self.copy_config_at_state()
-        dyns = scopy.collect_internal_dynamics()
-        refs = references = scopy.system_references()
-
-        #Data Storage
-        data = {}
-
-        
+        #loop through components and do this (part of global)
         #Orchestrate The Simulation
-        dyn_sys = {(k,v['lvl']):v['conf'] for k,v in dyns['dynamics'].items()}
-        trn_sys = {(k,v['lvl']):v['conf'] for k,v in dyns['traces'].items()}
-        signal_sys = {(k,v['lvl']):v['conf'] for k,v in dyns['signals'].items()}
-        solver_sys = {(k,v['lvl']):v['conf'] for k,v in dyns['solvers'].items()}
+        system = self.copy_config_at_state()
+        system.create_state_matrix()
+        system.comp.create_state_matrix()
+        refs = system.collect_solver_refs()
+        intl_refs = refs['tr_states']
+        out_refs = refs['tr_output']
 
+        #Initial State
         #Create X & Index For Transient Variables
-        #X should be ordered by the order of the systems
-        #X = 
-        #Index =
+        #X should be ordered by the order of the system states        
+        #Get or Set Initial State
+        if X0 is None:
+            #get current
+            X0 = {k:v.value() for k,v in intl_refs.items()}
+        #else:
+            #refset_input(intl_refs,X0)
+        X0 = np.array([X0[p] for p in intl_refs])
 
-        #Run Simulation
-        #1. create function to run the simulation by updating X, and recording Xdot
-        #1.2. create state matrices for each system
-        #1.3. organize systems into a global state space model
-        #1.4. organize signals to be executed via state IO
+        data = {}
+        #time loop (remove)
+        #for t in Time:
+        def sim_iter(t,x,*args):
+            out = {p:np.nan for p in intl_refs}
+
+            #set state to match x
+            for i,(k,v) in enumerate(intl_refs.items()):
+                v.set_value(x[i])
+            
+            #solver always gets a copy of x
+            solver[t] = x 
+            
+            #test for record time
+            if not data or t > max(data)+dt:
+                data[t] = system.data_dict_tm(t)
+
+            #pre signals
+            #TODO: custom transient signals
+            for sig,sdict in refs['signals'].items():
+                if sdict['mode'] in ['pre','both']:
+                    sdict['target'].set_value(sdict['source'].value())
+
+            #transients
+            for parm,trdct in refs['tr_sets'].items():
+                out[parm] = trdct['dpdt'].value()
+
+            #dynamics 
+            for compnm,compdict in refs['dyn_comp'].items():
+                comp = compdict['comp']
+                Xds = np.array([r.value() for r in comp.Xt_ref.values()])
+                Uds = np.array([r.value() for r in comp.Ut_ref.values()])
+                #print(t,Xds,Uds,comp.Xt_ref)
+                dxdt = comp.step(t,dt,Xds,Uds)
+
+                for i,(p,ref) in enumerate(comp.Xt_ref.items()):
+                    out[(f'{compnm}.' if compnm else '')+p] = dxdt[i]
+
+            #solvers
+            if run_solver:
+                refmin_solve(refs['ss_states'],refs['ss_output'],**mkw)
+            
+            #last signals
+            for sig,sdict in refs['signals'].items():
+               if sdict['mode'] in ['post','both']:
+                   sdict['target'].set_value(sdict['source'].value())
+
+            return np.array([out[p] for p in intl_refs])
         
-        #2. run the simulation, #TODO: respecting bounds and constraints
-        #While t < endtime; t += dt:
-        #2.1 first run signals
-        #2.2 solve the free variables
-        #2.3 determine rate change of the state
-        #2.4 #TODO: check boundaries & constraints| (Bnd-sign(X)*X)?
+        ans = solve_ivp(sim_iter,[0,endtime],X0,method='RK45',t_eval=Time)
+        print(ans)
 
-        #Simulate The Data
+        #convert to list with time
+        data = [{'time':k,**v} for k,v in data.items()]
+        df = pandas.DataFrame(data)    
+        if return_system:
+            return system,df
+        return df
+
+            
+
+    def data_dict_tm(self,time,**kw):
+        """returns the data dictionary"""
+        dd = self.data_dict
+        dd['time'] = time
+        dd.update(kw) #TODO: check for typing
+        #print(dd)
+        return dd
+
 
 
     @property#TODO: make the dataframe_property for the dataframe
     def dataframe(self):
         """overrides the dataframe property to collect the dataframes of the subsystems"""
         raise NotImplementedError()
+
 
 
 if __name__ == "__main__":
@@ -480,6 +577,26 @@ if __name__ == "__main__":
         def create_state_constants(self,**kwargs) -> np.ndarray:
             """creates the input matrix for the system, called B"""
             return np.array([0,self.K*self.x0/self.M])
+        
+        def update_state_constants(self, t, F, X) -> np.ndarray:
+            """override """
+            F = F.copy()
+            F[-1] = self.K*self.x0/self.M
+            return F
+        
+        @system_property
+        def a(self) -> float:
+            return (-self.v*self.b - (self.x-self.x0)*self.K)/self.M
+
+    @forge(auto_attribs=True)
+    class TransientSys(Component):
+
+        x:float = 0
+        v:float = 0
+        a:float = 0
+
+        speed = TRANSIENT.integrate('x','v',mode='euler')
+        accel = TRANSIENT.integrate('v','a',mode='euler')
 
 
 
@@ -492,16 +609,46 @@ if __name__ == "__main__":
         v:float = 0
         a:float = 0
 
-        speed = TRANSIENT.integrate('x','v',mode='euler')
-        accel = TRANSIENT.integrate('v','a',mode='euler')
+        Force:float = 0.
+        Damp: float = 10
+        Mass:float = 100.
+        K: float = 1
+
+        Fref: float = 10
+        omega: float = 1
 
         comp = SLOT.define(DynamicComponent)
-        sig = SIGNAL.define('a','spring_accel')
-        slv = SOLVER.define('spring_accel','comp.x0')
+        trns = SLOT.define(TransientSys)
+
+        sig = SIGNAL.define('trns.a','spring_accel')
+        slv = SOLVER.define('delta_a','Force')
+
+        nonlinear: bool = True
 
         @system_property
         def spring_accel(self)->float:
-            return (-self.comp.v*self.comp.b - self.comp.x*self.comp.K)/self.comp.M
+            #print(self.comp.v,self.comp.x,self.comp.a)
+            return (-self.comp.v*self.comp.b - (self.comp.x-self.comp.x0)*self.comp.K)/self.comp.M
+        
+        @system_property
+        def delta_a(self)->float:
+            return self.Fref*np.cos(self.omega*self.time) - self.Force + self.v*self.Damp - self.K*self.x
+
+        def create_state_matrix(self,*args,**kwargs) -> np.ndarray:
+            """creates the state matrix for the system"""
+            return np.array([[0,1.],[-self.K/self.Mass,-1*self.Damp/self.Mass]])
+
+        def create_state_constants(self,*args,**kwargs) -> np.ndarray:
+            """creates the input matrix for the system, called B"""
+            return np.array([0,self.Force/self.Mass])     
+
+        def update_state_nonlinear(self,*args,**kwargs) -> np.ndarray:
+            """creates the state matrix for the system"""
+            return np.array([[0,1.],[0,-1*self.Damp/self.Mass]])
+
+        def update_state_constants(self,*args,**kwargs) -> np.ndarray:
+            """creates the input matrix for the system, called B"""
+            return np.array([0,self.Force/self.Mass])      
 
 
     dc = DynamicComponent()
@@ -510,10 +657,31 @@ if __name__ == "__main__":
     ds = DynamicSystem(comp=dc)
     ds.create_dynamics()
     #ds.update_dynamics()
-    ds.collect_internal_dynamics()
-    ds2 = ds.copy_config_at_state()
+    ds.collect_solver_dynamics()
+    #ds2 = ds.copy_config_at_state()
+    sr = ds.collect_solver_refs()
 
-    ds.as_dict
+    min_kw={'normalize':np.array([1/1000])}
+    sim,df = ds.simulate(0.01,60,run_solver=True,return_system=True)
+    ax = df.plot('time',['x','comp.x','trns.x'])
+    #ax.set_ylim(-1,5)
+    ax2 = ax.twinx()
+    ax2.plot(df.time,df.a,'r--',label='acl')
+    ax2.plot(df.time,df['trns.a'],'b--',label='trans_acl')
+    ax2.plot(df.time,df['spring_accel'],'c--',label='spring_acl')
+    ax2.legend()
+                    
+
+    #test instance separation
+#     dsx_start = ds.x
+#     sr['dynamics']['']['state']['x'].set_value((dsx_start+1)*5)
+#     assert ds.x == dsx_start
+# 
+#     dsx_start = ds.comp.x
+#     sr['dynamics']['comp']['state']['x'].set_value((dsx_start+1)*5)
+#     assert ds.comp.x == dsx_start    
+# 
+#     ds.as_dict
         
     #N_test = 2
 

@@ -39,6 +39,7 @@ fluids
 CoolProp
 
 #Database
+expiringdict~=1.2.2
 # SQLAlchemy>=1.3.17
 # SQLAlchemy-Utils
 # psycopg2-binary

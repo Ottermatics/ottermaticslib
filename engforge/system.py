@@ -50,7 +50,7 @@ log = SystemsLog()
 
 
 @forge
-class System(Configuration,TabulationMixin, SolverMixin, PlottingMixin):
+class System(Configuration,SolverMixin, TabulationMixin, PlottingMixin):
     """A system defines SLOTS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
@@ -112,90 +112,4 @@ class System(Configuration,TabulationMixin, SolverMixin, PlottingMixin):
         """allows default functionality with new property system"""
         self._anything_changed_ = inpt
 
-    #@instance_cached
-    @property
-    def comp_references(self):
-        """A cached set of recursive references to any slot component"""
-        out = {}
-        for key, lvl, comp in self.go_through_configurations(parent_level=1):
-            if not isinstance(comp, TabulationMixin):
-                continue
-            out[key] = comp
-        return out
-
-    #@property
-    def system_references(self,recache=False):
-        """gather a list of references to attributes and"""
-        if recache == False and hasattr(self,'_prv_system_references'):
-            return self._prv_system_references
-        
-        out = self.internal_references(recache)
-        tatr = out["attributes"]
-        tprp = out["properties"]
-
-        # component iternals
-        for key, comp in self.comp_references.items():
-            sout = comp.internal_references(recache)
-            satr = sout["attributes"]
-            sprp = sout["properties"]
-
-            # Fill in
-            for k, v in satr.items():
-                tatr[f"{key}.{k}"] = v
-
-            for k, v in sprp.items():
-                tprp[f"{key}.{k}"] = v
-        
-        self._prv_system_references = out
-        return out
-
-    @instance_cached
-    def all_references(self) -> dict:
-        out = {}
-        sysref = self.system_references()
-        out.update(**sysref["attributes"])
-        out.update(**sysref["properties"])
-        return out
-
-    @solver_cached
-    def data_dict(self):
-        """records properties from the entire system, via system references cache"""
-        out = collections.OrderedDict()
-        sref = self.system_references()
-        for k, v in sref["attributes"].items():
-            val = v.value()
-            if isinstance(val, TABLE_TYPES):
-                out[k] = val
-            else:
-                out[k] = numpy.nan
-        for k, v in sref["properties"].items():
-            val = v.value()
-            if isinstance(val, TABLE_TYPES):
-                out[k] = val
-            else:
-                out[k] = numpy.nan
-        return out
-
-    @property
-    def system_state(self):
-        """records all attributes"""
-        out = collections.OrderedDict()
-        sref = self.system_references()
-        for k, v in sref["attributes"].items():
-            out[k] = v.value()
-        self.debug(f"recording system state: {out}")
-        return out
-
-    def set_system_state(self, ignore=None, **kwargs):
-        """accepts parital input scoped from system references"""
-        sref = self.system_references()
-        satr = sref["attributes"]
-        self.debug(f"setting system state: {kwargs}")
-        for k, v in kwargs.items():
-            if ignore and k in ignore:
-                continue
-            if k not in satr:
-                self.debug(f'skipping {k} not in attributes')
-                continue
-            ref = satr[k]
-            ref.set_value(v)
+    

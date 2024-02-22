@@ -321,6 +321,7 @@ class Configuration(AttributedBaseMixin):
     log_silo = True
 
     _created_datetime = None
+    _subclass_init: bool = True
 
 
     # Configuration Information
@@ -353,10 +354,11 @@ class Configuration(AttributedBaseMixin):
         from engforge.configuration import Configuration
         
         if changed is None:
+            #top!
             changed = {}
 
         if self in changed:
-            self.info(f'already changed {self}')
+            self.debug(f'already changed {self}')
             return changed[self]
 
         if level is None:
@@ -366,7 +368,7 @@ class Configuration(AttributedBaseMixin):
 
         #exit early if below the level 
         if level >= levels_deep and levels_deep > 0:
-            self.info(f'below level {level} {levels_deep} {self}')
+            self.debug(f'below level {level} {levels_deep} {self}')
             new_sys = attrs.evolve(self) #copy as is
             changed[self] = new_sys
             return new_sys
@@ -374,7 +376,7 @@ class Configuration(AttributedBaseMixin):
         #copy the internal configurations
         kwcomps = {}
         for key, config in self.internal_configurations().items():
-            self.info(f'copying {key} {config} {level} {changed}')
+            self.debug(f'copying {key} {config} {level} {changed}')
             #copy the system
             if config in changed:
                 ccomp = changed[config]
@@ -383,7 +385,7 @@ class Configuration(AttributedBaseMixin):
             kwcomps[key] = ccomp
         
         #Finally make the new system with changed internals
-        self.info(f'changing with changes {self} {kwcomps} {kw}')
+        self.debug(f'changing with changes {self} {kwcomps} {kw}')
         new_sys = attrs.evolve(self,**kwcomps,**kw)
         changed[self] = new_sys
         return new_sys
@@ -423,7 +425,7 @@ class Configuration(AttributedBaseMixin):
 
     # Our Special Init Methodology
     def __on_init__(self):
-        """Override this when creating your special init functionality, you must use attrs for input variables, this is called after parents are assigned"""
+        """Override this when creating your special init functionality, you must use attrs for input variables, this is called after parents are assigned. subclasses are always called after"""
         pass
 
     def __pre_init__(self):
@@ -439,7 +441,17 @@ class Configuration(AttributedBaseMixin):
         self._log = None
         self._anything_changed = True  # save by default first go!
         self._created_datetime = datetime.datetime.utcnow()
+        
+        #subclass instance instance init causes conflicts in structures ect
         self.__pre_init__()
+        if self._subclass_init:
+            try:
+                for comp in self.__class__.mro():
+                    if hasattr(comp,'__on_init__'):
+                        comp.__pre_init__(self)
+            except Exception as e:
+                self.error(e,f"error in __pre_init__ {e}")               
+
                 
         #Assign Parents, ensure single componsition
         #TODO: allow multi-parent, w/wo keeping state, state swap on update()?
@@ -453,7 +465,15 @@ class Configuration(AttributedBaseMixin):
                     comp.parent = self
             
         self.debug(f"created {self.identity}")
+        #subclass instance instance init causes conflicts in structures 
         self.__on_init__()
+        if self._subclass_init:
+            try:
+                for comp in self.__class__.mro():
+                    if hasattr(comp,'__on_init__'):
+                        comp.__on_init__(self)
+            except Exception as e:
+                self.error(e,f"error in __on_init__")               
 
 
     @classmethod
@@ -533,5 +553,20 @@ class Configuration(AttributedBaseMixin):
     def classname(self):
         """Shorthand for the classname"""
         return str(type(self).__name__).lower()
+    
+    #Structural Orchestration Through Subclassing
+    @classmethod
+    def subclasses(cls, out=None):
+        """return all subclasses of components, including their subclasses
+        :param out: out is to pass when the middle of a recursive operation, do not use it!
+        """
 
+        # init the set by default
+        if out is None:
+            out = set()
 
+        for cls in cls.__subclasses__():
+            out.add(cls)
+            cls.subclasses(out)
+
+        return out

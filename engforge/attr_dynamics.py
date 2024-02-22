@@ -36,7 +36,7 @@ class IntegratorInstance(AttributeInstance):
         new_val = self.parameter.value() + self.derivative.value() * dt
         self.parameter.set_value(new_val)
 
-
+#TODO: depriciate modes and update for dynamicmixin strategies
 class TRANSIENT(ATTR_BASE):
     """Transient is a base class for integrators over time"""
 
@@ -66,13 +66,16 @@ class TRANSIENT(ATTR_BASE):
             name=new_name,
             parameter=parameter,
             derivative=derivative,
+            #type=cls,
         )
         new_slot = type(new_name, (TRANSIENT,), new_dict)
+        new_slot.type = new_slot
         return new_slot
+    
     #make define the same as integrate
-    @classmethod
-    def subcls_compile(cls,**kwargs):
-        cls.define = cls.integrate
+    # @classmethod
+    # def subcls_compile(cls,**kwargs):
+    #     cls.define = cls.integrate
 
     @classmethod
     def class_validate(cls,instance,**kwargs):

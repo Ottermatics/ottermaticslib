@@ -10,8 +10,9 @@ import attr
 
 from engforge.common import inst_vectorize, chunks
 #from engforge.configuration import Configuration, forge
-from engforge.engforge_attributes import AttributedBaseMixin
+from engforge.solveable import Ref, SolveableMixin
 from engforge.logging import LoggingMixin
+from engforge.dataframe import DataframeMixin
 from engforge.typing import *
 from engforge.properties import *
 from typing import Callable
@@ -29,132 +30,7 @@ class TableLog(LoggingMixin):
 
 log = TableLog()
 
-#Dataframe interrogation functions
-def is_uniform(s:pandas.Series):
-    a = s.to_numpy() # s.values (pandas<0.24)
-    if (a[0] == a).all():
-        return True
-    try:
-        if not numpy.isfinite(a).any():
-            return True
-    except:
-        pass
-    return False
-
-#key_func = lambda kv: len(kv[0].split('.'))*len(kv[1])
-#length of matches / length of key
-key_func = lambda kv: len(kv[1])/len(kv[0].split('.'))
-#key_func = lambda kv: len(kv[1])
-
-    
-#TODO: remove duplicate columns
-# mtches = collections.defaultdict(set)
-# dfv = ecs.dataframe_variants[0]
-# for v1,v2 in itertools.combinations(dfv.columns,2):
-#     if numpy.all(dfv[v1]==dfv[v2]):
-#         
-#         mtches[v1].add(v2)
-#         mtches[v2].add(v1)
-        
-    
-def determine_split(raw,top:int=1,key_f = key_func):
-    parents = {}
-
-    for rw in raw:
-        grp = rw.split('.')
-        for i in range(len(grp)):
-            tkn = '.'.join(grp[0:i+1])
-            parents[tkn] = set()
-        
-    for rw in raw:
-        for par in parents:
-            if rw.startswith(par):
-                parents[par].add(rw)
-
-
-    grps = sorted(parents.items(),key=key_f,reverse=True)[:top]
-    return [g[0] for g in grps]
-
-def split_dataframe(df:pandas.DataFrame)->tuple:
-    """split dataframe into a dictionary of invariants and a dataframe of variable values
-    
-    :returns tuple: constants,dataframe
-    """
-    uniform = {}
-    for s in df:
-        c = df[s]
-        if is_uniform(c):
-            uniform[s] = c[0]
-
-    df_unique = df.copy().drop(columns=list(uniform))
-    return uniform,df_unique[0] if len(df_unique)>0 else df_unique
-
-class DataframeMixin:
-    dataframe: pandas.DataFrame
-
-    _split_dataframe_func = split_dataframe
-    _determine_split_func = determine_split
-
-    def smart_split_dataframe(self,df=None,split_groups=0,key_f = key_func):
-        """splits dataframe between constant values and variants"""
-        if df is None:
-            df = self.dataframe
-        out = {}
-        const,vardf = split_dataframe( df )
-        out['constants'] = const
-        columns = set(vardf.columns)
-        split_groups = min(split_groups,len(columns)-1)
-        if split_groups==0:
-            out['variants'] = vardf
-        else:
-            nconst = {}
-            cgrp = determine_split(const,min(split_groups,len(const)-1))
-            for i,grp in enumerate(sorted(cgrp,reverse=True)):
-                columns = set(const)
-                bad_columns = [c for c in columns if not c.startswith(grp)]
-                good_columns = [c for c in columns if c.startswith(grp)]
-                nconst[grp] = {c:const[c] for c in good_columns}
-                for c in good_columns:
-                    if c in columns:
-                        columns.remove(c)
-            out['constants'] = nconst
-
-            raw = sorted(set(df.columns))
-            grps = determine_split(raw,split_groups,key_f=key_f)
-            
-            for i,grp in enumerate(sorted(grps,reverse=True)):
-                columns = set(vardf.columns)
-                bad_columns = [c for c in columns if not c.startswith(grp)]
-                good_columns = [c for c in columns if c.startswith(grp)]
-                out[grp] = vardf.copy().drop(columns=bad_columns)
-                #remove columns from vardf
-                vardf = vardf.drop(columns=good_columns) 
-            if vardf.size>0:
-                out['misc'] = vardf
-        return out
-    
-    @solver_cached
-    def _split_dataframe(self):
-        """splits dataframe between constant values and variants"""
-        return split_dataframe(self.dataframe)    
-    
-    @property
-    def dataframe_constants(self):
-        return self._split_dataframe[0]
-    
-    @property
-    def dataframe_variants(self):
-        return self._split_dataframe[1:]    
-
-    #Plotting Interface
-    @property
-    def skip_plot_vars(self) -> list:
-        """accesses '_skip_plot_vars' if it exists, otherwise returns empty list"""
-        if hasattr(self,'_skip_plot_vars'):
-            return [var.lower() for var in self._skip_plot_vars]
-        return []
-
-class TabulationMixin(AttributedBaseMixin,DataframeMixin):
+class TabulationMixin(SolveableMixin,DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
@@ -168,7 +44,6 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
     _table: dict = None
     _anything_changed: bool
     _always_save_data = False
-    _prv_internal_references: dict 
 
     # Data Tabulation - Intelligent Lookups
     def save_data(
@@ -217,69 +92,6 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         # reset value
         self._anything_changed = False
 
-    def internal_components(self,recache=False) -> dict:
-        """get all the internal components"""
-        if recache == False and hasattr(self,'_prv_internal_components'):
-            return self._prv_internal_components 
-        from engforge.components import Component
-        o = {k: getattr(self, k) for k in self.slots_attributes()}
-        o = {k: v for k, v in o.items() if isinstance(v, Component)}
-        self._prv_internal_components = o
-        return o
-    
-    def internal_systems(self,recache=False) -> dict:
-        """get all the internal components"""
-        if recache == False and hasattr(self,'_prv_internal_systems'):
-            return self._prv_internal_systems 
-        from engforge.system import System
-        o = {k: getattr(self, k) for k in self.slots_attributes()}
-        o = {k: v for k, v in o.items() if isinstance(v, System)}
-        self._prv_internal_systems = o
-        return o    
-    
-    def internal_tabulations(self,recache=False) -> dict:
-        """get all the internal tabulations"""
-        
-        if recache == False and hasattr(self,'_prv_internal_tabs'):
-            return self._prv_internal_tabs 
-            
-        o = {k: getattr(self, k) for k in self.slots_attributes()}
-        o = {k: v for k, v in o.items() if isinstance(v, TabulationMixin)}
-        self._prv_internal_tabs = o
-        return o    
-
-    @instance_cached
-    def iterable_components(self) -> dict:
-        """Finds ComponentIter internal_components that are not 'wide'"""
-        from engforge.component_collections import ComponentIter
-
-        return {
-            k: v
-            for k, v in self.internal_components().items()
-            if isinstance(v, ComponentIter) and not v.wide
-        }
-
-    def internal_references(self,recache=False) -> dict:
-        """get references to all internal attributes and values"""
-        if recache == False and hasattr(self,'_prv_internal_references'):
-            return self._prv_internal_references  
-              
-        out = self._gather_references()
-        self._prv_internal_references = out
-        return out
-    
-    def _gather_references(self) -> dict:
-        out = {}
-        out["attributes"] = at = {}
-        out["properties"] = pr = {}
-
-        for key in self.system_properties_classdef():
-            pr[key] = Ref(self, key,True,False)
-
-        for key in self.input_fields():
-            at[key] = Ref(self, key, False,True)
-
-        return out
 
     @property
     def anything_changed(self):
@@ -545,67 +357,6 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         ):
             log.info(f"setting always save on {cls.__name__}")
 
-    @classmethod
-    def locate(cls, key, fail=True) -> type:
-        """:returns: the class or attribute by key if its in this system class or a subcomponent. If nothing is found raise an error"""
-        # Nested
-        log.debug(f"locating {cls.__name__} | key: {key}")
-        val = None
-
-        if "." in key:
-            args = key.split(".")
-            comp, sub = args[0], ".".join(args[1:])
-            assert comp in cls.slots_attributes(), f"invalid {comp} in {key}"
-            comp_cls = cls.slots_attributes()[comp].type.accepted[0]
-            val = comp_cls.locate(sub, fail=False)
-
-        elif key in cls.input_fields():
-            val = cls.input_fields()[key]
-
-        elif key in cls.system_properties_classdef():
-            val = cls.system_properties_classdef()[key]
-
-        # Fail on comand but otherwise return val
-        if val is None:
-            if fail:
-                raise Exception(f"key {key} not found")
-            return None
-        return val
-
-    def locate_ref(self, key, fail=True):
-        """:returns: the instance assigned to this system. If the key has a `.` in it the comp the lowest level component will be returned"""
-
-        log.debug(f"locating {self.identity} | key: {key}")
-        val = None
-
-        if "." in key:
-            args = key.split(".")
-            comp, sub = args[0], ".".join(args[1:])
-            assert comp in self.slots_attributes(), f"invalid {comp} in {key}"
-            # comp_cls = cls.slots_attributes()[comp].type.accepted[0]
-            comp = getattr(self, comp)
-            if "." not in key:
-                return Ref(comp, sub)
-            return comp.locate_ref(sub, fail=False)
-
-        elif key in self.input_fields():
-            # val= cls.input_fields()[key]
-            return Ref(self, key)
-
-        elif key in self.system_properties_classdef():
-            # val= cls.system_properties_classdef()[key]
-            return Ref(self, key)
-        
-        elif key in self.internal_configurations() or key in self.slots_attributes():
-            return Ref(self,key)
-
-        # Fail on comand but otherwise return val
-        if val is None:
-            if fail:
-                raise Exception(f"key {key} not found")
-            return None
-        return val
-
     @property
     def system_id(self) -> str:
         """returns an instance unique id based on id(self)"""
@@ -613,50 +364,3 @@ class TabulationMixin(AttributedBaseMixin,DataframeMixin):
         return f"{self.classname}.{idd}"
     
 
-
-class Ref:
-    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated,
-    
-    A dictionary can be used
-    """
-
-    __slots__ = ["comp", "key", "use_call",'use_dict','allow_set','eval_f']
-    comp: "TabulationMixin"
-    key: str
-    use_call: bool
-    use_dict: bool
-    allow_set: bool
-    eval_f: callable
-
-    def __init__(self, component, key, use_call=True,allow_set=True,eval_f=None):
-        self.comp = component
-        if isinstance(self.comp,dict):
-            self.use_dict = True
-        else:
-            self.use_dict = False
-        self.key = key
-        self.use_call = use_call
-        self.allow_set = allow_set
-        self.eval_f = eval_f
-
-    def value(self):
-        if self.use_dict:
-            o = self.comp.get(self.key)
-        else:
-            o = getattr(self.comp, self.key)
-        if self.use_call and callable(o):
-            o = o()
-        if self.eval_f:
-            return self.eval_f(o)
-        return o
-
-    def set_value(self, val):
-        if self.allow_set:
-            return setattr(self.comp, self.key, val)
-        else:
-            raise Exception(f'not allowed to set value on {self.key}')
-
-    def __str__(self) -> str:
-        if self.use_dict:
-            return f"REF[DICT.{self.key}]"
-        return f"REF[{self.comp.classname}.{self.key}]"

@@ -23,21 +23,6 @@ class Component(Configuration,TabulationMixin,SolveableMixin):
 
     parent: typing.Union['Component','System'] = attr.ib(default=None)
 
-    @classmethod
-    def subclasses(cls, out=None):
-        """return all subclasses of components, including their subclasses
-        :param out: out is to pass when the middle of a recursive operation, do not use it!
-        """
-
-        # init the set by default
-        if out is None:
-            out = set()
-
-        for cls in cls.__subclasses__():
-            out.add(cls)
-            cls.subclasses(out)
-
-        return out
 
     #UPDATE & POST UPDATE recieve the same kw args
 #     def update(self, system,**kw):
