@@ -1,7 +1,7 @@
 from engforge.components import Component
 from engforge.component_collections import ComponentDict, ComponentIter
 from engforge.system import System
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.configuration import forge
 from engforge.tabulation import system_property
 
@@ -49,14 +49,14 @@ class ListComp(ComponentDict):
 
 @forge
 class WideSystem(System):
-    cdict = SLOT.define_iterator(DictComp)
-    citer = SLOT.define_iterator(ComponentIter)
+    cdict = Slot.define_iterator(DictComp)
+    citer = Slot.define_iterator(ComponentIter)
 
 
 @forge
 class NarrowSystem(System):
-    cdict = SLOT.define_iterator(DictComp, wide=False)
-    citer = SLOT.define_iterator(ComponentIter, wide=False)
+    cdict = Slot.define_iterator(DictComp, wide=False)
+    citer = Slot.define_iterator(ComponentIter, wide=False)
 
 
 class TestWide(unittest.TestCase):
@@ -96,11 +96,13 @@ class TestWide(unittest.TestCase):
         ]
 
         should_keys = set()
+        dataframe_keys = set()
         for ck, vlist in comps.items():
             for v in vlist:
                 for p in props:
                     tkn = f"{ck}.{v}.{p}"
                     should_keys.add(tkn)
+                    dataframe_keys.add(tkn.replace('.','_'))
 
         self.assertTrue(should_keys.issubset(set(self.system.data_dict.keys())))
 
@@ -109,7 +111,7 @@ class TestWide(unittest.TestCase):
 
         self.assertTrue(len(self.system.table) == 1)
         self.assertTrue(should_keys.issubset(set(self.system.table[1].keys())))
-        self.assertTrue(should_keys.issubset(set(self.system.dataframe.keys())))
+        self.assertTrue(dataframe_keys.issubset(set(self.system.dataframe.keys())))
 
 
 class TestNarrow(unittest.TestCase):
@@ -149,11 +151,13 @@ class TestNarrow(unittest.TestCase):
         ]
 
         should_keys = set()
+        dataframe_keys = set()
         for ck, vlist in comps.items():
             # for v in vlist:
             for p in props:
                 tkn = f"{ck}.{p}"
                 should_keys.add(tkn)
+                dataframe_keys.add(tkn.replace('.', '_'))
 
         self.assertTrue(should_keys.issubset(set(self.system.data_dict.keys())))
 
@@ -162,21 +166,21 @@ class TestNarrow(unittest.TestCase):
 
         self.assertTrue(len(self.system.table) == 5 ** len(comps))
         self.assertTrue(should_keys.issubset(set(self.system.table[1].keys())))
-        self.assertTrue(should_keys.issubset(set(self.system.dataframe.keys())))
+        self.assertTrue(dataframe_keys.issubset(set(self.system.dataframe.keys())))
 
         # test item existence
-        v1 = set(self.system.dataframe["cdict.current_item"])
+        v1 = set(self.system.dataframe["cdict_current_item"])
         v2 = set(comps["cdict"])
 
         self.assertEqual(v1, v2)
 
-        d1 = set(self.system.dataframe["citer.current_item"])
+        d1 = set(self.system.dataframe["citer_current_item"])
         d2 = set(comps["citer"])
 
         self.assertEqual(d1, d2)
 
-        dvs = self.system.dataframe["cdict.current_item"]
-        cvs = self.system.dataframe["citer.current_item"]
+        dvs = self.system.dataframe["cdict_current_item"]
+        cvs = self.system.dataframe["citer_current_item"]
 
         al = set(zip(dvs, cvs))
         sh = set(itertools.product(v2, d2))

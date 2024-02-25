@@ -1726,7 +1726,7 @@ class OtterDrive(LoggingMixin, metaclass=InputSingletonMeta):
     def process_duplicates(
         self, duplicate_folder_groups, duplicate_file_groups
     ):
-        """evaluates a set of duplicates and adjusts the fileystem as nessicary, the files and folders input should have no interaction"""
+        """evals a set of duplicates and adjusts the fileystem as nessicary, the files and folders input should have no interaction"""
 
         self.delete_duplicate_items(duplicate_file_groups)
         self.delete_duplicate_folders(duplicate_folder_groups)

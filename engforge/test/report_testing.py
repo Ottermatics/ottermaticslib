@@ -110,7 +110,7 @@ class TestAnalysis(Analysis):
     def rand_val(self):
         return random.random() * self.internal_component.val
 
-    def evaluate(self, item):
+    def eval(self, item):
         self.some_random_value = item
 
     @system_property

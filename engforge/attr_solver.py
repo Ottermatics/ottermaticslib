@@ -51,7 +51,7 @@ class SolverInstance(AttributeInstance):
         self.system.info(f"solving {self.dependent} with {self.independent}")
 
 
-class SOLVER(ATTR_BASE):
+class Solver(ATTR_BASE):
     """solver creates subclasses per solver balance"""
 
     dependent: str
@@ -140,3 +140,5 @@ class SOLVER(ATTR_BASE):
         cls.constraints[type_] = value
 
 
+#Support Previous SnakeCase
+SOLVER = Solver

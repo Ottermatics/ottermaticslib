@@ -221,9 +221,9 @@ class SimplePump(Component):
     name = attr.field(default="pump")
 
     def __on_init__(self):
-        self.evaluate()
+        self.eval()
 
-    def evaluate(self):
+    def eval(self):
         self.fluid.T = self.Tin
         self.fluid.P = self.Pin
 

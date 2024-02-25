@@ -2,7 +2,7 @@
 
 When `wide` is set each component's references are reported to the system's table, otherwise only one component's references are reported, however the system will iterate over the components by calling `system.iterable_components` 
 
-Define a Iterable Component slot in a system by calling `SLOT.define_iterable(...,wide=True/False)`
+Define a Iterable Component slot in a system by calling `Slot.define_iterable(...,wide=True/False)`
 
 CostModel isonly supported in wide mode at this time.
 
@@ -14,7 +14,7 @@ Types:
 
 from collections import UserDict, UserList
 from engforge.components import Component
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.configuration import forge
 from engforge.typing import *
 from engforge.tabulation import Ref, system_property
@@ -45,7 +45,7 @@ class iter_tkn:
 
 @forge
 class ComponentIter(Component):
-    """Iterable components are designed to evaluate a large selection of components either one-by-one or all at once at the system level depending on if `wide` property is set."""
+    """Iterable components are designed to eval a large selection of components either one-by-one or all at once at the system level depending on if `wide` property is set."""
 
     _ref_cache: dict = None
     _item_refs: dict = None

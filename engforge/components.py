@@ -95,7 +95,7 @@ class Component(Configuration,TabulationMixin,SolveableMixin):
 #
 # @forge
 # class ComponentIterator(Component):
-#     """An object to loop through a list of components as the system is evaluated,
+#     """An object to loop through a list of components as the system is evald,
 #
 #     iterates through each component and pipes data_row and data_label to this objects table
 #     """

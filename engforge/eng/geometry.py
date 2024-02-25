@@ -375,6 +375,7 @@ class ShapelySection(Profile2D):
     _geo: Geometry  = None
     _A: float
     _symmetric: bool
+    _subclass_init: bool = False
 
     def __on_init__(self):
         self.init_with_material(self.material)

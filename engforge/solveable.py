@@ -11,6 +11,8 @@ import datetime
 #from engforge.dynamics import DynamicsMixin
 from engforge.engforge_attributes import AttributedBaseMixin
 from engforge.properties import *
+from engforge.system_reference import *
+from engforge.system_reference import Ref
 
 import collections
 import itertools
@@ -21,133 +23,10 @@ SOLVER_OPTIONS = ["root", "minimize"]
 class SolvableLog(LoggingMixin):
     pass
 
+SKIP_REF = ['run_id','converged','name','index']
 
 log = SolvableLog()
 
-def refset_input(refs,delta_dict):
-    for k, v in delta_dict.items():
-        refs[k].set_value(v)
-
-def refset_get(refs):
-    return {k: refs[k].value() for k in refs}
-
-def refmin_solve(Xref:dict,Yref:dict,Xo=None,normalize:np.array=None,reset=True,doset=True,fail=True,**kw):
-    """minimize the difference between two dictionaries of refernces, x references are changed in place, y will be solved to zero, options ensue for cases where the solution is not ideal
-    
-    :param Xref: dictionary of references to the x values
-    :param Yref: dictionary of references to the y values
-    :param Xo: initial guess for the x values as a list against Xref order, or a dictionary
-    :param normalize: a dictionary of values to normalize the x values by, list also ok as long as same length and order as Xref 
-    :param reset: if the solution fails, reset the x values to their original state, if true will reset the x values to their original state on failure overiding doset. 
-    :param doset: if the solution is successful, set the x values to the solution by default, otherwise follows reset, if not successful reset is checked first, then doset
-    """
-    parms = list(Xref.keys()) #static x_basis
-    yref_parm = list(Yref.keys()) #static y_basis
-    if normalize is None:
-        normalize = np.ones(len(parms))
-    elif isinstance(normalize,(list,tuple,np.ndarray)):
-        assert len(normalize)==len(parms), "bad length normalize"
-    elif isinstance(normalize,(dict)):
-        normalize = np.array([normalize[p] for p in parms])
-
-    #make anonymous function
-    def f(x):
-        inpt = {}
-        for p,xi in zip(parms,x):
-            inpt[p] = xi
-            Xref[p].set_value(xi)
-        
-        #if method == 'minimize':
-        grp = (yref_parm,x,normalize)
-        vals = [(Yref[p].value()/n)**2 for p,x,n in zip(*grp)]
-        #print(vals,inpt)
-        rs = np.array(vals)
-        out = np.sum(rs)**0.5
-        return out
-    
-    #get state
-    x_pre = refset_get(Xref) #record before changing
-
-    if Xo is None:
-        Xo = [Xref[p].value() for p in parms]
-
-    elif isinstance(Xo,dict):
-        Xo = [Xo[p] for p in parms]
-
-    #solve
-    #print(Xref,Yref,Xo,normalize)
-    #TODO: IO for jacobean and state estimations (complex as function definition, requires learning)
-    ans = sciopt.minimize(f,Xo,**kw)
-    #print(ans)
-    if ans.success:
-        ans_dct = {p:a for p,a in zip(parms,ans.x)}
-        if doset:
-            refset_input(Xref,ans_dct)        
-        if reset: 
-            refset_input(Xref,x_pre)
-        return ans_dct
-        
-    else:
-        min_dict = {p:a for p,a in zip(parms,ans.x)}
-        if reset: 
-            refset_input(Xref,x_pre)
-        if doset:
-            refset_input(Xref,min_dict)            
-            return min_dict
-        if fail:
-            raise Exception(f"failed to solve {ans.message}")
-        return min_dict
-
-    
-
-
-
-class Ref:
-    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated,
-    
-    A dictionary can be used
-    """
-
-    __slots__ = ["comp", "key", "use_call",'use_dict','allow_set','eval_f']
-    comp: "TabulationMixin"
-    key: str
-    use_call: bool
-    use_dict: bool
-    allow_set: bool
-    eval_f: callable
-
-    def __init__(self,component, key, use_call=True,allow_set=True,eval_f=None):
-        self.comp = component
-        if isinstance(self.comp,dict):
-            self.use_dict = True
-        else:
-            self.use_dict = False
-        self.key = key
-        self.use_call = use_call
-        self.allow_set = allow_set
-        self.eval_f = eval_f
-
-    def value(self):
-        if self.use_dict:
-            o = self.comp.get(self.key)
-        else:
-            o = getattr(self.comp, self.key)
-        if self.use_call and callable(o):
-            o = o()
-        if self.eval_f:
-            return self.eval_f(o)
-        return o
-
-    def set_value(self, val):
-        if self.allow_set:
-            return setattr(self.comp, self.key, val)
-        else:
-            raise Exception(f'not allowed to set value on {self.key}')
-
-    def __str__(self) -> str:
-        if self.use_dict:
-            return f"REF[DICT.{self.key}]"
-        return f"REF[{self.comp.classname}.{self.key}]"
 
 class SolveableMixin(AttributedBaseMixin): #'Configuration'
     """commonality for components,systems that identifies subsystems and states for solving.
@@ -241,6 +120,7 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
         ignore.add(self)
 
     #internals caching
+    #instance attributes
     @instance_cached
     def signals(self):
         return {k: getattr(self, k) for k in self.signals_attributes()}
@@ -285,6 +165,7 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
         self._prv_internal_tabs = o
         return o    
 
+    #recursive references
     @instance_cached
     def iterable_components(self) -> dict:
         """Finds ComponentIter internal_components that are not 'wide'"""
@@ -318,7 +199,258 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
 
         return out
     
-    #Refs Ect.
+    #@instance_cached
+    @property
+    def comp_references(self):
+        """A cached set of recursive references to any slot component
+        #TODO: work on caching, concern with iterators
+        """
+        out = {}
+        for key, lvl, comp in self.go_through_configurations(parent_level=1):
+            if not isinstance(comp, SolveableMixin):
+                continue
+            out[key] = comp
+        return out
+
+    #Dynamics info refs
+    def collect_solver_dynamics(self,conf:"ConfigurationMixin"=None,**kw)->dict:
+        """collects the dynamics of the systems 
+            1. Time.integrate
+            2. Dynamic Instances
+        """
+        if conf is None:
+            conf = self
+        
+        dynamics = {}
+        traces = {}
+        signals = {}
+        solvers = {}  
+        out = dict(
+            dynamics = dynamics,
+            traces = traces,
+            signals = signals,
+            solvers = solvers
+            )
+        
+        for key,lvl,conf in conf.go_through_configurations(**kw):
+            #FIXME: add a check for the dynamics mixin, that isn't hacky
+            #BUG: importing dynamicsmixin resolves as different class in different modules, weird
+            if 'dynamicsmixin' in str(conf.__class__.mro()).lower():
+                dynamics[key] = {'lvl':lvl,'conf':conf}
+
+            tra = conf.transients_attributes()
+            if tra:
+                trec = {k:at.type for k,at in tra.items()}
+                traces[key] = {'lvl':lvl,'conf':conf,
+                               'transients':trec}
+
+            #map signals and slots
+            sig = conf.signals_attributes()
+            if sig:
+                sigc = {k:at.type for k,at in sig.items()}
+                signals[key] = {'lvl':lvl,'conf':conf,
+                                'signals':sigc}
+
+            solv = conf.solvers_attributes()
+            if solv:
+                solvc = {k:at.type for k,at in solv.items()}
+                solvers[key] = {'lvl':lvl,'conf':conf,
+                                'solvers':solvc}
+
+        return out     
+
+    #Run & Input
+    #General method to distribute input to internal components          
+
+    def _iterate_input_matrix(self,method,revert=True, cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None, force_solve=False,return_results=False,**kwargs):
+        """applies a permutation of input parameters for parameters. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. 
+
+        :param revert: will reset the values of X that were recorded at the beginning of the run.
+        :param cb: a callback function that takes the system as an argument cb(system)
+        :param sequence: a list of dictionaries that should be run in order per the outer-product of kwargs
+        :param eval_kw: a dictionary of keyword arguments to pass to the eval function of each component by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
+        :param sys_kw: a dictionary of keyword arguments to pass to the eval function of each system by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
+        :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
+
+
+        :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
+        """
+        from engforge.system import System
+        self.debug(f"running [SOLVER].{method} {self.identity} with input {kwargs}")
+
+        # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
+        
+        #Recache system references
+        if isinstance(self,System):
+            self.system_references(recache=True)
+
+        #create iterable null for sequence
+        if sequence is None or not sequence:
+            sequence = [{}]
+
+        #Create Keys List
+        sequence_keys = set()
+        for seq in sequence:
+            sequence_keys = sequence_keys.union(set(seq.keys()))
+
+        # RUN when not solved, or anything changed, or arguments or if forced
+        if force_solve or not self.solved or self.anything_changed or kwargs:
+            _input = self.parse_run_kwargs(**kwargs)
+            
+            output = {}
+            inputs = {}
+            result = {'output':output,'input_sets':inputs}
+
+            if revert:
+                #revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
+                sys_refs = self.get_system_input_refs(all=True)
+                revert_x = Ref.refset_get(sys_refs)
+
+            # prep references for keys
+            refs = {}
+            for k, v in _input.items():
+                refs[k] = self.locate_ref(k)
+            for k in sequence_keys:
+                refs[k] = self.locate_ref(k)
+
+            #Pre Run Callback
+            self.pre_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
+
+            # Premute the input as per SS or Transient Logic
+            ingrp = list(_input.values())
+            keys = list(_input.keys())
+
+            #Iterate over components (they are assigned to the system by call)
+            for itercomp in self._iterate_components():
+                #Iterate over inputs
+                for parms in itertools.product(*ingrp):
+                    # Set the reference aliases
+                    cur = {k: v for k, v in zip(keys, parms)}
+                    #Iterate over Sequence (or run once)
+                    for seq in sequence:
+                        #apply sequenc evalues
+                        icur = cur.copy()
+                        if seq:
+                            icur.update(**seq)
+                        
+                        #Run The Method with inputs provisioned
+                        out = method(refs,icur,eval_kw,sys_kw,cb=cb)
+
+                        if return_results:
+                            
+                            #store the output
+                            output[max(output)+1 if output else 0] = out
+                            #store the input
+                            inputs[max(inputs)+1 if inputs else 0] = icur
+            
+            #nice
+            self._solved = True
+            
+            #Pre Run Callback with current state
+            self.post_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
+            
+            #pre-revert by default
+            if revert and revert_x:
+                Ref.refset_input(sys_refs,revert_x)
+            
+            #reapply solved state
+            self._solved = True
+            
+            if return_results:
+                return result
+
+        elif not self.anything_changed:
+            self.warning(f'nothing changed, not running {self.identity}')
+            
+            return
+        elif self.solved:
+            raise Exception("Analysis Already Solved")   
+    
+    #IO Functions
+    def parse_simulation_input(self,**kwargs):
+        """parses the simulation input
+        
+        :param dt: timestep in s, required for transients
+        :param endtime: when to end the simulation
+        """
+        # timestep
+        if "dt" not in kwargs:
+            raise Exception("transients require `dt` to run")
+        # f"transients require timestep input `dt`"
+        dt = float(kwargs.pop("dt"))
+
+        # endtime
+        if "endtime" not in kwargs:
+            raise Exception("transients require `endtime` to run")
+
+        # add data
+        _trans_opts = {"dt": None, "endtime": None}
+        _trans_opts["dt"] = dt
+
+        # f"transients require `endtime` to specify "
+        _trans_opts["endtime"] = endtime = float(kwargs.pop("endtime"))
+        _trans_opts["Nrun"] = max(int(endtime / dt) + 1, 1)
+
+        #TODO: expose integrator choices
+        #TODO: add delay and signal & feedback options
+
+        return _trans_opts  
+
+    def parse_run_kwargs(self, **kwargs):
+        """ensures correct input for simulation.
+        :returns: first set of input for initalization, and all input dictionaries as tuple.
+
+        """
+
+        #use eval_kw and sys_kw to handle slot argument and sub-system arguments
+
+        # Validate OTher Arguments By Parameter Or Comp-Recursive
+        parm_args = {k: v for k, v in kwargs.items() if "." not in k}
+        comp_args = {k: v for k, v in kwargs.items() if "." in k}
+
+        # check parms
+        inpossible = set.union(set(self.input_fields()),set(self.slots_attributes()))
+        argdiff = set(parm_args).difference(inpossible)
+        assert not argdiff, f"bad input {argdiff}"
+
+        # check components
+        comps = set([k.split(".")[0] for k in comp_args.keys()])
+        compdiff = comps.difference(set(self.slots_attributes()))
+        assert not compdiff, f"bad slot references {compdiff}"
+
+        _input = {}
+        test = lambda v,add: isinstance(v, (int, float, str,*add)) or v is None
+
+        # parameters input
+        for k, v in kwargs.items():
+            
+            #If a slot check the type is applicable
+            subslot = self.check_ref_slot_type(k)
+            if subslot is not None:
+                #log.debug(f'found subslot {k}: {subslot}')
+                addty = subslot
+            else:
+                addty = []
+
+            # Ensure Its a List
+            if isinstance(v, numpy.ndarray):
+                v = v.tolist()
+
+            if not isinstance(v, list):
+                assert test(v,addty), f"bad values {k}:{v}"
+                v = [v]
+            else:
+                assert all([test(vi,addty) for vi in v]), f"bad values: {k}:{v}"
+
+            if k not in _input:
+                _input[k] = v
+            else:
+                _input[k].extend(v)
+
+        return _input
+    
+    #REFERENCE FUNCTIONS
+    #Location Funcitons
     @classmethod
     def locate(cls, key, fail=True) -> type:
         """:returns: the class or attribute by key if its in this system class or a subcomponent. If nothing is found raise an error"""
@@ -380,20 +512,7 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
             return None
         return val
     
-    #@instance_cached
-    @property
-    def comp_references(self):
-        """A cached set of recursive references to any slot component
-        #TODO: work on caching, concern with iterators
-        """
-        out = {}
-        for key, lvl, comp in self.go_through_configurations(parent_level=1):
-            if not isinstance(comp, SolveableMixin):
-                continue
-            out[key] = comp
-        return out
-
-    #@property
+    #Reference Caching
     def system_references(self,recache=False,child_only=True):
         """gather a list of references to attributes and"""
         if recache == False and hasattr(self,'_prv_system_references'):
@@ -419,184 +538,7 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
         self._prv_system_references = out
         return out
 
-    @instance_cached
-    def all_references(self) -> dict:
-        out = {}
-        sysref = self.system_references()
-        out.update(**sysref["attributes"])
-        out.update(**sysref["properties"])
-        return out
-
-    @property
-    def system_state(self):
-        """records all attributes"""
-        out = collections.OrderedDict()
-        sref = self.system_references()
-        for k, v in sref["attributes"].items():
-            out[k] = v.value()
-        self.debug(f"recording system state: {out}")
-        return out
-
-    def set_system_state(self, ignore=None, **kwargs):
-        """accepts parital input scoped from system references"""
-        sref = self.system_references()
-        satr = sref["attributes"]
-        self.debug(f"setting system state: {kwargs}")
-        for k, v in kwargs.items():
-            if ignore and k in ignore:
-                continue
-            if k not in satr:
-                self.debug(f'skipping {k} not in attributes')
-                continue
-            ref = satr[k]
-            ref.set_value(v)
-
-
-    #Run & Input
-    #General method to distribute input to internal components          
-
-    def _iterate_input_matrix(self,method,revert=True, cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None, force_solve=False,return_results=False,**kwargs):
-        """applies a permutation of input parameters for parameters. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. 
-
-        :param revert: will reset the values of X that were recorded at the beginning of the run.
-        :param cb: a callback function that takes the system as an argument cb(system)
-        :param sequence: a list of dictionaries that should be run in order per the outer-product of kwargs
-        :param eval_kw: a dictionary of keyword arguments to pass to the evaluate function of each component by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
-        :param sys_kw: a dictionary of keyword arguments to pass to the evaluate function of each system by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
-        :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
-
-
-        :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
-        """
-        from engforge.system import System
-        self.debug(f"running [SOLVER].{method} {self.identity} with input {kwargs}")
-
-        # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
-        
-        #Recache system references
-        if isinstance(self,System):
-            self.system_references(recache=True)
-
-        #create iterable null for sequence
-        if sequence is None or not sequence:
-            sequence = [{}]
-
-        #Create Keys List
-        sequence_keys = set()
-        for seq in sequence:
-            sequence_keys = sequence_keys.union(set(seq.keys()))
-
-        # RUN when not solved, or anything changed, or arguments or if forced
-        if force_solve or not self.solved or self.anything_changed or kwargs:
-            _input = self.parse_run_kwargs(**kwargs)
-            
-            output = {}
-            inputs = {}
-            result = {'output':output,'input_sets':inputs}
-
-            if revert:
-                # TODO: revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
-                revert_x = self.system_state
-
-            # prep references for keys
-            refs = {}
-            for k, v in _input.items():
-                refs[k] = self.locate_ref(k)
-            for k in sequence_keys:
-                refs[k] = self.locate_ref(k)
-
-            #Pre Run Callback
-            self.pre_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
-
-            # Premute the input as per SS or Transient Logic
-            ingrp = list(_input.values())
-            keys = list(_input.keys())
-            #Iterate over components (they are assigned to the system by call)
-            for itercomp in self._iterate_components():
-                #Iterate over inputs
-                for parms in itertools.product(*ingrp):
-                    # Set the reference aliases
-                    cur = {k: v for k, v in zip(keys, parms)}
-                    #Iterate over Sequence (or run once)
-                    for seq in sequence:
-                        #apply sequenc evalues
-                        icur = cur.copy()
-                        if seq:
-                            icur.update(**seq)
-                        
-                        #Run The Method with inputs provisioned
-                        out = method(refs,icur,eval_kw,sys_kw,cb=cb)
-
-                        if return_results:
-                            #store the output
-                            output[max(output)+1 if output else 0] = out
-                            #store the input
-                            inputs[max(inputs)+1 if inputs else 0] = icur
-            
-            #nice
-            self._solved = True
-            
-            #Pre Run Callback with current state
-            self.post_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
-            
-            #pre-revert by default
-            if revert and revert_x:
-                self.set_system_state(ignore=["index"], **revert_x)
-            
-            #reapply solved state
-            self._solved = True
-            
-            if return_results:
-                return result
-
-        elif not self.anything_changed:
-            self.warning(f'nothing changed, not running {self.identity}')
-            return
-        elif self.solved:
-            raise Exception("Analysis Already Solved")
-        
-    def collect_solver_dynamics(self,conf:"ConfigurationMixin"=None,**kw)->dict:
-        """collects the dynamics of the systems"""
-        if conf is None:
-            conf = self
-        
-        dynamics = {}
-        traces = {}
-        signals = {}
-        solvers = {}  
-        out = dict(
-            dynamics = dynamics,
-            traces = traces,
-            signals = signals,
-            solvers = solvers
-            )
-        
-        for key,lvl,conf in conf.go_through_configurations(**kw):
-            #FIXME: add a check for the dynamics mixin, that isn't hacky
-            #BUG: importing dynamicsmixin resolves as different class in different modules, weird
-            if 'dynamicsmixin' in str(conf.__class__.mro()).lower():
-                dynamics[key] = {'lvl':lvl,'conf':conf}
-
-            tra = conf.transients_attributes()
-            if tra:
-                trec = {k:at.type for k,at in tra.items()}
-                traces[key] = {'lvl':lvl,'conf':conf,
-                               'transients':trec}
-
-            #map signals and slots
-            sig = conf.signals_attributes()
-            if sig:
-                sigc = {k:at.type for k,at in sig.items()}
-                signals[key] = {'lvl':lvl,'conf':conf,
-                                'signals':sigc}
-
-            solv = conf.solvers_attributes()
-            if solv:
-                solvc = {k:at.type for k,at in solv.items()}
-                solvers[key] = {'lvl':lvl,'conf':conf,
-                                'solvers':solvc}
-
-        return out           
+      
     
     #Reference Interaction
     def collect_solver_refs(self,conf:"ConfigurationMixin"=None,by_parm=False,min_set=True,**kw)->dict:
@@ -659,7 +601,7 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
 
                 #ss_states.append(f'{ck+"." if ck else ""}{v.independent}')
                 #outputs.append(f'{ck+"." if ck else ""}{v.dependent}')
-                ss_output[f'{ck+"." if ck else ""}{v.dependent}'] = p_par
+                ss_output[f'{ck+"." if ck else ""}{v.independent}'] = p_par
                 ss_states[f'{ck+"." if ck else ""}{v.independent}'] = d_par
 
                 solvers[f'{ck+"." if ck else ""}{k}']= dict(dep=p_par,indep=d_par)
@@ -771,88 +713,259 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
             )
             return out
 
-        return out        
+        return out     
+
+    @contextmanager
+    def revert_X(self, refs=None,pre_execute=True,post_execute=False):
+        """
+        Stores the _X parameter at present, the reverts to that state when done
+
+        """
+        if refs is None:
+            refs = self.get_system_input_refs(all=True)
+            
+        X_now = Ref.refset_get(refs)
+        try:  # Change Variables To Input
+            yield self
+        finally:
+            Ref.refset_input(refs, X_now)
+            if pre_execute: self.pre_execute()      
+            if post_execute: self.pre_execute()
+
+    def get_system_input_refs(self,strings=False,numeric=True,misc=False,all=False,boolean=False,**kw)->dict:
+        """
+        Get the references to system input based on the specified criteria.
+
+        :param strings: Include system properties of string type.
+        :type strings: bool, optional
+        :param numeric: Include system properties of numeric type (float, int).
+        :type numeric: bool, optional
+        :param misc: Include system properties of miscellaneous type.
+        :type misc: bool, optional
+        :param all: Include all system properties regardless of type.
+        :type all: bool, optional
+        :param boolean: Include system properties of boolean type.
+        :type boolean: bool, optional
+        :param kw: Additional keyword arguments passed to recursive config loop
+        :type kw: dict, optional
+        :return: A dictionary of system property references.
+        :rtype: dict
+        """        
+        refs = {}
+        for ckey,lvl,comp in self.go_through_configurations(**kw):
+            for p,atr in comp.input_fields().items():
+                if p in SKIP_REF and not all:
+                    continue
+                if all:
+                    refs[(f'{ckey}.' if ckey else '')+p] = Ref(comp,p,False,True)
+                    continue
+                elif atr.type:
+                    ty = atr.type
+                    if issubclass(ty,(bool)):
+                        if not boolean:
+                            continue #prevent catch at int type                        
+                        refs[(f'{ckey}.' if ckey else '')+p] = Ref(comp,p,True,False)                      
+                    elif issubclass(ty,(float,int)) and numeric:
+                        refs[(f'{ckey}.' if ckey else '')+p] = Ref(comp,p,False,True)
+                    elif issubclass(ty,(str)) and strings:
+                        refs[(f'{ckey}.' if ckey else '')+p] = Ref(comp,p,False,True)
+                    elif misc:
+                        refs[(f'{ckey}.' if ckey else '')+p] = Ref(comp,p,False,True)
+                        
+        return refs
     
-    #IO Functions
-    def parse_simulation_input(self,**kwargs):
-        """parses the simulation input
+    def get_system_property_refs(self, strings=False, numeric=True, misc=False, all=False, boolean=False, **kw):
+        """
+        Get the references to system properties based on the specified criteria.
+
+        :param strings: Include system properties of string type.
+        :type strings: bool, optional
+        :param numeric: Include system properties of numeric type (float, int).
+        :type numeric: bool, optional
+        :param misc: Include system properties of miscellaneous type.
+        :type misc: bool, optional
+        :param all: Include all system properties regardless of type.
+        :type all: bool, optional
+        :param boolean: Include system properties of boolean type.
+        :type boolean: bool, optional
+        :param kw: Additional keyword arguments passed to recursive config loop
+        :type kw: dict, optional
+        :return: A dictionary of system property references.
+        :rtype: dict
+        """
+        refs = {}
+        for ckey, lvl, comp in self.go_through_configurations(**kw):
+            if not isinstance(comp, SolveableMixin):
+                continue
+            for p, atr in comp.system_properties_classdef().items():
+                if p in SKIP_REF and not all:
+                    continue                
+                ty = atr.return_type
+                if all:
+                    refs[(f'{ckey}.' if ckey else '') + p] = Ref(comp, p, True, False)
+                    continue
+                if issubclass(ty, bool):
+                    if not boolean:
+                        continue  # prevent catch at int type
+                    refs[(f'{ckey}.' if ckey else '') + p] = Ref(comp, p, True, False)
+                elif issubclass(ty, (float, int)) and numeric:
+                    refs[(f'{ckey}.' if ckey else '') + p] = Ref(comp, p, True, False)
+                elif issubclass(ty, str) and strings:
+                    refs[(f'{ckey}.' if ckey else '') + p] = Ref(comp, p, True, False)
+                elif misc:
+                    refs[(f'{ckey}.' if ckey else '') + p] = Ref(comp, p, True, False)
+
+        return refs
+
+    #component reference frame constraint caching
+    @instance_cached
+    def has_constraints(self):
+        """checks for any active constrints"""
+        from engforge.solver import comp_constraints,comp_has_constraints,comp_solver_constraints,create_constraint
+        return comp_has_constraints(self)
+
+    @instance_cached
+    def constraints(self):
+        """returns a list of constraitns by type"""
+        from engforge.solver import comp_constraints,comp_has_constraints,comp_solver_constraints,create_constraint
+        return comp_constraints(self)
+
+    @instance_cached
+    def solver_constraints(self):
+        from engforge.solver import comp_constraints,comp_has_constraints,comp_solver_constraints,create_constraint
+        return comp_solver_constraints(self)
+
+
         
-        :param dt: timestep in s, required for transients
-        :param endtime: when to end the simulation
-        """
-        # timestep
-        if "dt" not in kwargs:
-            raise Exception("transients require `dt` to run")
-        # f"transients require timestep input `dt`"
-        dt = float(kwargs.pop("dt"))
 
-        # endtime
-        if "endtime" not in kwargs:
-            raise Exception("transients require `endtime` to run")
 
-        # add data
-        _trans_opts = {"dt": None, "endtime": None}
-        _trans_opts["dt"] = dt
 
-        # f"transients require `endtime` to specify "
-        _trans_opts["endtime"] = endtime = float(kwargs.pop("endtime"))
-        _trans_opts["Nrun"] = max(int(endtime / dt) + 1, 1)
 
-        #TODO: expose integrator choices
-        #TODO: add delay and signal & feedback options
 
-        return _trans_opts  
 
-    def parse_run_kwargs(self, **kwargs):
-        """ensures correct input for simulation.
-        :returns: first set of input for initalization, and all input dictionaries as tuple.
+#TODO: depriciate the following
+# 
+# def setX(self, x_ordered=None, pre_execute=True, **x_kw):
+#     """Apply full X data to X. #TODO allow partial data"""
+#     # assert len(input_values) == len(self._X), f'bad input data'
+#     assert x_ordered is not None or x_kw, f"have to have some input"
+#     if x_ordered is not None:
+#         if isinstance(x_ordered, numpy.ndarray):
+#             x_ordered = x_ordered.tolist()
+#         assert not x_kw, f"there must only be ordered inputs or keyword"
+#         assert len(x_ordered) == len(self._X), f"must be a full sized"
+#         for f, x in zip(self._X.values(), x_ordered):
+#             f.set_value(x)
+#     else:
+#         assert set(x_kw).issubset(set(self._X)), f"incorrect parms {x_kw}"
+#         _Xref = self._X
+# 
+#         for k, v in x_kw.items():
+#             self.debug(f"setting X value {k}={v}")
+#             _Xref[k].set_value(v)
+# 
+#     if pre_execute:
+#         self.pre_execute()
+# 
+# # Function Calculation
+# def calcF(self, x_ordered=None, pre_execute=True, **x_kw):
+#     """calculates the orderdered or keyword input per Ref in `_F`"""
+#     assert x_ordered is not None or x_kw, f"have to have some input"
+#     with self.revert_X() as rx:
+#         if x_ordered is not None:
+#             # print(x_ordered)
+#             if isinstance(x_ordered, numpy.ndarray):
+#                 x_ordered = x_ordered.tolist()
+#             assert not x_kw, f"there must only be ordered inputs or keyword"
+#             assert len(x_ordered) == len(
+#                 self._X
+#             ), f"must be a full sized input"
+#             # Set Em
+#             self.setX(x_ordered, pre_execute=pre_execute)
+#             # Get Em
+#             o = [f.value() for f, x in zip(self.Flist, x_ordered)]
+#             # o = [f.value() for f  in self.Flist]
+#             return numpy.array(o)
+#         elif x_kw:
+#             assert (
+#                 set(x_kw) in self._X
+#             ), f"incompatable keyword args in {x_kw}"
+#             # Set Em
+#             self.setX(**x_kw, pre_execute=pre_execute)
+#             # Get Em
+#             o = [self._F[k].value(v) for k, v in x_kw.items()]
+#             return numpy.array(o)
+# 
+#     #Forget Em
+#     raise NotImplemented('#TODO')
+# 
+# # Useful Properties (F & X)
+# #TODO: define instance and global X/F contributions
+# #important to use a consistent order
+# @instance_cached
+# def Flist(self):
+#     """returns F() for each solver dependent as an anonymous function"""
+#     return [self._F[self.F_keyword_order[i]] for i in range(len(self._F))]
+# 
+# @instance_cached
+# def _X(self):
+#     """stores the internal references to the solver references"""
+#     return {k: v.independent for k, v in self.solvers.items()}
+# 
+# @instance_cached
+# def _F(self):
+#     """stores the internal references to the solver references"""
+#     return {k: v.dependent for k, v in self.solvers.items()}
+# 
+# @instance_cached
+# def F_keyword_order(self):
+#     """defines the order of inputs in ordered mode for calcF"""
+#     return {i: k for i, k in enumerate(self.solvers)}
+# 
+# @instance_cached
+# def F_keyword_rev_order(self):
+#     """defines the order of inputs in ordered mode for calcF"""
+#     return {k: i for i, k in self.F_keyword_order.items()}
+# 
+# @property
+# def X(self) -> numpy.array:
+#     """The current state of the system"""
+#     return numpy.array([v.value() for v in self._X.values()])
+# 
+# @property
+# def F(self) -> numpy.array:
+#     """The current solution to the system"""
+#     return numpy.array([v.value() for v in self._F.values()])
 
-        """
+# @instance_cached
+# def all_references(self) -> dict:
+#     out = {}
+#     sysref = self.system_references()
+#     out.update(**sysref["attributes"])
+#     out.update(**sysref["properties"])
+#     return out
 
-        #use eval_kw and sys_kw to handle slot argument and sub-system arguments
-
-        # Validate OTher Arguments By Parameter Or Comp-Recursive
-        parm_args = {k: v for k, v in kwargs.items() if "." not in k}
-        comp_args = {k: v for k, v in kwargs.items() if "." in k}
-
-        # check parms
-        inpossible = set.union(set(self.input_fields()),set(self.slots_attributes()))
-        argdiff = set(parm_args).difference(inpossible)
-        assert not argdiff, f"bad input {argdiff}"
-
-        # check components
-        comps = set([k.split(".")[0] for k in comp_args.keys()])
-        compdiff = comps.difference(set(self.slots_attributes()))
-        assert not compdiff, f"bad slot references {compdiff}"
-
-        _input = {}
-        test = lambda v,add: isinstance(v, (int, float, str,*add)) or v is None
-
-        # parameters input
-        for k, v in kwargs.items():
-            
-            #If a slot check the type is applicable
-            subslot = self.check_ref_slot_type(k)
-            if subslot is not None:
-                #log.debug(f'found subslot {k}: {subslot}')
-                addty = subslot
-            else:
-                addty = []
-
-            # Ensure Its a List
-            if isinstance(v, numpy.ndarray):
-                v = v.tolist()
-
-            if not isinstance(v, list):
-                assert test(v,addty), f"bad values {k}:{v}"
-                v = [v]
-            else:
-                assert all([test(vi,addty) for vi in v]), f"bad values: {k}:{v}"
-
-            if k not in _input:
-                _input[k] = v
-            else:
-                _input[k].extend(v)
-
-        return _input
-            
+#     @property
+#     def system_state(self):
+#         """records all attributes"""
+#         out = collections.OrderedDict()
+#         sref = self.system_references()
+#         for k, v in sref["attributes"].items():
+#             out[k] = v.value()
+#         self.debug(f"recording system state: {out}")
+#         return out
+# 
+#     def set_system_state(self, ignore=None, **kwargs):
+#         """accepts parital input scoped from system references"""
+#         sref = self.system_references()
+#         satr = sref["attributes"]
+#         self.debug(f"setting system state: {kwargs}")
+#         for k, v in kwargs.items():
+#             if ignore and k in ignore:
+#                 continue
+#             if k not in satr:
+#                 self.debug(f'skipping {k} not in attributes')
+#                 continue
+#             ref = satr[k]
+#             ref.set_value(v)
+      

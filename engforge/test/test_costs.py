@@ -7,7 +7,7 @@
 import unittest
 from engforge.configuration import forge
 from engforge.eng.costs import CostModel, Economics, cost_property
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.system import System
 from engforge.components import Component
 from engforge.component_collections import ComponentIterator
@@ -22,13 +22,13 @@ class Norm(Component,CostModel):
 
 @forge
 class Comp1(Component,CostModel):
-    norm = SLOT.define(Norm,none_ok=True)
-    not_cost = SLOT.define(Component)
+    norm = Slot.define(Norm,none_ok=True)
+    not_cost = Slot.define(Component)
 
 @forge
 class Comp2(Norm,CostModel):
 
-    comp1 = SLOT.define(Comp1,none_ok=True,default_ok=False)
+    comp1 = Slot.define(Comp1,none_ok=True,default_ok=False)
 
 quarterly = lambda inst,term: True if (term+1)%3==0 else False
 @forge
@@ -53,15 +53,15 @@ class TermCosts(Comp1,CostModel):
 
 @forge
 class EconDefault(System,CostModel):
-    econ = SLOT.define(Economics)
-    comp = SLOT.define(Component,none_ok=True)
-    comp1 = SLOT.define(Comp1,none_ok=True)
+    econ = Slot.define(Economics)
+    comp = Slot.define(Component,none_ok=True)
+    comp1 = Slot.define(Comp1,none_ok=True)
 
 @forge
 class EconRecursive(System,CostModel):
-    econ = SLOT.define(Economics)
-    comp1 = SLOT.define(Comp1,none_ok=True)
-    comp2 = SLOT.define(Comp2,none_ok=True)
+    econ = Slot.define(Economics)
+    comp1 = Slot.define(Comp1,none_ok=True)
+    comp2 = Slot.define(Comp2,none_ok=True)
 
 
 class TestEconDefaults(unittest.TestCase):
@@ -139,11 +139,12 @@ class TestCategoriesAndTerms(unittest.TestCase):
         Comp2.default_cost('comp1',50)
         c2 = Comp2(cost_per_item=10)
         er = EconRecursive(comp1=tc,comp2=c2)
-        #inkw = {'econ.term_length':[1,5,10,50],'econ.discount_rate':[0,0.01,0.05,0.1]}
+        #inkw = {'econ_term_length':[1,5,10,50],'econ_discount_rate':[0,0.01,0.05,0.1]}
         inkw = {}
         er.run(revert=False,**inkw)
         
         d = er.data_dict
+        print(d)
         self.assertEqual(d['econ.lifecycle.term_cost'],161)
         self.assertEqual(d['econ.summary.total_cost'],161)
         self.assertEqual(d['combine_cost'],161)
@@ -159,7 +160,7 @@ class TestCategoriesAndTerms(unittest.TestCase):
         er.run(revert=False,**inkw)
 
         df = er.dataframe
-        tc = (df['econ.summary.total_cost'] == np.array([161., 220., 305., 390.])).all()
+        tc = (df['econ_summary_total_cost'] == np.array([161., 220., 305., 390.])).all()
         self.assertTrue(tc)
 
 
@@ -229,7 +230,7 @@ class TestEconomicsAccounting(unittest.TestCase):
         self.assertEqual(ANS,d['econ.combine_cost'])
         self.assertEqual(ANS,d['combine_cost']) 
         self.assertEqual(3,d['econ.comp1.cost.item_cost'])
-        #self.assertEqual(10,d['econ.comp2.combine_cost'])
+        #self.assertEqual(10,d['econ_comp2.combine_cost'])
 
     def test_recursive_all(self,ANS=80):
 
@@ -245,8 +246,8 @@ class TestEconomicsAccounting(unittest.TestCase):
         d = er.data_dict
         self.assertEqual(ANS,d['econ.combine_cost'])
         self.assertEqual(ANS,d['combine_cost']) 
-        # self.assertEqual(5,d['econ.comp1.combine_cost'])
-        # self.assertEqual(10,d['econ.comp2.combine_cost']) 
+        # self.assertEqual(5,d['econ_comp1.combine_cost'])
+        # self.assertEqual(10,d['econ_comp2.combine_cost']) 
         self.assertEqual(10,d['econ.comp2.comp1.cost.item_cost'])     
         self.assertEqual(5,d['econ.comp1.norm.cost.item_cost'])                
 
@@ -383,11 +384,11 @@ class SysEcon(Economics):
 @forge
 class FanSystem(System,CostModel):
 
-    base = SLOT.define(Component)
-    fan = SLOT.define(Fan)
-    motor = SLOT.define(Motor)
+    base = Slot.define(Component)
+    fan = Slot.define(Fan)
+    motor = Slot.define(Motor)
 
-    econ = SLOT.define(SysEcon)
+    econ = Slot.define(SysEcon)
 
 FanSystem.default_cost('base',100)
 
@@ -402,10 +403,10 @@ class TestFanSystemDataFrame(unittest.TestCase):
         df_complete = fs.dataframe
 
         dfc = df_complete
-        match = (dfc['fan.blade_cost']+dfc['motor.motor_cost']==dfc['econ.lifecycle.category.capex']).all()
+        match = (dfc['fan_blade_cost']+dfc['motor_motor_cost']==dfc['econ_lifecycle_category_capex']).all()
         self.assertTrue(match)
 
-        match = (df_complete['fan.area']*df_complete['fan.V'] == df_complete['fan.volumetric_flow']).all()
+        match = (df_complete['fan_area']*df_complete['fan_v'] == df_complete['fan_volumetric_flow']).all()
         self.assertTrue(match)
 
 #TODO: get cost accounting working for ComponentIter components
@@ -419,13 +420,13 @@ class TestFanSystemDataFrame(unittest.TestCase):
 
 # @forge
 # class EconWide(System):
-#     econ = SLOT.define(Economics)
-#     comp_set = SLOT.define_iterator(CompGroup,wide=True)
+#     econ = Slot.define(Economics)
+#     comp_set = Slot.define_iterator(CompGroup,wide=True)
 # 
 # @forge
 # class EconNarrow(System):
-#     econ = SLOT.define(Economics)
-#     comp_set = SLOT.define_iterator(CompGroup,wide=False)
+#     econ = Slot.define(Economics)
+#     comp_set = Slot.define_iterator(CompGroup,wide=False)
 
 # class TestEconomicsIter(unittest.TestCase):
 # 
@@ -453,7 +454,7 @@ class TestFanSystemDataFrame(unittest.TestCase):
 #         ew.run()
 #         
 #         d = ew.data_dict
-#         self.assertEqual(d['econ.comp_set.item_cost'], ew.comp_set.current.item_cost)
+#         self.assertEqual(d['econ_comp_set.item_cost'], ew.comp_set.current.item_cost)
 #         self.assertEqual(ew.econ.total_cost,total)
 #         self.assertEqual(ew.econ.total_cost,total)
 

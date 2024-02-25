@@ -1,10 +1,10 @@
 """Combines the tabulation and component mixins to create a mixin for systems and components that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification
 
-This module is intended to work alongside the solver module and the TRANSIENT integrating attributes, and will raise an error if a conflict is detected.
+This module is intended to work alongside the solver module and the Time integrating attributes, and will raise an error if a conflict is detected.
 
 The DynamicsMixin works by establishing a state matricies A, B, C, and D, which are used to define the dynamics of the system. The state matrix A is the primary matrix, and is used to define the state dynamics of the system. The input matrix B is used to define the input dynamics of the system. The output matrix C is used to define the output dynamics of the system. The feedthrough matrix D is used to define the feedthrough dynamics of the system.
 
-As opposed to the TRANSIENT attribute, which modifies the state of the system, the DynamicsMixin copies the initial values of the state and input which then are integrated over time. At predefined intervals the control and output will stored in the tabulation.
+As opposed to the Time attribute, which modifies the state of the system, the DynamicsMixin copies the initial values of the state and input which then are integrated over time. At predefined intervals the control and output will stored in the tabulation.
 
 #TODO: The top level system will collect the underlying dynamical systems and combine them to an index and overall state space model. This will allow for the creation of a system of systems, and the ability to create a system of systems with a single state space model.
 
@@ -15,7 +15,7 @@ from engforge.configuration import Configuration, forge
 from engforge.tabulation import TabulationMixin
 from engforge import properties as prop
 from engforge.attributes import ATTR_BASE
-from engforge.properties import instance_cached
+from engforge.properties import instance_cached, solver_cached
 from engforge.tabulation import Ref
 from engforge.solveable import SolveableMixin,refmin_solve,refset_get,refset_input
 
@@ -106,7 +106,7 @@ class DynamicsIntegratorMixin(SolveableMixin):
 #TODO: add time as a state variable
 @forge(auto_attribs=True)
 class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
-    """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the TRANSIENT integrating attributes, and will raise an error if a conflict is detected #TODO.
+    """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the Time integrating attributes, and will raise an error if a conflict is detected #TODO.
     """
 
     dynamic_state_parms:list = attrs.field(factory=list)
@@ -356,7 +356,7 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         out = self.nonlinear_output(t,dt,X,U,update=False)
         
         for i,p in enumerate(self.dynamic_output_parms):
-            self.Yt[p] = out[p]
+            self.Yt_ref[p] = out[p]
 
         return dXdt
     
@@ -367,7 +367,7 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         out = self.linear_output(t,dt,X,U)
         
         for i,p in enumerate(self.dynamic_output_parms):
-            self.Yt[p] = out[p]
+            self.Yt_ref[p] = out[p]
 
         return dXdt 
 
@@ -376,6 +376,25 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
             return self.nonlinear_step(t,dt,X,U)
         else:
             return self.linear_step(t,dt,X,U)
+        
+    @solver_cached
+    def cache_dXdt(self):
+        """caches the time differential of the state,
+        uses current state of X and U to determine the dXdt
+        """
+        #TODO: gather timestep
+        print(f'cache dXdt {self.time} {self.state} {self.input}')
+        step = self.step(self.time,1E-3,self.state,self.input)
+        return step
+        
+
+    def ref_dXdt(self,name:str):
+        """returns the reference to the time differential of the state"""
+        parms = self.dynamic_state_parms
+        assert name in parms,f'name {name} not in state parms'
+        accss = lambda comp: comp.cache_dXdt[parms.index(name)]
+        return Ref(self,name,accss)
+
 
     def determine_nearest_stationary_state(self,t=0,X=None,U=None)->np.ndarray:
         """determine the nearest stationary state"""
@@ -398,6 +417,8 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
     
     def __hash__(self):
         return hash(id(self))
+    
+
 
 @forge(auto_attribs=True)
 class GlobalDynamics(DynamicsMixin):
@@ -491,7 +512,7 @@ class GlobalDynamics(DynamicsMixin):
                 if sdict['mode'] in ['pre','both']:
                     sdict['target'].set_value(sdict['source'].value())
 
-            #transients
+            #ad hoc time integration
             for parm,trdct in refs['tr_sets'].items():
                 out[parm] = trdct['dpdt'].value()
 
@@ -500,7 +521,6 @@ class GlobalDynamics(DynamicsMixin):
                 comp = compdict['comp']
                 Xds = np.array([r.value() for r in comp.Xt_ref.values()])
                 Uds = np.array([r.value() for r in comp.Ut_ref.values()])
-                #print(t,Xds,Uds,comp.Xt_ref)
                 dxdt = comp.step(t,dt,Xds,Uds)
 
                 for i,(p,ref) in enumerate(comp.Xt_ref.items()):
@@ -508,7 +528,8 @@ class GlobalDynamics(DynamicsMixin):
 
             #solvers
             if run_solver:
-                refmin_solve(refs['ss_states'],refs['ss_output'],**mkw)
+                #TODO: add in any transient 
+                refmin_solve(self,refs['ss_states'],refs['ss_output'],**mkw)
             
             #last signals
             for sig,sdict in refs['signals'].items():
@@ -518,11 +539,11 @@ class GlobalDynamics(DynamicsMixin):
             return np.array([out[p] for p in intl_refs])
         
         ans = solve_ivp(sim_iter,[0,endtime],X0,method='RK45',t_eval=Time)
-        print(ans)
 
         #convert to list with time
         data = [{'time':k,**v} for k,v in data.items()]
         df = pandas.DataFrame(data)    
+        self.format_columns(df)
         if return_system:
             return system,df
         return df
@@ -537,22 +558,24 @@ class GlobalDynamics(DynamicsMixin):
         #print(dd)
         return dd
 
+        
 
 
-    @property#TODO: make the dataframe_property for the dataframe
-    def dataframe(self):
-        """overrides the dataframe property to collect the dataframes of the subsystems"""
-        raise NotImplementedError()
+
+    # @property#TODO: make the dataframe_property for the dataframe
+    # def dataframe(self):
+    #     """overrides the dataframe property to collect the dataframes of the subsystems"""
+    #     raise NotImplementedError()
 
 
 
 if __name__ == "__main__":
     from engforge.system import System
     from engforge.components import Component
-    from engforge.attr_slots import SLOT
-    from engforge.attr_dynamics import TRANSIENT
-    from engforge.attr_signals import SIGNAL
-    from engforge.attr_solver import SOLVER
+    from engforge.attr_slots import Slot
+    from engforge.attr_dynamics import Time
+    from engforge.attr_signals import Signal
+    from engforge.attr_solver import Solver
     from engforge.properties import system_property
 
     @forge(auto_attribs=True)
@@ -569,6 +592,9 @@ if __name__ == "__main__":
         x0:float = 0.5
 
         nonlinear:bool = False
+        Fext: float = 0
+
+        no_load = Solver.define('a','x0')
 
         def create_state_matrix(self,**kwargs) -> np.ndarray:
             """creates the state matrix for the system"""
@@ -581,7 +607,7 @@ if __name__ == "__main__":
         def update_state_constants(self, t, F, X) -> np.ndarray:
             """override """
             F = F.copy()
-            F[-1] = self.K*self.x0/self.M
+            F[-1] = (self.K*self.x0-self.Fext)/self.M
             return F
         
         @system_property
@@ -595,8 +621,10 @@ if __name__ == "__main__":
         v:float = 0
         a:float = 0
 
-        speed = TRANSIENT.integrate('x','v',mode='euler')
-        accel = TRANSIENT.integrate('v','a',mode='euler')
+        speed = Time.integrate('x','v',mode='euler')
+        accel = Time.integrate('v','a',mode='euler')
+
+        
 
 
 
@@ -612,16 +640,18 @@ if __name__ == "__main__":
         Force:float = 0.
         Damp: float = 10
         Mass:float = 100.
-        K: float = 1
+        K: float = 20
 
         Fref: float = 10
         omega: float = 1
 
-        comp = SLOT.define(DynamicComponent)
-        trns = SLOT.define(TransientSys)
+        comp = Slot.define(DynamicComponent)
+        trns = Slot.define(TransientSys)
 
-        sig = SIGNAL.define('trns.a','spring_accel')
-        slv = SOLVER.define('delta_a','Force')
+        sig = Signal.define('trns.a','spring_accel')
+        fig = Signal.define('comp.Fext','Force')
+        slv = Solver.define('delta_a','Force')
+        
 
         nonlinear: bool = True
 
@@ -632,7 +662,7 @@ if __name__ == "__main__":
         
         @system_property
         def delta_a(self)->float:
-            return self.Fref*np.cos(self.omega*self.time) - self.Force + self.v*self.Damp - self.K*self.x
+            return (self.Fref*np.cos(self.omega*self.time) - self.Force + self.v*self.Damp - self.K*self.x)/self.Mass - self.spring_accel
 
         def create_state_matrix(self,*args,**kwargs) -> np.ndarray:
             """creates the state matrix for the system"""
@@ -644,7 +674,7 @@ if __name__ == "__main__":
 
         def update_state_nonlinear(self,*args,**kwargs) -> np.ndarray:
             """creates the state matrix for the system"""
-            return np.array([[0,1.],[0,-1*self.Damp/self.Mass]])
+            return np.array([[0,1.],[-self.K/self.Mass,-1*self.Damp/self.Mass]])
 
         def update_state_constants(self,*args,**kwargs) -> np.ndarray:
             """creates the input matrix for the system, called B"""
@@ -662,12 +692,12 @@ if __name__ == "__main__":
     sr = ds.collect_solver_refs()
 
     min_kw={'normalize':np.array([1/1000])}
-    sim,df = ds.simulate(0.01,60,run_solver=True,return_system=True)
-    ax = df.plot('time',['x','comp.x','trns.x'])
+    sim,df = ds.simulate(0.01,30,run_solver=True,return_system=True)
+    ax = df.plot('time',['x','comp_x','trns_x','comp_x0'])
     #ax.set_ylim(-1,5)
     ax2 = ax.twinx()
     ax2.plot(df.time,df.a,'r--',label='acl')
-    ax2.plot(df.time,df['trns.a'],'b--',label='trans_acl')
+    ax2.plot(df.time,df['trns_a'],'b--',label='trans_acl')
     ax2.plot(df.time,df['spring_accel'],'c--',label='spring_acl')
     ax2.legend()
                     

@@ -9,14 +9,14 @@ SLOT_TYPES = typ.Union["Component", "System"]
 ITERATOR = typ.Union["ComponentIterator"]
 
 
-class SLOT(ATTR_BASE):
+class Slot(ATTR_BASE):
     """Slot defines a way to accept different components or systems in a system"""
 
     # These are added on System signals_slots_handler aka attrs field_transformer
     name: str
     accepted: SLOT_TYPES
     config_cls: "System"
-    attr_prefix = 'SLOT'
+    attr_prefix = 'Slot'
     none_ok: bool
     
     dflt_kw: dict = None #a dictionary of input in factory for custom inits
@@ -75,10 +75,10 @@ class SLOT(ATTR_BASE):
             none_ok = True
 
         # FIXME: come up with a better name :)
-        new_name = f"SLOT_{str(uuid.uuid4()).replace('-','')[0:16]}"
+        new_name = f"Slot_{str(uuid.uuid4()).replace('-','')[0:16]}"
         new_slot = type(
             new_name,
-            (SLOT,),
+            (Slot,),
             dict(
                 name=new_name,
                 accepted=component_or_systems,
@@ -125,10 +125,10 @@ class SLOT(ATTR_BASE):
         ), "Not System Or Component Input"
 
         # FIXME: come up with a better name :)
-        new_name = f"SLOTITER_{str(uuid.uuid4()).replace('-','')[0:16]}"
+        new_name = f"SlotITER_{str(uuid.uuid4()).replace('-','')[0:16]}"
         new_slot = type(
             new_name,
-            (SLOT,),
+            (Slot,),
             dict(
                 #default=cls.make_factory(),
                 name=new_name,
@@ -185,4 +185,6 @@ class SLOT(ATTR_BASE):
             return attrs.Factory(accepted,False)
         else:
             return None
-    
+
+#Support Previous SnakeCase
+Slot = Slot

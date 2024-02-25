@@ -3,10 +3,10 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.attr_dynamics import TRANSIENT
-from engforge.attr_solver import SOLVER
+from engforge.attr_dynamics import Time
+from engforge.attr_solver import Solver
 from engforge.attr_signals import SIGNAL
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.properties import *
 
 import attrs
@@ -18,7 +18,7 @@ class MockComponent(Component):
     # use to test input from system
     aux: float = attrs.field(default=0)
 
-    comp = SLOT.define(Component, none_ok=True)
+    comp = Slot.define(Component, none_ok=True)
 
     @system_property
     def output(self) -> float:
@@ -43,16 +43,16 @@ class MockSystem(System):
     # move component output to system
     post_sig = SIGNAL.define("output", "comp.output", mode="both")
 
-    solver = SOLVER.define("in_out_diff", "input")
+    solver = Solver.define("in_out_diff", "input")
     solver.add_constraint("min", 0)
     solver.add_constraint("max", 1)
     # solver.addConstraint('MAX','limit_max')
     # solver.addConstraint('MIN', 0)
-    sol2 = SOLVER.define("in2out2", "in2")
+    sol2 = Solver.define("in2out2", "in2")
     sol2.add_constraint("max", limit_max)
     sol2.add_constraint("min", 0)
 
-    comp = SLOT.define(MockComponent)
+    comp = Slot.define(MockComponent)
 
     @system_property
     def in_out_diff(self) -> float:
@@ -123,8 +123,8 @@ class TestComposition(unittest.TestCase):
             **{"comp.aux": 5, "comp.comp.aux": 6}  # , dt=0.1, endtime=0.1
         )
         self.assertEqual(len(self.system.TABLE), 1, f"wrong run config")
-        self.assertEqual(set(self.system.dataframe["comp.aux"]), set([5]))
-        self.assertEqual(set(self.system.dataframe["comp.comp.aux"]), set([6]))
+        self.assertEqual(set(self.system.dataframe["comp_aux"]), set([5]))
+        self.assertEqual(set(self.system.dataframe["comp_comp_aux"]), set([6]))
 
         # internal storage
         # self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))

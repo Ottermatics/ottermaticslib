@@ -21,8 +21,8 @@ The economics term_length applies costs over the term, using the `cost_property.
 @forge
 class Parent(System,CostModel)
 
-    econ = SLOT.define(Economics) #will calculate parent costs as well
-    cost = SLOT.define(Widget) #slots automatically set to none if no input provided
+    econ = Slot.define(Economics) #will calculate parent costs as well
+    cost = Slot.define(Widget) #slots automatically set to none if no input provided
 
 Parent(econ=Economics(term_length=25,discount_rate=0.05,fixed_output=1000))
 
@@ -62,7 +62,7 @@ class cost_property(system_property):
     `cost_property` should return a float/int always and will raise an error if the return annotation is different, although annotations are not required and will default to float.
 
     #Terms:
-    Terms start counting at 0 and can be evaluated by the Economic.term_length
+    Terms start counting at 0 and can be evald by the Economic.term_length
     cost_properties will return their value as system_properties do without regard for the term state, however a CostModel's costs at a term can be retrived by `costs_at_term`. The default mode is for `initial` cost
 
     #Categories:
@@ -129,7 +129,7 @@ class CostModel(Configuration,TabulationMixin):
 
     `item_cost` is determined by `calculate_item_cost()` which by default uses: `cost_per_item` field to return the item cost, which defaults to `numpy.nan` if not set. Nan values are ignored and replaced with 0.
     
-    `sub_items_cost` system_property summarizes the costs of any component in a SLOT that has a `CostModel` or for SLOTS which CostModel.declare_cost(`slot`,default=numeric|CostModelInst|dict[str,float])
+    `sub_items_cost` system_property summarizes the costs of any component in a Slot that has a `CostModel` or for SlotS which CostModel.declare_cost(`slot`,default=numeric|CostModelInst|dict[str,float])
     """
     _slot_costs: dict #TODO: insantiate per class
 
@@ -189,7 +189,7 @@ class CostModel(Configuration,TabulationMixin):
 
     @classmethod
     def default_cost(cls,slot_name:str,cost:typing.Union[float,'CostModel'],warn_on_non_costmodel=True):
-        """Provide a default cost for SLOT items that are not CostModel's. Cost is applied class wide, but can be overriden with custom_cost per instance"""
+        """Provide a default cost for Slot items that are not CostModel's. Cost is applied class wide, but can be overriden with custom_cost per instance"""
         assert not isinstance(cost,type), f'insantiate classes before adding as a cost!'
         assert slot_name in cls.slots_attributes(), f'slot {slot_name} doesnt exist'
         assert isinstance(cost,(float,int,dict)) or isinstance(cost,CostModel), 'only numeric types or CostModel instances supported'
@@ -275,7 +275,7 @@ class CostModel(Configuration,TabulationMixin):
          
     
     def sub_costs(self,saved:set=None,categories:tuple=None,term=0):
-        """gets items from CostModel's defined in a SLOT attribute or in a slot default"""
+        """gets items from CostModel's defined in a Slot attribute or in a slot default"""
         if saved is None:
             saved = set()
 
@@ -301,7 +301,7 @@ class CostModel(Configuration,TabulationMixin):
             elif slot in self._slot_costs and (categories is None or 'unit' in categories) and term==0:
                 #Add default costs from direct slots
                 dflt = self._slot_costs[slot]
-                sub = evaluate_slot_cost(dflt,saved)                
+                sub = eval_slot_cost(dflt,saved)                
                 log.debug(f'{self} adding slot: {comp}.{slot}: {sub}+{sub_tot}')
                 cst= [sub_tot,sub]
                 sub_tot = numpy.nansum(cst)
@@ -314,7 +314,7 @@ class CostModel(Configuration,TabulationMixin):
                     if issubclass(cc,CostModel):
                         if cc._slot_costs:
                             for k,v in cc._slot_costs.items():
-                                sub = evaluate_slot_cost(v,saved)
+                                sub = eval_slot_cost(v,saved)
                                 log.debug(f'{self} adding dflt: {slot}.{k}: {sub}+{sub_tot}')
                                 cst= [sub_tot,sub]
                                 sub_tot = numpy.nansum(cst)
@@ -363,7 +363,7 @@ class CostModel(Configuration,TabulationMixin):
         return COST_CATEGORIES
 
 cost_type = typing.Union[float,int,CostModel,dict]
-def evaluate_slot_cost(slot_item:cost_type,saved:set=None):
+def eval_slot_cost(slot_item:cost_type,saved:set=None):
     sub_tot = 0
     #log.debug(f'evaluating slot: {slot_item}')
     if isinstance(slot_item,(float,int)):
@@ -629,7 +629,7 @@ class Economics(Component):
                     else:                    
                         _key=bse+'cost.item_cost'
                         self.debug(f'dflt child cost for {kbase}.{comp_key}')
-                        CST[_key] = ref = Ref(child._slot_costs,comp_key,False,False, eval_f = evaluate_slot_cost)
+                        CST[_key] = ref = Ref(child._slot_costs,comp_key,False,False, eval_f = eval_slot_cost)
                         cc = 'unit'
                         self._comp_costs[_key] = ref
                         self._cost_categories['category.'+cc].append(ref)
@@ -644,7 +644,7 @@ class Economics(Component):
                 else:
                     self.debug(f'dflt parent cost for {kbase}.{comp_key}')
                     _key=bse+'cost.item_cost'
-                    CST[_key] = ref = Ref(parent._slot_costs,comp_key,False,False, eval_f = evaluate_slot_cost)
+                    CST[_key] = ref = Ref(parent._slot_costs,comp_key,False,False, eval_f = eval_slot_cost)
                     cc = 'unit'
                     self._comp_costs[_key] = ref
                     self._cost_categories['category.'+cc].append(ref)
@@ -661,7 +661,7 @@ class Economics(Component):
         #Add cost fields
         _key = bse+'item_cost'
         CST = self._cost_references
-
+        #TODO: replace dataframe '.' with '_' for keys
         for cost_nm,cost_prop in conf.class_cost_properties().items():
             _key=bse+'cost.'+cost_nm
             CST[_key] = ref = Ref(conf,cost_nm,True,False)
@@ -690,7 +690,7 @@ class Economics(Component):
             cur_slot = getattr(conf,slot_name)
             _key = bse+slot_name+'.cost.item_cost'
             if not isinstance(cur_slot,Configuration) and _key not in CST:
-                CST[_key] = ref = Ref(conf._slot_costs,slot_name,False,False,eval_f = evaluate_slot_cost)
+                CST[_key] = ref = Ref(conf._slot_costs,slot_name,False,False,eval_f = eval_slot_cost)
 
                 cc = 'unit'
                 self._comp_costs[_key] = ref
@@ -717,7 +717,7 @@ class Economics(Component):
                                 else:
                                     
                                     self.debug(f'adding missing cost for {conf}.{compnm}')
-                                    CST[_key] = ref = Ref(cc._slot_costs,k,False,False,eval_f = evaluate_slot_cost)
+                                    CST[_key] = ref = Ref(cc._slot_costs,k,False,False,eval_f = eval_slot_cost)
 
                                     cc = 'unit'
                                     self._comp_costs[_key] = ref

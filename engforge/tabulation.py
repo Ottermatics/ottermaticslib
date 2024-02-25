@@ -2,7 +2,7 @@
 
 Incrementally records attrs input values and system_properties per save_data() call.
 
-save_data() is called after item.evaluate() is called.
+save_data() is called after item.eval() is called.
 """
 
 from contextlib import contextmanager
@@ -132,7 +132,9 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
     def dataframe(self):
         """The table compiled into a dataframe"""
         data = [self.TABLE[v] for v in sorted(self.TABLE)]
-        return pandas.DataFrame(data=data, copy=True)
+        df = pandas.DataFrame(data=data, copy=True)
+        self.format_columns(df)
+        return df
     
 
     @property

@@ -82,7 +82,7 @@ class PipeNode(Component):
 class PipeFlow(Component):
     D: float = attrs.field()
     v: float = attrs.field(default=0)
-    material = SLOT.define(FluidMaterial)
+    material = Slot.define(FluidMaterial)
 
     def set_flow(self, flow):
         v = flow / self.A
@@ -172,8 +172,8 @@ class PipeFlow(Component):
 
 @forge
 class Pipe(PipeFlow, Component):
-    node_s = SLOT.define(PipeNode, default_ok=False)
-    node_e = SLOT.define(PipeNode, default_ok=False)
+    node_s = Slot.define(PipeNode, default_ok=False)
+    node_e = Slot.define(PipeNode, default_ok=False)
     roughness: float = attrs.field(default=0.0)
     bend_radius: float = attrs.field(default=None)
 
@@ -398,7 +398,7 @@ class Pump(Component):
 
 @forge
 class PipeSystem(System):
-    in_node = SLOT.define(PipeNode)
+    in_node = Slot.define(PipeNode)
     graph: nx.Graph
     items: dict
 

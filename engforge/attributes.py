@@ -44,12 +44,12 @@ class ATTR_BASE(attrs.Attribute):
         """add the config class, and perform checks with `class_validate)
         :returns: [optional] a dictionary of options to be used in the make_attribute method
         """
-        log.info(f'{cls.__name__} is being configured for {cls.attr_prefix}')
+        log.debug(f'{cls.__name__} is being configured for {cls.attr_prefix}')
         cls.name = name
         cls.config_cls = config_class
 
         if cb is not None:
-            cb(cls,config_cls,**kwargs)
+            cb(cls,config_class,**kwargs)
 
 
         return {} #OVERWRITE ME "custom_options":False

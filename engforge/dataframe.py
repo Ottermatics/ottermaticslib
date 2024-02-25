@@ -146,6 +146,9 @@ class DataframeMixin:
             if len(o)==1:
                 return o[0]
         return o
+    
+    def format_columns(self,dataframe:pandas.DataFrame):
+        dataframe.rename(lambda x: x.replace('.','_').lower(), axis='columns',inplace=True)
 
     #Plotting Interface
     @property

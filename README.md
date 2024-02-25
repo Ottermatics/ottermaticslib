@@ -29,7 +29,7 @@ To use the default solver & constraints
 ```python
 @forge
 SolverSystem(System):
-    sol2 = SOLVER.define("dep", "indep")
+    sol2 = Solver.define("dep", "indep")
     sol2.add_constraint("max", limit_max) #indep should never go above this value (or function)
     sol2.add_constraint("min", 0) #indep should never go below zero
 ```
@@ -54,7 +54,7 @@ from engforge.components import Component
 from engforge.system import System
 from engforge.plotting import PLOT
 from engforge.slots import SLOT
-from engforge.solver import SOLVER
+from engforge.solver import Solver
 from engforge.signals import SIGNAL
 from engforge.configuration import forge
 import numpy as np
@@ -96,7 +96,7 @@ class Airfilter(System):
     set_fan_n = SIGNAL.define('fan.n','throttle',mode='both')
     set_filter_w = SIGNAL.define('filt.w','w',mode='both')
 
-    flow_solver = SOLVER.define('sum_dP','w')
+    flow_solver = Solver.define('sum_dP','w')
     flow_solver.add_constraint('min',0)
 
     flow_curve = PLOT.define(
@@ -162,7 +162,7 @@ class SpringMass(System):
     x_neutral:float = attrs.field(default=0.5)
     
     #a is solved for to ensure sumF is zero
-    res = SOLVER.define('sumF','a')
+    res = Solver.define('sumF','a')
 
 	#a is integrated to provide v, similar to v integrated to supply x
     vtx = TRANSIENT.integrate('v','a')

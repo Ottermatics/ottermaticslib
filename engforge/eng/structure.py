@@ -21,7 +21,7 @@ from engforge.eng.solid_materials import *
 from engforge.common import *
 from engforge.logging import log, LoggingMixin
 from engforge.eng.costs import CostModel,cost_property
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.eng.prediction import PredictionMixin
 
 import sectionproperties
@@ -222,7 +222,7 @@ class Structure(System,CostModel,PredictionMixin):
     tolerance: float = attrs.field(default=1e-3)
     
     #beams
-    beams = SLOT.define_iterator(BeamDict, wide=True)
+    beams = Slot.define_iterator(BeamDict, wide=True)
     
     #per execute failure analysis
     #calculate actual failure will estimate then run failure analysis for bad cases

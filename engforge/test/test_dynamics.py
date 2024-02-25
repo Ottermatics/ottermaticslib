@@ -4,10 +4,10 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.attr_dynamics import TRANSIENT
-from engforge.attr_solver import SOLVER
+from engforge.attr_dynamics import Time
+from engforge.attr_solver import Solver
 from engforge.attr_signals import SIGNAL
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.properties import *
 from engforge.attr_plotting import *
 
@@ -32,12 +32,12 @@ class SpringMass(System):
 
     x_neutral: float = attrs.field(default=0.5)
 
-    res = SOLVER.define("sumF", "a")
+    res = Solver.define("sumF", "a")
 
-    vtx = TRANSIENT.integrate("v", "a")
-    xtx = TRANSIENT.integrate("x", "v")
+    vtx = Time.integrate("v", "a")
+    xtx = Time.integrate("x", "v")
 
-    pos = TRACE.define(y="x", y2=["v", "a"])
+    pos = Trace.define(y="x", y2=["v", "a"])
 
     @system_property
     def dx(self) -> float:
@@ -78,6 +78,7 @@ class TestDynamics(unittest.TestCase):
         self.assertTrue(self.sm.converged)
 
         df = self.sm.dataframe
+        
         X = df.x
         T = df.t
         t = T[T < 2]

@@ -13,7 +13,9 @@ import datetime
 
 #from engforge.dynamics import DynamicsMixin
 from engforge.properties import *
-from engforge.solveable import SolveableMixin,refmin_solve,refset_get,refset_input
+from engforge.solveable import SolveableMixin
+from engforge.system_reference import Ref,refmin_solve,refroot_solve
+import pprint   
 import itertools,collections
 
 SOLVER_OPTIONS = ["root", "minimize"]
@@ -22,8 +24,10 @@ SOLVER_OPTIONS = ["root", "minimize"]
 class SolverLog(LoggingMixin):
     pass
 
-
 log = SolverLog()
+
+
+#add to any SolvableMixin to allow solver use from its namespace
 class SolverMixin(SolveableMixin):
     _run_id: str = None
     _solved = None
@@ -44,6 +48,14 @@ class SolverMixin(SolveableMixin):
     @property
     def solved(self):
         return self._solved
+    
+    def post_run_callback(self,**kwargs):
+        """user callback for when run is complete"""
+        pass
+
+    def pre_run_callback(self,**kwargs):
+        """user callback for when run is beginning"""
+        pass    
 
     def run(self,*args,**kwargs):
         """the steady state run method for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
@@ -55,7 +67,7 @@ class SolverMixin(SolveableMixin):
         
         #TODO: what to do with eval / sys kw
         #TODO: option to preserve state
-        refset_input(refs,icur)
+        Ref.refset_input(refs,icur)
         self.info(f"running with {icur}|{kwargs}")
         self.run_method(*args,**kwargs)
         self.debug(f"{icur} run time: {self._run_time}")
@@ -73,31 +85,10 @@ class SolverMixin(SolveableMixin):
         if self._run_id is None:
             self._run_id = int(uuid.uuid4())
         #Recache system references
-        self.evaluate(cb=cb,eval_kw=eval_kw,sys_kw=sys_kw)
+        self.eval(cb=cb,eval_kw=eval_kw,sys_kw=sys_kw)
 
         self._run_end = datetime.datetime.now()
         self._run_time = self._run_end - self._run_start
-                
-    
-    def post_run_callback(self,**kwargs):
-        """user callback for when run is complete"""
-        pass
-
-    def pre_run_callback(self,**kwargs):
-        """user callback for when run is beginning"""
-        pass    
-
-    # def simulate(self, dt, N, cb=None,eval_kw=None,sys_kw=None):
-    #     """integrates the time series over N points at a increment of dt"""
-    #     for i in range(N):
-    #         #TODO: adapt timestep & integrate ODE system integrator
-    #         # Run The SS Timestep
-    #         self.evaluate(cb=cb)
-    #         # Run Integrators
-    #         for k, v in self.transients.items():
-    #             v.integrate(dt)
-    #         # Mark Time
-    #         self.time = self.time + dt
 
     def run_internal_systems(self,sys_kw=None):
         """runs internal systems with potentially scoped kwargs"""
@@ -119,10 +110,10 @@ class SolverMixin(SolveableMixin):
             #Systems solve cycle
             if isinstance(comp, System): #should always be true
                 self.info(f"solving {key} with {sys_kw_comp}")
-                comp.evaluate(**sys_kw_comp)
+                comp.eval(**sys_kw_comp)
 
     # Single Point Flow
-    def evaluate(self, cb=None,eval_kw:dict=None,sys_kw:dict=None, *args,**kw):
+    def eval(self, cb=None,eval_kw:dict=None,sys_kw:dict=None, *args,**kw):
         """Evaluates the system with additional inputs for execute()
         :param cb: an optional callback taking the system as an argument of the form (self,eval_kw,sys_kw,*args,**kw)
         """
@@ -140,7 +131,7 @@ class SolverMixin(SolveableMixin):
         try:
             out = self.execute( *args,**kw)
         except Exception as e:
-            self.error(e, f"solver failed @ {self.X}")
+            self.error(e, f"solver failed")
             out = None
             raise e
 
@@ -186,72 +177,174 @@ class SolverMixin(SolveableMixin):
     def execute(self, *args,**kw):
         """Solves the system's system of constraints and integrates transients if any exist
 
-        Override this function for custom solving functions, and call `system_solver` to use default solver functionality.
+        Override this function for custom solving functions, and call `solver` to use default solver functionality.
 
-        :returns: the result of this function is returned from evaluate()
+        :returns: the result of this function is returned from eval()
         """
-        self.system_solver()
+        #steady state
+        dflt = dict(obj=None,cons=True,X0=None,dXdt=0)
+        dflt.update(kw)
+        return self.solver(**dflt)
 
-    def system_solver(self):
-        #TODO: use ref algorithm to solve system
-        #TODO: add transient balances to the system with constraints ect.
-        # Check independents to run system
-        if not self.X.size > 0:
-            if self.log_level < 10:
-                self.debug(f"nothing to solve...")
-            return
+    #TODO: code options for transient integration
+    def solver(self,obj=None,cons=True,X0:dict=None,dXdt:dict=None,**kw):
+        """runs the system solver using the current system state and modifying it. This is the default solver for the system, and it is recommended to add additional options or methods via the execute method.
+        
+        #TODO: make it so...
+        :param obj: the objective function to minimize, by default will minimize the sum of the squares of the residuals. Objective function should be a function(system,Xs,Xt) where Xs is the system state and Xt is the system transient state. The objective function will be argmin(X)|(1+custom_objective)*residual_RSS
+        :param cons: the constraints to be used in the solver, by default will use the system's constraints will be enabled when True. If a dictionary is passed the solver will use the dictionary as the constraints in addition to system constraints. These can be individually disabled by key=None in the dictionary.
+        :param X0: the initial guess for the solver, by default will use the current system state. If a dictionary is passed the solver will use the dictionary as the initial guess in addition to the system state.
+        :param dXdt: can be 0 to indicate steady-state, or None to not run the transient constraints. Otherwise a partial dictionary of parameters for the dynamics rates can be given, those not given will be assumed steady state or 0.
+        :param kw: additional options for the solver, such as the solver_option, or the solver method options.
+        """
+        
+        has_constraints = self.has_constraints
+        solve_mode = self.solver_option
+        if 'solver_option' in kw and kw['solver_option'] in SOLVER_OPTIONS:
+            solve_mode = kw['solver_option']
+        elif 'solver_option' in kw:
+            raise ValueError(f"invalid solver option: {kw['solver_option']}")
 
-        self.debug(f"running system solver")
+        threshold = 0.001
 
-        # solver objective functions
-        def f(*x):
-            res = self.calcF(x[0], pre_execute=True)
-            return res
+        if solve_mode == 'minimize' or has_constraints:
+            opts = {"rhobeg": 0.01, "catol": 1e-4, "tol": 1e-6}            
+            opts.update(kw)
+        else:
+            opts = {}
+        
+        #TODO: get the solver configuration
+        info = self.collect_solver_refs(min_set=True)
+        pprint.pprint(info)
 
-        def f_min(*x):
-            res = self.calcF(x[0], pre_execute=True)
-            ans = numpy.linalg.norm(res, 2)
+        #Collect Steady State References, indexed by same x parameter
+        Xref = info['ss_states']
+        Yref = info['ss_output']
 
-            if ans < 1:
-                return ans**0.5
-            return ans
+        #TODO: enhance objective with obj_add for argmin(X)|(1+add_obj)*obj
+        #TODO: add global optimization search for objective addin, via a new  `search_optimization` method.
 
-        if self.solver_option == "root" and not self.has_constraints:
-            self._ans = scopt.root(f, x0=self.X)
+        #Transient State Target
+        #TODO: add dynamics integration (steady: dXdt==0, dXdt = C)
+        #-how to handle dXdt cycle references? or in series as in 2nd order systems?
+        #-how to handle conflicts with time parameters?
+        #Dynamic Systems:
+
+        #Time Integration:
+        Xtr,Ytr = {},{}
+        #rates are directly defined by input for Time integration 
+        for k,v in info['tr_sets'].items():
+            #TODO: check on which variable is callable vs settable. 
+            Ytr[k] = v['dpdt']
+            Xtr[k] = v['dpdt']
+        
+        #Dynamic Components
+        for comp,cdict in info['dyn_comp'].items():
+            if cdict['state']:
+                ckey = comp+'.' if comp else ''
+                for p,v in cdict['state'].items():
+                    Xtr[p] = v
+                    Ytr[p] = cdict['comp'].ref_dXdt(p.replace(ckey,'')) 
+
+        #Dynamics Configuration
+        if dXdt is not None and dXdt is not False:
+            if dXdt == 0:
+                pass
+            elif dXdt is True:
+                pass
+            else:#dXdt is a dictionary
+                assert isinstance(dXdt,dict),f'not dict for dXdt: {dXdt}'
+                raise NotImplementedError(f"dynamic integration not yet implemented for dictionary based input: {dXdt}")
+        else:
+            #nope!
+            Ytr = {}
+            Xtr = {}
+        
+        #Time changes:
+        #TODO: check parameter conflicts
+        Xref.update(Xtr)
+        Yref.update(Ytr)
+
+        #Initial States
+        if X0 is not None:
+            assert isinstance(X0,dict), f'wrong format for state: {X0}'
+            X0 = X0
+            #TODO: check if X0 is valid
+        else:
+            X0 = Xref
+        
+        #constraints lookup
+        constraints = self.solver_constraints
+        if isinstance(cons,dict):
+            #Remove None Values
+            nones = {k for k,v in cons.items() if v is  None}
+            for ki in nones:
+                constraints.pop(ki,None)
+            constraints.update({k:v for k,v in cons.items() if v is not None})
+
+        elif cons is False or cons is None:
+            constraints = {}
+            
+        parameter_list = list(X0.keys())
+        Xg = Ref.refset_get(Xref)
+
+        #TODO: add basin hopping method in search_optimization
+        output = {'Xstart':Xg,'ans':None,'dXdt':dXdt,'constraints':constraints,'parms':parameter_list,'Xans':None}
+
+        #Solve / Minimize
+        if solve_mode == "root" and not has_constraints and obj is None:
+            
+            self._ans = refroot_solve(self,Xref,Yref,ret_ans=True,**kw)
+            output['ans'] = self._ans
             if self._ans.success:
-                self.setX(self._ans.x, pre_execute=True)
+                #Set Values
+                Xa = {p:self._ans.x[i] for i,p in enumerate(parameter_list)}
+                output['Xans'] = Xa
+                Ref.refset_input(Xref,Xa)
+                self.pre_execute()
                 self._converged = True
             else:
+                Ref.refset_input(Xref,Xg)
+                self.pre_execute()                
                 self._converged = False
                 raise Exception(f"solver didnt converge: {self._ans}")
 
-            return self._ans
+            return output
+        
+        elif solve_mode == "minimize" or has_constraints:
 
-        elif self.solver_option == "minimize" or self.has_constraints:
-            cons = self.solver_constraints
-            opts = {"rhobeg": 0.01, "catol": 1e-4, "tol": 1e-6}
-            self._ans = scopt.minimize(
-                f_min, x0=self.X, method="COBYLA", options=opts, **cons
-            )
-            if self._ans.success and abs(self._ans.fun) < 0.01:
-                self.setX(self._ans.x)
+            self._ans = refmin_solve(self,Xref,Yref,ret_ans=True,**kw)
+            output['ans'] = self._ans
+            if self._ans.success and abs(self._ans.fun) < threshold:
+                #Set Values
+                Xa = {p:self._ans.x[i] for i,p in enumerate(parameter_list)}
+                output['Xans'] = Xa
+                Ref.refset_input(Xref,Xa)
+                self.pre_execute()
                 self._converged = True
 
             elif self._ans.success:
-                self.setX(self._ans.x)
+                Xa = {p:self._ans.x[i] for i,p in enumerate(parameter_list)}
+                output['Xans'] = Xa
                 self.warning(
                     f"solver didnt fully solve equations! {self._ans.x} -> residual: {self._ans.fun}"
                 )
-                self._converged = False
+                Ref.refset_input(Xref,Xg)
+                self.pre_execute()                
+                self._converged = False                
 
             else:
+                Ref.refset_input(Xref,Xg)
+                self.pre_execute()                      
                 self._converged = False
                 raise Exception(f"solver didnt converge: {self._ans}")
 
-            return self._ans
+            return output
 
         else:
-            self.warning(f"no solution attempted!")
+            self.warning(f"no solution attempted!")            
+
+
 
     def _iterate_components(self):
         """sets the current component for each product combination of iterable_components"""
@@ -281,234 +374,6 @@ class SolverMixin(SolveableMixin):
             for ck, comp in components.items():
                 comp.reset()
 
-    def setX(self, x_ordered=None, pre_execute=True, **x_kw):
-        """Apply full X data to X. #TODO allow partial data"""
-        # assert len(input_values) == len(self._X), f'bad input data'
-        assert x_ordered is not None or x_kw, f"have to have some input"
-        if x_ordered is not None:
-            if isinstance(x_ordered, numpy.ndarray):
-                x_ordered = x_ordered.tolist()
-            assert not x_kw, f"there must only be ordered inputs or keyword"
-            assert len(x_ordered) == len(self._X), f"must be a full sized"
-            for f, x in zip(self._X.values(), x_ordered):
-                f.set_value(x)
-        else:
-            assert set(x_kw).issubset(set(self._X)), f"incorrect parms {x_kw}"
-            _Xref = self._X
-
-            for k, v in x_kw.items():
-                self.debug(f"setting X value {k}={v}")
-                _Xref[k].set_value(v)
-
-        if pre_execute:
-            self.pre_execute()
-
-    # Function Calculation
-    def calcF(self, x_ordered=None, pre_execute=True, **x_kw):
-        """calculates the orderdered or keyword input per Ref in `_F`"""
-        assert x_ordered is not None or x_kw, f"have to have some input"
-        with self.revert_X() as rx:
-            if x_ordered is not None:
-                # print(x_ordered)
-                if isinstance(x_ordered, numpy.ndarray):
-                    x_ordered = x_ordered.tolist()
-                assert not x_kw, f"there must only be ordered inputs or keyword"
-                assert len(x_ordered) == len(
-                    self._X
-                ), f"must be a full sized input"
-                # Set Em
-                self.setX(x_ordered, pre_execute=pre_execute)
-                # Get Em
-                o = [f.value() for f, x in zip(self.Flist, x_ordered)]
-                # o = [f.value() for f  in self.Flist]
-                return numpy.array(o)
-            elif x_kw:
-                assert (
-                    set(x_kw) in self._X
-                ), f"incompatable keyword args in {x_kw}"
-                # Set Em
-                self.setX(**x_kw, pre_execute=pre_execute)
-                # Get Em
-                o = [self._F[k].value(v) for k, v in x_kw.items()]
-                return numpy.array(o)
-        # Forget Em
-
-        # raise NotImplemented('#TODO')
-
-    def calcJacobean(self, x, pct=0.001, diff=0.0001):
-        """
-        returns the jacobiean by modifying X' <= X*pct + diff and recording the differences. When abs(x) < pct x' = x*1.1 + diff
-        """
-        with self.revert_X():
-            # initalize here
-            self.setX(x)
-            self.pre_execute()
-
-            rows = []
-            dxs = []
-            Fbase = self.F
-            for k, v in self._X.items():
-                x = v.value()
-                if abs(x) > pct:
-                    new_x = x * (1 + pct) + diff
-                else:
-                    new_x = x * (1.1) + diff * x
-                dx = new_x - x
-                dxs.append(dx)
-
-                v.set_value(new_x)
-                self.pre_execute()
-
-                F_ = self.F - Fbase
-
-                rows.append(F_ / dx)
-
-        return numpy.column_stack(rows)
-
-    # Useful Properties (F & X)
-    @instance_cached
-    def Flist(self):
-        """returns F() for each solver dependent as an anonymous function"""
-        return [self._F[self.F_keyword_order[i]] for i in range(len(self._F))]
-
-    @instance_cached
-    def _X(self):
-        """stores the internal references to the solver references"""
-        return {k: v.independent for k, v in self.solvers.items()}
-
-    @instance_cached
-    def _F(self):
-        """stores the internal references to the solver references"""
-        return {k: v.dependent for k, v in self.solvers.items()}
-
-    @instance_cached
-    def F_keyword_order(self):
-        """defines the order of inputs in ordered mode for calcF"""
-        return {i: k for i, k in enumerate(self.solvers)}
-
-    @instance_cached
-    def F_keyword_rev_order(self):
-        """defines the order of inputs in ordered mode for calcF"""
-        return {k: i for i, k in self.F_keyword_order.items()}
-
-    @property
-    def X(self) -> numpy.array:
-        """The current state of the system"""
-        return numpy.array([v.value() for v in self._X.values()])
-
-    @property
-    def F(self) -> numpy.array:
-        """The current solution to the system"""
-        return numpy.array([v.value() for v in self._F.values()])
-
-    @contextmanager
-    def revert_X(self, *ing):
-        """
-        Stores the _X parameter at present, the reverts to that state when done
-        #TODO: add pre_execute / post_execute options
-        """
-        X_now = self.X
-        try:  # Change Variables To Input
-            yield self
-        finally:
-            self.setX(X_now)
-            self.pre_execute()
-
-    # Solution Managment
-    @instance_cached
-    def has_constraints(self):
-        """checks for any active constrints"""
-        for solvname, solv in self.solvers.items():
-            soltype = solv.solver
-            if any([s is not None for s in soltype.constraints.values()]):
-                return True
-        return False
-
-    @instance_cached
-    def constraints(self):
-        """returns a list of constraitns by type"""
-        out = []
-        for solvname, solv in self.solvers.items():
-            soltype = solv.solver
-            for stype, sv in soltype.constraints.items():
-                if sv is None:
-                    continue
-                out.append(
-                    {
-                        "name": solvname,
-                        "type": stype,
-                        "value": sv,
-                        "solver": soltype,
-                        "independent": soltype.independent,
-                        "solv_instance": solv,
-                    }
-                )
-        return out
-
-    @instance_cached
-    def solver_constraints(self):
-        """formatted as arguments for the solver"""
-        out = {"bounds": [], "constraints": []}
-
-        # boudns must be X length wide
-        for parm, solv in self.solvers.items():
-            out["bounds"].append([None, None])
-
-        groups = {}
-        for const in self.constraints:
-            name = const["name"]
-            if name not in groups:
-                groups[name] = [const]
-            else:
-                groups[name].append(const)
-
-        for group, values in groups.items():
-            for vcon in values:
-                con = self.create_constraint(vcon, out, group)
-                out["constraints"].append(con)
-        return out
-
-    def create_constraint(self, vcon, out, group):
-        contype = vcon["type"]
-        value = vcon["value"]
-        x_inx = self.F_keyword_rev_order[vcon["name"]]
-        # print(group,contype,value,x_inx,isinstance(value,(int,float)))
-
-        if isinstance(value, (int, float)):
-            # its a number
-            val = float(value)
-            if contype == "max":
-                # make objective that is negative when x > lim
-                def fun(x):
-                    return val - x[x_inx]
-
-            else:
-
-                def fun(x):
-                    return x[x_inx] + val
-
-            cons = {"type": "ineq", "fun": fun}
-            return cons
-        else:
-            val = copy.copy(value)
-            # its a function
-            if contype == "max":
-                # make objective that is negative when x > lim
-                def fun(x):
-                    with self.revert_X():
-                        self.setX(x)
-                        return val(self) - x[x_inx]
-
-            else:
-
-                def fun(x):
-                    with self.revert_X():
-                        self.setX(x)
-                        return x[x_inx] - val(self)
-
-            cons = {"type": "ineq", "fun": fun}
-            return cons
-
     #Replaces Tabulation Method
     @solver_cached
     def data_dict(self):
@@ -529,3 +394,96 @@ class SolverMixin(SolveableMixin):
                 out[k] = numpy.nan
         return out
 
+#Constraint Functions
+def comp_has_constraints(comp):
+    """checks for any active constrints"""
+    for solvname, solv in comp.solvers.items():
+        soltype = solv.solver
+        if any([s is not None for s in soltype.constraints.values()]):
+            return True
+    return False
+
+
+def comp_constraints(comp):
+    """returns a list of constraitns by type"""
+    out = []
+    for solvname, solv in comp.solvers.items():
+        soltype = solv.solver
+        for stype, sv in soltype.constraints.items():
+            if sv is None:
+                continue
+            out.append(
+                {
+                    "name": solvname,
+                    "type": stype,
+                    "value": sv,
+                    "solver": soltype,
+                    "independent": soltype.independent,
+                    "solv_instance": solv,
+                }
+            )
+    return out
+
+def comp_solver_constraints(comp):
+    """formatted as arguments for the solver"""
+    out = {"bounds": [], "constraints": []}
+
+    # boudns must be X length wide
+    for parm, solv in comp.solvers.items():
+        out["bounds"].append([None, None])
+
+    groups = {}
+    for const in comp.constraints:
+        name = const["name"]
+        if name not in groups:
+            groups[name] = [const]
+        else:
+            groups[name].append(const)
+
+    for group, values in groups.items():
+        for vcon in values:
+            con = create_constraint(vcon, out, group)
+            out["constraints"].append(con)
+    return out
+
+def create_constraint(comp, vcon, out, group):
+    contype = vcon["type"]
+    value = vcon["value"]
+    #x_inx = comp.F_keyword_rev_order[vcon["name"]]
+    # print(group,contype,value,x_inx,isinstance(value,(int,float)))
+
+    if isinstance(value, (int, float)):
+        # its a number
+        val = float(value)
+        if contype == "max":
+            # make objective that is negative when x > lim
+            def fun(x):
+                return val - x[x_inx]
+
+        else:
+
+            def fun(x):
+                return x[x_inx] + val
+
+        cons = {"type": "ineq", "fun": fun}
+        return cons
+    else:
+        val = copy.copy(value)
+        # its a function
+        if contype == "max":
+            # make objective that is negative when x > lim
+            def fun(x):
+                with comp.revert_X():
+                    comp.setX(x)
+                    return val(comp) - x[x_inx]
+
+        else:
+
+            def fun(x):
+                with comp.revert_X():
+                    comp.setX(x)
+                    return x[x_inx] - val(comp)
+
+        cons = {"type": "ineq", "fun": fun}
+        return cons
+    

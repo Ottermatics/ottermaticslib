@@ -1,10 +1,10 @@
 
 from engforge.attributes import ATTR_BASE,AttributeInstance
-from engforge.attr_dynamics import TRANSIENT
-from engforge.attr_solver import SOLVER
-from engforge.attr_signals import SIGNAL
-from engforge.attr_slots import SLOT
-from engforge.attr_plotting import PLOT, TRACE
+from engforge.attr_dynamics import Time
+from engforge.attr_solver import Solver
+from engforge.attr_signals import Signal
+from engforge.attr_slots import Slot
+from engforge.attr_plotting import Plot, Trace
 from engforge.logging import LoggingMixin, log
 from engforge.typing import *
 
@@ -75,13 +75,13 @@ class AttributedBaseMixin(LoggingMixin):
     @classmethod
     def _extract_type(cls,typ):
         """gathers valid types for an attribute.type"""
-        from engforge.attr_slots import SLOT
+        from engforge.attr_slots import Slot
         from engforge.configuration import Configuration
             
         if not isinstance(typ,type) or typ is None:
             return list()
 
-        if issubclass(typ,SLOT):
+        if issubclass(typ,Slot):
             accept = typ.accepted
             if isinstance(accept,(tuple,list)):
                 return list(accept)
@@ -146,32 +146,32 @@ class AttributedBaseMixin(LoggingMixin):
     @classmethod
     def slots_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all slots attributes for class"""
-        return cls._get_init_attrs_data(SLOT)
+        return cls._get_init_attrs_data(Slot)
 
     @classmethod
     def signals_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        return cls._get_init_attrs_data(SIGNAL)
+        return cls._get_init_attrs_data(Signal)
 
     @classmethod
     def solvers_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        return cls._get_init_attrs_data(SOLVER)
+        return cls._get_init_attrs_data(Solver)
 
     @classmethod
     def transients_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all signals attributes for class"""
-        return cls._get_init_attrs_data(TRANSIENT)
+        return cls._get_init_attrs_data(Time)
 
     @classmethod
     def trace_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all trace attributes for class"""
-        return cls._get_init_attrs_data(TRACE)
+        return cls._get_init_attrs_data(Trace)
 
     @classmethod
     def plot_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all plot attributes for class"""
-        return cls._get_init_attrs_data(PLOT)
+        return cls._get_init_attrs_data(Plot)
 
     @classmethod
     def input_attrs(cls):
@@ -180,29 +180,29 @@ class AttributedBaseMixin(LoggingMixin):
     @classmethod
     def input_fields(cls):
         ignore_types = (
-            SLOT,
-            SIGNAL,
-            SOLVER,
-            TRANSIENT,
+            Slot,
+            Signal,
+            Solver,
+            Time,
             tuple,
             list,
-            PLOT,
-            TRACE,
+            Plot,
+            Trace,
         )
         return cls._get_init_attrs_data(ignore_types, exclude=True)
 
     @classmethod
     def numeric_fields(cls):
         ignore_types = (
-            SLOT,
-            SIGNAL,
-            SOLVER,
-            TRANSIENT,
+            Slot,
+            Signal,
+            Solver,
+            Time,
             str,
             tuple,
             list,
-            PLOT,
-            TRACE,
+            Plot,
+            Trace,
         )
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}
@@ -284,7 +284,7 @@ class AttributedBaseMixin(LoggingMixin):
         you may not access any "private" variable that starts with an `_` as in _whatever
 
         difference is useful for saving slight differences in configuration in conjunction with solve
-        you might create wrappers for evaluate, or implement a strategy pattern.
+        you might create wrappers for eval, or implement a strategy pattern.
 
         only attributes may be changed.
 

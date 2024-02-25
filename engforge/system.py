@@ -1,9 +1,9 @@
 """A System is a Configuration that orchestrates dataflow between components, as well as solving systems of equations in the presense of limits, as well as formatting results of each Component into reporting ready dataframe. System's solver behavior is inspired by NASA's numerical propulsion simulation system (NPSS) to solve systems of inequalities in complex systems.
 
-Component or other subsystems are added to a System class with `SLOTs`:
+Component or other subsystems are added to a System class with `Slots`:
     ```
     class CustomSystem(System):
-        slot_name = System.defineSLOT(Component,ComponentSubclass,System)
+        slot_name = Slot.define(Component,ComponentSubclass,System)
     ```
 
 Component's data flow is established via `SIGNALS` that are defined:
@@ -17,9 +17,9 @@ Component's data flow is established via `SIGNALS` that are defined:
 
 update description to include solver
 
-A system calculates its state upon calling `System.run()`. This executes `pre_execute()` first which will directly update any attributes based on their `SIGNAL` definition between `SLOT` components. Once convergence is reached target_attr's are updated in `post_execute()` for cyclic SIGNALS.
+A system calculates its state upon calling `System.run()`. This executes `pre_execute()` first which will directly update any attributes based on their `SIGNAL` definition between `Slot` components. Once convergence is reached target_attr's are updated in `post_execute()` for cyclic SIGNALS.
 
-If the system encounters a subsystem in its solver routine, the subsystem is evaluated() and its results used as static in that iteration,ie it isn't included in the system level dependents if cyclic references are found.
+If the system encounters a subsystem in its solver routine, the subsystem is evald() and its results used as static in that iteration,ie it isn't included in the system level dependents if cyclic references are found.
 
 
 The solver uses the root or cobla scipy optimizer results on quick references to internal component references. Upon solving the system
@@ -51,7 +51,7 @@ log = SystemsLog()
 
 @forge
 class System(Configuration,SolverMixin, TabulationMixin, PlottingMixin):
-    """A system defines SLOTS for Components, and data flow between them using SIGNALS
+    """A system defines SlotS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
 

@@ -31,13 +31,13 @@ class SignalInstance(AttributeInstance):
     def compile(self,**kwargs):
         self.source = self.system.locate_ref(self.signal.source)
         self.target = self.system.locate_ref(self.signal.target)
-        self.system.info(f"setting {self.target} with {self.source}")
+        self.system.debug(f"SIGNAL|setting {self.target} with {self.source}")
 
     def apply(self):
         """sets `target` from `source`"""
         val = self.source.value()
         if self.system.log_level < 5:
-            self.system.debug(f"applying {self.source}|{val} to {self.target}")
+            self.system.debug(f"SIGNAL|applying {self.source}|{val} to {self.target}")
         self.target.set_value(val)
 
     @property
@@ -47,7 +47,7 @@ class SignalInstance(AttributeInstance):
 
 
 
-class SIGNAL(ATTR_BASE):
+class Signal(ATTR_BASE):
     """A base class that handles initalization in the attrs meta class scheme by ultimately createing a SignalInstance"""
 
     name: str
@@ -106,4 +106,5 @@ class SIGNAL(ATTR_BASE):
             raise Exception(f"source not found: {cls.source}")
 
 
-
+#Support Previous API
+SIGNAL = Signal

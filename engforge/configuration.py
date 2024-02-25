@@ -193,25 +193,25 @@ def signals_slots_handler(
 
         # Add Time Parm
         #TODO: remove after formulated in testing
-        if cls.transients_attributes():
-            time = attrs.Attribute(
-                name="time",
-                default=0,
-                validator=None,
-                repr=True,
-                cmp=None,
-                hash=None,
-                init=False,
-                metadata=None,
-                type=float,
-                converter=None,
-                kw_only=True,
-                eq=None,
-                order=None,
-                on_setattr=None,
-                inherited=False,
-            )
-            out.append(time)
+        # if cls.transients_attributes():
+        #     time = attrs.Attribute(
+        #         name="time",
+        #         default=0,
+        #         validator=None,
+        #         repr=True,
+        #         cmp=None,
+        #         hash=None,
+        #         init=False,
+        #         metadata=None,
+        #         type=float,
+        #         converter=None,
+        #         kw_only=True,
+        #         eq=None,
+        #         order=None,
+        #         on_setattr=None,
+        #         inherited=False,
+        #     )
+        #     out.append(time)
 
     # Add Slots
     if slots:
@@ -232,7 +232,7 @@ def signals_slots_handler(
             at = solver.make_attribute(solver_name,cls)
             out.append(at)
 
-        # Add TRANSIENT
+        # Add Time
         for solver_name, solver in cls.transients_attributes().items():
             # add from cls since not accessible from attrs
             at = solver.make_attribute(solver_name,cls)
@@ -251,10 +251,10 @@ def signals_slots_handler(
     created_fields = set([o.name for o in out])
     # print options
     if cls.log_level < 10:
-        from engforge.attr_plotting import PLOT
+        from engforge.attr_plotting import Plot
 
         for o in out:
-            if isinstance(o.type, PLOT):
+            if isinstance(o.type, Plot):
                 #print(o)
                 pass
 
@@ -296,7 +296,7 @@ def signals_slots_handler(
 
 # alternate initalisers
 comp_transform = lambda c, f: signals_slots_handler(
-    c, f, slots=True, signals=False, solvers=False, sys=False, plots=False
+    c, f, slots=True, signals=True, solvers=True, sys=False, plots=False
 )
 
 # TODO: Make A MetaClass for Configuration, and provide forge interface there. Problem with replaceing metaclass later, as in the case of a singleton.
@@ -465,6 +465,7 @@ class Configuration(AttributedBaseMixin):
                     comp.parent = self
             
         self.debug(f"created {self.identity}")
+
         #subclass instance instance init causes conflicts in structures 
         self.__on_init__()
         if self._subclass_init:

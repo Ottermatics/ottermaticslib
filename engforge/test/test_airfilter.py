@@ -4,10 +4,10 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
-from engforge.attr_dynamics import TRANSIENT
-from engforge.attr_solver import SOLVER
+from engforge.attr_dynamics import Time
+from engforge.attr_solver import Solver
 from engforge.attr_signals import SIGNAL
-from engforge.attr_slots import SLOT
+from engforge.attr_slots import Slot
 from engforge.properties import *
 from engforge.attr_plotting import *
 from engforge.analysis import Analysis
@@ -46,16 +46,16 @@ class Airfilter(System):
     w: float = attrs.field(default=1)
     k_parasitic: float = attrs.field(default=0.1)
 
-    fan: Fan = SLOT.define(Fan, default_ok=True)
-    filt: Filter = SLOT.define(Filter, default_ok=True)
+    fan: Fan = Slot.define(Fan, default_ok=True)
+    filt: Filter = Slot.define(Filter, default_ok=True)
 
     set_fan_n = SIGNAL.define("fan.n", "throttle", mode="both")
     set_filter_w = SIGNAL.define("filt.w", "w", mode="both")
 
-    flow_solver = SOLVER.define("sum_dP", "w")
+    flow_solver = Solver.define("sum_dP", "w")
     flow_solver.add_constraint("min", 0)
 
-    flow_curve = PLOT.define(
+    flow_curve = Plot.define(
         "throttle", "w", kind="lineplot", title="Flow Curve"
     )
 
@@ -75,7 +75,7 @@ class Airfilter(System):
 @forge
 class AirFilterAnalysis(Analysis):
     efficiency: float = attrs.field(default=0.9)
-    system = SLOT.define(Airfilter, default_ok=True)
+    system = Slot.define(Airfilter, default_ok=True)
 
     @system_property
     def cadr(self) -> float:

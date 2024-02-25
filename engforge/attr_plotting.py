@@ -1,4 +1,4 @@
-"""This module defines PLOT and TRACE methods that allow the plotting of Statistical & Transient relationships of data in each system
+"""This module defines Plot and Trace methods that allow the plotting of Statistical & Transient relationships of data in each system
 """
 
 
@@ -246,12 +246,12 @@ class PlottingMixin:
 class PlotInstance(AttributeInstance):
     """combine plotclass parms with system info"""
 
-    plot_cls: "PLOT"
+    plot_cls: "Plot"
     system: "System"
 
     refs = None
 
-    def __init__(self, system: "System", plot_cls: "PLOT"):
+    def __init__(self, system: "System", plot_cls: "Plot"):
         self.plot_cls = plot_cls
         self.system = system
 
@@ -531,7 +531,7 @@ class TraceInstance(PlotInstance):
         return self.process_fig(fig, title)
 
 
-class TRACE(PLOT_ATTR):
+class Trace(PLOT_ATTR):
     """trace is a plot for transients, with y and y2 axes which can have multiple parameters each"""
 
     types = ["scatter", "line"]
@@ -633,10 +633,10 @@ class TRACE(PLOT_ATTR):
         if "y2":
             plot_args["y2"] = y2
 
-        log.info(f"adding TRACE|{kind} {x},{y},{y2},{kwargs}")
+        log.info(f"adding Trace|{kind} {x},{y},{y2},{kwargs}")
 
         # Create A New Signals Class
-        new_name = f"TRACE_x_{x}_y_{y}_{str(uuid.uuid4())}".replace(
+        new_name = f"Trace_x_{x}_y_{y}_{str(uuid.uuid4())}".replace(
             ".", "_"
         ).replace("-", "")
         new_dict = dict(
@@ -692,7 +692,7 @@ class TRACE(PLOT_ATTR):
         return pa
 
 
-class PLOT(PLOT_ATTR):
+class Plot(PLOT_ATTR):
     """Plot is a conveinence method"""
 
     types: tuple = ("displot", "relplot", "catplot")
@@ -812,3 +812,8 @@ class PLOT(PLOT_ATTR):
             if k in parm_opts:
                 p[k] = arg
         return p
+
+
+### Support Previous API
+PLOT = Plot
+Trace = Trace

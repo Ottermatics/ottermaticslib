@@ -8,7 +8,7 @@ class IntegratorInstance(AttributeInstance):
     """A decoupled signal instance to perform operations on a system instance"""
 
     system: "System"
-    transient: "TRANSIENT"
+    transient: "Time"
 
     # compiled info
     parameter: "Ref"
@@ -18,7 +18,7 @@ class IntegratorInstance(AttributeInstance):
 
     # TODO: add forward implicit solver
 
-    def __init__(self, solver: "TRANSIENT", system: "System") -> None:
+    def __init__(self, solver: "Time", system: "System") -> None:
         self.solver = solver
         self.system = system
         self.compile()
@@ -37,7 +37,7 @@ class IntegratorInstance(AttributeInstance):
         self.parameter.set_value(new_val)
 
 #TODO: depriciate modes and update for dynamicmixin strategies
-class TRANSIENT(ATTR_BASE):
+class Time(ATTR_BASE):
     """Transient is a base class for integrators over time"""
 
     mode: str
@@ -68,7 +68,7 @@ class TRANSIENT(ATTR_BASE):
             derivative=derivative,
             #type=cls,
         )
-        new_slot = type(new_name, (TRANSIENT,), new_dict)
+        new_slot = type(new_name, (Time,), new_dict)
         new_slot.type = new_slot
         return new_slot
     
@@ -109,3 +109,6 @@ class TRANSIENT(ATTR_BASE):
             ), f"bad parm {cls.derivative} not numeric"
         
         #else: attributes are not checked, youre in command
+            
+#Support Previous API
+TRANSIENT = Time
