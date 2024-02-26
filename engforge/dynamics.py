@@ -260,7 +260,6 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
 
     def update_dynamics(self,t,X,U):
         """Updates dynamics when nonlinear is enabled, otherwise it will do nothing"""
-        self.time = t
         if not self.nonlinear:
             return
         
@@ -280,7 +279,6 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
     def rate_linear(self,t,dt,X,U=None):
         """simulate the system over the course of time. Return time differential of the state.
         """
-    
         O = self.static_A @ X
         if U is not None and self.static_B.size and U.size:
             O += self.static_B @ U
@@ -299,7 +297,6 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         Returns:
             np.array: time differential of the state
         """
-
         O = self.static_C @ X
         if U is not None and self.static_D.size and U.size:
             O += self.static_D @ U
@@ -348,34 +345,38 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         return  O
 
     #optimized convience funcitons
-    def nonlinear_step(self,t,dt,X,U=None):
+    def nonlinear_step(self,t,dt,X,U=None,set_Y=True):
         """Optimal nonlinear steps"""
+        self.time = t
         self.update_dynamics(t,X,U)
         #print(self.dynamic_A,self.dynamic_B,X,U)
         dXdt = self.rate_nonlinear(t,dt,X,U,update=False)
         out = self.nonlinear_output(t,dt,X,U,update=False)
         
-        for i,p in enumerate(self.dynamic_output_parms):
-            self.Yt_ref[p] = out[p]
+        if set_Y:
+            for i,p in enumerate(self.dynamic_output_parms):
+                self.Yt_ref[p].set_value(out[p])
 
         return dXdt
     
-    def linear_step(self,t,dt,X,U=None):
+    def linear_step(self,t,dt,X,U=None,set_Y=True):
         """Optimal nonlinear steps"""
+        self.time = t
         self.update_dynamics(t,X,U)
         dXdt = self.rate_linear(t,dt,X,U)
         out = self.linear_output(t,dt,X,U)
         
-        for i,p in enumerate(self.dynamic_output_parms):
-            self.Yt_ref[p] = out[p]
+        if set_Y:
+            for i,p in enumerate(self.dynamic_output_parms):
+                self.Yt_ref[p].set_value(out[p])
 
         return dXdt 
 
-    def step(self,t,dt,X,U=None):
+    def step(self,t,dt,X,U=None,set_Y=True):
         if self.nonlinear:
-            return self.nonlinear_step(t,dt,X,U)
+            return self.nonlinear_step(t,dt,X,U,set_Y=set_Y)
         else:
-            return self.linear_step(t,dt,X,U)
+            return self.linear_step(t,dt,X,U,set_Y=set_Y)
         
     @solver_cached
     def cache_dXdt(self):
@@ -383,8 +384,11 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         uses current state of X and U to determine the dXdt
         """
         #TODO: gather timestep
-        print(f'cache dXdt {self.time} {self.state} {self.input}')
-        step = self.step(self.time,1E-3,self.state,self.input)
+        lt = getattr(self,'_last_cache_time',0)
+        dt = max(self.time - lt,0)
+        self.info(f'cache dXdt {self.time} {lt} {dt}')
+        step = self.step(self.time,dt,self.state,self.input)
+        self._last_cache_time = self.time
         return step
         
 
@@ -392,7 +396,8 @@ class DynamicsMixin(Configuration,DynamicsIntegratorMixin):
         """returns the reference to the time differential of the state"""
         parms = self.dynamic_state_parms
         assert name in parms,f'name {name} not in state parms'
-        accss = lambda comp: comp.cache_dXdt[parms.index(name)]
+        inx = parms.index(name)
+        accss = lambda comp: comp.cache_dXdt[inx]
         return Ref(self,name,accss)
 
 
@@ -521,7 +526,8 @@ class GlobalDynamics(DynamicsMixin):
                 comp = compdict['comp']
                 Xds = np.array([r.value() for r in comp.Xt_ref.values()])
                 Uds = np.array([r.value() for r in comp.Ut_ref.values()])
-                dxdt = comp.step(t,dt,Xds,Uds)
+                #time updated in step
+                dxdt = comp.step(t,dt,Xds,Uds,True)
 
                 for i,(p,ref) in enumerate(comp.Xt_ref.items()):
                     out[(f'{compnm}.' if compnm else '')+p] = dxdt[i]
@@ -623,9 +629,6 @@ if __name__ == "__main__":
 
         speed = Time.integrate('x','v',mode='euler')
         accel = Time.integrate('v','a',mode='euler')
-
-        
-
 
 
     @forge(auto_attribs=True)

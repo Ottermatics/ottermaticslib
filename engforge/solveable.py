@@ -199,6 +199,34 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
 
         return out
     
+    def _iterate_components(self):
+        """sets the current component for each product combination of iterable_components"""
+
+        components = self.iterable_components
+
+        if not components:
+            yield  # enter once
+        else:
+
+            def _gen(gen, compkey):
+                for itemkey, item in gen:
+                    yield compkey, itemkey
+
+            iter_vals = {
+                cn: _gen(comp._item_gen(), cn)
+                for cn, comp in components.items()
+            }
+
+            for out in itertools.product(*list(iter_vals.values())):
+                for ck, ikey in out:
+                    # TODO: progress bar or print location
+                    components[ck].current_item = ikey
+                yield out
+
+            # finally reset the data!
+            for ck, comp in components.items():
+                comp.reset()    
+    
     #@instance_cached
     @property
     def comp_references(self):
@@ -639,14 +667,7 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
                 for (p,ref) in comp.Ut_ref.items():
                     tr_inputs[f'{ck+"." if ck else ""}{p}'] = ref
                     dyni['input'][f'{ck+"." if ck else ""}{p}'] = ref
-                
-            # for k in comp.dynamic_input_parms:
-            #     p_par = comp.locate_ref(k)
-            #     dyn_ref[k]= p_par
-            # 
-            # for k in comp.dynamic_output_parms:
-            #     p_par = comp.locate_ref(k)
-            #     dyn_ref[k]= p_par 
+
                 
         #Orchestrate The Simulation
         if min_set:
@@ -660,8 +681,14 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
                 #ig_source = sig_source,
                 #sig_target = sig_target,
                 dyn_comp = dyn_comp,
-                signals=signals
+                signals=signals,
+                solvers=solvers,
             )
+            #print(solvers)
+            key = lambda ck,pk: f'{ck+"." if ck else ""}{pk}'
+            dct = lambda ck,pk,cd,ci: {'comp':cd['conf'],'inst':getattr(cd['conf'],pk,None),'type':ci,'parm':pk,'sys_key':ck,'ref_indep': out['solvers'][key(ck,pk)]['indep'],'ref_dep': out['solvers'][key(ck,pk)]['dep'],'constraints':getattr(cd['conf'],pk,None).solver.constraints }
+            solvers = { key(ck,pk):dct(ck,pk,cd,ci) for ck,cd in internal_dynamics['solvers'].items() for pk,ci in cd['solvers'].items()}
+            out['solvers'] = solvers
             return out        
 
 
@@ -821,21 +848,21 @@ class SolveableMixin(AttributedBaseMixin): #'Configuration'
     @instance_cached
     def has_constraints(self):
         """checks for any active constrints"""
-        from engforge.solver import comp_constraints,comp_has_constraints,comp_solver_constraints,create_constraint
-        return comp_has_constraints(self)
+        from engforge.solver import comp_has_constraints
+        return comp_has_constraints(self.solvers)
 
     @instance_cached
     def constraints(self):
         """returns a list of constraitns by type"""
-        from engforge.solver import comp_constraints,comp_has_constraints,comp_solver_constraints,create_constraint
-        return comp_constraints(self)
-
-    @instance_cached
-    def solver_constraints(self):
-        from engforge.solver import comp_constraints,comp_has_constraints,comp_solver_constraints,create_constraint
-        return comp_solver_constraints(self)
+        from engforge.solver import comp_constraints
+        return comp_constraints(self.solvers)
 
 
+    def solver_constraints(self,parms=None):
+        from engforge.solver import comp_solver_constraints
+        if not parms:
+            parms = [v.independent.key for v in self.solvers.values()]
+        return comp_solver_constraints(self.solvers,parms)
         
 
 

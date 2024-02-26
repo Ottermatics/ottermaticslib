@@ -48,7 +48,7 @@ class SolverInstance(AttributeInstance):
     def compile(self):
         self.dependent = self.system.locate_ref(self.solver.dependent)
         self.independent = self.system.locate_ref(self.solver.independent)
-        self.system.info(f"solving {self.dependent} with {self.independent}")
+        self.system.debug(f"solving {self.dependent} with {self.independent}")
 
 
 class Solver(ATTR_BASE):
@@ -65,7 +65,7 @@ class Solver(ATTR_BASE):
 
     @classmethod
     def define(
-        cls, dependent: "system_property", independent: "attrs.Attribute"
+        cls, dependent: "system_property", independent: "attrs.Attribute"=None
     ):
         """Defines a new dependent and independent variable for the system solver. The error term will not necessiarily be satisfied by changing this particular independent"""
 
@@ -84,6 +84,10 @@ class Solver(ATTR_BASE):
 #        new_slot.default_options['validator'] = new_slot.configure_instance
         return new_slot
 
+    #TODO: update all code with this
+    solve_root = define
+    #TODO: add minimize / maximize / objective options
+    
 
     @classmethod
     def class_validate(cls,instance,**kwargs):
@@ -121,13 +125,13 @@ class Solver(ATTR_BASE):
     def add_constraint(cls, type_, value):
         """adds a `type` constraint to the solver. If value is numeric it is used as a bound with `scipy` optimize.
 
-        If value is a function it should be of the form value(system) and will establish an inequality constraint that independent parameter must be:
+        If value is a function it should be of the form value(Xarray) and will establish an inequality constraint that independent parameter must be:
             1. less than for max
             2. more than for min
 
         During the evaluation of the limit function system.X should be set, and pre_execute() have already run.
 
-        :param type: str, must be either min or max
+        :param type: str, must be either min or max with independent value comparison, or with a function additionally eq,ineq (same as max(0)) can be used
         :value: either a numeric (int,float), or a function, f(system)
         """
         assert cls is not SOLVER, f"must set constraint on SOLVER subclass"
@@ -138,6 +142,14 @@ class Solver(ATTR_BASE):
             value
         ), f"only int,float or callables allow. Callables must take system as argument"
         cls.constraints[type_] = value
+
+    #this means the independent parameter is the only thing that can change
+    add_input_constraint = add_constraint
+
+    @classmethod
+    def add_constraints(cls, **kwargs):
+        for k, v in kwargs.items():
+            cls.add_constraint(k, v)
 
 
 #Support Previous SnakeCase

@@ -1,8 +1,14 @@
-"""Module to define the Ref class and utility methods for working with it."""
+"""Module to define the Ref class and utility methods for working with it.
+
+Ref's are designed to create adhoc links between the systems & components of the system, and their properties. This is useful for creating optimization problems, and for creating dynamic links between the state and properties of the system. Care must be used on the component objects changing of state, the recommened procedure is to copy your base system to prevent hysterisis and other issues, then push/pop X values through the optimization methods and change state upon success
+
+Ref.component can be a Component,System or dictionary for referencing via keyword. Ref.key can be a string or a callable, if callable the ref will be evaluated as the result of the callable (allow_set=False), this renders the component unused, and disables the ability to set the value of the reference.
+"""
 import attrs
 import numpy as np
 import collections
 import scipy.optimize as sciopt
+from contextlib import contextmanager
 from engforge.properties import *
 
 
@@ -61,6 +67,20 @@ def f_lin_min(system,Xref:dict,Yref:dict,normalize=None):
     
     return f
 
+@contextmanager
+def revert_X(system,refs,pre_execute=True,post_execute=False):
+    """
+    Stores the _X parameter at present, the reverts to that state when done
+
+    """
+        
+    X_now = Ref.refset_get(refs)
+    try:  # Change Variables To Input
+        yield X_now
+    finally:
+        Ref.refset_input(refs, X_now)
+        if pre_execute: system.pre_execute()      
+        if post_execute: system.pre_execute()
 
 def refmin_solve(system,Xref:dict,Yref:dict,Xo=None,normalize:np.array=None,reset=True,doset=True,fail=True,ret_ans=False,ffunc=f_lin_min,**kw):
     """minimize the difference between two dictionaries of refernces, x references are changed in place, y will be solved to zero, options ensue for cases where the solution is not ideal
@@ -223,9 +243,11 @@ def calcJacobean(sys,Yrefs:dict,Xrefs:dict,X0:dict=None,pct=0.001,diff=0.0001):
     return np.column_stack(rows)    
 
 class Ref:
-    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evald,
+    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evald. This is useful for creating an adhoc optimization problems dynamically between variables. However use must be carefully control to avoid circular references, and understanding the safe use of the refset_input and refset_get methods (changing state on actual system).
     
-    A dictionary can be used
+    A dictionary can be used as a component, and the key will be used to access the value in the dictionary.
+
+    The key can be a callable, and the ref will be evaluated as the result of the callable (allow_set=False), this renders the component unused, and disables the ability to set the value of the reference.
     """
 
     __slots__ = ["comp", "key", "use_call",'use_dict','allow_set','eval_f','key_override']
@@ -237,8 +259,11 @@ class Ref:
     eval_f: callable
     key_override: bool
 
-    def __init__(self,component, key, use_call=True,allow_set=True,eval_f=None):
-        self.comp = component
+    def __init__(self,comp, key, use_call=True,allow_set=True,eval_f=None):
+        self.set(comp,key,use_call,allow_set,eval_f)
+    
+    def set(self,comp, key, use_call=True,allow_set=True,eval_f=None):
+        self.comp = comp
         if isinstance(self.comp,dict):
             self.use_dict = True
         else:
@@ -250,12 +275,22 @@ class Ref:
             self.key = key
             self.use_call = False
             self.allow_set = False
-            self.eval_f = None          
+            self.eval_f = eval_f          
         else:
             self.key = key
             self.use_call = use_call
             self.allow_set = allow_set
             self.eval_f = eval_f
+
+    def copy(self,**changes):
+        """copy the reference, and make changes to the copy"""
+        if 'key' not in changes:
+            changes['key'] = self.key
+        if 'comp' not in changes:
+            changes['comp'] = self.comp
+        copy = copy.copy(self)
+        copy.set(**changes)
+        return copy
 
     def value(self):
         if self.key_override:
