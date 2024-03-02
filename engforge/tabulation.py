@@ -9,7 +9,8 @@ from contextlib import contextmanager
 import attr
 
 from engforge.common import inst_vectorize, chunks
-#from engforge.configuration import Configuration, forge
+
+# from engforge.configuration import Configuration, forge
 from engforge.solveable import Ref, SolveableMixin
 from engforge.logging import LoggingMixin
 from engforge.dataframe import DataframeMixin
@@ -30,7 +31,8 @@ class TableLog(LoggingMixin):
 
 log = TableLog()
 
-class TabulationMixin(SolveableMixin,DataframeMixin):
+
+class TabulationMixin(SolveableMixin, DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
@@ -92,7 +94,6 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
         # reset value
         self._anything_changed = False
 
-
     @property
     def anything_changed(self):
         """use the on_setattr method to determine if anything changed,
@@ -113,8 +114,8 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
         self.index = 0
         self._table = None
         cls = self.__class__
-        if hasattr(cls,'_{cls.__name__}_system_properties'):
-            return  setattr(cls,'_{cls.__name__}_system_properties',None)    
+        if hasattr(cls, "_{cls.__name__}_system_properties"):
+            return setattr(cls, "_{cls.__name__}_system_properties", None)
 
     @property
     def TABLE(self):
@@ -135,18 +136,23 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
         df = pandas.DataFrame(data=data, copy=True)
         self.format_columns(df)
         return df
-    
 
     @property
     def plotable_variables(self):
-        '''Checks columns for ones that only contain numeric types or haven't been explicitly skipped'''
+        """Checks columns for ones that only contain numeric types or haven't been explicitly skipped"""
         if self.dataframe is not None:
-            check_type = lambda key: all([ isinstance(v, NUMERIC_TYPES) for v in self.dataframe[key] ])
-            check_non_mono =  lambda key: len(set(self.dataframe[key])) > 1
+            check_type = lambda key: all(
+                [isinstance(v, NUMERIC_TYPES) for v in self.dataframe[key]]
+            )
+            check_non_mono = lambda key: len(set(self.dataframe[key])) > 1
 
-
-            return [ var for var in self.dataframe.columns 
-                         if var.lower() not in self.skip_plot_vars and check_type(var) and check_non_mono(var)]
+            return [
+                var
+                for var in self.dataframe.columns
+                if var.lower() not in self.skip_plot_vars
+                and check_type(var)
+                and check_non_mono(var)
+            ]
         return []
 
     # Properties & Attribues
@@ -175,7 +181,7 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
         if self._skip_table_parms is None:
             return base
         return self._skip_table_parms + base
-    
+
     def format_label_attr(self, k, attr_prop):
         if attr_prop.metadata and "label" in attr_prop.metadata:
             return self.format_label(attr_prop.metadata["label"])
@@ -303,16 +309,17 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
         return self.__class__.system_properties_classdef()
 
     @classmethod
-    def system_properties_classdef(cls,recache=False):
+    def system_properties_classdef(cls, recache=False):
         """Combine other classes table properties into this one, in the case of subclassed system_properties"""
         from engforge.tabulation import TabulationMixin
-        #Use a cache for deep recursion
-        if not recache and hasattr(cls,'_{cls.__name__}_system_properties'):
-            res=getattr(cls,'_{cls.__name__}_system_properties')
+
+        # Use a cache for deep recursion
+        if not recache and hasattr(cls, "_{cls.__name__}_system_properties"):
+            res = getattr(cls, "_{cls.__name__}_system_properties")
             if res is not None:
                 return res
 
-        #otherwise make the cache
+        # otherwise make the cache
         __system_properties = {}
         for k, obj in cls.__dict__.items():
             if isinstance(obj, system_property):
@@ -344,7 +351,7 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
                                 f"adding system property {mrv.__name__}.{k}"
                             )
 
-        setattr(cls,'_{cls.__name__}_system_properties',__system_properties)
+        setattr(cls, "_{cls.__name__}_system_properties", __system_properties)
 
         return __system_properties
 
@@ -364,5 +371,3 @@ class TabulationMixin(SolveableMixin,DataframeMixin):
         """returns an instance unique id based on id(self)"""
         idd = id(self)
         return f"{self.classname}.{idd}"
-    
-

@@ -1,6 +1,8 @@
 from engforge.env_var import EnvVariable
 
-FORGE_PATH_VAR = EnvVariable("FORGE_REPORT_PATH", default=None, dontovrride=True)
+FORGE_PATH_VAR = EnvVariable(
+    "FORGE_REPORT_PATH", default=None, dontovrride=True
+)
 
 
 def client_path(alternate_path=None, **kw):

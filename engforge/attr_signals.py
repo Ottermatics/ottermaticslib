@@ -4,7 +4,7 @@
 """
 
 
-import attrs,uuid
+import attrs, uuid
 from engforge.attributes import ATTR_BASE, AttributeInstance
 from engforge.attr_slots import SLOT_TYPES
 
@@ -28,7 +28,7 @@ class SignalInstance(AttributeInstance):
         self.system = system
         self.compile()
 
-    def compile(self,**kwargs):
+    def compile(self, **kwargs):
         self.source = self.system.locate_ref(self.signal.source)
         self.target = self.system.locate_ref(self.signal.target)
         self.system.debug(f"SIGNAL|setting {self.target} with {self.source}")
@@ -37,14 +37,14 @@ class SignalInstance(AttributeInstance):
         """sets `target` from `source`"""
         val = self.source.value()
         if self.system.log_level < 5:
-            self.system.debug(f"SIGNAL|applying {self.source}|{val} to {self.target}")
+            self.system.debug(
+                f"SIGNAL|applying {self.source}|{val} to {self.target}"
+            )
         self.target.set_value(val)
 
     @property
     def mode(self) -> str:
         return self.signal.mode
-
-
 
 
 class Signal(ATTR_BASE):
@@ -55,7 +55,7 @@ class Signal(ATTR_BASE):
     target: str
     source: str
     config_cls: "System"
-    attr_prefix = 'SIGNAL'
+    attr_prefix = "SIGNAL"
     instance_class = SignalInstance
 
     @classmethod
@@ -65,7 +65,7 @@ class Signal(ATTR_BASE):
 
         # Create A New Signals Class
         new_name = f"SIGNAL_{mode}_{source}_to_{target}".replace(".", "_")
-        new_name = new_name + '_' + str(uuid.uuid4()).replace('-','')[0:16]
+        new_name = new_name + "_" + str(uuid.uuid4()).replace("-", "")[0:16]
         new_dict = dict(
             name=new_name,
             mode=mode,
@@ -73,10 +73,11 @@ class Signal(ATTR_BASE):
             source=source,
             default_options=cls.default_options.copy(),
         )
-        new_slot = type(new_name, (SIGNAL,), new_dict)
-        new_slot.default_options['default'] = new_slot.make_factory()
-        new_slot.default_options['validator'] = new_slot.configure_instance
-        return new_slot
+        #new_slot = type(new_name, (SIGNAL,), new_dict)
+        #new_slot.default_options["default"] = new_slot.make_factory()
+        #new_slot.default_options["validator"] = new_slot.configure_instance
+        new_sig = cls._setup_cls(new_name, new_dict)
+        return new_sig
 
     # @classmethod
     # def define_validate(cls, **kwargs):
@@ -89,7 +90,7 @@ class Signal(ATTR_BASE):
 
     # FIXME: move to
     @classmethod
-    def class_validate(cls,instance,**kwargs):
+    def class_validate(cls, instance, **kwargs):
         from engforge.properties import system_property
 
         system = cls.config_cls
@@ -106,5 +107,5 @@ class Signal(ATTR_BASE):
             raise Exception(f"source not found: {cls.source}")
 
 
-#Support Previous API
+# Support Previous API
 SIGNAL = Signal

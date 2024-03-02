@@ -2,7 +2,7 @@
 
 import attrs
 import uuid
-from engforge.attributes import ATTR_BASE,AttributeInstance
+from engforge.attributes import ATTR_BASE, AttributeInstance
 import typing as typ
 
 SLOT_TYPES = typ.Union["Component", "System"]
@@ -16,32 +16,38 @@ class Slot(ATTR_BASE):
     name: str
     accepted: SLOT_TYPES
     config_cls: "System"
-    attr_prefix = 'Slot'
+    attr_prefix = "Slot"
     none_ok: bool
-    
-    dflt_kw: dict = None #a dictionary of input in factory for custom inits
-    default_ok = True #otherwise accept class with defaults
+    instance_class = None #add the component or system on define
+
+    dflt_kw: dict = None  # a dictionary of input in factory for custom inits
+    default_ok = True  # otherwise accept class with defaults
 
     is_iter: bool
     wide: bool  # only for component iterator
-    #default_options = ATTR_BASE.default_options.copy()
-    default_options = dict( repr=True,
-                            validator=None,
-                            cmp=None,
-                            hash=None,
-                            init=True,
-                            metadata=None,
-                            converter=None,
-                            kw_only=True,
-                            eq=None,
-                            order=None,
-                            on_setattr=None,
-                            inherited=False)
+    # default_options = ATTR_BASE.default_options.copy()
+    default_options = dict(
+        repr=True,
+        validator=None,
+        cmp=None,
+        hash=None,
+        init=True,
+        metadata=None,
+        converter=None,
+        kw_only=True,
+        eq=None,
+        order=None,
+        on_setattr=None,
+        inherited=False,
+    )
 
     @classmethod
     def define(
-        cls, *component_or_systems: SLOT_TYPES, none_ok=False, default_ok=True,
-        dflt_kw:dict=None
+        cls,
+        *component_or_systems: SLOT_TYPES,
+        none_ok=False,
+        default_ok=True,
+        dflt_kw: dict = None,
     ):
         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass
 
@@ -71,37 +77,31 @@ class Slot(ATTR_BASE):
 
         ### Cost models should always default to None
         if any([issubclass(c, CostModel) for c in component_or_systems]):
-            default_ok = False 
+            default_ok = False
             none_ok = True
 
-        # FIXME: come up with a better name :)
-        new_name = f"Slot_{str(uuid.uuid4()).replace('-','')[0:16]}"
-        new_slot = type(
-            new_name,
-            (Slot,),
-            dict(
-                name=new_name,
+        new_dict =  dict(
                 accepted=component_or_systems,
                 none_ok=none_ok,
                 default_ok=default_ok,
                 dflt_kw=dflt_kw,
-                default_options = cls.default_options.copy()
-            ),
-        )
-        new_slot.default_options['validator'] = new_slot.configure_instance
-        new_slot.default_options['default'] = new_slot.make_factory()
-        #print(new_slot)
-        
-        return new_slot
+                instance_class = component_or_systems[0],
+                default_options=cls.default_options.copy(),
+            )
+
+        #slot
+        new_name = cls.attr_prefix+'_'
+        new_sig = cls._setup_cls(new_name, new_dict)
+        return new_sig
 
     @classmethod
     def define_iterator(
         cls,
         *component_or_systems: ITERATOR,
-        none_ok:bool=False,
-        default_ok:bool=True,
-        wide:bool=True,
-        dflt_kw:dict=None,
+        none_ok: bool = False,
+        default_ok: bool = True,
+        wide: bool = True,
+        dflt_kw: dict = None,
     ):
         """taking a type of component iterator, defines an interface that can be 'wide' where all items are executed in the same row on `System.run()`.
 
@@ -130,7 +130,7 @@ class Slot(ATTR_BASE):
             new_name,
             (Slot,),
             dict(
-                #default=cls.make_factory(),
+                # default=cls.make_factory(),
                 name=new_name,
                 accepted=component_or_systems,
                 none_ok=none_ok,
@@ -138,11 +138,12 @@ class Slot(ATTR_BASE):
                 dflt_kw=dflt_kw,
                 is_iter=True,
                 wide=wide,
-                default_options = cls.default_options.copy()
+                instance_class = component_or_systems[0],
+                default_options=cls.default_options.copy(),
             ),
         )
-        #new_slot.default_options['validator'] = new_slot.configure_instance
-        #new_slot.default_options['default'] =  new_slot.make_factory()
+        # new_slot.default_options['validator'] = new_slot.configure_instance
+        # new_slot.default_options['default'] =  new_slot.make_factory()
         return new_slot
 
     # Create a validator function
@@ -154,7 +155,7 @@ class Slot(ATTR_BASE):
 
         # apply wide behavior to componentiter instance
         if isinstance(value, ComponentIter) and attribute.type.wide == False:
-            #print(f'validate {instance} {attribute} {value}')
+            # print(f'validate {instance} {attribute} {value}')
             value.wide = False
 
         if value in cls.accepted or all([value is None, cls.none_ok]):
@@ -162,7 +163,7 @@ class Slot(ATTR_BASE):
 
         if any([isinstance(value, a) for a in cls.accepted]):
             return True
-        
+
         if cls.default_ok and value is None:
             return True
 
@@ -171,20 +172,26 @@ class Slot(ATTR_BASE):
         )
 
     @classmethod
-    def make_factory(cls,**kwargs):
+    def make_factory(cls, **kwargs):
         accepted = cls.accepted
-        #print(f'slot instance factory: {cls} {accepted}, {kwargs}')
+        # print(f'slot instance factory: {cls} {accepted}, {kwargs}')
 
-        if isinstance(accepted,(tuple,list)) and len(accepted) > 0:
+        if isinstance(accepted, (tuple, list)) and len(accepted) > 0:
             accepted = accepted[0]
 
-        #print(accepted,cls.dflt_kw,cls.default_ok)
+        # print(accepted,cls.dflt_kw,cls.default_ok)
         if cls.dflt_kw:
-            return attrs.Factory(lambda: accepted(**cls.dflt_kw),False)
+            return attrs.Factory(lambda: accepted(**cls.dflt_kw), False)
         elif cls.default_ok:
-            return attrs.Factory(accepted,False)
+            return attrs.Factory(accepted, False)
         else:
             return None
+        
+    @classmethod
+    def handle_instance(cls,canidate):
+        """a passthrough"""
+        return canidate
 
-#Support Previous SnakeCase
+
+# Support Previous SnakeCase
 Slot = Slot

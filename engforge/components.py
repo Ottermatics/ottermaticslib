@@ -18,20 +18,21 @@ import matplotlib.pyplot as plt
 
 
 @forge
-class Component(Configuration,TabulationMixin,SolveableMixin):
+class Component(Configuration, TabulationMixin, SolveableMixin):
     """Component is an Evaluatable configuration with tabulation and reporting functionality"""
 
-    parent: typing.Union['Component','System'] = attr.ib(default=None)
+    parent: typing.Union["Component", "System"] = attr.ib(default=None)
+
+    # UPDATE & POST UPDATE recieve the same kw args
 
 
-    #UPDATE & POST UPDATE recieve the same kw args
 #     def update(self, system,**kw):
 #         """override with custom system interaction"""
 #         pass
-# 
+#
 #     def post_update(self, system,**kw):
 #         """override with custom system interaction, will execute after all components have been updated"""
-#         pass    
+#         pass
 
 #     def update_internal(self,ignore:set=None,**kw):
 #         """updates internal components with self"""
@@ -39,17 +40,17 @@ class Component(Configuration,TabulationMixin,SolveableMixin):
 #             config.update(self)
 #             config.update_internal(ignore)
 #         if ignore: ignore.add(self)
-# 
+#
 #     def post_update_internal(self,ignore:set=None,**kw):
 #         """updates internal components with self"""
 #         self.debug(f'post updating internal {self.__class__.__name__}.{self}')
 #         for key, config in self.internal_components().items():
 #             if ignore is not None and config in ignore:
 #                 continue
-#             self.debug(f'post updating internal component {config.__class__.__name__}.{config}')       
+#             self.debug(f'post updating internal component {config.__class__.__name__}.{config}')
 #             config.post_update(self)
-#             config.post_update_internal(ignore)    
-#         if ignore: ignore.add(self)        
+#             config.post_update_internal(ignore)
+#         if ignore: ignore.add(self)
 
 
 # TODO: move inspection for components to mixin for inspection of slots

@@ -3,6 +3,8 @@ import attr, attrs
 from engforge.engforge_attributes import AttributedBaseMixin
 from engforge.logging import LoggingMixin, log
 from engforge.properties import *
+from engforge.env_var import EnvVariable
+import randomname
 import datetime
 
 
@@ -10,11 +12,23 @@ import datetime
 class ConfigLog(LoggingMixin):
     pass
 
-
 log = ConfigLog()
 
+conv_nms = lambda v: v.split(',') if isinstance(v,str) else v
+NAME_ADJ = EnvVariable('FORGE_NAME_ADJ',default=('geometry','size','algorithms','complexity','colors','materials'),type_conv=conv_nms)
+NAME_NOUN = EnvVariable('FORGE_NAME_NOUN',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
+def name_generator(instance):
+    """a name generator for the instance"""
+    base = str(instance.__class__.__name__).lower()
+    if instance.__class__._use_random_name:
+        out =base+ randomname.get_name(adj=NAME_ADJ.secret,noun=NAME_NOUN.secret)
+    else:
+        out = base
+    log.info(f"generated name: {out}")
+    return out
 
-#Wraps Configuration with a decorator, similar to @attrs.define(**options)
+
+# Wraps Configuration with a decorator, similar to @attrs.define(**options)
 def forge(cls=None, **kwargs):
     """Wrap all Configurations with this decorator with the following behavior
     1) we use the callback when any property changes
@@ -22,7 +36,7 @@ def forge(cls=None, **kwargs):
     3) hash is by object identity"""
 
     # Define defaults and handle conflicts
-    dflts = dict(repr=False, eq=False, slots=False, kw_only=True,hash=False)
+    dflts = dict(repr=False, eq=False, slots=False, kw_only=True, hash=False)
     for k, v in kwargs.items():
         if k in dflts:
             dflts.pop(k)
@@ -40,10 +54,10 @@ def forge(cls=None, **kwargs):
             )
 
             # must be here since can't inspect till after fields corrected
-            acls.pre_compile() #custom class compiler
+            acls.pre_compile()  # custom class compiler
             acls.validate_class()
-            if acls.__name__ != 'Configuration': #prevent configuration lookup
-                acls.compile_classes() #compile subclasses
+            if acls.__name__ != "Configuration":  # prevent configuration lookup
+                acls.compile_classes()  # compile subclasses
             return acls
 
         # Component/Config Flow
@@ -56,10 +70,10 @@ def forge(cls=None, **kwargs):
             **kwargs,
         )
         # must be here since can't inspect till after fields corrected
-        acls.pre_compile() #custom class compiler
+        acls.pre_compile()  # custom class compiler
         acls.validate_class()
-        if acls.__name__ != 'Configuration': #prevent configuration lookup
-            acls.compile_classes() #compile subclasses
+        if acls.__name__ != "Configuration":  # prevent configuration lookup
+            acls.compile_classes()  # compile subclasses
         return acls
 
     else:
@@ -81,16 +95,17 @@ def meta(title, desc=None, **kwargs):
     }
     return out
 
+
 # Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
     from engforge.tabulation import TabulationMixin
 
     if not isinstance(instance, (TabulationMixin)):
         return value
-    
+
     if instance._anything_changed:
         # Bypass Check since we've already flagged for an update
-        return value    
+        return value
 
     if log.log_level <= 10:
         log.msg(f"checking property changed {instance}{variable.name} {value}")
@@ -133,8 +148,8 @@ def signals_slots_handler(
     field_names = set([o.name for o in fields])
     log.debug(f"fields: {field_names}")
 
-    # Add Important Fields
-    in_fields = {f.name: f for f in fields}
+    #Add Fields (no underscored fields)
+    in_fields = {f.name: f for f in fields if not f.name.startswith("_") }
     if "name" in in_fields:
         name = in_fields.pop("name")
         out.append(name)
@@ -143,7 +158,7 @@ def signals_slots_handler(
         log.warning(f"{cls.__name__} does not have a name!")
         name = attrs.Attribute(
             name="name",
-            default=attrs.Factory(lambda inst: str(inst.__class__.__name__).lower(),True),
+            default=attrs.Factory(name_generator, True),
             validator=None,
             repr=True,
             cmp=None,
@@ -192,7 +207,7 @@ def signals_slots_handler(
             out.append(index)
 
         # Add Time Parm
-        #TODO: remove after formulated in testing
+        # TODO: remove after formulated in testing
         # if cls.transients_attributes():
         #     time = attrs.Attribute(
         #         name="time",
@@ -216,36 +231,34 @@ def signals_slots_handler(
     # Add Slots
     if slots:
         for slot_name, slot in cls.slots_attributes().items():
-            at = slot.make_attribute(slot_name,cls)
+            at = slot.make_attribute(slot_name, cls)
             out.append(at)
 
     # Add Signals
     if signals:
         for signal_name, signal in cls.signals_attributes().items():
-            at = signal.make_attribute(signal_name,cls)
+            at = signal.make_attribute(signal_name, cls)
             out.append(at)
-    
+
     # Add SOLVERS
     if solvers:
         for solver_name, solver in cls.solvers_attributes().items():
-
-            at = solver.make_attribute(solver_name,cls)
+            at = solver.make_attribute(solver_name, cls)
             out.append(at)
 
         # Add Time
         for solver_name, solver in cls.transients_attributes().items():
             # add from cls since not accessible from attrs
-            at = solver.make_attribute(solver_name,cls)
+            at = solver.make_attribute(solver_name, cls)
             out.append(at)
 
     if plots:
         for pltname, plot in cls.plot_attributes().items():
-            at = plot.make_attribute(pltname,cls)
+            at = plot.make_attribute(pltname, cls)
             out.append(at)
-            
 
         for pltname, plot in cls.trace_attributes().items():
-            at = plot.make_attribute(pltname,cls)
+            at = plot.make_attribute(pltname, cls)
             out.append(at)
 
     created_fields = set([o.name for o in out])
@@ -255,17 +268,17 @@ def signals_slots_handler(
 
         for o in out:
             if isinstance(o.type, Plot):
-                #print(o)
+                # print(o)
                 pass
 
     # Merge Fields Checking if we are overriding an attribute with system_property
-    #hack since TabulationMixin isn't available yet
-    #print(cls.mro())
-    if 'TabulationMixin' in str(cls.mro()):   
+    # hack since TabulationMixin isn't available yet
+    # print(cls.mro())
+    if "TabulationMixin" in str(cls.mro()):
         cls_properties = cls.system_properties_classdef(True)
     else:
         cls_properties = {}
-    #print(f'tab found!! {cls_properties.keys()}')
+    # print(f'tab found!! {cls_properties.keys()}')
     for k, o in in_fields.items():
         if k not in created_fields:
             if k in cls_properties and o.inherited:
@@ -273,7 +286,7 @@ def signals_slots_handler(
                     f"{cls.__name__} overriding inherited attr: {o.name} as a system property overriding it"
                 )
             else:
-                log.debug(f'{cls.__name__} adding attr: {o.name}')
+                log.debug(f"{cls.__name__} adding attr: {o.name}")
                 out.append(o)
         else:
             log.warning(
@@ -299,6 +312,8 @@ comp_transform = lambda c, f: signals_slots_handler(
     c, f, slots=True, signals=True, solvers=True, sys=False, plots=False
 )
 
+
+
 # TODO: Make A MetaClass for Configuration, and provide forge interface there. Problem with replaceing metaclass later, as in the case of a singleton.
 @forge
 class Configuration(AttributedBaseMixin):
@@ -311,8 +326,9 @@ class Configuration(AttributedBaseMixin):
 
     _temp_vars = None
 
+    _use_random_name: bool = True
     name: str = attr.ib(
-        default = attrs.Factory(lambda inst: str(inst.__class__.__name__).lower(),True),
+        default=attrs.Factory(name_generator, True),
         validator=attr.validators.instance_of(str),
         kw_only=True,
     )
@@ -323,75 +339,76 @@ class Configuration(AttributedBaseMixin):
     _created_datetime = None
     _subclass_init: bool = True
 
-
     # Configuration Information
-    def internal_configurations(self,check_config=True,use_dict=True)->dict:
+    def internal_configurations(self, check_config=True, use_dict=True) -> dict:
         """go through all attributes determining which are configuration objects
         additionally this skip any configuration that start with an underscore (private variable)
         """
         from engforge.configuration import Configuration
 
         if check_config:
-            chk = lambda k,v: isinstance(v, Configuration)
+            chk = lambda k, v: isinstance(v, Configuration)
         else:
-            chk = lambda k,v: k in self.slots_attributes()
-        
+            chk = lambda k, v: k in self.slots_attributes()
+
         obj = self.__dict__
-        if not use_dict: #slots
-            obj = {k: obj.get(k,None) for k in self.slots_attributes()}
+        if not use_dict:  # slots
+            obj = {k: obj.get(k, None) for k in self.slots_attributes()}
 
         return {
-            k: v
-            for k, v in obj.items()
-            if chk(k,v) and not k.startswith("_")
+            k: v for k, v in obj.items() if chk(k, v) and not k.startswith("_")
         }
 
-    def copy_config_at_state(self,level=None,levels_deep:int=-1,changed:dict=None,**kw):
+    def copy_config_at_state(
+        self, level=None, levels_deep: int = -1, changed: dict = None, **kw
+    ):
         """copy the system at the current state recrusively to a certain level, by default copying everything
         :param levels_deep: how many levels deep to copy, -1 is all
         :param level: the current level, defaults to 0 if not set
         """
         from engforge.configuration import Configuration
-        
+
         if changed is None:
-            #top!
+            # top!
             changed = {}
 
         if self in changed:
-            self.debug(f'already changed {self}')
+            self.debug(f"already changed {self}")
             return changed[self]
 
         if level is None:
             level = 0
-            #at top level add parent to changed to prevent infinte parent recursion
+            # at top level add parent to changed to prevent infinte parent recursion
             changed[self] = None
 
-        #exit early if below the level 
+        # exit early if below the level
         if level >= levels_deep and levels_deep > 0:
-            self.debug(f'below level {level} {levels_deep} {self}')
-            new_sys = attrs.evolve(self) #copy as is
+            self.debug(f"below level {level} {levels_deep} {self}")
+            new_sys = attrs.evolve(self)  # copy as is
             changed[self] = new_sys
             return new_sys
-        
-        #copy the internal configurations
+
+        # copy the internal configurations
         kwcomps = {}
         for key, config in self.internal_configurations().items():
-            self.debug(f'copying {key} {config} {level} {changed}')
-            #copy the system
+            self.debug(f"copying {key} {config} {level} {changed}")
+            # copy the system
             if config in changed:
                 ccomp = changed[config]
             else:
-                ccomp = config.copy_config_at_state(level+1,levels_deep,changed)
+                ccomp = config.copy_config_at_state(
+                    level + 1, levels_deep, changed
+                )
             kwcomps[key] = ccomp
-        
-        #Finally make the new system with changed internals
-        self.debug(f'changing with changes {self} {kwcomps} {kw}')
-        new_sys = attrs.evolve(self,**kwcomps,**kw)
+
+        # Finally make the new system with changed internals
+        self.debug(f"changing with changes {self} {kwcomps} {kw}")
+        new_sys = attrs.evolve(self, **kwcomps, **kw)
         changed[self] = new_sys
         return new_sys
 
     def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0,**kw
+        self, level=0, levels_to_descend=-1, parent_level=0, **kw
     ):
         """A generator that will go through all internal configurations up to a certain level
         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
@@ -411,17 +428,16 @@ class Configuration(AttributedBaseMixin):
             yield "", level, self
 
         level += 1
-        if 'check_config' not in kw:
-            kw['check_config'] = False
+        if "check_config" not in kw:
+            kw["check_config"] = False
         for key, config in self.internal_configurations(**kw).items():
-
-            if isinstance(config,Configuration):
+            if isinstance(config, Configuration):
                 for skey, level, iconf in config.go_through_configurations(
                     level, levels_to_descend, parent_level
                 ):
                     yield f"{key}.{skey}" if skey else key, level, iconf
             else:
-                yield key,level,config
+                yield key, level, config
 
     # Our Special Init Methodology
     def __on_init__(self):
@@ -435,47 +451,47 @@ class Configuration(AttributedBaseMixin):
     def __attrs_post_init__(self):
         """This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!"""
         # Store abs path On Creation, in case we change
-        
+
         from engforge.components import Component
 
         self._log = None
         self._anything_changed = True  # save by default first go!
         self._created_datetime = datetime.datetime.utcnow()
-        
-        #subclass instance instance init causes conflicts in structures ect
+
+        # subclass instance instance init causes conflicts in structures ect
         self.__pre_init__()
         if self._subclass_init:
             try:
                 for comp in self.__class__.mro():
-                    if hasattr(comp,'__on_init__'):
+                    if hasattr(comp, "__on_init__"):
                         comp.__pre_init__(self)
             except Exception as e:
-                self.error(e,f"error in __pre_init__ {e}")               
+                self.error(e, f"error in __pre_init__ {e}")
 
-                
-        #Assign Parents, ensure single componsition
-        #TODO: allow multi-parent, w/wo keeping state, state swap on update()?
-        for compnm,comp in self.internal_configurations(False).items():
-            if isinstance(comp,Component):
-                #TODO: allow multiple parents
-                if (not hasattr(comp,'parent')) and (comp.parent is not None):
-                    self.warning(f"Component {compnm} already has a parent {comp.parent} copying, and assigning to {self}")
-                    setattr(self,compnm,attrs.evolve(comp,parent=self))
+        # Assign Parents, ensure single componsition
+        # TODO: allow multi-parent, w/wo keeping state, state swap on update()?
+        for compnm, comp in self.internal_configurations(False).items():
+            if isinstance(comp, Component):
+                # TODO: allow multiple parents
+                if (not hasattr(comp, "parent")) and (comp.parent is not None):
+                    self.warning(
+                        f"Component {compnm} already has a parent {comp.parent} copying, and assigning to {self}"
+                    )
+                    setattr(self, compnm, attrs.evolve(comp, parent=self))
                 else:
                     comp.parent = self
-            
+
         self.debug(f"created {self.identity}")
 
-        #subclass instance instance init causes conflicts in structures 
+        # subclass instance instance init causes conflicts in structures
         self.__on_init__()
         if self._subclass_init:
             try:
                 for comp in self.__class__.mro():
-                    if hasattr(comp,'__on_init__'):
+                    if hasattr(comp, "__on_init__"):
                         comp.__on_init__(self)
             except Exception as e:
-                self.error(e,f"error in __on_init__")               
-
+                self.error(e, f"error in __on_init__")
 
     @classmethod
     def validate_class(cls):
@@ -493,7 +509,7 @@ class Configuration(AttributedBaseMixin):
         cls.cls_compile()
         for subcls in cls.parent_configurations_cls():
             if subcls.subcls_compile is not Configuration:
-                log.debug(f'{cls.__name__} compiling {subcls.__name__}')
+                log.debug(f"{cls.__name__} compiling {subcls.__name__}")
             subcls.subcls_compile()
 
     @classmethod
@@ -507,11 +523,11 @@ class Configuration(AttributedBaseMixin):
         pass
 
     @classmethod
-    def parent_configurations_cls(cls)->list:
+    def parent_configurations_cls(cls) -> list:
         """returns all subclasses that are a Configuration"""
-        return [c for c in cls.mro() if issubclass(c,Configuration)]
+        return [c for c in cls.mro() if issubclass(c, Configuration)]
 
-    #Identity & location Methods
+    # Identity & location Methods
     @property
     def filename(self):
         """A nice to have, good to override"""
@@ -554,8 +570,8 @@ class Configuration(AttributedBaseMixin):
     def classname(self):
         """Shorthand for the classname"""
         return str(type(self).__name__).lower()
-    
-    #Structural Orchestration Through Subclassing
+
+    # Structural Orchestration Through Subclassing
     @classmethod
     def subclasses(cls, out=None):
         """return all subclasses of components, including their subclasses

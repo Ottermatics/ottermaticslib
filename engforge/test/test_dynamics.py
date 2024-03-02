@@ -32,7 +32,7 @@ class SpringMass(System):
 
     x_neutral: float = attrs.field(default=0.5)
 
-    res = Solver.define("sumF", "a")
+    res =Solver.declare_var("sumF", "a")
 
     vtx = Time.integrate("v", "a")
     xtx = Time.integrate("x", "v")

@@ -28,7 +28,11 @@ def check_comp_type(instance, attr, value):
     """ensures the input component type is a Component"""
     from engforge.eng.costs import CostModel
 
-    if  not instance.wide and isinstance(value, type) and issubclass(value, CostModel):
+    if (
+        not instance.wide
+        and isinstance(value, type)
+        and issubclass(value, CostModel)
+    ):
         raise TypeError(f"Cost Mixin Not Supported As Iter Type! {value}")
 
     if isinstance(value, type) and issubclass(value, Component):
@@ -56,7 +60,7 @@ class ComponentIter(Component):
     data: iter
 
     # current item keu, non table type, this triggers `anything_changed` in `system._iterate_component()`
-    current_item: iter_tkn = attr.ib(factory=lambda: None,hash=False,eq=False)
+    current_item: iter_tkn = attr.ib(factory=lambda: None, hash=False, eq=False)
     _first_item_key: iter_tkn
 
     @property
@@ -112,18 +116,22 @@ class ComponentIter(Component):
         out["properties"] = pr = {}
 
         for key in self.system_properties_classdef():
-            pr[key] = Ref(self, key,True,False)
+            pr[key] = Ref(self, key, True, False)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key, False,True)
+            at[key] = Ref(self, key, False, True)
 
         return out
 
-    def internal_references(self,recache=False):
+    def internal_references(self, recache=False):
         """lists the this_name.comp_key.<attr/prop key>: Ref format to override data_dict"""
-        
-        if recache == False and hasattr(self,'_prv_internal_references') and self._prv_internal_references:
-            return self._internal_references  
+
+        if (
+            recache == False
+            and hasattr(self, "_prv_internal_references")
+            and self._prv_internal_references
+        ):
+            return self._internal_references
 
         keeprefcopy = lambda d: {k: {**c} for k, c in d.items()}
 
@@ -142,14 +150,14 @@ class ComponentIter(Component):
             # set property refs
             for key in item.system_properties_classdef():
                 k = f"{it_base_key}.{key}"
-                rc = Ref(item, key,True,False)
+                rc = Ref(item, key, True, False)
                 pr[k] = rc
                 prr[key] = rc
 
             # set attr refs
             for key in item.input_fields():
                 k = f"{it_base_key}.{key}"
-                ri = Ref(item, key, False,True)
+                ri = Ref(item, key, False, True)
                 at[k] = ri
                 atr[key] = ri
 
@@ -157,7 +165,7 @@ class ComponentIter(Component):
         self._prv_internal_references = out
         self._item_refs = _item_refs
         return self._internal_references
-    
+
     def __hash__(self):
         return hash(id(self))
 

@@ -50,7 +50,7 @@ log = SystemsLog()
 
 
 @forge
-class System(Configuration,SolverMixin, TabulationMixin, PlottingMixin):
+class System(Configuration, SolverMixin, TabulationMixin, PlottingMixin):
     """A system defines SlotS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
@@ -62,7 +62,7 @@ class System(Configuration,SolverMixin, TabulationMixin, PlottingMixin):
 
     _anything_changed_ = False
 
-    parent: typing.Union['Component','System'] = attrs.field(default=None)
+    parent: typing.Union["Component", "System"] = attrs.field(default=None)
 
     # Properties!
     @system_property
@@ -96,7 +96,10 @@ class System(Configuration,SolverMixin, TabulationMixin, PlottingMixin):
 
     @property
     def identity(self):
-        return f"{self.name}_{self._run_id}"
+        if self._run_id:
+            return f"{self.name}_{self._run_id}"
+        else:
+            return f"{self.name}"
 
     @property
     def _anything_changed(self):
@@ -111,5 +114,3 @@ class System(Configuration,SolverMixin, TabulationMixin, PlottingMixin):
     def _anything_changed(self, inpt):
         """allows default functionality with new property system"""
         self._anything_changed_ = inpt
-
-    

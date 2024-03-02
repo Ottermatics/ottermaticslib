@@ -20,10 +20,11 @@ warned = set()  # a nice global variable to hold any warnings
 FALSE_VALUES = (False, "false", "no", "n")
 TRUE_VALUES = (True, "checked", "true", "yes", "y")
 
+
 def parse_bool(input: str):
-    if isinstance(input,str):
+    if isinstance(input, str):
         input = input.lower()
-        
+
     if not input:
         return False
     elif input in TRUE_VALUES:
@@ -32,7 +33,8 @@ def parse_bool(input: str):
         return False
     return False
 
-DEFAULT_CONVERTERS = {bool:parse_bool}
+
+DEFAULT_CONVERTERS = {bool: parse_bool}
 
 
 class EnvVariable(LoggingMixin):
@@ -50,7 +52,7 @@ class EnvVariable(LoggingMixin):
     _replaced = set()
     fail_on_missing: bool
     desc: str = None
-    _upgrd_warn:bool = False
+    _upgrd_warn: bool = False
     _dontovrride: bool = False
 
     def __init__(
@@ -72,7 +74,11 @@ class EnvVariable(LoggingMixin):
         :param desc: a description of the purpose of the variable
         """
         self.var_name = secret_var_name
-        self.type_conv = type_conv if type_conv not in DEFAULT_CONVERTERS else DEFAULT_CONVERTERS[type_conv]
+        self.type_conv = (
+            type_conv
+            if type_conv not in DEFAULT_CONVERTERS
+            else DEFAULT_CONVERTERS[type_conv]
+        )
         self._dontovrride = dontovrride
 
         if default is not None:
@@ -128,17 +134,17 @@ class EnvVariable(LoggingMixin):
 
     @property
     def secret(self):
-
-        #Check if this secret is the one in the secrets registry
+        # Check if this secret is the one in the secrets registry
         sec = self.__class__._secrets[self.var_name]
         if sec is not self and not sec._dontovrride:
-
-            #Provide warning that the secret is being replaced
+            # Provide warning that the secret is being replaced
             if not self._upgrd_warn:
                 self._upgrd_warn = True
-                self.info(f'upgrading: {self.var_name} from {id(self)}->{id(sec)}')
-                
-            #Monkeypatch dictionary
+                self.info(
+                    f"upgrading: {self.var_name} from {id(self)}->{id(sec)}"
+                )
+
+            # Monkeypatch dictionary
             self.__dict__ = sec.__dict__
 
         if hasattr(self, "_override"):

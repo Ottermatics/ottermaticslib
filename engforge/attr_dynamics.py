@@ -1,8 +1,9 @@
 from engforge.attributes import ATTR_BASE, AttributeInstance
 
-import attrs, attr,uuid
+import attrs, attr, uuid
 
-#Instance & Attribute definition for integration parameters
+
+# Instance & Attribute definition for integration parameters
 # Solver minimizes residual by changing independents
 class IntegratorInstance(AttributeInstance):
     """A decoupled signal instance to perform operations on a system instance"""
@@ -28,13 +29,9 @@ class IntegratorInstance(AttributeInstance):
         self.derivative = self.system.locate_ref(self.solver.derivative)
         self.system.info(f"integrating {self.parameter} with {self.derivative}")
 
-    def integrate(self, dt):
-        # TODO: support different integrator modes
-        assert (
-            self.solver.mode == "euler"
-        ), "only euler integration supported currently"
-        new_val = self.parameter.value() + self.derivative.value() * dt
-        self.parameter.set_value(new_val)
+    def as_ref_dict(self):
+        return {'rate':self.derivative,'parm':self.parameter}
+
 
 #TODO: depriciate modes and update for dynamicmixin strategies
 class Time(ATTR_BASE):
@@ -60,30 +57,28 @@ class Time(ATTR_BASE):
         new_name = f"TRANSIENT_{mode}_{parameter}_{derivative}".replace(
             ".", "_"
         )
-        new_name = new_name + '_' + str(uuid.uuid4()).replace('-','')[0:16]
+        new_name = new_name + "_" + str(uuid.uuid4()).replace("-", "")[0:16]
         new_dict = dict(
             mode=mode,
             name=new_name,
             parameter=parameter,
             derivative=derivative,
-            #type=cls,
+            # type=cls,
         )
-        new_slot = type(new_name, (Time,), new_dict)
-        new_slot.type = new_slot
-        return new_slot
-    
-    #make define the same as integrate
+        return cls._setup_cls(new_name, new_dict)
+
+    # make define the same as integrate
     # @classmethod
     # def subcls_compile(cls,**kwargs):
     #     cls.define = cls.integrate
 
     @classmethod
-    def class_validate(cls,instance,**kwargs):
+    def class_validate(cls, instance, **kwargs):
         from engforge.properties import system_property
         from engforge.solver import SolveableMixin
 
         system = cls.config_cls
-        assert issubclass(system,SolveableMixin), f"must be a solveable system"
+        assert issubclass(system, SolveableMixin), f"must be a solveable system"
 
         parm_type = instance.locate(cls.parameter)
         if parm_type is None:
@@ -100,15 +95,16 @@ class Time(ATTR_BASE):
         if driv_type is None:
             raise Exception(f"derivative not found: {cls.derivative}")
         assert isinstance(
-            driv_type, (system_property,attrs.Attribute)
+            driv_type, (system_property, attrs.Attribute)
         ), f"bad derivative {cls.derivative} type: {driv_type}"
         if isinstance(driv_type, system_property):
             assert driv_type.return_type in (
                 int,
                 float,
             ), f"bad parm {cls.derivative} not numeric"
-        
-        #else: attributes are not checked, youre in command
-            
-#Support Previous API
+
+        # else: attributes are not checked, youre in command
+
+
+# Support Previous API
 TRANSIENT = Time

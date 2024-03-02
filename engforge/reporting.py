@@ -384,10 +384,10 @@ class GdriveReporter(PlotReporter, TemporalReporterMixin):
 #         table = self.joined_dataframe[field.title()]
 #     else:
 #         raise Exception('No Field Named {}'.format(field))
-# 
+#
 #     #Remove Infinity
 #     table = table.replace([numpy.inf, -numpy.inf], numpy.nan)
-# 
+#
 #     if check_type is not None:
 #         if all([isinstance(v,check_type) for v in table]):
 #             return table.to_numpy(copy=True)
@@ -396,7 +396,7 @@ class GdriveReporter(PlotReporter, TemporalReporterMixin):
 #         if all([check_value(v) for v in table]):
 #             return table.to_numpy(copy=True)
 #         return None
-# 
+#
 #     return table.to_numpy(dtype=float,copy=True)
 
 

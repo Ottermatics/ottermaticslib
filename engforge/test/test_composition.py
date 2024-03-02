@@ -43,12 +43,12 @@ class MockSystem(System):
     # move component output to system
     post_sig = SIGNAL.define("output", "comp.output", mode="both")
 
-    solver = Solver.define("in_out_diff", "input")
+    solver =Solver.declare_var("in_out_diff", "input")
     solver.add_constraint("min", 0)
     solver.add_constraint("max", 1)
     # solver.addConstraint('MAX','limit_max')
     # solver.addConstraint('MIN', 0)
-    sol2 = Solver.define("in2out2", "in2")
+    sol2 =Solver.declare_var("in2out2", "in2")
     sol2.add_constraint("max", limit_max)
     sol2.add_constraint("min", 0)
 

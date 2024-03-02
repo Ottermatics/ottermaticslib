@@ -11,16 +11,18 @@ from matplotlib.font_manager import get_font_names
 import inspect
 
 import typing
-#from engforge.configuration import forge
+
+# from engforge.configuration import forge
 from engforge.properties import *
 from engforge.logging import LoggingMixin
 from engforge.env_var import EnvVariable
-from engforge.attributes import ATTR_BASE,AttributeInstance
+from engforge.attributes import ATTR_BASE, AttributeInstance
 from matplotlib.backends.backend_pdf import PdfPages
 
 
 class PlotLog(LoggingMixin):
     pass
+
 
 log = PlotLog()
 
@@ -28,10 +30,12 @@ log = PlotLog()
 SEABORN_CONTEXTS = ["paper", "talk", "poster", "notebook"]
 SEABORN_THEMES = ["darkgrid", "whitegrid", "dark", "white", "ticks"]
 
+
 def conv_ctx(ctx):
     if ctx.lower() not in SEABORN_CONTEXTS:
         raise ValueError(f"theme must be one of {SEABORN_CONTEXTS}")
     return ctx.lower()
+
 
 def conv_theme(theme):
     if theme.lower() not in SEABORN_THEMES:
@@ -126,7 +130,10 @@ def install_seaborn(rc_override=None, **kwargs):
 
 install_seaborn()
 
-def save_all_figures_to_pdf(filename, figs=None, dpi=200, close=True, pdf=None, return_pdf=False):
+
+def save_all_figures_to_pdf(
+    filename, figs=None, dpi=200, close=True, pdf=None, return_pdf=False
+):
     """
     Save all figures to a PDF file.
 
@@ -154,14 +161,15 @@ def save_all_figures_to_pdf(filename, figs=None, dpi=200, close=True, pdf=None, 
         figs = [pylab.figure(n) for n in pylab.get_fignums()]
 
     for fig in figs:
-        fig.savefig(pp, format='pdf', dpi=dpi)
+        fig.savefig(pp, format="pdf", dpi=dpi)
 
     if close:
-        pylab.close('all')
+        pylab.close("all")
     if return_pdf:
         return pp
     else:
         pp.close()  # Don't keep the PDF file open
+
 
 class PlottingMixin:
     """Inherited by Systems and Analyses to provide common interface for plotting"""
@@ -344,7 +352,7 @@ class PlotInstance(AttributeInstance):
         return f"{self.plot_cls.type}.{self.plot_cls.kind}"
 
 
-class PLOT_ATTR(ATTR_BASE):
+class PlotBase(ATTR_BASE):
     """base class for plot attributes"""
 
     name: str
@@ -531,7 +539,7 @@ class TraceInstance(PlotInstance):
         return self.process_fig(fig, title)
 
 
-class Trace(PLOT_ATTR):
+class Trace(PlotBase):
     """trace is a plot for transients, with y and y2 axes which can have multiple parameters each"""
 
     types = ["scatter", "line"]
@@ -636,7 +644,7 @@ class Trace(PLOT_ATTR):
         log.info(f"adding Trace|{kind} {x},{y},{y2},{kwargs}")
 
         # Create A New Signals Class
-        new_name = f"Trace_x_{x}_y_{y}_{str(uuid.uuid4())}".replace(
+        new_name = f"Trace_x_{x}_y_{y}".replace(
             ".", "_"
         ).replace("-", "")
         new_dict = dict(
@@ -650,8 +658,7 @@ class Trace(PLOT_ATTR):
             title=title,
             kind=kind,
         )
-        new_plot = type(new_name, (cls,), new_dict)
-
+        new_plot = cls._setup_cls(new_name, new_dict)
         return new_plot
 
     @classmethod
@@ -692,7 +699,7 @@ class Trace(PLOT_ATTR):
         return pa
 
 
-class Plot(PLOT_ATTR):
+class Plot(PlotBase):
     """Plot is a conveinence method"""
 
     types: tuple = ("displot", "relplot", "catplot")
@@ -773,7 +780,7 @@ class Plot(PLOT_ATTR):
         )
 
         # Create A New Signals Class
-        new_name = f"PLOT_x_{x}_y_{y}_{str(uuid.uuid4())}".replace(
+        new_name = f"PLOT_x_{x}_y_{y}".replace(
             ".", "_"
         ).replace("-", "")
         new_dict = dict(
@@ -789,8 +796,7 @@ class Plot(PLOT_ATTR):
             plot_args=plot_args,
             title=title,
         )
-        new_plot = type(new_name, (cls,), new_dict)
-
+        new_plot = cls._setup_cls(new_name, new_dict)
         return new_plot
 
     @classmethod

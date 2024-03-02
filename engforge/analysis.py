@@ -1,7 +1,7 @@
 import attr
 from engforge.configuration import forge, Configuration
 from engforge.components import Component
-from engforge.tabulation import TabulationMixin,DataframeMixin
+from engforge.tabulation import TabulationMixin, DataframeMixin
 from engforge.system import System
 from engforge.typing import *
 from engforge.reporting import *
@@ -35,7 +35,7 @@ def make_reporter_check(type_to_check):
 
 
 @forge
-class Analysis(Configuration,TabulationMixin, PlottingMixin, DataframeMixin):
+class Analysis(Configuration, TabulationMixin, PlottingMixin, DataframeMixin):
     """Analysis takes a system and many reporters, runs the system, adds its own system properties to the dataframe and post processes the results
 
     make_plots() makes plots from the analysis, and stores figure
@@ -43,7 +43,7 @@ class Analysis(Configuration,TabulationMixin, PlottingMixin, DataframeMixin):
     report_results() writes to reporters
     """
 
-    #TODO: generate pdf with tables ect.
+    # TODO: generate pdf with tables ect.
 
     system: System = attrs.field()
     table_reporters: list = attrs.field(
@@ -67,7 +67,7 @@ class Analysis(Configuration,TabulationMixin, PlottingMixin, DataframeMixin):
         self.info(
             f"running analysis {self.identity} with input {args} {kwargs}"
         )
-        cb = lambda *args,**kw: self.save_data(force=True, subforce=True)
+        cb = lambda *args, **kw: self.save_data(force=True, subforce=True)
         out = self.system.run(*args, **kwargs, cb=cb)
         self.post_process(*args, **kwargs)
 
@@ -107,7 +107,7 @@ class Analysis(Configuration,TabulationMixin, PlottingMixin, DataframeMixin):
 
     @property
     def dataframe(self):
-        #TODO: join with analysis dataframe
+        # TODO: join with analysis dataframe
         return self.system.dataframe
 
     # Plotting & Report Methods:

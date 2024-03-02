@@ -1,5 +1,4 @@
-
-from engforge.attributes import ATTR_BASE,AttributeInstance
+from engforge.attributes import ATTR_BASE, AttributeInstance
 from engforge.attr_dynamics import Time
 from engforge.attr_solver import Solver
 from engforge.attr_signals import Signal
@@ -14,14 +13,17 @@ import typing
 import datetime
 
 
+import attr, attrs
 
-import attr,attrs
 
 class EngAttr(LoggingMixin):
     pass
+
+
 log = EngAttr()
 
-def get_attributes_of(cls, subclass_of: type=None, exclude=False):
+
+def get_attributes_of(cls, subclass_of: type = None, exclude=False):
     choose = issubclass
     if exclude:
         choose = lambda ty, type_set: not issubclass(ty, type_set)
@@ -29,7 +31,7 @@ def get_attributes_of(cls, subclass_of: type=None, exclude=False):
     if subclass_of is None:
         subclass_of = ATTR_BASE
 
-    #This handles the attrs class before or after compilation
+    # This handles the attrs class before or after compilation
     attrval = {}
     if "__attrs_attrs__" in cls.__dict__:  # Handle Attrs Class
         for k, v in attrs.fields_dict(cls).items():
@@ -37,7 +39,7 @@ def get_attributes_of(cls, subclass_of: type=None, exclude=False):
                 attrval[k] = v
 
     # else:  # Handle Pre-Attrs Class
-    #FIXME: should this run first?
+    # FIXME: should this run first?
     for k, v in cls.__dict__.items():
         if isinstance(v, type) and choose(v, subclass_of):
             attrval[k] = v
@@ -48,9 +50,24 @@ def get_attributes_of(cls, subclass_of: type=None, exclude=False):
 class AttributedBaseMixin(LoggingMixin):
     """A mixin that adds the ability to configure all engforge.core attributes of a class"""
 
-    @property
-    def attrs_fields(self) -> set:
-        return set(attr.fields(self.__class__))
+
+    # Auto Configuration Methods
+    @classmethod
+    def collect_all_attributes(cls):
+        """collects all the attributes for a system"""
+        out = {}
+        for base_class in ATTR_BASE.subclasses():
+            nm = base_class.__name__.lower()
+            out[nm] = base_class.collect_cls(cls)
+        return out
+    
+    def collect_inst_attributes(self,**kw):
+        """collects all the attributes for a system"""
+        out = {}
+        for base_class in ATTR_BASE.subclasses():
+            nm = base_class.__name__.lower()
+            out[nm] = base_class.collect_attr_inst(self,**kw)
+        return out  
 
     @classmethod
     def _get_init_attrs_data(cls, subclass_of: type, exclude=False):
@@ -65,52 +82,60 @@ class AttributedBaseMixin(LoggingMixin):
                     attrval[k] = v
 
         # else:  # Handle Pre-Attrs Class
-        #FIXME: should this run first?
+        # FIXME: should this run first?
         for k, v in cls.__dict__.items():
             if isinstance(v, type) and choose(v, subclass_of):
                 attrval[k] = v
 
         return attrval
 
+    # Attribute Methods
+    @property
+    def attrs_fields(self) -> set:
+        return set(attr.fields(self.__class__))
+
+
+
     @classmethod
-    def _extract_type(cls,typ):
+    def _extract_type(cls, typ):
         """gathers valid types for an attribute.type"""
         from engforge.attr_slots import Slot
         from engforge.configuration import Configuration
-            
-        if not isinstance(typ,type) or typ is None:
+
+        if not isinstance(typ, type) or typ is None:
             return list()
 
-        if issubclass(typ,Slot):
+        if issubclass(typ, Slot):
             accept = typ.accepted
-            if isinstance(accept,(tuple,list)):
+            if isinstance(accept, (tuple, list)):
                 return list(accept)
             return [accept]
-            
-        elif issubclass(typ,Configuration):
+
+        elif issubclass(typ, Configuration):
             return [typ]
-        
-        elif issubclass(typ,TABLE_TYPES):
+
+        elif issubclass(typ, TABLE_TYPES):
             return [typ]
 
     @classmethod
-    def check_ref_slot_type(cls,sys_key:str)->list:
+    def check_ref_slot_type(cls, sys_key: str) -> list:
         """recursively checks class slots for the key, and returns the slot type"""
 
         from engforge.configuration import Configuration
+
         slot_refs = cls.slot_refs()
         if sys_key in slot_refs:
             return slot_refs[sys_key]
-        
+
         slts = cls.input_attrs()
-        key_segs = sys_key.split('.')
+        key_segs = sys_key.split(".")
         out = []
-       # print(slts.keys(),sys_key)
-        if '.' not in sys_key and sys_key not in slts:
+        # print(slts.keys(),sys_key)
+        if "." not in sys_key and sys_key not in slts:
             pass
 
         elif sys_key in slts:
-            #print(f'slt find {sys_key}')
+            # print(f'slt find {sys_key}')
             return cls._extract_type(slts[sys_key].type)
         else:
             fst = key_segs[0]
@@ -119,30 +144,31 @@ class AttributedBaseMixin(LoggingMixin):
                 sub_clss = cls._extract_type(slts[fst].type)
                 out = []
                 for acpt in sub_clss:
-                    if isinstance(acpt,type) and issubclass(acpt,Configuration):
-                        
-                        vals = acpt.check_ref_slot_type('.'.join(rem))
-                        #print(f'recursive find {acpt}.{rem} = {vals}')
+                    if isinstance(acpt, type) and issubclass(
+                        acpt, Configuration
+                    ):
+                        vals = acpt.check_ref_slot_type(".".join(rem))
+                        # print(f'recursive find {acpt}.{rem} = {vals}')
                         if vals:
                             out.extend(vals)
-                        
-                    elif isinstance(acpt,type):
+
+                    elif isinstance(acpt, type):
                         out.append(acpt)
 
         slot_refs[sys_key] = out
 
         return out
-    
+
     @classmethod
-    def slot_refs(cls,recache=False):
+    def slot_refs(cls, recache=False):
         """returns all slot references in this configuration"""
-        key = f'{cls.__name__}_prv_slot_sys_refs'
-        if recache == False and hasattr(cls,key):
-            return getattr(cls,key)
+        key = f"{cls.__name__}_prv_slot_sys_refs"
+        if recache == False and hasattr(cls, key):
+            return getattr(cls, key)
         o = {}
-        setattr(cls,key,o)
+        setattr(cls, key, o)
         return o
-        
+
     @classmethod
     def slots_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all slots attributes for class"""
@@ -209,7 +235,6 @@ class AttributedBaseMixin(LoggingMixin):
 
     @classmethod
     def table_fields(cls):
-
         keeps = (str, float, int)  # TODO: add numpy fields
         typ = cls._get_init_attrs_data(keeps)
         return {k: v for k, v in typ.items()}
@@ -219,10 +244,10 @@ class AttributedBaseMixin(LoggingMixin):
     def as_dict(self):
         """returns values as they are in the class instance"""
         from engforge.configuration import Configuration
-        
+
         inputs = self.input_attrs()
-        #TODO: add signals?
-        properties = getattr(self,'system_properties_classdef',None)
+        # TODO: add signals?
+        properties = getattr(self, "system_properties_classdef", None)
         if properties:
             inputs.update(properties())
 
@@ -233,6 +258,7 @@ class AttributedBaseMixin(LoggingMixin):
     def input_as_dict(self):
         """returns values as they are in the class instance, but converts classes inputs to their input_as_dict"""
         from engforge.configuration import Configuration
+
         o = {k: getattr(self, k, None) for k in self.input_fields()}
         o = {
             k: v if not isinstance(v, Configuration) else v.input_as_dict
@@ -243,6 +269,7 @@ class AttributedBaseMixin(LoggingMixin):
     @property
     def numeric_as_dict(self):
         from engforge.configuration import Configuration
+
         o = {k: getattr(self, k, None) for k in self.numeric_fields()}
         o = {
             k: v if not isinstance(v, Configuration) else v.numeric_as_dict
@@ -264,15 +291,15 @@ class AttributedBaseMixin(LoggingMixin):
     @property
     def numeric_hash(self):
         d = self.numeric_as_dict
-        return deepdiff.DeepHash(d)[d]    
-    
-    #Configuration Push/Pop methods
-    def setattrs(self,dict):
+        return deepdiff.DeepHash(d)[d]
+
+    # Configuration Push/Pop methods
+    def setattrs(self, dict):
         """sets attributes from a dictionary"""
         msg = f"invalid keys {set(dict.keys()) - set(self.input_attrs())}"
         assert set(dict.keys()).issubset(set(self.input_attrs())), msg
-        for k,v in dict.items():
-            setattr(self,k,v)
+        for k, v in dict.items():
+            setattr(self, k, v)
 
     @contextmanager
     def difference(self, **kwargs):
@@ -310,13 +337,6 @@ class AttributedBaseMixin(LoggingMixin):
             self.setattrs(kwargs)
             yield self
         finally:
-            rstdict = {k:_temp_vars[k] for k,v in kwargs.items()}
-            self.setattrs(rstdict)    
-
-    #Auto Configuration Method
-    @classmethod
-    def auto_configure(cls,**kwargs):
-        """automatically configures a class with the given inputs"""
-        pass
-        #TODO: loop through all the attributes and configure them for the class with the given inputs
-        #TODO: give each attribute a routine to configure itself if it has applicable inputs / type TBD
+            rstdict = {k: _temp_vars[k] for k, v in kwargs.items()}
+            self.setattrs(rstdict)
+  

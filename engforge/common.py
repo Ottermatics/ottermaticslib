@@ -10,11 +10,11 @@ from urllib.request import urlopen
 import numpy
 
 
-class OtterLog(LoggingMixin):
+class ForgeLog(LoggingMixin):
     pass
 
 
-log = OtterLog()
+log = ForgeLog()
 log.info("Starting engforge Enviornment")
 
 

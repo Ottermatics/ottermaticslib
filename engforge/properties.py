@@ -21,18 +21,11 @@ log = PropertyLog()
 
 class engforge_prop:
     """an interface for extension and identification and class return support"""
+
     must_return = False
 
-    def __init__(
-        self,
-        fget=None,
-        fset=None,
-        fdel=None,
-        *args,
-        **kwargs
-    ):
-        """
-        """
+    def __init__(self, fget=None, fset=None, fdel=None, *args, **kwargs):
+        """ """
 
         self.fget = fget
         if fget:
@@ -41,18 +34,18 @@ class engforge_prop:
         self.fset = fset
         self.fdel = fdel
 
-
-    def __call__(self, fget=None, fset=None, fdel=None, doc=None,*args,**kwargs):
+    def __call__(
+        self, fget=None, fset=None, fdel=None, doc=None, *args, **kwargs
+    ):
         """this will be called when input is provided before property is set"""
         if fget and self.fget is None:
             self.gname = fget.__name__
             self.get_func_return(fget)
             self.fget = fget
-            
-        
+
         if self.fset is None:
             self.fset = fset
-        
+
         if self.fdel is None:
             self.fdel = fdel
 
@@ -71,7 +64,7 @@ class engforge_prop:
 
     def __get__(self, obj, objtype=None):
         if obj is None:
-            return self #class support
+            return self  # class support
         if self.fget is None:
             raise AttributeError("unreadable attribute")
         return self.fget(obj)
@@ -95,22 +88,27 @@ class engforge_prop:
     def deleter(self, fdel):
         return type(self)(self.fget, self.fset, fdel, self.__doc__)
 
+
 class cache_prop(engforge_prop):
+    allow_set: bool = (
+        False  # keep this flag false to maintain current persistent value
+    )
 
-    allow_set: bool = False #keep this flag false to maintain current persistent value
-
-    def __init__(self,*args,**kwargs):
+    def __init__(self, *args, **kwargs):
         self.allow_set = True
-        super().__init__(*args,**kwargs)
-    
+        super().__init__(*args, **kwargs)
+
     def __set__(self, instance, value):
         if self.allow_set:
-            self.set_cache(instance,reason='change',val=value)
+            self.set_cache(instance, reason="change", val=value)
         else:
             raise Exception(f"cannot set {self.gname}")
 
-    def set_cache(self, instance, reason="update",val=None):
-        raise NotImplementedError("cache_prop must be subclassed and set_cache method defined")
+    def set_cache(self, instance, reason="update", val=None):
+        raise NotImplementedError(
+            "cache_prop must be subclassed and set_cache method defined"
+        )
+
 
 class system_property(engforge_prop):
     """
@@ -207,7 +205,7 @@ class system_property(engforge_prop):
 
     def __get__(self, obj, objtype=None):
         if obj is None:
-            return self #class support
+            return self  # class support
         if self.fget is None:
             raise AttributeError("unreadable attribute")
         return self.fget(obj)
@@ -231,11 +229,12 @@ class system_property(engforge_prop):
     def deleter(self, fdel):
         return type(self)(self.fget, self.fset, fdel, self.__doc__)
 
+
 class cached_system_property(system_property):
     """A system property that caches the result when nothing changes. Use for expensive functions since the checking adds some overhead"""
 
     gname: str
-    
+
     def get_func_return(self, func):
         """ensures that the function has a return annotation, and that return annotation is in valid sort types"""
         anno = func.__annotations__
@@ -246,13 +245,14 @@ class cached_system_property(system_property):
             )
         else:
             self.return_type = typ
+
     @property
     def private_var(self):
         return f"_{self.gname}"
 
     def __get__(self, instance: "TabulationMixin", objtype=None):
         if instance is None:
-            return self        
+            return self
         if not hasattr(instance, self.private_var):
             from engforge.tabulation import TabulationMixin
 
@@ -264,8 +264,7 @@ class cached_system_property(system_property):
             return self.set_cache(instance)
         return getattr(instance, self.private_var)
 
-
-    def set_cache(self, instance, reason="update",val=None):
+    def set_cache(self, instance, reason="update", val=None):
         if log.log_level < 5:
             log.msg(
                 f"solver cache for {instance.identity}.{self.private_var}| {reason}"
@@ -294,19 +293,19 @@ class solver_cached(cache_prop):
                 instance.__class__, TabulationMixin
             ), f"incorrect class: {instance.__class__.__name__}"
             return self.set_cache(instance, reason="set")
-        
+
         elif instance.anything_changed:
             return self.set_cache(instance)
-    
+
         return getattr(instance, self.private_var)
 
-    def set_cache(self, instance, reason="update",val=None):
+    def set_cache(self, instance, reason="update", val=None):
         if log.log_level < 5:
             log.debug(
                 f"caching attr for {instance.identity}.{self.private_var}| {reason}"
             )
         if val is None:
-            val = self.fget(instance) #default!
+            val = self.fget(instance)  # default!
         setattr(instance, self.private_var, val)
         return val
 
@@ -317,7 +316,6 @@ class instance_cached(cache_prop):
     A property that caches a result to an instance the first call then returns that each successive call
     """
 
-
     @property
     def private_var(self):
         return f"_{self.gname}"
@@ -326,7 +324,7 @@ class instance_cached(cache_prop):
         if not hasattr(instance, self.private_var):
             from engforge.tabulation import TabulationMixin
 
-            if instance.__class__ is not None: #its an instance
+            if instance.__class__ is not None:  # its an instance
                 assert issubclass(
                     instance.__class__, TabulationMixin
                 ), f"incorrect class: {instance.__class__.__name__}"
@@ -335,14 +333,13 @@ class instance_cached(cache_prop):
                 return self.fget(instance)
         return getattr(instance, self.private_var)
 
-
-    def set_cache(self, instance, reason="update",val=None):
+    def set_cache(self, instance, reason="update", val=None):
         if log.log_level < 5:
             log.debug(
                 f"caching instance for {instance.identity}.{self.private_var}| {reason}"
             )
         if val is None:
-            val = self.fget(instance) #default!
+            val = self.fget(instance)  # default!
         setattr(instance, self.private_var, val)
         return val
 

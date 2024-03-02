@@ -52,7 +52,7 @@ class Airfilter(System):
     set_fan_n = SIGNAL.define("fan.n", "throttle", mode="both")
     set_filter_w = SIGNAL.define("filt.w", "w", mode="both")
 
-    flow_solver = Solver.define("sum_dP", "w")
+    flow_solver =Solver.declare_var("sum_dP", "w")
     flow_solver.add_constraint("min", 0)
 
     flow_curve = Plot.define(
