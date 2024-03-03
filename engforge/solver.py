@@ -31,10 +31,12 @@ log = SolverLog()
 def combo_filter(attr_name,parm_name, solver_inst, extra_kw):
     
     outc = filt_combo_vars(parm_name,solver_inst, extra_kw)
-    if attr_name in ['solver.eq','solver.ineq','solver.var','solver.obj','time.parm','time.rate','dynamics.state','dynamics.rate']:
+    outp = False
+    if outc is not False and attr_name in ['solver.eq','solver.ineq','solver.var','solver.obj','time.parm','time.rate','dynamics.state','dynamics.rate']:
         outp = filt_parm_vars(parm_name,solver_inst, extra_kw)
-        outc = any((outc,outp))
-    print(f'combo filter {attr_name} {parm_name} {outc}')
+        outc = any((outp,outc)) #redundant per above
+    
+
     return outc
 
 # add to any SolvableMixin to allow solver use from its namespace
@@ -42,13 +44,6 @@ class SolverMixin(SolveableMixin):
     _run_id: str = None
     _solved = None
     _trans_opts = None
-
-    # TODO: implement custom solver with unified derivative equation.
-    # _system_jacobean = None
-    # _last_X = None
-    # _current_X = None
-    # _last_F = None
-    # _current_F = None
 
     _converged = False
     custom_solver = False
@@ -239,23 +234,24 @@ class SolverMixin(SolveableMixin):
 
             #TODO: Apply filter to solver attributes
             info = self.collect_solver_refs(check_atr_f=combo_filter,check_kw=extra_kw) 
-            comps = info['comps']
-            attrx = info['attrs']
+            comps = info.get('comps',{})
+            attrx = info.get('attrs',{})
+            #print(info)
 
             #Collect Solver States
             Xref = sys_solver_variables(self,info,extra_kw=extra_kw,as_flat=True)
-            Eqref = attrx["solver.eq"]
-            InEqref = attrx["solver.ineq"]
+            Eqref = attrx.get("solver.eq",{})
+            InEqref = attrx.get("solver.ineq",{})
             Yref = sys_solver_objectives(self,info,Xref,combo_kw=extra_kw)
 
             #Dynamic References
             #Time Integration
             #TODO: check parameter conflicts            
             #TODO: time solver integration
-            Pref = attrx["time.parm"]
-            Dref = attrx["time.rate"]
-            Xdref = attrx["dynamics.state"]
-            dXdRefDt = attrx["dynamics.rate"]        
+            Pref = attrx.get("time.parm",{})
+            Dref = attrx.get("time.rate",{})
+            Xdref = attrx.get("dynamics.state",{})
+            dXdRefDt = attrx.get("dynamics.rate",{}) 
 
             # get the solver configuration
             has_constraints = True if len(Eqref) + len(InEqref) > 0 else False

@@ -258,9 +258,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                     return None,False
                 option = option.split(',')
             else:
-                self.warning(f'bad option {option} for {key}')
                 if input_dict.get('_fail',True):
                     assert isinstance(option,list),f"str or list combos: {option}"
+                    #this is OK!
+                else:
+                    self.warning(f'bad option {option} for {key}| {input_dict}')
                     
             return option,False
         elif key in defaults:
@@ -624,13 +626,16 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         if conf is None:
             conf = self
 
+        state_parms = ['solver.var','dynamics.state','time.parm']
         comp_dict = {}
-        attr_dict = {**self.collect_dynamic_refs(conf)}
+        attr_dict = {}
         cls_dict = {}
+        skipped = {}
 
         conv = conv if conv is not None else None
 
-        out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict}
+        out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict,'skipped':skipped}
+        
         #Go through all components
         for key, lvl, conf in self.go_through_configurations():
             atrs = conf.collect_inst_attributes()
@@ -639,13 +644,14 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             comp_dict[key] = conf
             #Gather attribute heirarchy and make key.parm the dictionary entry
             for atype,aval in atrs.items():
-                    
+
                 cls_dict[f'{key}{atype}'] = ck_type = rawattr[atype]
 
                 if isinstance(aval,dict) and aval:
                                        
                     for k,pre,val in ATTR_BASE.unpack_atrs(aval,atype):
-                        
+
+
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
                             #log.info(f'skipping {val}')
@@ -657,22 +663,42 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             if isinstance(_var,AttributeInstance):
                                 slv_type = _var
 
-                        #Otherwise assign the data
+                        #Otherwise assign the data from last parm and the compoenent name
                         if slv_type:
                             parm_name = slv_type.get_alias(pre)
                         else:
                             parm_name = pre.split('.')[-1]
-                        pre = f'{atype}.{k}'
+                        pre = f'{atype}.{k}' #pre switch
 
+                        if pre not in attr_dict:
+                            attr_dict[pre] = {}                    
+                                                    
+                        if val is None:
+                            continue
                         
+                        #Check to skip this item
                         val_type = ck_type[parm_name]
+                        if isinstance(val,Ref) and val.allow_set:
+                            #its a parameter, skip it if it's already been skipped
+                            current_skipped = [set(v) for v in skipped.values()]
+                            if current_skipped and val.key in set.union(*current_skipped):
+                                continue
+
                         if check_atr_f and not check_atr_f(pre,parm_name,val_type,check_kw):
                             print(f'skip {parm_name} {k} {pre} {val}')
+                            if pre not in skipped:
+                                skipped[pre] = []
+
+                            if isinstance(val,Ref) and val.allow_set:
+                                skipped[pre].append(val.key) #its a var
+                            elif any(pre.endswith(v) for v in state_parms):
+                                skipped[pre].append(f'{key}{k}')
+                            else:
+                                #not objective or settable, must be a obj/cond
+                                skipped[pre].append(f'{key}{parm_name}')
                             continue
 
                         #if the value is a dictionary, unpack it with comp key
-                        if pre not in attr_dict:
-                            attr_dict[pre] = {}
                         if val:
                             attr_dict[pre].update({f'{key}{parm_name}':val})
                         else:
@@ -683,6 +709,31 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 elif atype not in attr_dict or not attr_dict[atype]:
                    #print(f'unpacking {atype} {aval}')
                    attr_dict[atype] = {}
+        
+        #Dynamic Variables Add, following the skipped items
+        if check_atr_f and any([v for v in skipped.values()]):
+            #print('skipped',skipped)
+            skipd = set().union(*(set(v) for v in skipped.values()))
+            for pre,refs in self.collect_dynamic_refs(conf).items():
+                if pre not in attr_dict:
+                    attr_dict[pre] = {}
+                for parm,ref in refs.items():
+                    
+                    if f'{key}{parm}' in skipd:
+                        continue
+
+                    elif isinstance(val,Ref) and val.allow_set:
+                        if val.key in skipd:
+                            continue
+
+                    if check_atr_f(pre,ref.key,val_type,check_kw):
+                        print('add',pre,ref.key,val_type,skipd)
+                        attr_dict[pre].update(**{parm:ref})
+                    else:
+                        print('skip',pre,ref.key,val_type,skipd)
+
+        else:
+            attr_dict.update(**self.collect_dynamic_refs(conf))                   
 
         return out
 
