@@ -10,11 +10,11 @@ from engforge.dynamics import DynamicsMixin,GlobalDynamics
 
 import numpy as np
 
-Fun_size = lambda sys,info: sys.volume
-Fun_eff = lambda sys: sys.cost / sys.volume
-Fun_minz = lambda sys,*a: max(sys.x, sys.y)
-Fun_em = lambda sys: sys.max_length - sys.combine_length
-Fun_cm = lambda sys,info: sys.budget - sys.cost
+Fun_size = lambda sys,*a,**kw: sys.volume
+Fun_eff = lambda sys,*a,**kw: sys.cost / sys.volume
+Fun_minz = lambda sys,*a,**kw: max(sys.x, sys.y)
+Fun_em = lambda sys,*a,**kw: sys.max_length - sys.combine_length
+Fun_cm = lambda sys,*a,**kw: sys.budget - sys.cost
 
 @forge(auto_attribs=True)
 class SolvComp(System,GlobalDynamics):
@@ -45,25 +45,25 @@ class SolvComp(System,GlobalDynamics):
     Zvar.add_var_constraint(Fun_minz, kind="min")
 
     #Constraints by function
-    #sym = Solver.equality_constraint("x",'y',combos='z_sym_eq')
+    sym = Solver.equality_constraint("x",'y',combos='z_sym_eq')
 
-    #costA = Solver.ineq_con('budget','cost',combos='ineq_cost')
+    costA = Solver.ineq_con('budget','cost',combos='ineq_cost')
     costF = Solver.ineq_con(Fun_cm,combos='fun_cost')
-    #costP = Solver.ineq_con('cost_margin',combos='prop_cost')
+    costP = Solver.ineq_con('cost_margin',combos='prop_cost')
 
     #Constraints by length
-    #lenA = Solver.ineq_con('max_length','combine_length',combos='ineq_length')
-    #lenF = Solver.ineq_con(Fun_em,combos='fun_length')
+    lenA = Solver.ineq_con('max_length','combine_length',combos='ineq_length')
+    lenF = Solver.ineq_con(Fun_em,combos='fun_length')
     lenP = Solver.ineq_con('edge_margin',combos='prop_length')
 
     #Objectives
     size_goal = Solver.objective('goal',combos='prop_goal',kind='min')
 
     size = Solver.objective('volume',combos='prop_size',kind='max')
-    #sizeF = Solver.objective(Fun_size,combos='fun_size',kind='max')
+    sizeF = Solver.objective(Fun_size,combos='fun_size',kind='max')
 
     eff = Solver.objective('cost_to_volume',combos='prop_eff',kind='min')
-    #effF = Solver.objective(Fun_eff,combos='fun_eff',kind='min')
+    effF = Solver.objective(Fun_eff,combos='fun_eff',kind='min')
 
     @system_property
     def zdot(self)->float:
@@ -106,10 +106,62 @@ class SolvComp(System,GlobalDynamics):
     def cost_to_volume(self) -> float:
         return self.cost / self.volume
     
-class SolverTest(unittest.TestCase):
-
+class SingleCompSolverTest(unittest.TestCase):
+    inequality_min = -1E-6
     def setUp(self) -> None:
         self.sc = SolvComp()
 
-    def test(self):
-        self.sc.execute()
+    def test_exec_results(self):
+        extra = dict()
+        o = self.sc.execute(**extra)
+        res = self.test_results(o)
+        self.test_selection(o,res,extra)
+
+    def test_selective_exec(self):
+        extra = dict(combos='*fun*,goal',ignore_combos=['z_sym_eq','*size*','*eff*'])
+        o = self.sc.execute(**extra)
+        res = self.test_results(o)
+        self.test_selection(o,res,extra)
+
+    def test_runmtx(self):
+        extra = dict(budget=[100,500,1000],max_length=[50,100,200])
+        o = self.sc.run(**extra)
+        res = self.test_results(o)
+        df = self.test_dataframe(o)
+        self.test_selection(o,res,extra)  
+
+    def test_selective_runmtx(self):
+        extra = dict(budget=[100,500,1000],max_length=[50,100,200],combos='*fun*,goal',ignore_combos=['z_sym_eq','*size*','*eff*'])        
+        o = self.sc.run(**extra)
+        res = self.test_results(o)
+        df = self.test_dataframe(o)
+        self.test_selection(o,res,extra)
+
+    def test_run_wildcard(self):
+        extra = dict(combos='*fun*,goal',ignore_combos='*',budget=[100,500,1000],max_length=[50,100,200])
+        o = self.sc.run(**extra)
+        res = self.test_results(o)
+        df = self.test_dataframe(o)
+        self.test_selection(o,res,extra)               
+
+    #Checks
+    def test_dataframe(self,results)->dict:
+        #print(results)
+        raise NotImplementedError("#FIXME!")
+
+    def test_selection(self,results,df_res,extra):
+        #print(results,df_res,extra)
+        raise NotImplementedError("#FIXME!")
+
+    def test_results(self,results):
+        Ycon = results['Ycon']
+        costmg = {k:v for k,v in Ycon.items() if 'cost' in k}
+        lenmg = {k:v for k,v in Ycon.items() if 'len' in k}
+
+        #Test input equivalence of methods
+        self.assertEqual(len(set(costmg.values())),1)
+        self.assertEqual(len(set(lenmg.values())),1)
+
+        #Test inequality constraints
+        yvals = (v >= self.inequality_min for v in Ycon.values())
+        self.assertTrue(all(yvals))

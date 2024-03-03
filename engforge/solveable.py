@@ -246,6 +246,48 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     # Run & Input
     # General method to distribute input to internal components
 
+    def _parse_default(self,key,defaults,input_dict):
+        """splits strings or lists and returns a list of options for the key, if nothing found returns None if fail set to True raises an exception, otherwise returns the default value"""
+        if key in input_dict:
+            option = input_dict.pop(key)
+            #print(f'removing option {key} {option}')
+            if isinstance(option,(int,float,bool)):
+                return option,False
+            elif isinstance(option,str):
+                if not option:
+                    return None,False
+                option = option.split(',')
+            else:
+                self.warning(f'bad option {option} for {key}')
+                if input_dict.get('_fail',True):
+                    assert isinstance(option,list),f"str or list combos: {option}"
+                    
+            return option,False
+        elif key in defaults:
+            return defaults[key],True
+        elif input_dict.get('_fail',True):
+            raise Exception(f'no option for {key}')
+        return None,None
+        
+
+    def _rmv_extra_kws(self,kwargs,_check_keys:dict,_fail=True):
+        """extracts the combo input from the kwargs"""
+        # extract combo input
+        if not _check_keys:
+            return {}
+        #TODO: allow extended check_keys / defaults to be passed in, now every value in check_keys has a default
+        cur_in = kwargs
+        cur_in['_fail'] = _fail
+        combos = {}
+        for p,dflt in _check_keys.items():
+            val,is_dflt = self._parse_default(p,_check_keys,cur_in)
+            combos[p] = val
+            cur_in.pop(p,None)
+
+        comboos = dict(list(filter(lambda kv: kv[1] is not None or kv[0] in _check_keys, combos.items())))
+        #print(f'got {combos} -> {comboos} from {kwargs} with {_check_keys}')
+        return combos
+
     def _iterate_input_matrix(
         self,
         method,
@@ -405,7 +447,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         """
 
-        # use eval_kw and sys_kw to handle slot argument and sub-system arguments
+        # use eval_kw and sys_kw to handle slot argument and sub-system arguments. use gather_kw to gather extra parameters adhoc.
 
         # Validate OTher Arguments By Parameter Or Comp-Recursive
         parm_args = {k: v for k, v in kwargs.items() if "." not in k}
@@ -575,7 +617,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         return out
     
-    def collect_solver_refs(self,conf:"Configuration"=None,conv=None,**kw):
+    def collect_solver_refs(self,conf:"Configuration"=None,conv=None,check_atr_f=None,check_kw=None,**kw):
         """collects all the references for the system grouped by function and prepended with the system key"""    
         from engforge.attributes import ATTR_BASE
         from engforge.engforge_attributes import AttributedBaseMixin
@@ -598,7 +640,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             #Gather attribute heirarchy and make key.parm the dictionary entry
             for atype,aval in atrs.items():
                     
-                cls_dict[f'{key}{atype}'] = rawattr[atype]
+                cls_dict[f'{key}{atype}'] = ck_type = rawattr[atype]
 
                 if isinstance(aval,dict) and aval:
                                        
@@ -607,7 +649,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
                             #log.info(f'skipping {val}')
-                            continue
+                            continue   
 
                         slv_type = None
                         if hasattr(conf,atype):
@@ -621,6 +663,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         else:
                             parm_name = pre.split('.')[-1]
                         pre = f'{atype}.{k}'
+
+                        
+                        val_type = ck_type[parm_name]
+                        if check_atr_f and not check_atr_f(pre,parm_name,val_type,check_kw):
+                            print(f'skip {parm_name} {k} {pre} {val}')
+                            continue
 
                         #if the value is a dictionary, unpack it with comp key
                         if pre not in attr_dict:

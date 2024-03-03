@@ -159,7 +159,7 @@ class EnvVariable(LoggingMixin):
                 else:
                     dflt = self.default
 
-                self.info(f"Env Var: {self.var_name} Not Found! Using: {dflt}")
+                self.debug(f"Env Var: {self.var_name} Not Found! Using: {dflt}")
                 warned.add(self.var_name)
 
             secval = self.default
@@ -170,7 +170,7 @@ class EnvVariable(LoggingMixin):
                 )
             else:
                 if self.var_name not in warned:
-                    self.info(f"Env Var: {self.var_name} Not Found!")
+                    self.debug(f"Env Var: {self.var_name} Not Found!")
                     warned.add(self.var_name)
                 return None
 

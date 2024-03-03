@@ -28,6 +28,14 @@ class SolverLog(LoggingMixin):
 
 log = SolverLog()
 
+def combo_filter(attr_name,parm_name, solver_inst, extra_kw):
+    
+    outc = filt_combo_vars(parm_name,solver_inst, extra_kw)
+    if attr_name in ['solver.eq','solver.ineq','solver.var','solver.obj','time.parm','time.rate','dynamics.state','dynamics.rate']:
+        outp = filt_parm_vars(parm_name,solver_inst, extra_kw)
+        outc = any((outc,outp))
+    print(f'combo filter {attr_name} {parm_name} {outc}')
+    return outc
 
 # add to any SolvableMixin to allow solver use from its namespace
 class SolverMixin(SolveableMixin):
@@ -45,6 +53,8 @@ class SolverMixin(SolveableMixin):
     _converged = False
     custom_solver = False
     solver_option = "minimize" #or root
+
+    convergence_threshold = 100 #changer per problem
 
     # Configuration Information
     @property
@@ -195,160 +205,165 @@ class SolverMixin(SolveableMixin):
     # TODO: add global optimization search for objective addin, via a new  `search_optimization` method.
 
     # TODO: code options for transient integration
+    _slv_dflt_kwdict = dict(combos=None,ignore_combos=None,only_combos=None,add_obj=True,_fail=True,add_var=None,ignore_var=None,only_var=None)
     def solver(
-        self, obj=None, cons=True, X0: dict = None, dXdt: dict = None, **kw
-    ):
-        """runs the system solver using the current system state and modifying it. This is the default solver for the system, and it is recommended to add additional options or methods via the execute method.
+            self, obj=None, cons=True, X0: dict = None, dXdt: dict = None, **kw
+        ):
+            """
+            runs the system solver using the current system state and modifying it. This is the default solver for the system, and it is recommended to add additional options or methods via the execute method.
 
-        #TODO: make it so...
-        :param obj: the objective function to minimize, by default will minimize the sum of the squares of the residuals. Objective function should be a function(system,Xs,Xt) where Xs is the system state and Xt is the system transient state. The objective function will be argmin(X)|(1+custom_objective)*residual_RSS when `add_obj` is True in kw otherwise argmin(X)|custom_objective with constraints on the system as balances instead of first objective being included.
-        :param cons: the constraints to be used in the solver, by default will use the system's constraints will be enabled when True. If a dictionary is passed the solver will use the dictionary as the constraints in addition to system constraints. These can be individually disabled by key=None in the dictionary.
-        :param X0: the initial guess for the solver, by default will use the current system state. If a dictionary is passed the solver will use the dictionary as the initial guess in addition to the system state.
-        :param dXdt: can be 0 to indicate steady-state, or None to not run the transient constraints. Otherwise a partial dictionary of parameters for the dynamics rates can be given, those not given will be assumed steady state or 0.
-        :param kw: additional options for the solver, such as the solver_option, or the solver method options.
-        :param cons_opts: additional options for the constraints, such as the solver_option, or the solver method options.
-        """
-        add_obj = kw.pop("add_obj", True)
-        from engforge.attr_solver import Solver
+            :param obj: the objective function to minimize, by default will minimize the sum of the squares of the residuals. Objective function should be a function(system,Xs,Xt) where Xs is the system state and Xt is the system transient state. The objective function will be argmin(X)|(1+custom_objective)*residual_RSS when `add_obj` is True in kw otherwise argmin(X)|custom_objective with constraints on the system as balances instead of first objective being included.
+            :param cons: the constraints to be used in the solver, by default will use the system's constraints will be enabled when True. If a dictionary is passed the solver will use the dictionary as the constraints in addition to system constraints. These can be individually disabled by key=None in the dictionary.
+            :param X0: the initial guess for the solver, by default will use the current system state. If a dictionary is passed the solver will use the dictionary as the initial guess in addition to the system state.
+            :param dXdt: can be 0 to indicate steady-state, or None to not run the transient constraints. Otherwise a partial dictionary of parameters for the dynamics rates can be given, those not given will be assumed steady state or 0.
 
-        info = self.collect_solver_refs()
-        comps = info['comps']
-        attrx = info['attrs']
+            :param kw: additional options for the solver, such as the solver_option, or the solver method options. Described below
+            :param combos: a csv str or list of combos to include, including wildcards. the default means all combos will be run unless ignore_combos or only combos alters behavior. The initial selection of combos is made by matching any case with the full name of the combo, or a parial name with a wildcard(s) in the combo name Ignore and only combos will further filter the selection. Wildcards / queries per fnmatch
+            :param ignore_combos: a list of combo parameters to ignore.
+            :param only_combos: a list of combo parameters to include exclusively.
+            :param add_var: a csv str or variables to include, including wildcards. the default means all combos will be run unless ignore_combos or only combos alters behavior. The initial selection of combos is made by matching any case with the full name of the combo, or a parial name with a wildcard(s) in the combo name Ignore and only combos will further filter the selection. Wildcards / queries per fnmatch
+            :param ignore_var: a list of combo parameters to ignore.
+            :param only_var: a list of combo parameters to include exclusively.            
+            :param add_obj: a flag to add the objective to the system constraints, by default will add the objective to the system constraints. If False the objective will be the only constraint.        
 
-        # pprint.pprint(info)
-        #print(attrx)
-        #gather args for solver
+            """
+            
 
-        #Collect Solver States
-        Xref = sys_solver_variables(self,info,as_flat=True)
-        Eqref = attrx["solver.eq"]
-        InEqref = attrx["solver.ineq"]
-        Yref = sys_solver_objectives(self,info,Xref)
+            from engforge.attr_solver import Solver
 
-        #Dynamic References
-        #Time Integration
-        Pref = attrx["time.parm"]
-        Dref = attrx["time.rate"]
-        Xdref = attrx["dynamics.state"]
-        dXdRefDt = attrx["dynamics.rate"]        
+            #change references
+            #Extract Extra Kws for our default solver
+            extra_kw = self._rmv_extra_kws(kw,self._slv_dflt_kwdict)
+            add_obj = extra_kw.pop("add_obj", True)
+            #print(extra_kw)
 
-        # get the solver configuration
-        has_constraints = True if len(Eqref) + len(InEqref) > 0 else False
+            #TODO: Apply filter to solver attributes
+            info = self.collect_solver_refs(check_atr_f=combo_filter,check_kw=extra_kw) 
+            comps = info['comps']
+            attrx = info['attrs']
 
-        solve_mode = self.solver_option
-        if "solver_option" in kw and kw["solver_option"] in SOLVER_OPTIONS:
-            solve_mode = kw["solver_option"]
-        elif "solver_option" in kw:
-            raise ValueError(f"invalid solver option: {kw['solver_option']}")
+            #Collect Solver States
+            Xref = sys_solver_variables(self,info,extra_kw=extra_kw,as_flat=True)
+            Eqref = attrx["solver.eq"]
+            InEqref = attrx["solver.ineq"]
+            Yref = sys_solver_objectives(self,info,Xref,combo_kw=extra_kw)
 
-        # Get constraints
-        # constraints = sys_solver_cons(
-        #    self, solvers, Xref, cons, **kw.pop("cons_opts", {})
-        # )
+            #Dynamic References
+            #Time Integration
+            #TODO: check parameter conflicts            
+            #TODO: time solver integration
+            Pref = attrx["time.parm"]
+            Dref = attrx["time.rate"]
+            Xdref = attrx["dynamics.state"]
+            dXdRefDt = attrx["dynamics.rate"]        
 
-        #enhance objective with obj_add for argmin(X)|(1+add_obj)*obj
+            # get the solver configuration
+            has_constraints = True if len(Eqref) + len(InEqref) > 0 else False
 
-        # Dynamics Configuration
-        if dXdt is not None and dXdt is not False:
-            if dXdt == 0:
-                pass
-            elif dXdt is True:
-                pass
-            else:  # dXdt is a dictionary
-                # TODO: add dynamics integration (steady: dXdt==0, dXdt = C)
-                assert isinstance(dXdt, dict), f"not dict for dXdt: {dXdt}"
-                raise NotImplementedError(
-                    f"dynamic integration not yet implemented for dictionary based input: {dXdt}"
-                )  # TODO:
-        else:
-            # nope!
-            Ytr = {}
-            Xtr = {}
+            solve_mode = self.solver_option
+            if "solver_option" in kw and kw["solver_option"] in SOLVER_OPTIONS:
+                solve_mode = kw["solver_option"]
+            elif "solver_option" in kw:
+                raise ValueError(f"invalid solver option: {kw['solver_option']}")
 
-        # Time changes:
-        # TODO: check parameter conflicts
-        # TODO: convert equalities to constraints (global objmin vs constraint?)
-        # Xref.update(Xtr)
-        # Yref.update(Ytr)
-        # opts.update(**constraints)
+            #enhance objective with obj_add for argmin(X)|(1+add_obj)*obj
 
-        # Initial States
-        if X0 is not None:
-            assert isinstance(X0, dict), f"wrong format for state: {X0}"
-            X0 = X0
-            # TODO: check if X0 is valid
-        else:
-            X0 = Xref
-
-        parms = list(Xref.keys())
-        Xg = Ref.refset_get(Xref)
-
-        constraints = sys_solver_constraints(self,info,Xref,cons)
-        con_list = constraints.get('info')
-        
-
-        if solve_mode == "minimize" or has_constraints:
-            opts = {"tol": 1e-6, "method": "SLSQP"}
-        else:
-            opts = {}
-        #to your liking sir
-        opts.update(kw)
-        opts.update(**constraints) #constraints override kw per api spec 
-        #TODO: allow kw to override constraints with add/rmv above
-
-        # TODO: add basin hopping method in search_optimization
-        output = {
-            "Xstart": Xg,
-            "parms": parms,
-            "Xans": None,
-            "dXdt": dXdt,
-            "obj": obj,
-            "add_obj": add_obj,
-            "Yref": Yref,
-        }
-        output['input_cons'] = constraints
-
-        # Solve / Minimize
-        #if solve_mode == "root" and not has_constraints and obj is None:
-            #return self.solve_root(Xref, Yref, Xg, parms, output, **opts)
-        if solve_mode == "minimize" or has_constraints:
-            # handle threahold for success depending on if objective provided
-            if "thresh" not in opts:
-                # default threshold
-                opts["thresh"] = 0.0001 if not obj else None
-            elif obj:
-                opts["thresh"] = None
-
-            if obj:
-                if add_obj:
-                    #normi = opts.pop("normalize", None)
-                    ffunc = lambda *args, **kw: secondary_obj(obj, *args, **kw)
-                    opts["ffunc"] = ffunc
-                else:
-                    # TODO: define behavior
+            # Dynamics Configuration
+            if dXdt is not None and dXdt is not False:
+                if dXdt == 0:
                     pass
-            sol = self.solve_min(Xref, Yref, Xg, parms, output, **opts)
+                elif dXdt is True:
+                    pass
+                else:  # dXdt is a dictionary
+                    # TODO: add dynamics integration (steady: dXdt==0, dXdt = C)
+                    assert isinstance(dXdt, dict), f"not dict for dXdt: {dXdt}"
+                    raise NotImplementedError(
+                        f"dynamic integration not yet implemented for dictionary based input: {dXdt}"
+                    )  # TODO:
+            else:
+                # nope!
+                Ytr = {}
+                Xtr = {}
 
-            x_in = [sol['Xans'][p] for p in parms]
-            cur = refset_get(Xref)
-            refset_input(Xref, sol['Xans'])
-            #print(con_list,constraints['constraints'])
 
-            Ycon = {}
-            for c,k in zip(constraints['constraints'],con_list):
-                cv = c['fun'](x_in,self,{})
-                #print(c,k,cv)
-                Ycon[k] = cv
-            output['Ycon'] = Ycon
-            output['Yobj'] = {k:v.value(self,output) for k,v in Yref.items()}
-            refset_input(Xref, cur)
 
-            return sol
-        
-        else:
-            self.warning(
-                f"no solution attempted! for {solve_mode} with {obj} and const: {constraints}"
-            )
+            # Initial States
+            if X0 is not None:
+                assert isinstance(X0, dict), f"wrong format for state: {X0}"
+                X0 = X0
+                # TODO: check if X0 is valid
+            else:
+                X0 = Xref
+
+            parms = list(Xref.keys())
+            Xg = Ref.refset_get(Xref)
+
+            constraints = sys_solver_constraints(self,info,Xref,cons,filter_kw=extra_kw)
+            con_list = constraints.get('info')
+            
+
+            if solve_mode == "minimize" or has_constraints:
+                opts = {"tol": 1e-6, "method": "SLSQP"}
+            else:
+                opts = {}
+            #to your liking sir
+            opts.update(kw)
+            opts.update(**constraints) #constraints override kw per api spec 
+            #TODO: allow kw to override constraints with add/rmv above
+
+            # TODO: add basin hopping method in search_optimization
+            output = {
+                "Xstart": Xg,
+                "parms": parms,
+                "Xans": None,
+                "dXdt": dXdt,
+                "obj": obj,
+                "add_obj": add_obj,
+                "Yref": Yref,
+            }
+            output['input_cons'] = constraints
+
+            # Solve / Minimize
+            #if solve_mode == "root" and not has_constraints and obj is None:
+                #return self.solve_root(Xref, Yref, Xg, parms, output, **opts)
+            if solve_mode == "minimize" or has_constraints:
+                # handle threahold for success depending on if objective provided
+                if "thresh" not in opts:
+                    # default threshold
+                    opts["thresh"] = self.convergence_threshold if not obj else None
+                elif obj:
+                    opts["thresh"] = None
+
+                if obj:
+                    if add_obj:
+                        #normi = opts.pop("normalize", None)
+                        ffunc = lambda *args, **kw: secondary_obj(obj, *args, **kw)
+                        opts["ffunc"] = ffunc
+                    else:
+                        # TODO: define behavior
+                        pass
+                sol = self.solve_min(Xref, Yref, Xg, parms, output, **opts)
+
+                x_in = [sol['Xans'][p] for p in parms]
+                cur = refset_get(Xref)
+                refset_input(Xref, sol['Xans'])
+                #print(con_list,constraints['constraints'])
+
+                Ycon = {}
+                for c,k in zip(constraints['constraints'],con_list):
+                    cv = c['fun'](x_in,self,{})
+                    #print(c,k,cv)
+                    Ycon[k] = cv
+                output['Ycon'] = Ycon
+                output['Yobj'] = {k:v.value(self,output) for k,v in Yref.items()}
+                refset_input(Xref, cur)
+
+                return sol
+            
+            else:
+                self.warning(
+                    f"no solution attempted! for {solve_mode} with {obj} and const: {constraints}"
+                )
 
     def solve_min(
         self, Xref, Yref, Xreset, parms, output=None, fail=True, **kw
@@ -366,7 +381,7 @@ class SolverMixin(SolveableMixin):
         :param kw: Additional keyword arguments.
         :return: The output dictionary containing the results.
         """
-        thresh = kw.pop("thresh", 100)
+        thresh = kw.pop("thresh", self.convergence_threshold)
 
         if output is None:
             output = {

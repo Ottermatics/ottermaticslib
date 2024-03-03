@@ -1,5 +1,67 @@
 from engforge.system_reference import *
 
+import fnmatch
+
+
+def filt_combo_vars(parm,inst,extra_kw=None):
+    from engforge.attr_solver import SolverInstance
+    from engforge.attr_dynamics import IntegratorInstance
+    from engforge.attr_signals import SignalInstance
+    #not considered
+    if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
+        return True
+    
+    if extra_kw is None:
+        return True #"no exlusion principle"
+    groups = extra_kw.get('combos',None)
+    if groups is None:
+        return True #"no groups"
+    igngrp = extra_kw.get('ignore_combos',None)
+    onlygrp = extra_kw.get('only_combos',None)
+
+    if not hasattr(inst,'combos'):
+        return True #no combos to filter to match, its permanent
+    
+    for parm in inst.combos:
+        initial_match = [grp for grp in groups if fnmatch.fnmatch(parm,grp)]
+        if not any(initial_match):
+            continue
+        elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+            continue
+        elif igngrp and any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+            continue
+        #print('FINISH: {parm}')
+        return True
+    
+    return False    
+    
+def filt_parm_vars(parm,inst,extra_kw=None):
+    from engforge.attr_solver import SolverInstance
+    from engforge.attr_dynamics import IntegratorInstance
+    from engforge.attr_signals import SignalInstance
+    #not considered
+    if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
+        return True
+    
+    if extra_kw is None:
+        return True #"no exlusion principle"
+    groups = extra_kw.get('add_var',None)
+    if groups is None:
+        return True #"no groups"
+    igngrp = extra_kw.get('ignore_var',None)
+    onlygrp = extra_kw.get('only_var',None)
+
+    initial_match = [grp for grp in groups if fnmatch.fnmatch(parm,grp)]
+    if not any(initial_match):
+        return False
+    elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+        return False    
+    elif igngrp and any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+        return False
+    
+    return True
+
+
 def ref_to_val_constraint(system,Xrefs,parm_ref,kind,val,*args,**kwargs):
     """takes a parameter reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the parameter value and the value.
     """
@@ -37,17 +99,19 @@ def ref_to_val_constraint(system,Xrefs,parm_ref,kind,val,*args,**kwargs):
 
 
 #Function assembly
-def sys_solver_variables(system,sys_refs,add_vars=None,excl_vars=None,**kw):
+def sys_solver_variables(system,sys_refs,extra_kw=None,**kw):
     """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
     
     #TODO: add combo parsing
     """
+    extra_kw = extra_kw or {}
 
     slv_inst = sys_refs['type']['solver']
     timz_inst = sys_refs['type']['time']
 
+    print(sys_refs)
     sys_refs = sys_refs['attrs'] if 'attrs' in sys_refs else sys_refs
-
+    
     dyns = sys_refs['dynamics.state']
     timz = {timz_inst[k].solver.parameter: v for k,v in sys_refs['time.parm'].items()}
     vars = {slv_inst[k].solver.var: v for k,v in sys_refs['solver.var'].items()}
@@ -65,13 +129,20 @@ def sys_solver_variables(system,sys_refs,add_vars=None,excl_vars=None,**kw):
         return flt
     return out 
 
-def sys_solver_objectives(system,sys_refs,Xrefs,add_obj=None,rmv_obj=None,**kw):
+
+
+
+
+def sys_solver_objectives(system,sys_refs,Xrefs,extra_kw=None,add_obj=None,rmv_obj=None,**kw):
     """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
     
     #TODO: add combo parsing
     """
+    
     #Convert result per kind of objective (min/max ect)
-    return {k:v for k,v in sys_refs['attrs']['solver.obj'].items()}
+    objs = sys_refs['attrs']['solver.obj']
+    #print(extra_kw)
+    return {k:v for k,v in objs.items() if not extra_kw or filt_combo_vars(k,v,extra_kw)}
 
 
 def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None, *args, **kw):
@@ -180,19 +251,38 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None, *args, **kw):
 
 
 # Objective functions & Utilities
-def f_lin_min(system,Xref: dict,Yref: dict,normalizeX=None,normalizeY=None,*args,**kw):
-    """Creates an anonymous function with stored references to system,Yref,normalize, that returns a scipy optimize friendly function of (x,Xref,*a,**kw) x which corresponds to the order of Xref dicts, and the other inputs are up to application.
-    
-    A normal value between -0.1 and 0.1 will be treated as zero or having no effect
+def f_lin_min(system, Xref, Yref, weights=None, *args, **kw):
     """
-    base_dict = {'system':system,'Yref':Yref,'normalizeX':normalizeX,'normalizeY':normalizeY,'args':args,'kw':kw}
+    Creates an anonymous function with stored references to system, Yref, weights, that returns a scipy optimize friendly function of (x, Xref, *a, **kw) x which corresponds to the order of Xref dicts, and the other inputs are up to application.
+
+    :param system: the system object
+    :param Xref: a dictionary of reference values for X
+    :param Yref: a dictionary of reference values for Y
+    :param weights: optional weights for Yref
+    :param args: additional positional arguments
+    :param kw: additional keyword arguments
+
+    :return: the anonymous function
+    """
+
+    mult_pos = kw.pop("mult_pos", 1)
+    exp_pos = kw.pop("exp_pos", 1)
+    mult_neg = kw.pop("mult_neg", 1)
+    exp_neg = kw.pop("exp_neg", 1)
+    gam = norm_base = kw.pop("norm_base", 1)
+    inputs = [mult_neg,exp_neg,mult_pos,exp_pos,gam,norm_base]
+    is_lin = all(v==1 for v in inputs)
+
+    solver_ref =  system.collect_solver_refs(conv=False)
+    solver_types = solver_ref.get('type',{}).get('solver',{})
+    base_dict = {'system':system,'Yref':Yref,'weights':weights,'args':args,'kw':kw}
     xkey = "_".join(Xref.keys())
     ykey = "_".join(Yref.keys())
     alias_name = kw.pop("alias_name", f'min_X_{xkey}_Y_[{ykey}]')
 
     parms = list(Xref.keys())  # static x_basis
     yparm = list(Yref.keys())
-    normalize = normalizeY if normalizeY is not None else np.ones(len(Yref))
+    weights = weights if weights is not None else np.ones(len(Yref))
 
     def f(x, *rt_a,**rt_kw):
         # anonymous function
@@ -206,24 +296,43 @@ def f_lin_min(system,Xref: dict,Yref: dict,normalizeX=None,normalizeY=None,*args
             slv_info = base_dict
 
         with revert_X(system,Xref,Xnext=Xnext):
-            grp = (yparm, normalize)
-            vals = []
+            grp = (yparm, weights)
+            vals,pos,neg = [],[],[]
             for p,n in zip(*grp):
-                if abs(n) < 0.1:
-                    continue #not in sum zo 0
+                ty = solver_types.get(p,None)
+                if ty is None or ty.solver.kind == 'min':
+                    arry = pos
+                elif ty.solver.kind == 'max':
+                    arry = neg
+                else:
+                    system.warning(f'non minmax obj: {p} {ty.solver.kind}')
+
                 ref = Yref[p]
-                val = eval_ref(ref,system,slv_info)
-                #print(p,n,ref,val,ref.comp,ref.key)
-                vals.append( val/ n )
+                val = eval_ref(ref,system,slv_info) * n
+                arry.append( val )
+                vals.append( val )
 
-            rs = np.array(vals)
-            out = np.sum(rs) ** 0.5
-            
-            if system.log_level < 10:
-                system.debug(f'obj {alias_name}: {x} -> {vals}')
-                #print(f'obj {f.__name__}: {x} -> {out}')
+            if not is_lin:
+                ps = mult_pos*np.array( pos )**exp_pos
+                #Min-Max Logic
+                if neg:
+                    ns = mult_neg*np.array( neg )**exp_neg
+                    ns = np.sum(ns)
+                    out= np.sum(ps)**gam - np.sum(ns)**gam
+                else:
+                    out = mult_pos*np.sum(ps)**gam
+                
+                if system.log_level < 10:
+                    system.debug(f'obj {alias_name}: {x} -> {vals}')
+                    #print(f'obj {f.__name__}: {x} -> {out}')
 
-            return out  # n sized normal residual vector
+                return out  # n sized normal residual vector
+            else:
+                #the faster linear case
+                if neg:
+                    return np.sum(np.array( pos )) - np.sum(np.array( neg ))
+                else:
+                    return np.sum(np.array( pos ))
 
     return f
 
@@ -268,6 +377,7 @@ def secondary_obj(
             A = base_call(x)
             solver_info = base_dict.copy()
             solver_info.update(x=x,Xrefs=Xrefs,normalize=normalize,rt_args=rt_args, **rt_kwargs)
+
             out =  A * (1 + obj_f(system, solver_info))
             if system.log_level < 10:
                 system.debug(f'obj {alias_name}: {x} -> {out}')
@@ -376,7 +486,7 @@ def refmin_solve(
     Xref: dict,
     Yref: dict,
     Xo=None,
-    normalize: np.array = None,
+    weights: np.array = None,
     reset=True,
     doset=True,
     fail=True,
@@ -389,18 +499,17 @@ def refmin_solve(
     :param Xref: dictionary of references to the x values, or independents
     :param Yref: dictionary of references to the value of objectives to be minimized
     :param Xo: initial guess for the x values as a list against Xref order, or a dictionary
-    :param normalize: a dictionary of values to normalize the x values by, list also ok as long as same length and order as Xref
+    :param weights: a dictionary of values to weights the x values by, list also ok as long as same length and order as Xref
     :param reset: if the solution fails, reset the x values to their original state, if true will reset the x values to their original state on failure overiding doset.
     :param doset: if the solution is successful, set the x values to the solution by default, otherwise follows reset, if not successful reset is checked first, then doset
     #TODO: add 
     """
     parms = list(Xref.keys())  # static x_basis
     
-    normalizeX,normalizeY = handle_normalize(normalize,Xref,Yref)
-    print(f'norms: {normalizeX,normalizeY}')
+    norm_x,weights = handle_normalize(weights,Xref,Yref)
 
     # make objective function
-    Fc = ffunc(system,Xref,Yref,normalizeX,normalizeY)
+    Fc = ffunc(system,Xref,Yref,weights)
     Fc.__name__ = ffunc.__name__
 
     # get state
@@ -444,7 +553,7 @@ def process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans):
         ans_dct = {p: a for p, a in zip(parms, ans.x)}
         if doset:
             refset_input(Xref, ans_dct)
-        if reset:
+        elif reset:
             refset_input(Xref, x_pre)
         return ans_dct
 
@@ -452,7 +561,7 @@ def process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans):
         min_dict = {p: a for p, a in zip(parms, ans.x)}
         if reset:
             refset_input(Xref, x_pre)
-        if doset:
+        elif doset:
             refset_input(Xref, min_dict)
             return min_dict
         if fail:

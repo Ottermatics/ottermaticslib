@@ -54,12 +54,13 @@ def eval_ref(canidate,*args,**kw):
     return canidate
 
 def scale_val(val, mult=None, bias=None, power=None)->float:
-    if power is not None:
-        val = val ** power    
-    if mult is not None:
-        val = mult * val
-    if bias is not None:
-        val = bias + val
+    if any((mult,bias,power)):
+        if power is not None:
+            val = val ** power    
+        if mult is not None:
+            val = mult * val
+        if bias is not None:
+            val = bias + val
     return val
 
 

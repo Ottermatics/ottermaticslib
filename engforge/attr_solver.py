@@ -76,7 +76,11 @@ class SolverInstance(AttributeInstance):
             self.system.debug(f"solving {self.lhs}{m}{self.rhs}")
 
             if hasattr(self,'rhs') and self.rhs is not None:
-                fun = lambda sys,info: maybe_ref(self.lhs,SolverInstance,sys=sys,info=info) - maybe_ref(self.rhs,SolverInstance,sys=sys,info=info)
+                mult=1
+                bias=None
+                power=None
+                #careful with kw vs positional args here
+                fun = lambda sys,info: maybe_ref(self.lhs,SolverInstance,sys=sys,info=info,mult=mult,bias=bias,power=power) - maybe_ref(self.rhs,SolverInstance,sys=sys,info=info,mult=mult,bias=bias,power=power)
                 fun.__name__ = f"{self.lhs}_{self.rhs}_{self.solver.slvtype}"
                 objfunc = Ref(self.system,fun)
             else:
@@ -87,13 +91,13 @@ class SolverInstance(AttributeInstance):
         elif self.solver.slvtype == 'obj':
             self.obj_ref = self.system.locate_ref(self.solver.obj)
             if self.solver.kind == 'max':
-                mult=-1
+                mult=None
                 bias=None
-                power=2
+                power=None
             else:
                 mult=None
                 bias=None
-                power=2
+                power=None
 
             fun = lambda sys,info: maybe_ref(self.obj_ref,SolverInstance,sys=sys,info=info,mult=mult,bias=bias,power=power)  
             fun.__name__ = f"obj_{self.solver.obj}_{self.solver.kind}"
