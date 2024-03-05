@@ -11,7 +11,7 @@ import attr
 from engforge.common import inst_vectorize, chunks
 
 # from engforge.configuration import Configuration, forge
-from engforge.solveable import Ref, SolveableMixin
+from engforge.solveable import SolveableMixin
 from engforge.logging import LoggingMixin
 from engforge.dataframe import DataframeMixin
 from engforge.typing import *

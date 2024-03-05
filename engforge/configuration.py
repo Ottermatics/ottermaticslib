@@ -19,7 +19,7 @@ NAME_ADJ = EnvVariable('FORGE_NAME_ADJ',default=('geometry','size','algorithms',
 NAME_NOUN = EnvVariable('FORGE_NAME_NOUN',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
 def name_generator(instance):
     """a name generator for the instance"""
-    base = str(instance.__class__.__name__).lower()
+    base = str(instance.__class__.__name__).lower()+'-'
     if instance.__class__._use_random_name:
         out =base+ randomname.get_name(adj=NAME_ADJ.secret,noun=NAME_NOUN.secret)
     else:
@@ -564,6 +564,8 @@ class Configuration(AttributedBaseMixin):
         """A customizeable property that will be in the log by default"""
         if not self.name or self.name == "default":
             return self.classname.lower()
+        if self.classname in self.name:
+            return self.name.lower()
         return f"{self.classname}-{self.name}".lower()
 
     @property

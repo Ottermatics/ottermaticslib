@@ -40,6 +40,8 @@ class AttributeInstance:
     
     def get_alias(self,path):
         return path.split('.')[-1]
+    
+
 
 
 class ATTR_BASE(attrs.Attribute):
@@ -61,7 +63,7 @@ class ATTR_BASE(attrs.Attribute):
         cls.name = name
         cls.config_cls = config_class
 
-        if not hasattr(cls.instance_class, "backref"):
+        if isinstance(cls.instance_class,ATTR_BASE) and not hasattr(cls.instance_class, "backref"):
             #get parent class
             refs = [cls,ATTR_BASE]
             mro_group = cls.mro()

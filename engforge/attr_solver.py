@@ -144,6 +144,11 @@ class SolverInstance(AttributeInstance):
     def normalize(self):
         return self.solver.normalize
 
+    def  get_alias(self,pre):
+        if self.solver.slvtype  == 'var':
+            return self.var.key #direct ref
+        return super().get_alias(pre) #default
+
     def as_ref_dict(self):
         out = {'var':None,'eq':None,'ineq':None,'obj':None}
 

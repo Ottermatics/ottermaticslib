@@ -16,7 +16,7 @@ from engforge.tabulation import TabulationMixin
 from engforge import properties as prop
 from engforge.attributes import ATTR_BASE
 from engforge.properties import instance_cached, solver_cached
-from engforge.tabulation import Ref
+from engforge.system_reference import Ref
 from engforge.solveable import (
     SolveableMixin,
     refmin_solve,
@@ -543,7 +543,7 @@ class GlobalDynamics(DynamicsMixin):
         # Orchestrate The Simulation
         system = self.copy_config_at_state()
         system.create_state_matrix()
-        system.comp.create_state_matrix()
+        #system.comp.create_state_matrix() #TODO: recursively initalize transient components
         refs = system.collect_solver_refs()
         intl_refs = refs["tr_states"]
         out_refs = refs["tr_output"]

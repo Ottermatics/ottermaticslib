@@ -1,4 +1,4 @@
-import attrs
+import attrs,attr
 import uuid
 import numpy
 import numpy as np
@@ -6,11 +6,13 @@ import scipy.optimize as sciopt
 from contextlib import contextmanager
 import copy
 import datetime
+import typing
 
 
 # from engforge.dynamics import DynamicsMixin
 from engforge.attributes import AttributeInstance
 from engforge.engforge_attributes import AttributedBaseMixin
+from engforge.configuration import Configuration, forge
 from engforge.properties import *
 from engforge.system_reference import *
 from engforge.system_reference import Ref
@@ -245,7 +247,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
     # Run & Input
     # General method to distribute input to internal components
-
     def _parse_default(self,key,defaults,input_dict):
         """splits strings or lists and returns a list of options for the key, if nothing found returns None if fail set to True raises an exception, otherwise returns the default value"""
         if key in input_dict:
@@ -623,8 +624,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         """collects all the references for the system grouped by function and prepended with the system key"""    
         from engforge.attributes import ATTR_BASE
         from engforge.engforge_attributes import AttributedBaseMixin
-        if conf is None:
-            conf = self
+        
+        confobj = conf
+        if confobj is None:
+            confobj = self
 
         state_parms = ['solver.var','dynamics.state','time.parm']
         comp_dict = {}
@@ -637,47 +640,59 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict,'skipped':skipped}
         
         #Go through all components
-        for key, lvl, conf in self.go_through_configurations():
+        for key, lvl, conf in confobj.go_through_configurations():
             atrs = conf.collect_inst_attributes()
             rawattr = conf.collect_inst_attributes(handle_inst=False)
             key = f'{key}.' if key else ''
             comp_dict[key] = conf
             #Gather attribute heirarchy and make key.parm the dictionary entry
             for atype,aval in atrs.items():
-
-                cls_dict[f'{key}{atype}'] = ck_type = rawattr[atype]
+                
+                ck_type = rawattr[atype]
+                if atype not in cls_dict:
+                    cls_dict[atype] = {}
 
                 if isinstance(aval,dict) and aval:
                                        
                     for k,pre,val in ATTR_BASE.unpack_atrs(aval,atype):
-
 
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
                             #log.info(f'skipping {val}')
                             continue   
 
+                        if val is None:
+                            #conf.warning(f'skip val: {k} {pre} {val}')
+                            continue
+                        conf.debug(f'')
+                        conf.debug(f'got val: {k} {pre} {val}')  
+
                         slv_type = None
-                        if hasattr(conf,atype):
-                            _var = getattr(conf,atype)
+                        pre_var = pre.split('.')[-1]
+                        if hasattr(conf,pre_var):
+                            _var = getattr(conf,pre_var)
                             if isinstance(_var,AttributeInstance):
                                 slv_type = _var
+                            conf.debug(f'slv type: {pre_var} {pre_var} {conf.classname}.{pre_var} -> {_var}')
+
+                        val_type = ck_type[pre_var]
 
                         #Otherwise assign the data from last parm and the compoenent name
+                        parm_name = pre_var #prer alias
                         if slv_type:
                             parm_name = slv_type.get_alias(pre)
-                        else:
-                            parm_name = pre.split('.')[-1]
-                        pre = f'{atype}.{k}' #pre switch
 
-                        if pre not in attr_dict:
-                            attr_dict[pre] = {}                    
-                                                    
-                        if val is None:
-                            continue
-                        
+                        cls_dict[atype][f'{key}{parm_name}'] = val_type
+
+                        conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
+
                         #Check to skip this item
-                        val_type = ck_type[parm_name]
+                        #print(f'check {pre} {parm_name} {k} {val}')
+
+                        pre = f'{atype}.{k}' #pre switch
+                        if pre not in attr_dict:
+                            attr_dict[pre] = {}
+                        
                         if isinstance(val,Ref) and val.allow_set:
                             #its a parameter, skip it if it's already been skipped
                             current_skipped = [set(v) for v in skipped.values()]
@@ -685,14 +700,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                                 continue
 
                         if check_atr_f and not check_atr_f(pre,parm_name,val_type,check_kw):
-                            print(f'skip {parm_name} {k} {pre} {val}')
+                            conf.debug(f'skip {parm_name} {k} {pre} {val}')
                             if pre not in skipped:
                                 skipped[pre] = []
 
                             if isinstance(val,Ref) and val.allow_set:
-                                skipped[pre].append(val.key) #its a var
-                            elif any(pre.endswith(v) for v in state_parms):
-                                skipped[pre].append(f'{key}{k}')
+                                 skipped[pre].append(f'{key}{val.key}') #its a var
                             else:
                                 #not objective or settable, must be a obj/cond
                                 skipped[pre].append(f'{key}{parm_name}')
@@ -701,6 +714,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         #if the value is a dictionary, unpack it with comp key
                         if val:
                             attr_dict[pre].update({f'{key}{parm_name}':val})
+
                         else:
                             if attr_dict[pre]:
                                 continue #keep it!
@@ -719,18 +733,22 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                     attr_dict[pre] = {}
                 for parm,ref in refs.items():
                     
+                    val_type = getattr(ref.comp,parm)
                     if f'{key}{parm}' in skipd:
+                        conf.debug('dynvar skip',pre,ref.key,val_type,skipd)
                         continue
 
-                    elif isinstance(val,Ref) and val.allow_set:
-                        if val.key in skipd:
+                    elif isinstance(ref,Ref) and ref.allow_set:
+                        if ref.key in skipd:
+                            conf.debug('dynvar skip',pre,ref.key,val_type,skipd)
                             continue
-
-                    if check_atr_f(pre,ref.key,val_type,check_kw):
-                        print('add',pre,ref.key,val_type,skipd)
+                    
+                        
+                    elif check_atr_f(pre,ref.key,val_type,check_kw):
+                        conf.debug('dynvar add',pre,ref.key,val_type,skipd)
                         attr_dict[pre].update(**{parm:ref})
                     else:
-                        print('skip',pre,ref.key,val_type,skipd)
+                        conf.debug('dynvar skip',pre,ref.key,val_type,skipd)
 
         else:
             attr_dict.update(**self.collect_dynamic_refs(conf))                   
@@ -908,6 +926,28 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         if not parms:
             parms = [v.independent.key for v in self.solvers.values()]
         return comp_solver_cons(self.solvers, parms)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # @contextmanager

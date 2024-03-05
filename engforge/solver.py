@@ -282,7 +282,6 @@ class SolverMixin(SolveableMixin):
                 Xtr = {}
 
 
-
             # Initial States
             if X0 is not None:
                 assert isinstance(X0, dict), f"wrong format for state: {X0}"

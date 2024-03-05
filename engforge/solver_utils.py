@@ -111,13 +111,14 @@ def sys_solver_variables(system,sys_refs,extra_kw=None,**kw):
 
     slv_inst = sys_refs.get('type',{}).get('solver',{})
     timz_inst = sys_refs.get('type',{}).get('time',{})
-
-    print(sys_refs)
+    
     sys_refs = sys_refs.get('attrs',{}) if 'attrs' in sys_refs else sys_refs
     
     dyns = sys_refs.get('dynamics.state',{})
     timz = {timz_inst[k].solver.parameter: v for k,v in sys_refs.get('time.parm',{}).items()}
-    vars = {slv_inst[k].solver.var: v for k,v in sys_refs.get('solver.var',{}).items()}
+    # vars = {slv_inst[k].var.key: v for k,v in sys_refs.get('solver.var',{}).items()}
+    vars = {k: v for k,v in sys_refs.get('solver.var',{}).items()}
+
 
     
     out = dict(dynamics=dyns,integration=timz,variables=vars)
@@ -128,7 +129,7 @@ def sys_solver_variables(system,sys_refs,extra_kw=None,**kw):
     if 'as_flat' in kw and kw['as_flat']==True:
         flt = {}
         for k,v in out.items():
-            print(k,v)
+            #print(k,v)
             flt.update(v)
         return flt
     return out 

@@ -31,7 +31,7 @@ import attrs
 from engforge.properties import *
 from engforge.logging import LoggingMixin
 from engforge.configuration import Configuration, forge
-from engforge.tabulation import TabulationMixin
+from engforge.components import SolveableInterface
 from engforge.solver import SolverMixin
 from engforge.attr_plotting import PlottingMixin
 
@@ -50,7 +50,7 @@ log = SystemsLog()
 
 
 @forge
-class System(Configuration, SolverMixin, TabulationMixin, PlottingMixin):
+class System(SolveableInterface, SolverMixin, PlottingMixin):
     """A system defines SlotS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
@@ -62,7 +62,7 @@ class System(Configuration, SolverMixin, TabulationMixin, PlottingMixin):
 
     _anything_changed_ = False
 
-    parent: typing.Union["Component", "System"] = attrs.field(default=None)
+    #parent: typing.Union["Component", "System"] = attrs.field(default=None)
 
     # Properties!
     @system_property

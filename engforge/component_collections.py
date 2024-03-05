@@ -17,7 +17,7 @@ from engforge.components import Component
 from engforge.attr_slots import Slot
 from engforge.configuration import forge
 from engforge.typing import *
-from engforge.tabulation import Ref, system_property
+from engforge.system_reference import Ref, system_property
 from engforge.properties import *
 
 

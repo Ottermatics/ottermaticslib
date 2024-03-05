@@ -9,7 +9,6 @@ import attr
 from engforge.common import inst_vectorize, chunks
 
 # from engforge.configuration import Configuration, forge
-from engforge.solveable import Ref, SolveableMixin
 from engforge.logging import LoggingMixin
 from engforge.typing import *
 from engforge.properties import *

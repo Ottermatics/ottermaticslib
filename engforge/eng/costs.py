@@ -31,7 +31,8 @@ Parent(econ=Economics(term_length=25,discount_rate=0.05,fixed_output=1000))
 
 from engforge.components import Component
 from engforge.configuration import forge,Configuration
-from engforge.tabulation import TabulationMixin, system_property, Ref
+from engforge.tabulation import TabulationMixin, system_property
+from engforge.system_reference import Ref
 from engforge.properties import instance_cached,solver_cached,cached_system_property
 from engforge.logging import LoggingMixin
 from engforge.component_collections import ComponentIter
