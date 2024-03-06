@@ -33,10 +33,11 @@ SLVR_SCOPE_PARM = ['solver.eq','solver.ineq','solver.var','solver.obj','time.par
 def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
     
     #proceed to filter active items if vars / combos inputs is '*' select all, otherwise discard if not active
-    slv_vars = extra_kw.get('slv_vars',[])
-    combos_in = extra_kw.get('combos',[])
-    activate = extra_kw.get('activate',[])
-    deactivate = extra_kw.get('deactivate',[])
+    slv_vars = str_list_f(extra_kw.get('slv_vars',[]))
+    combos_in = str_list_f(extra_kw.get('combos',[]))
+    activate = str_list_f(extra_kw.get('activate',[]))
+    deactivate = str_list_f(extra_kw.get('deactivate',[]))
+
 
     outa = True
     if extra_kw.get('only_active',True):
@@ -46,7 +47,7 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
             return False
 
     #Otherwise look at the combo filter, its its false return that
-    outc = filt_combo_vars(parm_name,solver_inst, extra_kw,combos_in)
+    outc = filt_combo_vars(parm_name,solver_inst, extra_kw,combos)
     outp = False
     #if the combo filter didn't explicitly fail, check the parm filter
     if attr_name in SLVR_SCOPE_PARM:
@@ -58,7 +59,8 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
 
     fin =  bool(outr) and outa
 
-    log.debug(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}| {extra_kw}')
+    #if not fin:
+    log.info(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}| {extra_kw}')
     return fin 
 
 #The KW Defaults for Solver

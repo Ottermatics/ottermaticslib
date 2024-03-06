@@ -2,8 +2,26 @@ from engforge.system_reference import *
 
 import fnmatch
 
+def _parm_compare(parm,seq):
+    if '*' in seq:
+        return fnmatch.fnmatch(parm,seq)
+    else:
+        return parm == seq
+    
+def str_list_f(out:list,sep=','):
+    if isinstance(out,str):
+        out = out.split(sep)
+    return out
 
-def filt_combo_vars(parm,inst,extra_kw=None,combos=None):
+def ext_str_list(extra_kw,key,default=None):
+    if key in extra_kw:
+        out = extra_kw[key]
+        return str_list_f(out)
+    else:
+        out = default
+    return out
+
+def filt_combo_vars(parm,inst,extra_kw=None,combos_in=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -11,26 +29,28 @@ def filt_combo_vars(parm,inst,extra_kw=None,combos=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
-    groups = extra_kw.get('combos',None)
+    groups = ext_str_list(extra_kw,'combos',None)
     if groups is None:
         #print('no combo args',inst)
         return None #"no groups"
-    igngrp = extra_kw.get('ign_combos',None)
-    onlygrp = extra_kw.get('only_combos',None)
+    igngrp = ext_str_list(extra_kw,'ign_combos',None)
+    onlygrp = ext_str_list(extra_kw,'only_combos',None)
 
-    if not combos and hasattr(inst,'combos'):
+    if not combos_in and hasattr(inst,'combos'):
         combos = inst.combos
+    else:
+        combos = str_list_f(combos_in)
     
     if not combos:
         return None #no combos to filter to match, its permanent
     
     for parm in combos:
-        initial_match = [grp for grp in groups if fnmatch.fnmatch(parm,grp)]
+        initial_match = [grp for grp in groups if _parm_compare(parm,grp)]
         if not any(initial_match):
             continue
-        elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in onlygrp):
+        elif onlygrp and not any(_parm_compare(parm,grp) for grp in onlygrp):
             continue
-        elif igngrp and any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+        elif igngrp and any(_parm_compare(parm,grp) for grp in igngrp):
             continue
         return True
     return False    
@@ -43,18 +63,18 @@ def filt_parm_vars(parm,inst,extra_kw=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
-    groups = extra_kw.get('slv_vars',None)
+    groups = ext_str_list(extra_kw,'slv_vars',None)
     if groups is None:
-        return True #"no groups"
-    igngrp = extra_kw.get('ign_vars',None)
-    onlygrp = extra_kw.get('only_vars',None)
+        return True #"no groups, assume yes"
+    igngrp = ext_str_list(extra_kw,'ign_vars',None)
+    onlygrp = ext_str_list(extra_kw,'only_vars',None)
 
-    initial_match = [grp for grp in groups if fnmatch.fnmatch(parm,grp)]
+    initial_match = [grp for grp in groups if _parm_compare(parm,grp)]
     if not any(initial_match):
         return False
-    elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in onlygrp):
+    elif onlygrp and not any(_parm_compare(parm,grp) for grp in onlygrp):
         return False    
-    elif igngrp and any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+    elif igngrp and any(_parm_compare(parm,grp) for grp in igngrp):
         return False
     
     return True
@@ -68,17 +88,17 @@ def filt_active(parm,inst,extra_kw=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
 
-    activate = extra_kw.get('activate',[])
-    deactivate = extra_kw.get('deactivate',[])  
+    activate = ext_str_list(extra_kw,'activate',[])
+    deactivate = ext_str_list(extra_kw,'deactivate',[])  
 
     act = inst.is_active()
     if not act and not activate:
         return False #shortcut
     
-    elif activate and any(fnmatch.fnmatch(parm,grp) for grp in activate):
+    elif activate and any(_parm_compare(parm,grp) for grp in activate):
         return True
       
-    elif deactivate and any(fnmatch.fnmatch(parm,grp) for grp in deactivate):
+    elif deactivate and any(_parm_compare(parm,grp) for grp in deactivate):
         return False
     
     return True
@@ -175,8 +195,8 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None,combo_filter=T
     #TODO: add combo parsing
     """
     extra_kw = kw.get('extra_kw')
-    deactivated = extra_kw.get('deactivate',[]) if 'deactivate' in extra_kw and extra_kw['deactivate'] else []
-    activated = extra_kw.get('activate',[]) if 'activate' in extra_kw and  extra_kw['activate'] else []
+    deactivated = ext_str_list(extra_kw,'deactivate',[]) if 'deactivate' in extra_kw and extra_kw['deactivate'] else []
+    activated = ext_str_list(extra_kw,'activate',[]) if 'activate' in extra_kw and  extra_kw['activate'] else []
 
     slv_inst = sys_refs.get('type',{}).get('solver',{})
     sys_refs = sys_refs.get('attrs',{})
@@ -232,27 +252,28 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None,combo_filter=T
                 if 'combos' in ctype:
                     combos = ctype['combos']
                     combo_parm = ctype['combo_parm']
-                    active = ctype['active']
-#                     in_activate = any([fnmatch.fnmatch(combo_parm,v) for v in activated]) if activated else False
-#                     in_deactivate = any([fnmatch.fnmatch(combo_parm,v) for v in deactivated]) if deactivated else False
-# 
-#                     #Check active or activated
-#                     if not active and not activated:
-#                         system.debug(f'constraint {parm} {slvr} {ctype} is not active')
-#                         continue
-#                     elif not active and not in_activate:
-#                         system.debug(f'constraint {parm} {slvr} {ctype} is not active')
-#                         continue
-# 
-#                     elif active and not in_deactivate:
-#                         continue
+                    active = ctype.get('active',True)
+                    in_activate = any([_parm_compare(combo_parm,v) for v in activated]) if activated else False
+                    in_deactivate = any([_parm_compare(combo_parm,v) for v in deactivated]) if deactivated else False
+
+                    #Check active or activated
+                    if not active and not activated:
+                        system.msg(f'skip con: inactive {parm} {slvr} {ctype}')
+                        continue
+                    elif not active and not in_activate:
+                        system.msg(f'skip con: inactive {parm} {slvr} {ctype}')
+                        continue
+
+                    elif active and in_deactivate:
+                        system.msg(f'skip con: deactivated {parm} {slvr} ')
+                        continue
 
                     
 
                 if combos and combo_filter:
                     filt = filt_combo_vars(combo_parm,slv, extra_kw,combos)
                     if not filt: 
-                        system.debug(f'filtering constraint={filt} {parm} {slv} {ctype} | {combos} {extra_kw.get("combos",None)}')                        
+                        system.info(f'filtering constraint={filt} {parm} {slv} {ctype} | {combos} {ext_str_list(extra_kw,"combos",None)}')                        
                         continue
 
                 system.debug('adding var constraint',parm,slv,ctype,combos) 

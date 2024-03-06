@@ -749,7 +749,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             _var = getattr(conf,pre_var)
                             if isinstance(_var,AttributeInstance):
                                 slv_type = _var
-                            conf.debug(f'slv type: {pre_var} {pre_var} {conf.classname}.{pre_var} -> {_var}')
+                            conf.msg(f'slv type: {conf.classname}.{pre_var} -> {_var}')
 
                         val_type = ck_type[pre_var]
 
@@ -764,7 +764,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
 
                         #Check to skip this item
-                        #print(f'check {pre} {parm_name} {k} {val}')
+                        #self.info(f'check {pre} {parm_name} {k} {val}')
 
                         pre = f'{atype}.{k}' #pre switch
                         if pre not in attr_dict:
@@ -782,7 +782,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                                 skipped[pre] = []
 
                             if isinstance(val,Ref) and val.allow_set:
-                                 skipped[pre].append(f'{key}{val.key}') #its a var
+                                skipped[pre].append(f'{key}{val.key}') #its a var
                             else:
                                 #not objective or settable, must be a obj/cond
                                 skipped[pre].append(f'{key}{parm_name}')

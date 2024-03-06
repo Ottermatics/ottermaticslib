@@ -186,7 +186,7 @@ class SolvSys(System,GlobalDynamics,SpaceMixin):
 class SingleCompSolverTest(unittest.TestCase):
     inequality_min = -1E-6
     def setUp(self) -> None:
-        self.sc = SolvComp()
+        self.sc = SolvSys()
 
     def test_exec_results(self):
         extra = dict()
