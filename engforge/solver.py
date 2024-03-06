@@ -43,7 +43,7 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
     if extra_kw.get('only_active',True):
         outa  =  filt_active(parm_name,solver_inst,extra_kw=extra_kw)
         if not outa:
-            log.debug(f'filt not active: {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}')
+            log.msg(f'filt not active: {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}')
             return False
 
     #Otherwise look at the combo filter, its its false return that
@@ -60,7 +60,7 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
     fin =  bool(outr) and outa
 
     #if not fin:
-    log.info(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}| {extra_kw}')
+    log.msg(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}| {extra_kw}')
     return fin 
 
 #The KW Defaults for Solver

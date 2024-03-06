@@ -3,7 +3,6 @@ from engforge.system_reference import *
 import fnmatch
 
 def _parm_compare(parm,seq):
-    print(parm,seq)
     if '*' in seq:
         return fnmatch.fnmatch(parm,seq)
     else:
@@ -60,6 +59,7 @@ def filt_parm_vars(parm,inst,extra_kw=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
+    
     #not considered
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True

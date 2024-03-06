@@ -733,7 +733,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
-                            conf.info(f'skipping {val}')
+                            conf.msg(f'skipping {val}')
                             continue   
 
                         if val is None:
@@ -749,7 +749,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             _var = getattr(conf,pre_var)
                             if isinstance(_var,AttributeInstance):
                                 slv_type = _var
-                            conf.info(f'slv type: {conf.classname}.{pre_var} -> {_var}')
+                            conf.msg(f'slv type: {conf.classname}.{pre_var} -> {_var}')
 
                         val_type = ck_type[pre_var]
 
@@ -765,7 +765,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
 
                         #Check to skip this item
-                        self.info(f'check {pre} {parm_name} {k} {val}')
+                        #self.info(f'check {pre} {parm_name} {k} {val}')
 
                         pre = f'{atype}.{k}' #pre switch
                         if pre not in attr_dict:

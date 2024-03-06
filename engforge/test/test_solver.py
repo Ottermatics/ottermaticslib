@@ -47,7 +47,7 @@ class SpaceMixin(SolveableInterface):
     Zvar = Solver.declare_var("z", combos="z")
     Xvar.add_var_constraint(0.1, kind="min",combos=['min_len'])
     Yvar.add_var_constraint(0.1, kind="min",combos=['min_len'])
-    Zvar.add_var_constraint(0.1, kind="min",combos=['min_len'],active=True)
+    #Zvar.add_var_constraint(0.1, kind="min",combos=['min_len'],active=True)
     Zvar.add_var_constraint(Fun_minz, kind="min",combos=['len_fun_z'],active=False)
 
     #Constraints by function
