@@ -48,7 +48,9 @@ class SolverInstance(AttributeInstance):
     rhs: "Ref"
     const_f: "Ref"
 
-    __slots__ = ["system", "solver", "obj", "var", "lhs", "rhs","const_f"]
+    _active: bool
+    _constraints: list
+
 
     def __init__(self, solver: "SOLVER", system: "System",**kw) -> None:
         """kwargs passed to compile"""
@@ -125,6 +127,8 @@ class SolverInstance(AttributeInstance):
 
     @property
     def constraints(self):
+        if hasattr(self,'_constraints'):
+            return self._constraints
         if self.solver.slvtype in ['var','obj']:
             return self.solver.constraints
         else:
@@ -143,8 +147,18 @@ class SolverInstance(AttributeInstance):
     @property
     def normalize(self):
         return self.solver.normalize
+    
+    @property
+    def active(self):
+        if hasattr(self,'_active'):
+            return self._active        
+        return self.solver.active
+    
+    @property
+    def combos(self):   
+        return self.solver.combos        
 
-    def  get_alias(self,pre):
+    def get_alias(self,pre):
         if self.solver.slvtype  == 'var':
             return self.var.key #direct ref
         return super().get_alias(pre) #default
@@ -163,8 +177,13 @@ class SolverInstance(AttributeInstance):
         
         return out
     
-        
-        
+    def is_active(self,value=True) -> bool:
+        if hasattr(self,'_active'):
+            return self._active
+        elif hasattr(self.solver,'active'):
+            return self.solver.active
+        #the default
+        return value
             
             
 
@@ -181,7 +200,7 @@ class Solver(ATTR_BASE):
     normalize: ref_type
     allow_constraint_override: bool = True
     attr_prefix = "SOLVER"
-
+    active: bool
     instance_class = SolverInstance
 
     define = None
@@ -193,14 +212,25 @@ class Solver(ATTR_BASE):
         elif isinstance(combos, list):
             return combos
         
-    # @classmethod
-    # def collect_attr_inst(cls,system)->dict:
-    #     """collects all the attributes for a system, grouped by solver type"""
-    #     clsses = super(Solver,cls).collect_attr_inst(system)
-    #     out = {'var':{},'eq':{},'ineq':{},'obj':{}}
-    #     for k,v in clsses.items():
-    #         out[v.solver.slvtype][k] = cls.handle_instance(v)
-    #     return out
+    @classmethod
+    def configure_for_system(cls, name, config_class, cb=None, **kwargs):
+        """add the config class, and perform checks with `class_validate)
+        :returns: [optional] a dictionary of options to be used in the make_attribute method
+        """
+        pre_name = cls.name #random attr name
+        super(Solver,cls).configure_for_system(name,config_class,cb,**kwargs)
+
+        #change name of constraint  parm if 
+        if cls.slvtype == "var":
+            for const in cls.constraints:
+                if 'combo_parm' in const and const['combo_parm'] == pre_name:
+                    const['parm'] = name #update me
+                elif 'combo_parm' not in const:
+                    const['combo_parm'] = name #update me
+                
+                if 'combo' not in const:
+                    const['combo'] = 'default'
+                    
 
     # TODO: add normalize attribute to tune optimizations
     @classmethod
@@ -212,12 +242,14 @@ class Solver(ATTR_BASE):
         :return: The setup class for the solver variable.
         """
         # Create A New Signals Class
+        active = kwargs.get("active", True)
         combos = kwargs.get("combos", var)
         new_name = f"SOLVER_var_{var}".replace(".", "_")
         bkw = {"parm": var, "value": None}
         constraints = [{"type": "min", **bkw}, {"type": "max", **bkw}]
         new_dict = dict(
-            name=new_name,
+            name=new_name, #until configured for system, it gets the assigned name
+            active=active,
             var=var,
             slvtype="var",
             constraints=constraints,
@@ -238,6 +270,7 @@ class Solver(ATTR_BASE):
         :return: The setup class for the solver variable.
         """
         # Create A New Signals Class
+        active = kwargs.get("active", True)
         combos = kwargs.get("combos", "default")
         kind = kwargs.get("kind", "min")
         assert kind in ("min", "max")
@@ -246,6 +279,7 @@ class Solver(ATTR_BASE):
         bkw = {"parm": obj, "value": None}
         new_dict = dict(
             name=new_name,
+            active=active,
             obj=obj,
             slvtype="obj",
             kind=kind,
@@ -263,11 +297,13 @@ class Solver(ATTR_BASE):
     ):
         """Defines an equality constraint based on a required lhs of equation, and an optional rhs, the difference of which will be driven to zero"""
         combos = kwargs.get("combos", "default")
+        active = kwargs.get("active", True)
 
         # Create A New Signals Class
         new_name = f"SOLVER_coneq_{lhs}_{rhs}".replace(".", "_")
         new_dict = dict(
             name=new_name,
+            active=active,
             lhs=lhs,
             rhs=rhs,
             slvtype="eq",
@@ -283,11 +319,13 @@ class Solver(ATTR_BASE):
     def inequality_constraint(cls, lhs: ref_type, rhs: ref_type = 0, **kwargs):
         """Defines an inequality constraint"""
         combos = kwargs.get("combos", "default")
+        active = kwargs.get("active", True)
 
         # Create A New Signals Class
         new_name = f"SOLVER_conineq_{lhs}_{rhs}".replace(".", "_")
         new_dict = dict(
             name=new_name,
+            active=active,
             lhs=lhs,
             rhs=rhs,
             slvtype="ineq",
@@ -345,7 +383,7 @@ class Solver(ATTR_BASE):
         return SolverInstance(cls, system)
 
     @classmethod
-    def add_var_constraint(cls, value, kind="ineq"):
+    def add_var_constraint(cls, value, kind="ineq",**kwargs):
         """adds a `type` constraint to the solver. If value is numeric it is used as a bound with `scipy` optimize.
 
         If value is a function it should be of the form value(Xarray) and will establish an inequality constraint that var parameter must be:
@@ -367,7 +405,13 @@ class Solver(ATTR_BASE):
         assert parm is not None, "must provide parm on non-var solvers"
         assert cls.slvtype == "var", "only Solver.declare_var can have constraints"
         assert kind in ("min", "max")
-            
+
+        combos = kwargs.get("combos", "default")
+        if isinstance(combos,str):
+            combos = ','.split(combos)
+        active = kwargs.get("active", True)
+        const = {"type": kind, "value": value, "parm": parm, "active": active, "combos": combos, 'combo_parm':cls.name}
+        #print(const,cls.__dict__)
 
         if (
             cls.allow_constraint_override
@@ -376,11 +420,9 @@ class Solver(ATTR_BASE):
         ):
             #print(f'replacing constraint {cinx} with {kind} {value} {parm}')
             constraint = cls.constraints[cinx]
-            constraint["type"] = kind
-            constraint["parm"] = parm
-            constraint["value"] = value
+            constraint.update(const)
         else:
-            cls.constraints.append({"type": kind, "value": value, 'parm':parm})
+            cls.constraints.append(const)
 
     @classmethod
     def constraint_exists(cls, **kw):

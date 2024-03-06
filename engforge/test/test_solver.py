@@ -45,21 +45,22 @@ class SpaceMixin(SolveableInterface):
     Xvar = Solver.declare_var("x", combos="x")
     Yvar = Solver.declare_var("y", combos="y")
     Zvar = Solver.declare_var("z", combos="z")
-    Xvar.add_var_constraint(0.1, kind="min")
-    Yvar.add_var_constraint(0.1, kind="min")
-    Zvar.add_var_constraint(Fun_minz, kind="min")
+    Xvar.add_var_constraint(0.1, kind="min",combos=['min_len'])
+    Yvar.add_var_constraint(0.1, kind="min",combos=['min_len'])
+    Zvar.add_var_constraint(0.1, kind="min",combos=['min_len'],active=True)
+    Zvar.add_var_constraint(Fun_minz, kind="min",combos=['len_fun_z'],active=False)
 
     #Constraints by function
     sym = Solver.equality_constraint("x",'y',combos='z_sym_eq',active=False)
 
-    costA = Solver.ineq_con('budget','cost',combos='ineq_cost',active=True)
-    #costF = Solver.ineq_con(Fun_cm,combos='fun_cost')
-    #costP = Solver.ineq_con('cost_margin',combos='prop_cost')
+    costA = Solver.ineq_con('budget','cost',combos='ineq_cost')
+    costF = Solver.ineq_con(Fun_cm,combos='fun_cost',active=False)
+    costP = Solver.ineq_con('cost_margin',combos='prop_cost',active=False)
 
     #Constraints by length
     lenA = Solver.ineq_con('max_length','combine_length',combos='ineq_length')
-    #lenF = Solver.ineq_con(Fun_em,combos='fun_length')
-    #lenP = Solver.ineq_con('edge_margin',combos='prop_length')
+    lenF = Solver.ineq_con(Fun_em,combos='fun_length',active=False)
+    lenP = Solver.ineq_con('edge_margin',combos='prop_length',active=False)
 
     #Objectives
     size_goal = Solver.objective('goal',combos='prop_goal',kind='min',active=False)
@@ -71,12 +72,8 @@ class SpaceMixin(SolveableInterface):
     #effF = Solver.objective(Fun_eff,combos='fun_eff',kind='min')
 
     @system_property
-    def zdot(self)->float:
-        return self.x - self.y
-
-    @system_property
     def combine_length(self) -> float:
-        return (self.x + self.y + self.z) * 4
+        return (abs(self.x) + abs(self.y) + abs(self.z)) * 4
 
     @system_property
     def cost_margin(self) -> float:
@@ -98,18 +95,18 @@ class SpaceMixin(SolveableInterface):
 
     @system_property
     def volume(self) -> float:
-        return self.x * self.y * self.z
+        return abs(self.x * self.y * self.z)
 
     @system_property
     def cost(self) -> float:
-        edge_cost = self.x * 4 * self.cost_x
-        edge_cost =edge_cost+ self.y * 4 * self.cost_y
-        edge_cost =edge_cost+ self.z * 4 * self.cost_z
+        edge_cost = abs(self.x) * 4 * self.cost_x
+        edge_cost =edge_cost+ abs(self.y) * 4 * self.cost_y
+        edge_cost =edge_cost+ abs(self.z) * 4 * self.cost_z
         return self.base_cost + edge_cost
 
     @system_property
     def cost_to_volume(self) -> float:
-        if  self.volume < 0.001:
+        if self.volume == 0:
             return 0
         return self.cost / self.volume 
 
@@ -118,14 +115,14 @@ class SolvComp(Component,SpaceMixin):
     # this should be energy neutral 🤞
     #zspeed = Time.integrate("z", "zdot", mode="euler")
 
-    base_cost: float = 10
-    cost_x: float = 10
-    cost_y: float = 20
-    cost_z: float = 5
+    base_cost: float = attrs.field(default=10)
+    cost_x: float = attrs.field(default=10)
+    cost_y: float = attrs.field(default=20)
+    cost_z: float = attrs.field(default=5)
 
-    budget: float = 300
-    max_length: float = 100
-    volume_goal: float = 100
+    budget: float = attrs.field(default=300)
+    max_length: float = attrs.field(default=100)
+    volume_goal: float = attrs.field(default=100)
 
 
 
@@ -146,9 +143,30 @@ class SolvSys(System,GlobalDynamics,SpaceMixin):
     total_budget:float = 400
     total_length:float = 400
 
-    sys_budget = Solver.ineq_con('total_budget','system_cost',combos='ineq_cost')
+    sys_budget = Solver.ineq_con('total_budget','system_cost',combos='total_budget')
 
-    sys_length = Solver.ineq_con('total_length','system_length',combos='ineq_cost')
+    sys_length = Solver.ineq_con('total_length','system_length',combos='total_length')
+
+    volfrac = Solver.eq_con('goal_vol_frac','vol_frac',combos='vol_frac_eq',active=False)
+
+    obj = Solver.objective('total_volume',combos='volume',kind='max')
+    hght = Solver.objective('total_height',combos='height',kind='max')
+
+    x_lim = Solver.ineq_con('x','comp.x',combos='tierd_top')
+    y_lim = Solver.ineq_con('y','comp.y',combos='tierd_top')
+
+    @system_property
+    def vol_frac(self)->float:
+        cv = self.comp.volume
+        return cv / (self.volume+cv)
+    
+    @system_property
+    def total_volume(self)->float:
+        return self.volume + self.comp.volume
+    
+    @system_property
+    def total_height(self)->float:
+        return max(self.z,0) + max(self.comp.z,0)
 
     @system_property
     def system_cost(self) -> float:
@@ -177,7 +195,7 @@ class SingleCompSolverTest(unittest.TestCase):
         self.test_selection(o,res,extra)
 
     def test_selective_exec(self):
-        extra = dict(combos='*fun*,goal',ignore_combos=['z_sym_eq','*size*','*eff*'])
+        extra = dict(combos='*fun*,goal',ign_combos=['z_sym_eq','*size*','*eff*'])
         o = self.sc.execute(**extra)
         res = self.test_results(o)
         self.test_selection(o,res,extra)
@@ -190,14 +208,14 @@ class SingleCompSolverTest(unittest.TestCase):
         self.test_selection(o,res,extra)  
 
     def test_selective_runmtx(self):
-        extra = dict(budget=[100,500,1000],max_length=[50,100,200],combos='*fun*,goal',ignore_combos=['z_sym_eq','*size*','*eff*'])        
+        extra = dict(budget=[100,500,1000],max_length=[50,100,200],combos='*fun*,goal',ign_combos=['z_sym_eq','*size*','*eff*'])        
         o = self.sc.run(**extra)
         res = self.test_results(o)
         df = self.test_dataframe(o)
         self.test_selection(o,res,extra)
 
     def test_run_wildcard(self):
-        extra = dict(combos='*fun*,goal',ignore_combos='*',budget=[100,500,1000],max_length=[50,100,200])
+        extra = dict(combos='*fun*,goal',ign_combos='*',budget=[100,500,1000],max_length=[50,100,200])
         o = self.sc.run(**extra)
         res = self.test_results(o)
         df = self.test_dataframe(o)

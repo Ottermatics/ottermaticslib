@@ -121,8 +121,76 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 comp.post_update_internal(eval_kw=eval_kw_comp, ignore=ignore)
         ignore.add(self)
 
+    def gather_update_refs(self,eval_kw=None,ignore=None,*args,**kw):
+        """checks all methods and creates ref's to execute them later"""
+        updt_refs = {}
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+
+        # Ignore
+        if ignore is None:
+            ignore = set()
+        elif self in ignore:
+            return
+        
+        for key, comp in self.internal_configurations(False).items():
+            if ignore is not None and comp in ignore:
+                continue
+
+            if not isinstance(comp,SolveableMixin):
+                continue            
+
+            # provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}
+
+            if comp.__class__.update != SolveableMixin.update:
+                f = lambda : comp.update(comp.parent, *args, **kw)
+                f.__name__ = f'{comp.name}_update'
+                ref = Ref(comp,f)
+                updt_refs[key] =  ref
+
+        ignore.add(self)
+        return updt_refs
+
+    def gather_post_update_refs(self,eval_kw=None,ignore=None,*args,**kw):
+        """checks all methods and creates ref's to execute them later"""
+        updt_refs = {}
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+
+        # Ignore
+        if ignore is None:
+            ignore = set()
+        elif self in ignore:
+            return
+
+        for key, comp in self.internal_configurations(False).items():
+            if ignore is not None and comp in ignore:
+                continue
+
+            if not isinstance(comp,SolveableMixin):
+                continue            
+
+            # provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}
+
+            if comp.__class__.post_update != SolveableMixin.post_update:
+                f = lambda : comp.update(comp.parent, *args, **kw)
+                f.__name__ = f'{comp.name}_post_update'
+                ref = Ref(comp,f)
+                updt_refs[key] =  ref                
+        ignore.add(self)
+        return updt_refs
+
     # internals caching
     # instance attributes
+    #TODO: make a global signals call
     @instance_cached
     def signals(self):
         return {k: getattr(self, k) for k in self.signals_attributes()}
@@ -278,6 +346,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         # extract combo input
         if not _check_keys:
             return {}
+        _check_keys = _check_keys.copy()
         #TODO: allow extended check_keys / defaults to be passed in, now every value in check_keys has a default
         cur_in = kwargs
         cur_in['_fail'] = _fail
@@ -634,6 +703,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         attr_dict = {}
         cls_dict = {}
         skipped = {}
+        updates = {}
 
         conv = conv if conv is not None else None
 
@@ -641,6 +711,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         
         #Go through all components
         for key, lvl, conf in confobj.go_through_configurations():
+            
+            if hasattr(conf,'solver_override') and conf.solver_override:
+                continue
+
             atrs = conf.collect_inst_attributes()
             rawattr = conf.collect_inst_attributes(handle_inst=False)
             key = f'{key}.' if key else ''
@@ -664,8 +738,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         if val is None:
                             #conf.warning(f'skip val: {k} {pre} {val}')
                             continue
-                        conf.debug(f'')
-                        conf.debug(f'got val: {k} {pre} {val}')  
+
+                        if conf.log_level <= 5:
+                            conf.msg(f'')
+                            conf.msg(f'got val: {k} {pre} {val}')  
 
                         slv_type = None
                         pre_var = pre.split('.')[-1]
@@ -683,8 +759,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             parm_name = slv_type.get_alias(pre)
 
                         cls_dict[atype][f'{key}{parm_name}'] = val_type
-
-                        conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
+                        
+                        if conf.log_level <= 5:
+                            conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
 
                         #Check to skip this item
                         #print(f'check {pre} {parm_name} {k} {val}')
@@ -905,66 +982,3 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         return refs
 
-    # component reference frame constraint caching
-    @instance_cached
-    def has_constraints(self):
-        """checks for any active constrints"""
-        from engforge.solver import comp_has_constraints
-
-        return comp_has_constraints(self.solvers)
-
-    @instance_cached
-    def constraints(self):
-        """returns a list of constraitns by type"""
-        from engforge.solver import comp_constraints
-
-        return comp_constraints(self.solvers)
-
-    def solver_cons(self, parms=None):
-        from engforge.solver import comp_solver_cons
-
-        if not parms:
-            parms = [v.independent.key for v in self.solvers.values()]
-        return comp_solver_cons(self.solvers, parms)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# @contextmanager
-# def revert_X(self, refs=None, pre_execute=True, post_execute=False):
-#     """
-#     Stores the _X parameter at present, the reverts to that state when done
-# 
-#     """
-#     if refs is None:
-#         refs = self.get_system_input_refs(all=True)
-# 
-#     X_now = Ref.refset_get(refs)
-#     try:  # Change Variables To Input
-#         yield self
-#     finally:
-#         Ref.refset_input(refs, X_now)
-#         if pre_execute:
-#             self.pre_execute()
-#         if post_execute:
-#             self.pre_execute()

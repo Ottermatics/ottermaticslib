@@ -88,7 +88,7 @@ def maybe_attr_inst(can,astype=None):
 #Important State Preservation
 #TODO: check for hidden X dependents / circular references ect.
 @contextmanager
-def revert_X(system, refs, Xnext=None, pre_execute=True, post_execute=False):
+def revert_X(system, refs, Xnext=None, pre_exec=True, post_exec=False):
     """
     Stores the _X parameter at present, the reverts to that state when done
 
@@ -102,15 +102,20 @@ def revert_X(system, refs, Xnext=None, pre_execute=True, post_execute=False):
     #Change the current state
     if Xnext:
         Ref.refset_input(refs, Xnext)
+        if pre_exec:
+            system.pre_execute()
+        if post_exec:
+            system.post_execute()
 
     try:  # Change Variables To Input
         yield X_now
+        
     finally:
         #revert and call pre/post execute
         Ref.refset_input(refs, X_now)
-        if pre_execute:
+        if pre_exec:
             system.pre_execute()
-        if post_execute:
+        if post_exec:
             system.pre_execute()
 
 

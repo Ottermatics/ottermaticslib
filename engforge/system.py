@@ -61,8 +61,8 @@ class System(SolveableInterface, SolverMixin, PlottingMixin):
     """
 
     _anything_changed_ = False
+    solver_override: bool = False #this comp will run with run_internal_systems when True, otherwise it resolves to global solver behavior
 
-    #parent: typing.Union["Component", "System"] = attrs.field(default=None)
 
     # Properties!
     @system_property

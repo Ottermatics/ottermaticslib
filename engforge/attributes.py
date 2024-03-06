@@ -43,7 +43,6 @@ class AttributeInstance:
     
 
 
-
 class ATTR_BASE(attrs.Attribute):
     """A base class that handles initalization in the attrs meta class scheme by ultimately createing an Instance"""
 

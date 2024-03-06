@@ -3,7 +3,7 @@ from engforge.system_reference import *
 import fnmatch
 
 
-def filt_combo_vars(parm,inst,extra_kw=None):
+def filt_combo_vars(parm,inst,extra_kw=None,combos=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -11,31 +11,28 @@ def filt_combo_vars(parm,inst,extra_kw=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
-    if extra_kw is None:
-        #print('no args',inst)
-        return None #"no exlusion principle"
     groups = extra_kw.get('combos',None)
     if groups is None:
         #print('no combo args',inst)
         return None #"no groups"
-    igngrp = extra_kw.get('ignore_combos',None)
+    igngrp = extra_kw.get('ign_combos',None)
     onlygrp = extra_kw.get('only_combos',None)
 
-    if not hasattr(inst,'combos'):
-        #print('NO COMBOS',inst)
+    if not combos and hasattr(inst,'combos'):
+        combos = inst.combos
+    
+    if not combos:
         return None #no combos to filter to match, its permanent
     
-    for parm in inst.combos:
+    for parm in combos:
         initial_match = [grp for grp in groups if fnmatch.fnmatch(parm,grp)]
         if not any(initial_match):
             continue
-        elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+        elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in onlygrp):
             continue
         elif igngrp and any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
             continue
-        #print(f'FINISH: {parm}|{initial_match}')
         return True
-    #print(f'IGNORE: {parm}|{initial_match}')
     return False    
     
 def filt_parm_vars(parm,inst,extra_kw=None):
@@ -46,13 +43,11 @@ def filt_parm_vars(parm,inst,extra_kw=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
-    if extra_kw is None:
-        return True #"no exlusion principle"
-    groups = extra_kw.get('add_var',None)
+    groups = extra_kw.get('slv_vars',None)
     if groups is None:
         return True #"no groups"
-    igngrp = extra_kw.get('ignore_var',None)
-    onlygrp = extra_kw.get('only_var',None)
+    igngrp = extra_kw.get('ign_vars',None)
+    onlygrp = extra_kw.get('only_vars',None)
 
     initial_match = [grp for grp in groups if fnmatch.fnmatch(parm,grp)]
     if not any(initial_match):
@@ -60,6 +55,30 @@ def filt_parm_vars(parm,inst,extra_kw=None):
     elif onlygrp and not any(fnmatch.fnmatch(parm,grp) for grp in onlygrp):
         return False    
     elif igngrp and any(fnmatch.fnmatch(parm,grp) for grp in igngrp):
+        return False
+    
+    return True
+
+def filt_active(parm,inst,extra_kw=None):
+    from engforge.attr_solver import SolverInstance
+    from engforge.attr_dynamics import IntegratorInstance
+    from engforge.attr_signals import SignalInstance
+    
+    #not considered
+    if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
+        return True
+
+    activate = extra_kw.get('activate',[])
+    deactivate = extra_kw.get('deactivate',[])  
+
+    act = inst.is_active()
+    if not act and not activate:
+        return False #shortcut
+    
+    elif activate and any(fnmatch.fnmatch(parm,grp) for grp in activate):
+        return True
+      
+    elif deactivate and any(fnmatch.fnmatch(parm,grp) for grp in deactivate):
         return False
     
     return True
@@ -126,6 +145,7 @@ def sys_solver_variables(system,sys_refs,extra_kw=None,**kw):
     if 'as_set' in kw and kw['as_set']==True:
         vars = set.union(*(set(v) for k,v in out.items()))
         return vars
+    
     if 'as_flat' in kw and kw['as_flat']==True:
         flt = {}
         for k,v in out.items():
@@ -150,10 +170,13 @@ def sys_solver_objectives(system,sys_refs,Xrefs,extra_kw=None,add_obj=None,rmv_o
     #return {k:v for k,v in objs.items() if not extra_kw or filt_combo_vars(k,v,extra_kw)}
 
 
-def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None, *args, **kw):
+def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None,combo_filter=True, *args, **kw):
     """formatted as arguments for the solver
     #TODO: add combo parsing
     """
+    extra_kw = kw.get('extra_kw')
+    deactivated = extra_kw.get('deactivate',[]) if 'deactivate' in extra_kw and extra_kw['deactivate'] else []
+    activated = extra_kw.get('activate',[]) if 'activate' in extra_kw and  extra_kw['activate'] else []
 
     slv_inst = sys_refs.get('type',{}).get('solver',{})
     sys_refs = sys_refs.get('attrs',{})
@@ -189,6 +212,7 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None, *args, **kw):
         constraints = {} #youre free!
         return constraints
     
+    
 
     # Add Constraints
     ex_arg = {"con_args": (),**kw}
@@ -196,31 +220,64 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None, *args, **kw):
     for slvr, ref in sys_refs.get('solver.var',{}).items():
         slv = slv_inst[slvr]
         slv_constraints = slv.constraints
+        system.debug(f'constraints {slvr} {slv_constraints}')
         for ctype in slv_constraints:
             cval = ctype['value']
             kind = ctype['type']       
-            parm = ctype['parm']             
-            if cval is not None:
+            parm = ctype['parm']
+            system.debug(f'const: {slvr} {ctype}')
+            if cval is not None and slvr in Xparms:
+                
+                combos = None
+                if 'combos' in ctype:
+                    combos = ctype['combos']
+                    combo_parm = ctype['combo_parm']
+                    active = ctype['active']
+#                     in_activate = any([fnmatch.fnmatch(combo_parm,v) for v in activated]) if activated else False
+#                     in_deactivate = any([fnmatch.fnmatch(combo_parm,v) for v in deactivated]) if deactivated else False
+# 
+#                     #Check active or activated
+#                     if not active and not activated:
+#                         system.debug(f'constraint {parm} {slvr} {ctype} is not active')
+#                         continue
+#                     elif not active and not in_activate:
+#                         system.debug(f'constraint {parm} {slvr} {ctype} is not active')
+#                         continue
+# 
+#                     elif active and not in_deactivate:
+#                         continue
+
+                    
+
+                if combos and combo_filter:
+                    filt = filt_combo_vars(combo_parm,slv, extra_kw,combos)
+                    if not filt: 
+                        system.debug(f'filtering constraint={filt} {parm} {slv} {ctype} | {combos} {extra_kw.get("combos",None)}')                        
+                        continue
+
+                system.debug('adding var constraint',parm,slv,ctype,combos) 
+
+                x_inx = Xparms.index(slvr)            
                 #print(cval,kind,parm)
                 if (
                     kind in ("min", "max")
-                    and parm in Xparms
+                    and slvr in Xparms
                     and isinstance(cval, (int, float))
                 ):
-                    minv, maxv = bnd_list[Xparms.index(parm)]
-                    bnd_list[Xparms.index(parm)] = [
+                    minv, maxv = bnd_list[x_inx]
+                    bnd_list[x_inx] = [
                         cval if kind == "min" else minv,
                         cval if kind == "max" else maxv,
                         ]
                 #add the bias of cval to the objective function
-                elif kind in ('min','max') and parm in Xparms:
-                    parmref = Xrefs[parm]
+                elif kind in ('min','max') and slvr in Xparms:
+                    parmref = Xrefs[slvr]
                     #Ref Case
                     cval = ref_to_val_constraint(system,Xrefs,parmref,kind,cval,*args,**kw)
-                    con_info.append(f'val_{ref.comp.classname}_{kind}_{parm}')
+                    con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
                     con_list.append(cval)
                 else:
-                    log.warning(f"bad constraint: {cval} {kind} {parm}")
+                    log.warning(f"bad constraint: {cval} {kind} {slvr}")
 
     # Add Constraints
     for slvr, ref in sys_refs.get('solver.ineq',{}).items():
@@ -256,7 +313,7 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None, *args, **kw):
 
 
 # Objective functions & Utilities
-def f_lin_min(system, Xref, Yref, weights=None, *args, **kw):
+def f_lin_min(system, Xref, Yref,weights=None, setcb=None, *args, **kw):
     """
     Creates an anonymous function with stored references to system, Yref, weights, that returns a scipy optimize friendly function of (x, Xref, *a, **kw) x which corresponds to the order of Xref dicts, and the other inputs are up to application.
 
@@ -301,6 +358,10 @@ def f_lin_min(system, Xref, Yref, weights=None, *args, **kw):
             slv_info = base_dict
 
         with revert_X(system,Xref,Xnext=Xnext):
+            
+            if setcb:
+                setcb(*args,**kw)
+
             grp = (yparm, weights)
             vals,pos,neg = [],[],[]
             for p,n in zip(*grp):
@@ -365,6 +426,7 @@ def objectify(function,system,Xrefs,solver_info=None,*args,**kwargs):
         system.debug(inspect.getsource(function))
 
     fo = lambda x,*a,**kw: loaf(x,solver_info,*a,**kw)
+    fo.__name__ ==f'OBJ[{function.__name__}]'
     return fo
 
 def secondary_obj(
@@ -409,6 +471,7 @@ def create_constraint(
 
     # its a function
     _fun = lambda *args,**kw: ref.value(*args,**kw)
+    _fun.__name__ = f'const_{contype}_{ref.comp.classname}_{ref.key}'
     fun = objectify(_fun,system,Xref,*args,**kwargs)
     cons = {"type": contype, "fun": fun}
     if con_args:
@@ -512,9 +575,17 @@ def refmin_solve(
     parms = list(Xref.keys())  # static x_basis
     
     norm_x,weights = handle_normalize(weights,Xref,Yref)
+    
+    #gather unique update methods, to update on each call
+    updt_refss = list(system.gather_update_refs().values())
+    if updt_refss:
+        updt = lambda *args,**kw: [v.value(*args,**kw) for v in updt_refss]
+        updt.__name__ = f'{system.name}_glb_updater'
+    else:
+        updt = None
 
     # make objective function
-    Fc = ffunc(system,Xref,Yref,weights)
+    Fc = ffunc(system,Xref,Yref,weights,setcb=updt)
     Fc.__name__ = ffunc.__name__
 
     # get state
