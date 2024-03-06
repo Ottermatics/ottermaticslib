@@ -689,6 +689,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         return out
     
+    
     def collect_solver_refs(self,conf:"Configuration"=None,conv=None,check_atr_f=None,check_kw=None,**kw):
         """collects all the references for the system grouped by function and prepended with the system key"""    
         from engforge.attributes import ATTR_BASE
@@ -732,11 +733,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
-                            #log.info(f'skipping {val}')
+                            conf.info(f'skipping {val}')
                             continue   
 
                         if val is None:
-                            #conf.warning(f'skip val: {k} {pre} {val}')
                             continue
 
                         if conf.log_level <= 5:
@@ -749,7 +749,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             _var = getattr(conf,pre_var)
                             if isinstance(_var,AttributeInstance):
                                 slv_type = _var
-                            conf.msg(f'slv type: {conf.classname}.{pre_var} -> {_var}')
+                            conf.info(f'slv type: {conf.classname}.{pre_var} -> {_var}')
 
                         val_type = ck_type[pre_var]
 
@@ -758,13 +758,14 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         if slv_type:
                             parm_name = slv_type.get_alias(pre)
 
-                        cls_dict[atype][f'{key}{parm_name}'] = val_type
+                        scope_name = f'{key}{parm_name}'
+                        cls_dict[atype][scope_name] = val_type
                         
                         if conf.log_level <= 5:
                             conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
 
                         #Check to skip this item
-                        #self.info(f'check {pre} {parm_name} {k} {val}')
+                        self.info(f'check {pre} {parm_name} {k} {val}')
 
                         pre = f'{atype}.{k}' #pre switch
                         if pre not in attr_dict:
@@ -776,8 +777,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             if current_skipped and val.key in set.union(*current_skipped):
                                 continue
 
-                        if check_atr_f and not check_atr_f(pre,parm_name,val_type,check_kw):
-                            conf.debug(f'skip {parm_name} {k} {pre} {val}')
+                        if check_atr_f and not check_atr_f(pre,scope_name,val_type,check_kw):
+                            conf.debug(f'skip {scope_name} {k} {pre} {val}')
                             if pre not in skipped:
                                 skipped[pre] = []
 
@@ -785,12 +786,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                                 skipped[pre].append(f'{key}{val.key}') #its a var
                             else:
                                 #not objective or settable, must be a obj/cond
-                                skipped[pre].append(f'{key}{parm_name}')
+                                skipped[pre].append(scope_name)
                             continue
 
                         #if the value is a dictionary, unpack it with comp key
                         if val:
-                            attr_dict[pre].update({f'{key}{parm_name}':val})
+                            attr_dict[pre].update({scope_name:val})
 
                         else:
                             if attr_dict[pre]:

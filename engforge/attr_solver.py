@@ -224,7 +224,7 @@ class Solver(ATTR_BASE):
         if cls.slvtype == "var":
             for const in cls.constraints:
                 if 'combo_parm' in const and const['combo_parm'] == pre_name:
-                    const['parm'] = name #update me
+                    const['combo_parm'] = name #update me
                 elif 'combo_parm' not in const:
                     const['combo_parm'] = name #update me
                 

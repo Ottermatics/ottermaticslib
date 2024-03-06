@@ -83,6 +83,12 @@ class SolverMixin(SolveableMixin):
     @property
     def solved(self):
         return self._solved
+    
+    def solver_parameters(self,**kwargs):
+        """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations"""
+        from engforge.solver import combo_filter
+        return self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs)
+    
 
     def post_run_callback(self, **kwargs):
         """user callback for when run is complete"""
