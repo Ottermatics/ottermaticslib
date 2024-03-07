@@ -190,18 +190,20 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
     # internals caching
     # instance attributes
-    #TODO: make a global signals call
+
     @instance_cached
     def signals(self):
+        """this is just a record of signals from this solvable. dont use this to get the signals, use high level signals strategy #TODO: add signals strategy"""
         return {k: getattr(self, k) for k in self.signals_attributes()}
 
     @instance_cached
     def solvers(self):
+        """this is just a record of any solvable attribute. dont use this to get the attribute, use another strategy"""        
         return {k: getattr(self, k) for k in self.solvers_attributes()}
 
     @instance_cached(allow_set=True)
     def transients(self):
-        # TODO: add dynamics internals
+        """this is just a record of any transient attribute. dont use this to get the transient, use another strategy"""   
         return {k: getattr(self, k) for k in self.transients_attributes()}
 
     def internal_components(self, recache=False) -> dict:
@@ -300,11 +302,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for ck, comp in components.items():
                 comp.reset()
 
-    # @instance_cached
+    # @instance_cached 
     @property
     def comp_references(self):
         """A cached set of recursive references to any slot component
-        #TODO: work on caching, concern with iterators
+        #TODO: work on caching, concern with iterators 
+        #FIXME: by instance recache on iterative component change or other signals
         """
         out = {}
         for key, lvl, comp in self.go_through_configurations(parent_level=1):
@@ -318,9 +321,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     def _parse_default(self,key,defaults,input_dict):
         """splits strings or lists and returns a list of options for the key, if nothing found returns None if fail set to True raises an exception, otherwise returns the default value"""
         if key in input_dict:
+            #kwargs will no longer have key!
             option = input_dict.pop(key)
             #print(f'removing option {key} {option}')
-            if isinstance(option,(int,float,bool)):
+            if option is None:
+                return option,False
+            elif isinstance(option,(int,float,bool)):
                 return option,False
             elif isinstance(option,str):
                 if not option:
@@ -371,6 +377,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         force_solve=False,
         return_results=False,
         method_kw: dict = None,
+        extra_kw_dflt: dict = None,
         **kwargs,
     ):
         """applies a permutation of input parameters for parameters. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist.
@@ -411,7 +418,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         # RUN when not solved, or anything changed, or arguments or if forced
         if force_solve or not self.solved or self.anything_changed or kwargs:
-            _input = self.parse_run_kwargs(**kwargs)
+            _input,extra_kw = self.parse_run_kwargs(extra_kw_dflt=extra_kw_dflt,**kwargs)
+            method_kw.update(extra_kw)
 
             output = {}
             inputs = {}
@@ -513,13 +521,19 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         return _trans_opts
 
-    def parse_run_kwargs(self, **kwargs):
+    def parse_run_kwargs(self, extra_kw_dflt=None, **kwargs):
         """ensures correct input for simulation.
         :returns: first set of input for initalization, and all input dictionaries as tuple.
 
         """
 
         # use eval_kw and sys_kw to handle slot argument and sub-system arguments. use gather_kw to gather extra parameters adhoc.
+
+        if extra_kw_dflt:
+            #remove and return the extra_kw items separately
+            extra_kw = self._rmv_extra_kws(kwargs,extra_kw_dflt)
+        else:
+            extra_kw = {}
 
         # Validate OTher Arguments By Parameter Or Comp-Recursive
         parm_args = {k: v for k, v in kwargs.items() if "." not in k}
@@ -569,7 +583,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             else:
                 _input[k].extend(v)
 
-        return _input
+        return _input,extra_kw
 
     # REFERENCE FUNCTIONS
     # Location Funcitons
@@ -577,7 +591,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     def locate(cls, key, fail=True) -> type:
         """:returns: the class or attribute by key if its in this system class or a subcomponent. If nothing is found raise an error"""
         # Nested
-        log.debug(f"locating {cls.__name__} | key: {key}")
+        log.msg(f"locating {cls.__name__} | key: {key}")
         val = None
 
         if "." in key:
@@ -607,7 +621,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         :returns: the instance assigned to this system. If the key has a `.` in it the comp the lowest level component will be returned
         """
 
-        log.debug(f"locating {self.identity} | key: {key}")
+        log.msg(f"locating {self.identity} | key: {key}")
         val = None
 
         #Handle callable key override
@@ -650,7 +664,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return val
 
     # Reference Caching
-    def system_references(self, recache=False, child_only=True):
+    def system_references(self, recache=False):
         """gather a list of references to attributes and"""
         if recache == False and hasattr(self, "_prv_system_references"):
             return self._prv_system_references
@@ -699,12 +713,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         if confobj is None:
             confobj = self
 
-        state_parms = ['solver.var','dynamics.state','time.parm']
         comp_dict = {}
         attr_dict = {}
         cls_dict = {}
         skipped = {}
-        updates = {}
 
         conv = conv if conv is not None else None
 
@@ -713,9 +725,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         #Go through all components
         for key, lvl, conf in confobj.go_through_configurations():
             
-            if hasattr(conf,'solver_override') and conf.solver_override:
+            if hasattr(conf,'_solver_override') and conf._solver_override:
                 continue
 
+            #Get attributes & attribute instances
             atrs = conf.collect_inst_attributes()
             rawattr = conf.collect_inst_attributes(handle_inst=False)
             key = f'{key}.' if key else ''
@@ -733,7 +746,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
-                            conf.msg(f'skipping {val}')
+                            if conf.log_level <= 5:
+                                conf.debug(f'skipping {val}')
                             continue   
 
                         if val is None:
@@ -757,7 +771,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         parm_name = pre_var #prer alias
                         if slv_type:
                             parm_name = slv_type.get_alias(pre)
-
+                        
+                        #Keep reference to the original type and name
                         scope_name = f'{key}{parm_name}'
                         cls_dict[atype][scope_name] = val_type
                         
@@ -765,8 +780,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
 
                         #Check to skip this item
-                        #self.info(f'check {pre} {parm_name} {k} {val}')
-
+                        #keep references even if null
                         pre = f'{atype}.{k}' #pre switch
                         if pre not in attr_dict:
                             attr_dict[pre] = {}
@@ -776,7 +790,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             current_skipped = [set(v) for v in skipped.values()]
                             if current_skipped and val.key in set.union(*current_skipped):
                                 continue
-
+                        
+                        #Perform the check
                         if check_atr_f and not check_atr_f(pre,scope_name,val_type,check_kw):
                             conf.debug(f'skip {scope_name} {k} {pre} {val}')
                             if pre not in skipped:
@@ -792,43 +807,49 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         #if the value is a dictionary, unpack it with comp key
                         if val:
                             attr_dict[pre].update({scope_name:val})
-
                         else:
                             if attr_dict[pre]:
                                 continue #keep it!
                             else:
                                 attr_dict[pre] = {} #reset it
+
                 elif atype not in attr_dict or not attr_dict[atype]:
                    #print(f'unpacking {atype} {aval}')
                    attr_dict[atype] = {}
         
         #Dynamic Variables Add, following the skipped items
-        if check_atr_f and any([v for v in skipped.values()]):
+        if check_atr_f or any([v for v in skipped.values()]):
             #print('skipped',skipped)
             skipd = set().union(*(set(v) for v in skipped.values()))
-            for pre,refs in self.collect_dynamic_refs(conf).items():
+            for pre,refs in self.collect_dynamic_refs().items():
+                
                 if pre not in attr_dict:
                     attr_dict[pre] = {}
+
                 for parm,ref in refs.items():
                     
-                    val_type = getattr(ref.comp,parm)
-                    if f'{key}{parm}' in skipd:
-                        conf.debug('dynvar skip',pre,ref.key,val_type,skipd)
+                    scoped_name = f'{key}{parm}'
+                    val_setskip = (isinstance(ref,Ref) and ref.allow_set and ref.key in skipd)
+                    val_type = None
+                    
+                    if scoped_name in skipd:
+                        conf.msg(f'dynvar skip {pre,ref.key,val_type,skipd}')
                         continue
 
-                    elif isinstance(ref,Ref) and ref.allow_set:
-                        if ref.key in skipd:
-                            conf.debug('dynvar skip',pre,ref.key,val_type,skipd)
-                            continue
-                    
+                    elif val_setskip:
+                        conf.msg(f'dynvar r-skip {pre,ref.key,val_type,skipd}')
+                        continue
                         
-                    elif check_atr_f(pre,ref.key,val_type,check_kw):
-                        conf.debug('dynvar add',pre,ref.key,val_type,skipd)
+                    elif check_atr_f and check_atr_f(pre,ref.key,val_type,check_kw):
+                        conf.msg(f'dynvar add {pre,ref.key,val_type,skipd}')
                         attr_dict[pre].update(**{parm:ref})
                     else:
-                        conf.debug('dynvar skip',pre,ref.key,val_type,skipd)
+                        conf.msg(f'dynvar endskip {pre,ref.key,val_type,skipd}')
+                        if check_atr_f: #then it didn't checkout
+                            skipped[pre].append(scope_name)
 
         else:
+            #There's no checks to be done, just add these
             attr_dict.update(**self.collect_dynamic_refs(conf))                   
 
         return out
@@ -860,6 +881,13 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         return dynamics
     
+    def group_solver_refs(self,sys_refs):
+        """collects the integrator references from `collect_solver_refs` output"""
+        dynamics_state = sys_refs.get("dynamics.state",{})
+        dynamics_inpt = sys_refs.get("dynamics.input",{})
+        dynamics_rate = sys_refs.get("dynamics.input",{})
+        dynamics_out = sys_refs.get("dynamics.output",{})
+        #TODO: finish me! add time and parameter grouping
 
 
     def get_system_input_refs(
@@ -875,17 +903,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         Get the references to system input based on the specified criteria.
 
         :param strings: Include system properties of string type.
-        :type strings: bool, optional
         :param numeric: Include system properties of numeric type (float, int).
-        :type numeric: bool, optional
         :param misc: Include system properties of miscellaneous type.
-        :type misc: bool, optional
         :param all: Include all system properties regardless of type.
-        :type all: bool, optional
         :param boolean: Include system properties of boolean type.
-        :type boolean: bool, optional
         :param kw: Additional keyword arguments passed to recursive config loop
-        :type kw: dict, optional
         :return: A dictionary of system property references.
         :rtype: dict
         """
@@ -935,17 +957,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         Get the references to system properties based on the specified criteria.
 
         :param strings: Include system properties of string type.
-        :type strings: bool, optional
         :param numeric: Include system properties of numeric type (float, int).
-        :type numeric: bool, optional
         :param misc: Include system properties of miscellaneous type.
-        :type misc: bool, optional
         :param all: Include all system properties regardless of type.
-        :type all: bool, optional
         :param boolean: Include system properties of boolean type.
-        :type boolean: bool, optional
         :param kw: Additional keyword arguments passed to recursive config loop
-        :type kw: dict, optional
         :return: A dictionary of system property references.
         :rtype: dict
         """

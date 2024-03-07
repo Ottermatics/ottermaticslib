@@ -5,7 +5,7 @@
 
 
 import attrs, uuid
-from engforge.attributes import ATTR_BASE, AttributeInstance
+from engforge.attributes import ATTR_BASE, AttributeInstance, DEFAULT_COMBO
 from engforge.attr_slots import SLOT_TYPES
 
 VALID_MODES = ["pre", "post", "both"]
@@ -20,11 +20,10 @@ class SignalInstance(AttributeInstance):
     # compiled info
     target: "Ref"
     source: "Ref"
-
-    __slots__ = ["system", "signal", "target", "source"]
+    class_attr: "SIGNAL"
 
     def __init__(self, signal, system) -> None:
-        self.signal = signal
+        self.class_attr = self.signal = signal
         self.system = system
         self.compile()
 
@@ -36,8 +35,8 @@ class SignalInstance(AttributeInstance):
     def apply(self):
         """sets `target` from `source`"""
         val = self.source.value()
-        if self.system.log_level < 5:
-            self.system.debug(
+        if self.system.log_level < 15:
+            self.system.info(
                 f"SIGNAL|applying {self.source}|{val} to {self.target}"
             )
         self.target.set_value(val)
@@ -45,6 +44,15 @@ class SignalInstance(AttributeInstance):
     @property
     def mode(self) -> str:
         return self.signal.mode
+    
+    def as_ref_dict(self)->dict:
+        return dict(
+            target=self.target,
+            source=self.source,
+        )
+    
+    def get_alias(self,path):
+        return path.split('.')[-1]    
 
 
 class Signal(ATTR_BASE):
@@ -59,9 +67,12 @@ class Signal(ATTR_BASE):
     instance_class = SignalInstance
 
     @classmethod
-    def define(cls, target: str, source: str, mode="pre"):
+    def define(cls, target: str, source: str, mode="pre",**kw):
         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass"""
         assert mode in VALID_MODES, f"invalid mode: {mode}"
+
+        active = kw.get("active", True)
+        combos = kw.get("combos", 'default')
 
         # Create A New Signals Class
         new_name = f"SIGNAL_{mode}_{source}_to_{target}".replace(".", "_")
@@ -71,22 +82,15 @@ class Signal(ATTR_BASE):
             mode=mode,
             target=target,
             source=source,
+            active=active,
+            combos=combos,
             default_options=cls.default_options.copy(),
         )
-        #new_slot = type(new_name, (SIGNAL,), new_dict)
-        #new_slot.default_options["default"] = new_slot.make_factory()
-        #new_slot.default_options["validator"] = new_slot.configure_instance
+        new_slot = type(new_name, (SIGNAL,), new_dict)
+        new_slot.default_options["default"] = new_slot.make_factory()
+        new_slot.default_options["validator"] = new_slot.configure_instance
         new_sig = cls._setup_cls(new_name, new_dict)
         return new_sig
-
-    # @classmethod
-    # def define_validate(cls, **kwargs):
-    #     """A method to validate the kwargs passed to the define method"""
-    #     assert 'target' in kwargs
-    #     assert 'source' in kwargs
-    #     assert 'mode' in kwargs
-    #     mode = kwargs['mode']
-    #     assert mode in VALID_MODES, f"invalid mode: {mode}"
 
     # FIXME: move to
     @classmethod

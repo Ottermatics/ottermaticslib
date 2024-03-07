@@ -138,17 +138,11 @@ def save_all_figures_to_pdf(
     Save all figures to a PDF file.
 
     :param filename: The name of the PDF file to save.
-    :type filename: str
     :param figs: List of figures to save. If None, all open figures will be saved.
-    :type figs: list, optional
     :param dpi: The resolution of the saved figures in dots per inch.
-    :type dpi: int, optional
     :param close: Whether to close all figures after saving.
-    :type close: bool, optional
     :param pdf: An existing PdfPages object to append the figures to. If None, a new PdfPages object will be created.
-    :type pdf: PdfPages, optional
     :param return_pdf: Whether to return the PdfPages object after saving.
-    :type return_pdf: bool, optional
     :return: The PdfPages object if return_pdf is True, else None.
     :rtype: PdfPages or None
     """

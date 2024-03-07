@@ -24,7 +24,7 @@ def name_generator(instance):
         out =base+ randomname.get_name(adj=NAME_ADJ.secret,noun=NAME_NOUN.secret)
     else:
         out = base
-    log.info(f"generated name: {out}")
+    log.debug(f"generated name: {out}")
     return out
 
 
@@ -80,6 +80,8 @@ def forge(cls=None, **kwargs):
 
         def f(cls, *args):
             return forge(cls, **kwargs)
+        
+        f.__name__ ==  "forge"
 
         return f
 
@@ -286,7 +288,7 @@ def signals_slots_handler(
                     f"{cls.__name__} overriding inherited attr: {o.name} as a system property overriding it"
                 )
             else:
-                log.debug(f"{cls.__name__} adding attr: {o.name}")
+                log.msg(f"{cls.__name__} adding attr: {o.name}")
                 out.append(o)
         else:
             log.warning(

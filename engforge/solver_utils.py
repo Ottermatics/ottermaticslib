@@ -1,4 +1,8 @@
 from engforge.system_reference import *
+from engforge.logging import LoggingMixin
+
+class SolverUtilLog(LoggingMixin): pass
+log = SolverUtilLog()
 
 import fnmatch
 
@@ -26,6 +30,7 @@ def filt_combo_vars(parm,inst,extra_kw=None,combos_in=None):
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
     #not considered
+    
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
@@ -36,23 +41,28 @@ def filt_combo_vars(parm,inst,extra_kw=None,combos_in=None):
     igngrp = ext_str_list(extra_kw,'ign_combos',None)
     onlygrp = ext_str_list(extra_kw,'only_combos',None)
 
-    if not combos_in and hasattr(inst,'combos'):
-        combos = inst.combos
+    if not combos_in:
+        combos = str_list_f(getattr(inst,'combos', ''))
     else:
         combos = str_list_f(combos_in)
     
     if not combos:
+        log.info(f'no combos for {parm} {combos} {groups}')
         return None #no combos to filter to match, its permanent
     
     for parm in combos:
         initial_match = [grp for grp in groups if _parm_compare(parm,grp)]
         if not any(initial_match):
+            log.msg(f'skip {parm}: nothing ')
+            continue #not even 
+        if onlygrp and not any(_parm_compare(parm,grp) for grp in onlygrp):
+            log.msg(f'skip {parm} not in {onlygrp}')
             continue
-        elif onlygrp and not any(_parm_compare(parm,grp) for grp in onlygrp):
-            continue
-        elif igngrp and any(_parm_compare(parm,grp) for grp in igngrp):
+        if igngrp and any(_parm_compare(parm,grp) for grp in igngrp):
+            log.msg(f'skip {parm} in {igngrp}')
             continue
         return True
+    
     return False    
     
 def filt_parm_vars(parm,inst,extra_kw=None):
@@ -72,15 +82,17 @@ def filt_parm_vars(parm,inst,extra_kw=None):
 
     initial_match = [grp for grp in groups if _parm_compare(parm,grp)]
     if not any(initial_match):
+        log.msg(f'skip {parm}: nothing')
         return False
-    elif onlygrp and not any(_parm_compare(parm,grp) for grp in onlygrp):
+    if onlygrp and not any(_parm_compare(parm,grp) for grp in onlygrp):
+        log.msg(f'skip {parm} not in {onlygrp}')
         return False    
-    elif igngrp and any(_parm_compare(parm,grp) for grp in igngrp):
+    if igngrp and any(_parm_compare(parm,grp) for grp in igngrp):
+        log.msg(f'skip {parm} in {igngrp}')
         return False
-    
     return True
 
-def filt_active(parm,inst,extra_kw=None):
+def filt_active(parm,inst,extra_kw=None,dflt=False):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -92,17 +104,20 @@ def filt_active(parm,inst,extra_kw=None):
     activate = ext_str_list(extra_kw,'activate',[])
     deactivate = ext_str_list(extra_kw,'deactivate',[])  
 
-    act = inst.is_active()
+    act = inst.is_active(dflt) #default is inclusion boolean 
+    
+    #check for possibilities of activation
     if not act and not activate:
+        log.msg(f'skip {parm}: not active')
         return False #shortcut
-    
-    elif activate and any(_parm_compare(parm,grp) for grp in activate):
+    if activate and any(_parm_compare(parm,grp) for grp in activate):
+        log.msg(f'{parm} activated!')
         return True
-      
-    elif deactivate and any(_parm_compare(parm,grp) for grp in deactivate):
+    if deactivate and any(_parm_compare(parm,grp) for grp in deactivate):
+        log.msg(f'{parm} deactivated!')
         return False
-    
-    return True
+    log.msg(f'{parm} is {act}!')
+    return act
 
 
 def ref_to_val_constraint(system,Xrefs,parm_ref,kind,val,*args,**kwargs):
@@ -274,10 +289,10 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None,combo_filter=T
                 if combos and combo_filter:
                     filt = filt_combo_vars(combo_parm,slv, extra_kw,combos)
                     if not filt: 
-                        system.info(f'filtering constraint={filt} {parm} {slv} {ctype} | {combos} {ext_str_list(extra_kw,"combos",None)}')                        
+                        system.msg(f'filtering constraint={filt} {parm} {slv} {ctype} | {combos} {ext_str_list(extra_kw,"combos",None)}')                        
                         continue
 
-                system.debug('adding var constraint',parm,slv,ctype,combos) 
+                system.msg('adding var constraint',parm,slv,ctype,combos) 
 
                 x_inx = Xparms.index(slvr)            
                 #print(cval,kind,parm)
@@ -291,6 +306,7 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None,combo_filter=T
                         cval if kind == "min" else minv,
                         cval if kind == "max" else maxv,
                         ]
+                    
                 #add the bias of cval to the objective function
                 elif kind in ('min','max') and slvr in Xparms:
                     parmref = Xrefs[slvr]
@@ -298,6 +314,7 @@ def sys_solver_constraints( system, sys_refs, Xrefs, add_con=None,combo_filter=T
                     cval = ref_to_val_constraint(system,Xrefs,parmref,kind,cval,*args,**kw)
                     con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
                     con_list.append(cval)
+
                 else:
                     log.warning(f"bad constraint: {cval} {kind} {slvr}")
 
@@ -421,6 +438,8 @@ def f_lin_min(system, Xref, Yref,weights=None, setcb=None, *args, **kw):
                     return np.sum(np.array( pos )) - np.sum(np.array( neg ))
                 else:
                     return np.sum(np.array( pos ))
+                
+    f.__name__ = f'min_Y_{"_".join(Yref.keys())}_X_{"_".join(Xref.keys())}]'
 
     return f
 
@@ -444,11 +463,11 @@ def objectify(function,system,Xrefs,solver_info=None,*args,**kwargs):
             return out        
     
     if system.log_level < 18:
-        system.debug(f'obj settup {function} - > {loaf}')
+        system.debug(f'obj setup {function} - > {loaf}')
         system.debug(inspect.getsource(function))
 
     fo = lambda x,*a,**kw: loaf(x,solver_info,*a,**kw)
-    fo.__name__ ==f'OBJ[{function.__name__}]'
+    fo.__name__ =f'OBJ_{function.__name__}'
     return fo
 
 def secondary_obj(
@@ -621,7 +640,7 @@ def refmin_solve(
         Xo = [Xo[p] for p in parms]
 
     # TODO: IO for jacobean and state estimations (complex as function definition, requires learning)
-    system.info(f'minimize! {Fc,Xo,parms}')
+    system.debug(f'minimize! {Fc.__name__,Xo,parms,kw}')
     kw.pop('info',None)
     ans = sciopt.minimize(Fc, Xo, **kw)
     return process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans)

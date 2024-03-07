@@ -48,9 +48,9 @@ class SystemsLog(LoggingMixin):
 
 log = SystemsLog()
 
-
+#NOTE: solver must come before solvable interface since it overrides certain methods
 @forge
-class System(SolveableInterface, SolverMixin, PlottingMixin):
+class System(SolverMixin, SolveableInterface, PlottingMixin):
     """A system defines SlotS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
@@ -60,8 +60,8 @@ class System(SolveableInterface, SolverMixin, PlottingMixin):
     When solving by default the run(revert=True) call will revert the system state to what it was before the system began.
     """
 
-    _anything_changed_ = False
-    solver_override: bool = False #this comp will run with run_internal_systems when True, otherwise it resolves to global solver behavior
+    _anything_changed_ = True
+    _solver_override: bool = False #this comp will run with run_internal_systems when True, otherwise it resolves to global solver behavior, also prevents the solver from reaching into this system
 
 
     # Properties!

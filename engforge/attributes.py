@@ -5,14 +5,13 @@ on init an instance of `Instance` type for any ATTR_BASE subclass is created """
 import attrs, attr, uuid
 from engforge.logging import LoggingMixin, log
 
+
 class ATTRLog(LoggingMixin):
     pass
-
-
 log = ATTRLog()
 
-# TODO: develop a base class system for each config class to idenity the use of attributes throughout all systems, useful for `auto_configure` method
 
+DEFAULT_COMBO = 'default'
 
 class AttributeInstance:
     class_attr: "ATTR_BASE"
@@ -41,6 +40,27 @@ class AttributeInstance:
     def get_alias(self,path):
         return path.split('.')[-1]
     
+    def is_active(self,value=False) -> bool:
+        mthd = 'dflt'
+        if hasattr(self,'_active'):
+            mthd = 'instance'
+            value = self._active
+
+        elif hasattr(self.class_attr,'active'):
+            mthd = 'class'
+            value = self.class_attr.active
+        
+        #print(f'{self}| {mthd} is_active: {value}')
+        #the default
+        return value       
+    
+    @property
+    def combos(self):
+        return self.class_attr.combos
+    
+    @property
+    def active(self):
+        return self.class_attr.active    
 
 
 class ATTR_BASE(attrs.Attribute):
@@ -53,6 +73,23 @@ class ATTR_BASE(attrs.Attribute):
     default_options: dict
     template_class = True
 
+    #TODO: add generic selection & activation of attributes
+    active: bool
+    combos: list
+
+    #Activation & Combo Selection Functionality
+    @classmethod
+    def process_combos(cls, combos):
+        if isinstance(combos, str):
+            if '*' in combos:
+                raise KeyError("wildcard (*) not allowed in combos!")
+            return combos.split(",")
+        elif isinstance(combos, list):
+            if any(['*' in c for c in combos]):
+                raise KeyError("wildcard (*) not allowed in combos!")            
+            return combos     
+
+    #Initialization
     @classmethod
     def configure_for_system(cls, name, config_class, cb=None, **kwargs):
         """add the config class, and perform checks with `class_validate)
@@ -94,6 +131,7 @@ class ATTR_BASE(attrs.Attribute):
         cls.class_validate(instance=instance)
         return cls.instance_class(cls, instance)
 
+    #Override Me:
     @classmethod
     def configure_instance(cls, instance, attribute, value):
         """validates the instance given attr's init routine"""
@@ -108,7 +146,8 @@ class ATTR_BASE(attrs.Attribute):
     def define_validate(cls, **kwargs):
         """A method to validate the kwargs passed to the define method"""
         pass
-
+    
+    #Interafce & Utility
     @classmethod
     def define(cls, **kwargs):
         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass"""

@@ -31,19 +31,18 @@ log = SolverLog()
 SLVR_SCOPE_PARM = ['solver.eq','solver.ineq','solver.var','solver.obj','time.parm','time.rate','dynamics.state','dynamics.rate']
 
 def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
-    
+    #TODO: allow solver_inst to be None for dyn-classes
     #proceed to filter active items if vars / combos inputs is '*' select all, otherwise discard if not active
-    slv_vars = str_list_f(extra_kw.get('slv_vars',[]))
-    combos_in = str_list_f(extra_kw.get('combos',[]))
-    activate = str_list_f(extra_kw.get('activate',[]))
-    deactivate = str_list_f(extra_kw.get('deactivate',[]))
-
+    if extra_kw is None:
+        extra_kw = {}
 
     outa = True
     if extra_kw.get('only_active',True):
-        outa  =  filt_active(parm_name,solver_inst,extra_kw=extra_kw)
+
+        outa  =  filt_active(parm_name,solver_inst,extra_kw=extra_kw,dflt=False)
+        #log.info(f'only active: {outa}| {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
         if not outa:
-            log.msg(f'filt not active: {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}')
+            log.debug(f'filt not active: {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
             return False
 
     #Otherwise look at the combo filter, its its false return that
@@ -59,8 +58,10 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
 
     fin =  bool(outr) and outa
 
-    #if not fin:
-    log.msg(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin} |\t{combos_in} in {solver_inst.combos} | {parm_name} in {slv_vars}| {extra_kw}')
+    if not fin:
+        log.debug(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
+    elif fin:
+        log.debug(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos} {extra_kw}')
     return fin 
 
 #The KW Defaults for Solver
@@ -87,6 +88,7 @@ class SolverMixin(SolveableMixin):
     def solver_parameters(self,**kwargs):
         """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations"""
         from engforge.solver import combo_filter
+        #TODO: group solver parameters (group_solver_refs())
         return self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs)
     
 
@@ -101,7 +103,7 @@ class SolverMixin(SolveableMixin):
     def run(self, *args, **kwargs):
         """the steady state run method for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
 
-        self._iterate_input_matrix(self._run, *args, **kwargs)
+        self._iterate_input_matrix(self._run, extra_kw_dflt=_slv_dflt_kwdict,*args, **kwargs)
 
     def _run(self, refs, icur, eval_kw=None, sys_kw=None, *args, **kwargs):
         """the steady state run method for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
@@ -109,7 +111,7 @@ class SolverMixin(SolveableMixin):
         # TODO: what to do with eval / sys kw
         # TODO: option to preserve state
         Ref.refset_input(refs, icur)
-        self.info(f"running with {icur}|{kwargs}")
+        self.debug(f"running with {icur}|{kwargs}")
         self.run_method(*args, **kwargs)
         self.debug(f"{icur} run time: {self._run_time}")
 
@@ -144,7 +146,7 @@ class SolverMixin(SolveableMixin):
 
         # System Solver Loop
         for key, comp in self.internal_systems().items():
-            if hasattr(comp,'solver_override') and comp.solver_override:
+            if hasattr(comp,'_solver_override') and comp._solver_override:
                 if sys_kw and key in sys_kw:
                     sys_kw_comp = sys_kw[key]
                 else:
@@ -164,9 +166,16 @@ class SolverMixin(SolveableMixin):
         """
 
         if self.log_level < 20:
-            self.debug(f"running with X: {self.X} & args:{args} kw:{kw}")
+            self.debug(f"running with args:{args} kw:{kw}")
 
         # 0. run pre execute (signals=pre,both)
+        #TODO: add execution context with **kwargument for the signals. 
+        #PROB: this signals should correspond to the problem, done in execute, however we dont know what the problem will be yet. 
+        #TODO: parse signals here (through a new Signals.parse_rtkwargs(**kw)) which will non destructively parse the signals and return all the signal candiates which are put into an ExecutionContext object that resets the signals after the run depending on the revert behavior
+        #TODO: the execute method will recieve this ExecutionContext object where it can update the solver references / signals so that it can handle them per the signals api
+        #TODO: with self.execution_context(**kwargs) as ctx_exe: 
+            #self.execute(ctx_exe,**kwargs) 
+        #signals will be reset after the execute per the api
         self.pre_execute()
 
         # prep index
@@ -184,7 +193,7 @@ class SolverMixin(SolveableMixin):
         self.update_flow(eval_kw,sys_kw,*args,**kw)
 
         # Save The Data
-        self.save_data(index=self.index)
+        self.save_data(index=self.index,subforce=True,save_internal=True)
 
         if cb:
             cb(self, eval_kw, sys_kw, *args, **kw)
@@ -257,11 +266,14 @@ class SolverMixin(SolveableMixin):
             :param add_var: a csv str or variables to include, including wildcards. the default means all combos will be run unless ign_combos or only combos alters behavior. The initial selection of combos is made by matching any case with the full name of the combo, or a parial name with a wildcard(s) in the combo name Ignore and only combos will further filter the selection. Wildcards / queries per fnmatch
             :param ign_var: a list of combo parameters to ignore.
             :param only_var: a list of combo parameters to include exclusively.            
-            :param add_obj: a flag to add the objective to the system constraints, by default will add the objective to the system constraints. If False the objective will be the only constraint.        
-
+            :param add_obj: a flag to add the objective to the system constraints, by default will add the objective to the system constraints. If False the objective will be the only constraint.
+            :param only_active: default True, will only look at active variables objectives and constraints
+            :param activate: default None, a list of solver parameters to activate
+            :param deactivate: default None, a list of solver parameters to deactivate (if not activated above)
             """
             from engforge.attr_solver import Solver
 
+            #TODO: move parsing to execution_context!!!! this allows plug-play functionality
             #change references
             #Extract Extra Kws for our default solver
             extra_kw = self._rmv_extra_kws(kw,_slv_dflt_kwdict)
@@ -344,7 +356,9 @@ class SolverMixin(SolveableMixin):
                 opts = {}
 
             #to your liking sir
-            opts.update(kw)
+            opts.update(kw) #your custom args!
+            #TODO: warning for kw/opts conflicts
+            #opts.update(**extra_kw) #Add the solver args (should kw override?)
             opts.update(**constraints) #constraints override kw per api spec 
             #TODO: allow kw to override constraints with add/rmv above
 

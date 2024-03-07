@@ -54,7 +54,7 @@ class SolverInstance(AttributeInstance):
 
     def __init__(self, solver: "SOLVER", system: "System",**kw) -> None:
         """kwargs passed to compile"""
-        self.solver = solver
+        self.class_attr = self.solver = solver
         self.system = system
         self.compile(**kw)
 
@@ -176,14 +176,7 @@ class SolverInstance(AttributeInstance):
                 out['ineq'] =  self.const_f
         
         return out
-    
-    def is_active(self,value=True) -> bool:
-        if hasattr(self,'_active'):
-            return self._active
-        elif hasattr(self.solver,'active'):
-            return self.solver.active
-        #the default
-        return value
+
             
             
 
@@ -205,13 +198,7 @@ class Solver(ATTR_BASE):
 
     define = None
 
-    @classmethod
-    def process_combos(cls, combos):
-        if isinstance(combos, str):
-            return combos.split(",")
-        elif isinstance(combos, list):
-            return combos
-        
+
     @classmethod
     def configure_for_system(cls, name, config_class, cb=None, **kwargs):
         """add the config class, and perform checks with `class_validate)
@@ -222,6 +209,7 @@ class Solver(ATTR_BASE):
 
         #change name of constraint  parm if 
         if cls.slvtype == "var":
+            #provide defaults ot constraints, and update combo_parm with attribut name
             for const in cls.constraints:
                 if 'combo_parm' in const and const['combo_parm'] == pre_name:
                     const['combo_parm'] = name #update me
@@ -244,6 +232,7 @@ class Solver(ATTR_BASE):
         # Create A New Signals Class
         active = kwargs.get("active", True)
         combos = kwargs.get("combos", var)
+
         new_name = f"SOLVER_var_{var}".replace(".", "_")
         bkw = {"parm": var, "value": None}
         constraints = [{"type": "min", **bkw}, {"type": "max", **bkw}]

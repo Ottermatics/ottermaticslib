@@ -81,13 +81,13 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
             saved.add(self)
 
         # TODO: move to slots structure
-        if save_internal:
+        if save_internal or subforce:
             for config in self.internal_components().values():
                 if config is None:
                     continue
                 if config not in saved:
                     self.debug(f"saving {config.identity}")
-                    config.save_data(index, saved=saved, force=subforce)
+                    config.save_data(index, saved=saved, force=subforce,save_internal=save_internal)
                 else:
                     self.debug(f"skipping saved config {config.identity}")
 
@@ -165,7 +165,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     @property
     def data_dict(self):
         """this is what is captured and used in each row of the dataframe / table"""
-
+        #NOTE: Solver class overrides this with full system references
         out = collections.OrderedDict()
         sref = self.internal_references()
         for k, v in sref["attributes"].items():
@@ -334,7 +334,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
 
         for mrv in mrvs:
             # Remove anything not in the user code
-            log.debug(f"adding system properties from {mrv.__name__}")
+            log.msg(f"adding system properties from {mrv.__name__}")
             if (
                 issubclass(mrv, TabulationMixin)
                 # and "engforge" not in mrv.__module__
@@ -347,7 +347,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
                         prop = getattr(cls, k, None)
                         if prop and isinstance(prop, system_property):
                             __system_properties[k] = prop
-                            log.debug(
+                            log.msg(
                                 f"adding system property {mrv.__name__}.{k}"
                             )
 
