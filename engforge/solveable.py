@@ -121,8 +121,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 comp.post_update_internal(eval_kw=eval_kw_comp, ignore=ignore)
         ignore.add(self)
 
-    def gather_update_refs(self,eval_kw=None,ignore=None,*args,**kw):
+    def gather_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
+        #TODO: add to solver contexts
         updt_refs = {}
         from engforge.components import Component
         from engforge.component_collections import ComponentIter
@@ -146,8 +147,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             else:
                 eval_kw_comp = {}
 
+            #Add if its a unique update method (not the passthrough)
             if comp.__class__.update != SolveableMixin.update:
-                f = lambda : comp.update(comp.parent, *args, **kw)
+                f = lambda *args,**kw: comp.update(comp.parent, *args, **kw)
                 f.__name__ = f'{comp.name}_update'
                 ref = Ref(comp,f)
                 updt_refs[key] =  ref
@@ -155,7 +157,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         ignore.add(self)
         return updt_refs
 
-    def gather_post_update_refs(self,eval_kw=None,ignore=None,*args,**kw):
+    def gather_post_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
         updt_refs = {}
         from engforge.components import Component
@@ -179,12 +181,13 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 eval_kw_comp = eval_kw[key]
             else:
                 eval_kw_comp = {}
-
+            #Add if its a unique update method (not the passthrough)
             if comp.__class__.post_update != SolveableMixin.post_update:
-                f = lambda : comp.update(comp.parent, *args, **kw)
+                f = lambda *args, **kw: comp.update(comp.parent, *args, **kw)
                 f.__name__ = f'{comp.name}_post_update'
                 ref = Ref(comp,f)
-                updt_refs[key] =  ref                
+                updt_refs[key] =  ref
+
         ignore.add(self)
         return updt_refs
 
@@ -317,55 +320,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return out
 
     # Run & Input
-    # General method to distribute input to internal components
-    def _parse_default(self,key,defaults,input_dict):
-        """splits strings or lists and returns a list of options for the key, if nothing found returns None if fail set to True raises an exception, otherwise returns the default value"""
-        if key in input_dict:
-            #kwargs will no longer have key!
-            option = input_dict.pop(key)
-            #print(f'removing option {key} {option}')
-            if option is None:
-                return option,False
-            elif isinstance(option,(int,float,bool)):
-                return option,False
-            elif isinstance(option,str):
-                if not option:
-                    return None,False
-                option = option.split(',')
-            else:
-                if input_dict.get('_fail',True):
-                    assert isinstance(option,list),f"str or list combos: {option}"
-                    #this is OK!
-                else:
-                    self.warning(f'bad option {option} for {key}| {input_dict}')
-                    
-            return option,False
-        elif key in defaults:
-            return defaults[key],True
-        elif input_dict.get('_fail',True):
-            raise Exception(f'no option for {key}')
-        return None,None
-        
-
-    def _rmv_extra_kws(self,kwargs,_check_keys:dict,_fail=True):
-        """extracts the combo input from the kwargs"""
-        # extract combo input
-        if not _check_keys:
-            return {}
-        _check_keys = _check_keys.copy()
-        #TODO: allow extended check_keys / defaults to be passed in, now every value in check_keys has a default
-        cur_in = kwargs
-        cur_in['_fail'] = _fail
-        combos = {}
-        for p,dflt in _check_keys.items():
-            val,is_dflt = self._parse_default(p,_check_keys,cur_in)
-            combos[p] = val
-            cur_in.pop(p,None)
-
-        comboos = dict(list(filter(lambda kv: kv[1] is not None or kv[0] in _check_keys, combos.items())))
-        #print(f'got {combos} -> {comboos} from {kwargs} with {_check_keys}')
-        return combos
-
     def _iterate_input_matrix(
         self,
         method,
@@ -377,7 +331,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         force_solve=False,
         return_results=False,
         method_kw: dict = None,
-        extra_kw_dflt: dict = None,
         **kwargs,
     ):
         """applies a permutation of input parameters for parameters. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist.
@@ -400,10 +353,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
 
-        # Recache system references
-        if isinstance(self, System):
-            self.system_references(recache=True)
-
         # create iterable null for sequence
         if sequence is None or not sequence:
             sequence = [{}]
@@ -418,8 +367,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         # RUN when not solved, or anything changed, or arguments or if forced
         if force_solve or not self.solved or self.anything_changed or kwargs:
-            _input,extra_kw = self.parse_run_kwargs(extra_kw_dflt=extra_kw_dflt,**kwargs)
-            method_kw.update(extra_kw)
+            _input = self.parse_run_kwargs(**kwargs)
 
             output = {}
             inputs = {}
@@ -452,12 +400,13 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                     cur = {k: v for k, v in zip(keys, parms)}
                     # Iterate over Sequence (or run once)
                     for seq in sequence:
-                        # apply sequenc evalues
+                        #apply sequence values
                         icur = cur.copy()
                         if seq:
                             icur.update(**seq)
 
                         # Run The Method with inputs provisioned
+                        #TODO: wrap with ProblemExec 
                         out = method(
                             refs, icur, eval_kw, sys_kw, cb=cb, **method_kw
                         )
@@ -521,20 +470,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         return _trans_opts
 
-    def parse_run_kwargs(self, extra_kw_dflt=None, **kwargs):
+    def parse_run_kwargs(self, **kwargs):
         """ensures correct input for simulation.
         :returns: first set of input for initalization, and all input dictionaries as tuple.
 
         """
-
-        # use eval_kw and sys_kw to handle slot argument and sub-system arguments. use gather_kw to gather extra parameters adhoc.
-
-        if extra_kw_dflt:
-            #remove and return the extra_kw items separately
-            extra_kw = self._rmv_extra_kws(kwargs,extra_kw_dflt)
-        else:
-            extra_kw = {}
-
         # Validate OTher Arguments By Parameter Or Comp-Recursive
         parm_args = {k: v for k, v in kwargs.items() if "." not in k}
         comp_args = {k: v for k, v in kwargs.items() if "." in k}
@@ -583,7 +523,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             else:
                 _input[k].extend(v)
 
-        return _input,extra_kw
+        return _input
 
     # REFERENCE FUNCTIONS
     # Location Funcitons
@@ -793,7 +733,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         
                         #Perform the check
                         if check_atr_f and not check_atr_f(pre,scope_name,val_type,check_kw):
-                            conf.debug(f'skip {scope_name} {k} {pre} {val}')
+                            if conf.log_level <= 5:
+                                conf.msg(f'chk skip {scope_name} {k} {pre} {val}')
                             if pre not in skipped:
                                 skipped[pre] = []
 
@@ -880,14 +821,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             dynamics['dynamics.rate'].update(scope(conf.dXtdt_ref))
 
         return dynamics
-    
-    def group_solver_refs(self,sys_refs):
-        """collects the integrator references from `collect_solver_refs` output"""
-        dynamics_state = sys_refs.get("dynamics.state",{})
-        dynamics_inpt = sys_refs.get("dynamics.input",{})
-        dynamics_rate = sys_refs.get("dynamics.input",{})
-        dynamics_out = sys_refs.get("dynamics.output",{})
-        #TODO: finish me! add time and parameter grouping
 
 
     def get_system_input_refs(

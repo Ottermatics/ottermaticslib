@@ -25,8 +25,8 @@ def refset_input(refs, delta_dict):
         refs[k].set_value(v)
 
 
-def refset_get(refs):
-    return {k: refs[k].value() for k in refs}
+def refset_get(refs,*args,**kw):
+    return {k: refs[k].value(*args,**kw) for k in refs}
 
 
 def f_root(ResRef: collections.OrderedDict, norm: dict = None):
@@ -87,6 +87,7 @@ def maybe_attr_inst(can,astype=None):
 
 #Important State Preservation
 #TODO: check for hidden X dependents / circular references ect.
+#TODO: move to execution context
 @contextmanager
 def revert_X(system, refs, Xnext=None, pre_exec=True, post_exec=False):
     """
@@ -117,10 +118,6 @@ def revert_X(system, refs, Xnext=None, pre_exec=True, post_exec=False):
             system.pre_execute()
         if post_exec:
             system.pre_execute()
-
-
-
-
 
 
 #TODO: make global storage for Ref's based on the comp,key pair. This 
@@ -196,7 +193,7 @@ class Ref:
     def value(self,*args,**kw):
 
         if self.comp and self.comp.log_level < 5:
-            self.comp.debug(f"REF[get] {self.comp} {self.key}")
+            self.comp.msg(f"REF[get] {self.comp} {self.key}")
 
         if self.key_override:
             return self.key(*args,**kw)
@@ -211,8 +208,8 @@ class Ref:
             o = self.eval_f(o)
         self._last = o
 
-        if self.comp and self.comp.log_level < 10:
-            self.comp.debug(f"REF[get] {self.comp} {self.key} | got: {o}")
+        if self.comp and self.comp.log_level < 5:
+            self.comp.msg(f"REF[get] {self.comp} {self.key} | got: {o}")
 
         return o
 

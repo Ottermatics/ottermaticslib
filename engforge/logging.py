@@ -18,7 +18,7 @@ global LOG_LEVEL
 LOG_LEVEL = logging.INFO
 
 
-def change_all_log_levels(new_log_level: int, check_function=None):
+def change_all_log_levels(inst,new_log_level: int, check_function=None):
     """Changes All Log Levels With pyee broadcast before reactor is running
     :param new_log_level: int - changes unit level log level (10-msg,20-debug,30-info,40-warning,50-error,60-crit)
     :param check_function: callable -> bool - (optional) if provided if check_function(unit) is true then the new_log_level is applied
@@ -39,6 +39,7 @@ def change_all_log_levels(new_log_level: int, check_function=None):
     log.info(f"Changing All Logging Units To Level {new_log_level}")
     log_change_emitter.emit("change_level", new_log_level, check_function)
     LoggingMixin.log_level = new_log_level
+    inst.log_level = new_log_level
 
 
 class LoggingMixin(logging.Filter):
@@ -54,7 +55,7 @@ class LoggingMixin(logging.Filter):
     slack_webhook_url = None
     # log_silo = False
 
-    change_all_log_lvl = lambda s, *a, **kw: change_all_log_levels(*a, **kw)
+    change_all_log_lvl = lambda s, *a, **kw: change_all_log_levels(s,*a, **kw)
 
     @property
     def logger(self):
@@ -75,29 +76,21 @@ class LoggingMixin(logging.Filter):
                 # Do this on the fly since we SecretVariable is a log component
                 LoggingMixin.slack_webhook_url = SLACK_WEBHOOK
 
-            # if LoggingMixin.log_errors is None:
-            #     # Do this on the fly since we SecretVariable is a log component
-            #     LoggingMixin.log_errors = SecretVariable(
-            #         "CLOUD_SYNC_LOG_ERRORS",
-            #         default=True,
-            #         obscure=False,
-            #         type_conv=parse_bool,
-            #     )
+        if not hasattr(self, "_f_change_log"):
 
-            if not hasattr(self, "_f_change_log"):
+            def _change_log(new_level, check_function=None):
+                if new_level != self.log_level:
+                    if check_function is None or check_function(self):
+                        msg = f"changing {self.identity} log level: {self.log_level} -> {new_level}"
+                        self.__class__.log_level = new_level
+                        self.info(msg)
+                        self._log.setLevel(new_level)
+                        self.log_level=new_level
+                        self.resetLog()
 
-                def _change_log(new_level, check_function=None):
-                    if new_level != self.log_level:
-                        if check_function is None or check_function(self):
-                            msg = f"changing {self.identity} log level: {self.log_level} -> {new_level}"
-                            self.__class__.log_level = new_level
-                            self.info(msg)
-                            self._log.setLevel(new_level)
-                            self.resetLog()
+            log_change_emitter.add_listener("change_level", _change_log)
 
-                log_change_emitter.add_listener("change_level", _change_log)
-
-                self._f_change_log = _change_log
+            self._f_change_log = _change_log
 
         return self._log
 

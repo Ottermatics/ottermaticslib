@@ -35,8 +35,8 @@ class SignalInstance(AttributeInstance):
     def apply(self):
         """sets `target` from `source`"""
         val = self.source.value()
-        if self.system.log_level < 15:
-            self.system.info(
+        if self.system.log_level < 10:
+            self.system.msg(
                 f"SIGNAL|applying {self.source}|{val} to {self.target}"
             )
         self.target.set_value(val)
@@ -49,6 +49,7 @@ class SignalInstance(AttributeInstance):
         return dict(
             target=self.target,
             source=self.source,
+            signal=self,
         )
     
     def get_alias(self,path):

@@ -17,6 +17,7 @@ from engforge import properties as prop
 from engforge.attributes import ATTR_BASE
 from engforge.properties import instance_cached, solver_cached
 from engforge.system_reference import Ref
+from engforge.problem_context import ProblemExec
 from engforge.solveable import (
     SolveableMixin,
     refmin_solve,
@@ -473,14 +474,7 @@ class GlobalDynamics(DynamicsMixin):
 
     def sim_matrix(self, eval_kw=None, sys_kw=None, *args, **kwargs):
         """simulate the system over the course of time.
-
-        Args:
-            dt (float): time step
-            endtime (float): end time
-            #TODO: subsystems (bool, optional): simulate subsystems. Defaults to True.
-
-        Returns:
-            dataframe: tabulated data
+        return a dictionary of dataframes
         """
         tr_opts = self.parse_simulation_input(**kwargs)
         from engforge.solver import SolveableMixin
@@ -516,38 +510,39 @@ class GlobalDynamics(DynamicsMixin):
         min_kw=None,
         run_solver=True,
         return_system=False,
+        **kwargs,
     ) -> pandas.DataFrame:
         """runs a simulation over the course of time, and returns a dataframe of the results.
 
         A copy of this system is made, and the simulation is run on the copy, so as to not affect the state of the original system.
         """
-        min_kw_dflt = {
-            "method": "SLSQP",
-            "doset": True,
-            "reset": False,
-            "fail": True,
-        }
-        #'tol':1e-6,'options':{'maxiter':100}}
-        # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
-        if min_kw is None:
-            min_kw = min_kw_dflt
-        else:
-            min_kw_dflt.update(min_kw)
-        mkw = min_kw_dflt
+        # min_kw_dflt = {
+        #     "method": "SLSQP",
+        #     "doset": True,
+        #     "reset": False,
+        #     "fail": True,
+        # }
+        # #'tol':1e-6,'options':{'maxiter':100}}
+        # # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
+        # if min_kw is None:
+        #     min_kw = min_kw_dflt
+        # else:
+        #     min_kw_dflt.update(min_kw)
+        # mkw = min_kw_dflt
 
         # Data Storage {time: data}
         data = {}  # output storage
-        solver = expiringdict.ExpiringDict(100, 600)  # temp solver storage
-        Time = np.arange(0, endtime + dt, dt)
+        # solver = expiringdict.ExpiringDict(100, 600)  # temp solver storage
+        # Time = np.arange(0, endtime + dt, dt)
 
         # loop through components and do this (part of global)
         # Orchestrate The Simulation
-        system = self.copy_config_at_state()
-        system.create_state_matrix()
-        #system.comp.create_state_matrix() #TODO: recursively initalize transient components
-        refs = system.collect_solver_refs()
-        intl_refs = refs["tr_states"]
-        out_refs = refs["tr_output"]
+        # system = self.copy_config_at_state()
+        # system.create_state_matrix()
+        # #system.comp.create_state_matrix() #TODO: recursively initalize transient components
+        # refs = system.collect_solver_refs()
+        # intl_refs = refs["tr_states"]
+        # out_refs = refs["tr_output"]
 
         # Initial State
         # Create X & Index For Transient Variables
@@ -562,56 +557,57 @@ class GlobalDynamics(DynamicsMixin):
 
         data = {}
 
-        # time loop (remove)
-        # for t in Time:
-        def sim_iter(t, x, *args):
-            out = {p: np.nan for p in intl_refs}
+        #Time Iteration Context
+        with ProblemExec(self,level='',**kwargs) as pbx:
+            def sim_iter(t, x, *args):
+                out = {p: np.nan for p in intl_refs}
 
-            # set state to match x
-            for i, (k, v) in enumerate(intl_refs.items()):
-                v.set_value(x[i])
+                # set state to match x
+                for i, (k, v) in enumerate(intl_refs.items()):
+                    v.set_value(x[i])
 
-            # solver always gets a copy of x
-            solver[t] = x
+                # solver always gets a copy of x
+                solver[t] = x
 
-            # test for record time
-            if not data or t > max(data) + dt:
-                data[t] = system.data_dict_tm(t)
+                # test for record time
+                if not data or t > max(data) + dt:
+                    data[t] = system.data_dict_tm(t)
 
-            # pre signals
-            # TODO: custom transient signals
-            for sig, sdict in refs["signals"].items():
-                if sdict["mode"] in ["pre", "both"]:
-                    sdict["target"].set_value(sdict["source"].value())
+                # pre signals
+                # TODO: custom transient signals
+                # for sig, sdict in refs["signals"].items():
+                #     if sdict["mode"] in ["pre", "both"]:
+                #         sdict["target"].set_value(sdict["source"].value())
 
-            # ad hoc time integration
-            for parm, trdct in refs["tr_sets"].items():
-                out[parm] = trdct["dpdt"].value()
+                # ad hoc time integration
+                for parm, trdct in refs["tr_sets"].items():
+                    out[parm] = trdct["dpdt"].value()
 
-            # dynamics
-            for compnm, compdict in refs["dyn_comp"].items():
-                comp = compdict["comp"]
-                Xds = np.array([r.value() for r in comp.Xt_ref.values()])
-                Uds = np.array([r.value() for r in comp.Ut_ref.values()])
-                # time updated in step
-                dxdt = comp.step(t, dt, Xds, Uds, True)
+                # dynamics
+                for compnm, compdict in refs["dyn_comp"].items():
+                    comp = compdict["comp"]
+                    Xds = np.array([r.value() for r in comp.Xt_ref.values()])
+                    Uds = np.array([r.value() for r in comp.Ut_ref.values()])
+                    # time updated in step
+                    dxdt = comp.step(t, dt, Xds, Uds, True)
 
-                for i, (p, ref) in enumerate(comp.Xt_ref.items()):
-                    out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
+                    for i, (p, ref) in enumerate(comp.Xt_ref.items()):
+                        out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
 
-            # solvers
-            if run_solver:
-                # TODO: add in any transient
-                refmin_solve(self, refs["solver_vars"], refs["solver_cons"], **mkw)
+                # solvers
+                if run_solver:
+                    # TODO: add in any transient
+                    refmin_solve(self, refs["solver_vars"], refs["solver_cons"], **mkw)
 
-            # last signals
-            for sig, sdict in refs["signals"].items():
-                if sdict["mode"] in ["post", "both"]:
-                    sdict["target"].set_value(sdict["source"].value())
+                # # last signals
+                # for sig, sdict in refs["signals"].items():
+                #     if sdict["mode"] in ["post", "both"]:
+                #         sdict["target"].set_value(sdict["source"].value())
 
-            return np.array([out[p] for p in intl_refs])
+                return np.array([out[p] for p in intl_refs])
 
-        ans = solve_ivp(sim_iter, [0, endtime], X0, method="RK45", t_eval=Time)
+        
+            ans = solve_ivp(sim_iter, [0, endtime], X0, method="RK45", t_eval=Time)
 
         # convert to list with time
         data = [{"time": k, **v} for k, v in data.items()]

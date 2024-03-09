@@ -48,6 +48,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     _always_save_data = False
 
     # Data Tabulation - Intelligent Lookups
+    #TODO: 
     def save_data(
         self,
         index=None,
@@ -80,7 +81,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
             self.debug("saving data {}".format(self.index))
             saved.add(self)
 
-        # TODO: move to slots structure
+        #gather sub items as well!
         if save_internal or subforce:
             for config in self.internal_components().values():
                 if config is None:

@@ -21,6 +21,7 @@ import inspect
 
 SOLVER_OPTIONS = ["minimize"]#"root", "global", 
 from engforge.solver_utils import *
+from engforge.problem_context import *
 
 class SolverLog(LoggingMixin):
     pass
@@ -42,7 +43,7 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
         outa  =  filt_active(parm_name,solver_inst,extra_kw=extra_kw,dflt=False)
         #log.info(f'only active: {outa}| {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
         if not outa:
-            log.debug(f'filt not active: {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
+            log.msg(f'filt not active: {parm_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
             return False
 
     #Otherwise look at the combo filter, its its false return that
@@ -59,14 +60,10 @@ def combo_filter(attr_name,parm_name, solver_inst, extra_kw,combos=None)->bool:
     fin =  bool(outr) and outa
 
     if not fin:
-        log.debug(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
+        log.msg(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
     elif fin:
-        log.debug(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos} {extra_kw}')
+        log.msg(f'filter: {parm_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos} {extra_kw}')
     return fin 
-
-#The KW Defaults for Solver
-_slv_dflt_kwdict = dict(combos='*',ign_combos=None,only_combos=None,add_obj=True,_fail=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None)
-#TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 
 # add to any SolvableMixin to allow solver use from its namespace
 class SolverMixin(SolveableMixin):
@@ -78,13 +75,32 @@ class SolverMixin(SolveableMixin):
     custom_solver = False
     solver_option = "minimize" #or root #TODO: implement equality solver as root
 
-    convergence_threshold = 100 #changer per problem
-
     # Configuration Information
     @property
     def solved(self):
         return self._solved
     
+    # Replaces Tabulation Method
+    @solver_cached
+    def data_dict(self):
+        """records properties from the entire system, via system references cache"""
+        out = collections.OrderedDict()
+        sref = self.system_references()
+        for k, v in sref["attributes"].items():
+            val = v.value()
+            if isinstance(val, TABLE_TYPES):
+                out[k] = val
+            else:
+                out[k] = numpy.nan
+        for k, v in sref["properties"].items():
+            val = v.value()
+            if isinstance(val, TABLE_TYPES):
+                out[k] = val
+            else:
+                out[k] = numpy.nan
+        return out    
+    
+    #Official Solver Interface
     def solver_parameters(self,**kwargs):
         """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations"""
         from engforge.solver import combo_filter
@@ -101,9 +117,10 @@ class SolverMixin(SolveableMixin):
         pass
 
     def run(self, *args, **kwargs):
-        """the steady state run method for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
+        """the steady state run metsolverhod for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
 
-        self._iterate_input_matrix(self._run, extra_kw_dflt=_slv_dflt_kwdict,*args, **kwargs)
+        with ProblemExec(self,kwargs) as prb_ctx:
+            self._iterate_input_matrix(self._run,*args, **kwargs)
 
     def _run(self, refs, icur, eval_kw=None, sys_kw=None, *args, **kwargs):
         """the steady state run method for the system. It will run the system with the input parameters and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
@@ -121,6 +138,7 @@ class SolverMixin(SolveableMixin):
         from engforge.system import System
 
         # Transeint
+        #TODO: move to problem context!!! add plug-play functionality
         self._run_start = datetime.datetime.now()
         if isinstance(self, System):
             self.system_references(
@@ -168,78 +186,43 @@ class SolverMixin(SolveableMixin):
         if self.log_level < 20:
             self.debug(f"running with args:{args} kw:{kw}")
 
+
         # 0. run pre execute (signals=pre,both)
         #TODO: add execution context with **kwargument for the signals. 
         #PROB: this signals should correspond to the problem, done in execute, however we dont know what the problem will be yet. 
-        #TODO: parse signals here (through a new Signals.parse_rtkwargs(**kw)) which will non destructively parse the signals and return all the signal candiates which are put into an ExecutionContext object that resets the signals after the run depending on the revert behavior
-        #TODO: the execute method will recieve this ExecutionContext object where it can update the solver references / signals so that it can handle them per the signals api
+        #TODO: parse signals here (through a new Signals.parse_rtkwargs(**kw)) which will non destructively parse the signals and return all the signal candiates which are put into an ProblemExec object that resets the signals after the run depending on the revert behavior
+        #TODO: the execute method will recieve this ProblemExec object where it can update the solver references / signals so that it can handle them per the signals api
         #TODO: with self.execution_context(**kwargs) as ctx_exe: 
-            #self.execute(ctx_exe,**kwargs) 
-        #signals will be reset after the execute per the api
-        self.pre_execute()
-
-        # prep index
-        self.index += 1
-
-        # 1.Runs The Solver
-        try:
+            #1. pre-update / signals
+            #<FLEXIBLE_Exec>#self.execute(ctx_exe,**kwargs) 
+            #2. post-update / signals
+            #signals will be reset after the execute per the api
+        
+        #TODO: add x new context manager for the problem execution context
+        with ProblemExec(self,kw,level_name='eval',**kw) as prb_ctx:
+            #FIXME: change the eval_kw / sys_kw 
+            prb_ctx.pre_execute(*args,**kw)
+            self.index += 1
             out = self.execute(*args, **kw)
-        except Exception as e:
-            self.error(e, f"solver failed")
-            out = None
-            raise e
+            prb_ctx.post_execute(*args,**kw)
+            self.save_data(index=self.index)
 
-        #Update
-        self.update_flow(eval_kw,sys_kw,*args,**kw)
-
-        # Save The Data
-        self.save_data(index=self.index,subforce=True,save_internal=True)
+            #TODO: define exit behavior for the problem context
+            prb_ctx.exit_to_level(level='eval',revert=False)
 
         if cb:
             cb(self, eval_kw, sys_kw, *args, **kw)
 
         return out
-    
-    def update_flow(self,eval_kw,sys_kw,*args,**kw):
-        # 2. Update Internal Elements
-        self.update_internal(eval_kw=eval_kw, *args, **kw)
 
-        # run components and systems recursively
-        self.run_internal_systems(sys_kw=sys_kw)
-
-        # Post Execute (signals=post,both)
-        self.post_execute()
-
-        # Post Update Each Internal System
-        self.post_update_internal(eval_kw=eval_kw, *args, **kw)        
-
-
-    def pre_execute(self):
-        """runs the solver of the system"""
-        if self.log_level <= 10:
-            self.msg(f"pre execute")
-
-        # TODO: set system fields
-        for signame, sig in self.signals.items():
-            if sig.mode == "pre" or sig.mode == "both":
-                sig.apply()
-
-    def post_execute(self):
-        """runs the solver of the system"""
-        if self.log_level <= 10:
-            self.msg(f"post execute")
-
-        for signame, sig in self.signals.items():
-            if sig.mode == "post" or sig.mode == "both":
-                sig.apply()
-
-    def execute(self, *args, **kw):
+    def execute(self,*args, **kw):
         """Solves the system's system of constraints and integrates transients if any exist
 
         Override this function for custom solving functions, and call `solver` to use default solver functionality.
 
         :returns: the result of this function is returned from eval()
         """
+        #TODO: pass to execution context!!!!
         # steady state
         dflt = dict(obj=None, cons=True, X0=None, dXdt=0)
         dflt.update(kw)
@@ -271,51 +254,8 @@ class SolverMixin(SolveableMixin):
             :param activate: default None, a list of solver parameters to activate
             :param deactivate: default None, a list of solver parameters to deactivate (if not activated above)
             """
-            from engforge.attr_solver import Solver
 
-            #TODO: move parsing to execution_context!!!! this allows plug-play functionality
-            #change references
-            #Extract Extra Kws for our default solver
-            extra_kw = self._rmv_extra_kws(kw,_slv_dflt_kwdict)
-            add_obj = extra_kw.pop("add_obj", True)
-
-            #TODO: Apply filter to solver attributes
-            info = self.collect_solver_refs(check_atr_f=combo_filter,check_kw=extra_kw)
-            updts = self.gather_update_refs()
-            comps = info.get('comps',{})
-            attrx = info.get('attrs',{})
-            #print(info)
-
-            #Collect Solver States
-            Xref = sys_solver_variables(self,info,extra_kw=extra_kw,as_flat=True)
-            if len(Xref) == 0:
-                raise ValueError(f"no variables found for solver: {extra_kw}")
-            
-            Eqref = attrx.get("solver.eq",{})
-            InEqref = attrx.get("solver.ineq",{})
-            Yref = sys_solver_objectives(self,info,Xref,combo_kw=extra_kw)
-
-            #Dynamic References
-            #Time Integration
-            #TODO: check parameter conflicts            
-            #TODO: time solver integration
-            Pref = attrx.get("time.parm",{})
-            Dref = attrx.get("time.rate",{})
-            Xdref = attrx.get("dynamics.state",{})
-            dXdRefDt = attrx.get("dynamics.rate",{}) 
-
-            # get the solver configuration
-            has_constraints = True if len(Eqref) + len(InEqref) > 0 else False
-
-            solve_mode = self.solver_option
-            if "solver_option" in kw and kw["solver_option"] in SOLVER_OPTIONS:
-                solve_mode = kw["solver_option"]
-            elif "solver_option" in kw:
-                raise ValueError(f"invalid solver option: {kw['solver_option']}")
-
-            #enhance objective with obj_add for argmin(X)|(1+add_obj)*obj
-
-            # Dynamics Configuration
+            #TODO: move rate to problem context!!!
             if dXdt is not None and dXdt is not False:
                 if dXdt == 0:
                     pass
@@ -326,174 +266,218 @@ class SolverMixin(SolveableMixin):
                     assert isinstance(dXdt, dict), f"not dict for dXdt: {dXdt}"
                     raise NotImplementedError(
                         f"dynamic integration not yet implemented for dictionary based input: {dXdt}"
-                    )  # TODO:
-            else:
-                # nope!
-                Ytr = {}
-                Xtr = {}
+                    )  
+
+            output = {
+                "obj": obj,
+                "add_obj": True,
+            }
+
+            #Minimizer Args (#TODO: move to problem context!!!)
+            opts = {"tol": 1e-6, "method": "SLSQP"}
+            #to your liking sir
+            opts.update(kw) #your custom args!
+                   
+            #TODO: warning for kw/opts conflicts
+            #TODO: handle objective / constraints addition in problem execution context
+
+            self.warning(f'starting solver: {opts}')
+            with ProblemExec(self,opts) as prb_ctx:
+                #self.info(f'prob: {prb_ctx.sys_refs}')
+                Xref = prb_ctx.Xref
+                Yref = prb_ctx.Yref
+
+                opts.update(**prb_ctx.constraints)
+                output['prb_ctx'] = prb_ctx
+                
+                out = prb_ctx.solve_min(Xref,Yref,output=output, **opts)
+                #self.info(f"solver output: {out}")
+                return out
+
+
+
+
+
+
+
+
+    
+#     def update_flow(self,eval_kw,sys_kw,*args,**kw):
+#         #TODO: move this to problem context!!! add plug-play functionality
+#         # 2. Update Internal Elements
+#         self.update_internal(eval_kw=eval_kw, *args, **kw)
+# 
+#         # run components and systems recursively
+#         self.run_internal_systems(sys_kw=sys_kw)
+# 
+#         # Post Execute (signals=post,both)
+#         self.post_execute()
+# 
+#         # Post Update Each Internal System
+#         self.post_update_internal(eval_kw=eval_kw, *args, **kw)        
+
+
+#     def pre_execute(self):
+#         #TODO: move this to problem context!!! add plug-play functionality
+#         """runs the solver of the system"""
+#         if self.log_level <= 10:
+#             self.msg(f"pre execute")
+# 
+#         # TODO: set system fields
+#         for signame, sig in self.signals.items():
+#             if sig.mode == "pre" or sig.mode == "both":
+#                 sig.apply()
+# 
+#     def post_execute(self):
+#         #TODO: move this to problem context!!! add plug-play functionality
+#         """runs the solver of the system"""
+#         if self.log_level <= 10:
+#             self.msg(f"post execute")
+# 
+#         for signame, sig in self.signals.items():
+#             if sig.mode == "post" or sig.mode == "both":
+#                 sig.apply()
+
+
+
+
+
+
+
+
+
+
+
+            #from engforge.attr_solver import Solver
+
+            #TODO: move parsing to problem context!!! this allows plug-play functionality
+            #change references
+            #Extract Extra Kws for our default solver
+            # extra_kw = ProblemExec.get_extra_kws(kw)
+            # add_obj = extra_kw.pop("add_obj", True)
+
+#             #TODO: Apply filter to solver attributes
+#             info = self.collect_solver_refs(check_atr_f=combo_filter,check_kw=extra_kw)
+#             updts = self.gather_update_refs()
+#             comps = info.get('comps',{})
+#             attrx = info.get('attrs',{})
+#             #print(info)
+# 
+#             #Collect Solver States
+#             Xref = sys_solver_variables(self,info,extra_kw=extra_kw,as_flat=True)
+#             if len(Xref) == 0:
+#                 raise ValueError(f"no variables found for solver: {extra_kw}")
+#             
+#             Eqref = attrx.get("solver.eq",{})
+#             InEqref = attrx.get("solver.ineq",{})
+#             Yref = sys_solver_objectives(self,info,Xref,combo_kw=extra_kw)
+# 
+#             #Dynamic References
+#             #Time Integration
+#             #TODO: check parameter conflicts            
+#             #TODO: time solver integration
+#             Pref = attrx.get("time.parm",{})
+#             Dref = attrx.get("time.rate",{})
+#             Xdref = attrx.get("dynamics.state",{})
+#             dXdRefDt = attrx.get("dynamics.rate",{}) 
+
+            # get the solver configuration
+#             has_constraints = True if len(Eqref) + len(InEqref) > 0 else False
+# 
+#             solve_mode = self.solver_option
+#             if "solver_option" in kw and kw["solver_option"] in SOLVER_OPTIONS:
+#                 solve_mode = kw["solver_option"]
+#             elif "solver_option" in kw:
+#                 raise ValueError(f"invalid solver option: {kw['solver_option']}")
+
+            #enhance objective with obj_add for argmin(X)|(1+add_obj)*obj
+
+            # Dynamics Configuration
 
 
             # Initial States
-            if X0 is not None:
-                assert isinstance(X0, dict), f"wrong format for state: {X0}"
-                X0 = X0
-                # TODO: check if X0 is valid
-            else:
-                X0 = Xref
+            # if X0 is not None:
+            #     assert isinstance(X0, dict), f"wrong format for state: {X0}"
+            #     X0 = X0
+            #     # TODO: check if X0 is valid
+            # else:
+            #     X0 = Xref
 
-            parms = list(Xref.keys())
-            Xg = Ref.refset_get(Xref)
+            #parms = list(Xref.keys())
+            #Xg = Ref.refset_get(Xref)
 
-            constraints = sys_solver_constraints(self,info,Xref,cons,extra_kw=extra_kw)
-            con_list = constraints.get('info')
+            #constraints = sys_solver_constraints(self,info,Xref,cons,extra_kw=extra_kw)
             
 
-            #Minimizer Args
-            if solve_mode == "minimize" or has_constraints:
-                opts = {"tol": 1e-6, "method": "SLSQP"}
-            else:
-                raise NotImplementedError('minimize is the only solver option currently implemented')
-                opts = {}
+#             #Minimizer Args
+#             if solve_mode == "minimize" or has_constraints:
+#                 opts = {"tol": 1e-6, "method": "SLSQP"}
+#             else:
+#                 raise NotImplementedError('minimize is the only solver option currently implemented')
+#                 opts = {}
+# 
+#             #to your liking sir
+#             opts.update(kw) #your custom args!
+#             #TODO: warning for kw/opts conflicts
+#             #opts.update(**extra_kw) #Add the solver args (should kw override?)
+#             opts.update(**constraints) #constraints override kw per api spec 
+#             #TODO: allow kw to override constraints with add/rmv above
+# 
+#             # TODO: add basin hopping method in search_optimization
+#             output = {
+#                 "Xstart": Xg,
+#                 "parms": parms,
+#                 "Xans": None,
+#                 "dXdt": dXdt,
+#                 "obj": obj,
+#                 "add_obj": add_obj,
+#                 "Yref": Yref,
+#                 "update_methods": updts,
+#             }
+#             output['input_cons'] = constraints
+# 
+#             # Solve / Minimize
+#             #if solve_mode == "root" and not has_constraints and obj is None:
+#                 #return self.solve_root(Xref, Yref, Xg, parms, output, **opts)
+#             if solve_mode == "minimize" or has_constraints:
+#                 # handle threahold for success depending on if objective provided
+#                 if "thresh" not in opts:
+#                     # default threshold
+#                     opts["thresh"] = self.convergence_threshold if not obj else None
+#                 elif obj:
+#                     opts["thresh"] = None
+# 
+#                 if obj:
+#                     if add_obj:
+#                         #normi = opts.pop("normalize", None)
+#                         ffunc = lambda *args, **kw: secondary_obj(obj, *args, **kw)
+#                         opts["ffunc"] = ffunc
+#                     else:
+#                         # TODO: define behavior
+#                         pass
+#                 sol = self.solve_min(Xref, Yref, Xg, parms, output, **opts)
+# 
+#                 x_in = [sol['Xans'][p] for p in parms]
+#                 cur = refset_get(Xref)
+#                 refset_input(Xref, sol['Xans'])
+#                 #print(con_list,constraints['constraints'])
+# 
+#                 Ycon = {}
+#                 for c,k in zip(constraints['constraints'],constraints['info']):
+#                     cv = c['fun'](x_in,self,{})
+#                     #print(c,k,cv)
+#                     Ycon[k] = cv
+#                 output['Ycon'] = Ycon
+#                 output['Yobj'] = {k:v.value(self,output) for k,v in Yref.items()}
+#                 refset_input(Xref, cur)
+# 
+#                 return sol
+#             
+#             else:
+#                 self.warning(
+#                     f"no solution attempted! for {solve_mode} with {obj} and const: {constraints}"
+#                 )
 
-            #to your liking sir
-            opts.update(kw) #your custom args!
-            #TODO: warning for kw/opts conflicts
-            #opts.update(**extra_kw) #Add the solver args (should kw override?)
-            opts.update(**constraints) #constraints override kw per api spec 
-            #TODO: allow kw to override constraints with add/rmv above
 
-            # TODO: add basin hopping method in search_optimization
-            output = {
-                "Xstart": Xg,
-                "parms": parms,
-                "Xans": None,
-                "dXdt": dXdt,
-                "obj": obj,
-                "add_obj": add_obj,
-                "Yref": Yref,
-                "update_methods": updts,
-            }
-            output['input_cons'] = constraints
-
-            # Solve / Minimize
-            #if solve_mode == "root" and not has_constraints and obj is None:
-                #return self.solve_root(Xref, Yref, Xg, parms, output, **opts)
-            if solve_mode == "minimize" or has_constraints:
-                # handle threahold for success depending on if objective provided
-                if "thresh" not in opts:
-                    # default threshold
-                    opts["thresh"] = self.convergence_threshold if not obj else None
-                elif obj:
-                    opts["thresh"] = None
-
-                if obj:
-                    if add_obj:
-                        #normi = opts.pop("normalize", None)
-                        ffunc = lambda *args, **kw: secondary_obj(obj, *args, **kw)
-                        opts["ffunc"] = ffunc
-                    else:
-                        # TODO: define behavior
-                        pass
-                sol = self.solve_min(Xref, Yref, Xg, parms, output, **opts)
-
-                x_in = [sol['Xans'][p] for p in parms]
-                cur = refset_get(Xref)
-                refset_input(Xref, sol['Xans'])
-                #print(con_list,constraints['constraints'])
-
-                Ycon = {}
-                for c,k in zip(constraints['constraints'],con_list):
-                    cv = c['fun'](x_in,self,{})
-                    #print(c,k,cv)
-                    Ycon[k] = cv
-                output['Ycon'] = Ycon
-                output['Yobj'] = {k:v.value(self,output) for k,v in Yref.items()}
-                refset_input(Xref, cur)
-
-                return sol
-            
-            else:
-                self.warning(
-                    f"no solution attempted! for {solve_mode} with {obj} and const: {constraints}"
-                )
-
-    def solve_min(
-        self, Xref, Yref, Xreset, parms, output=None, fail=True, **kw
-    ):
-        """
-        Solve the minimization problem using the given parameters. And sets the system state to the solution depending on input of 
-
-        Solve the root problem using the given parameters.
-        :param Xref: The reference input values.
-        :param Yref: The reference output values.
-        :param Xreset: The reset input values.
-        :param parms: The list of parameter names.
-        :param output: The output dictionary to store the results. (default: None)
-        :param fail: Flag indicating whether to raise an exception if the solver doesn't converge. (default: True)
-        :param kw: Additional keyword arguments.
-        :return: The output dictionary containing the results.
-        """
-        thresh = kw.pop("thresh", self.convergence_threshold)
-
-        if output is None:
-            output = {
-                "Xstart": Xreset,
-                "parms": parms,
-                "Xans": None,
-                "success": None,
-            }
-
-        #print(f'solvemin {Xref} {Yref} {Xreset}')
-        self._ans = refmin_solve(self, Xref, Yref, ret_ans=True, **kw)
-        output["ans"] = self._ans
-        de = abs(self._ans.fun)
-        if self._ans.success and de < thresh if thresh else True:
-            # Set Values
-            Xa = {p: self._ans.x[i] for i, p in enumerate(parms)}
-            output["Xans"] = Xa
-            Ref.refset_input(Xref, Xa)
-            self.pre_execute()
-            self._converged = True
-            output["success"] = True
-        elif self._ans.success:
-            # out of threshold condition
-            Xa = {p: self._ans.x[i] for i, p in enumerate(parms)}
-            output["Xans"] = Xa
-            self.warning(
-                f"solver didnt fully solve equations! {self._ans.x} -> residual: {self._ans.fun}"
-            )
-            Ref.refset_input(Xref, Xreset)
-            self.pre_execute()
-            self._converged = False
-            output["success"] = False  # only false with threshold
-        else:
-            Ref.refset_input(Xref, Xreset)
-            self.pre_execute()
-            self._converged = False
-            if fail:
-                raise Exception(f"solver didnt converge: {self._ans}")
-            output["success"] = False
-
-        return output
-
-    # Replaces Tabulation Method
-    @solver_cached
-    def data_dict(self):
-        """records properties from the entire system, via system references cache"""
-        out = collections.OrderedDict()
-        sref = self.system_references()
-        for k, v in sref["attributes"].items():
-            val = v.value()
-            if isinstance(val, TABLE_TYPES):
-                out[k] = val
-            else:
-                out[k] = numpy.nan
-        for k, v in sref["properties"].items():
-            val = v.value()
-            if isinstance(val, TABLE_TYPES):
-                out[k] = val
-            else:
-                out[k] = numpy.nan
-        return out
     
 
