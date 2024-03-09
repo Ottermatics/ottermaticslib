@@ -310,18 +310,14 @@ class ProblemExec:
             if exc_value.revert:
                 self.revert_to_start()
                 if self.pre_exec:
-                    self.pre_execute()
-            else:
-                #A hack to edit the session state.
-                Xcur = self.record_state    
-                self._class_cache._session.X_start = Xcur           
+                    self.pre_execute()         
 
             #Decide our exit conditon (if we should exit)
             if isinstance(exc_value,ProblemExitAtLevel):
                 #should we stop?
                 if exc_value.level == self.level_name:
                     self.debug(f'[{self.level_number}-{self.level_name}] exit at level {exc_value}')
-                    ext = True
+                    ext = True                     
                 else:
                     self.msg(f'[{self.level_number}-{self.level_name}] exit not at level {exc_value}')
                     ext = False

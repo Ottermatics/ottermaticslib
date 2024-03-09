@@ -77,6 +77,8 @@ class ATTR_BASE(attrs.Attribute):
     active: bool
     combos: list
 
+    none_ok = False
+
     #Activation & Combo Selection Functionality
     @classmethod
     def process_combos(cls, combos):
@@ -223,7 +225,7 @@ class ATTR_BASE(attrs.Attribute):
         out = {}
         for k,v in cattr.items():
             inst = getattr(system,k)
-            if inst is None or (cls.instance_class is not None and not isinstance(inst,cls.instance_class)):
+            if inst is None and getattr(cls.instance_class,'none_ok',False) or (cls.instance_class is not None and not isinstance(inst,cls.instance_class)):
                 log.warning(f"Attribute {k}|{inst} is not an instance of {cls.instance_class} in {system}")
                 continue
 
