@@ -20,9 +20,10 @@ class RefLog(LoggingMixin):
 log = RefLog()
 
 
-def refset_input(refs, delta_dict):
+def refset_input(refs, delta_dict,chk=True):
     for k, v in delta_dict.items():
-        refs[k].set_value(v)
+        if not chk or k in refs:
+            refs[k].set_value(v)
 
 
 def refset_get(refs,*args,**kw):
@@ -192,7 +193,7 @@ class Ref:
 
     def value(self,*args,**kw):
 
-        if self.comp and self.comp.log_level < 5:
+        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 5:
             self.comp.msg(f"REF[get] {self.comp} {self.key}")
 
         if self.key_override:
@@ -208,7 +209,7 @@ class Ref:
             o = self.eval_f(o)
         self._last = o
 
-        if self.comp and self.comp.log_level < 5:
+        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 5:
             self.comp.msg(f"REF[get] {self.comp} {self.key} | got: {o}")
 
         return o
@@ -257,75 +258,3 @@ class Ref:
 
 
 
-
-
-
-
-
-
-
-
-#### TODO: solve equillibrium case first using root solver for tough problems
-# # make anonymous function
-# def f_lin_slv(system, Xref: dict, Yref: dict, normalize=None,slv_info=None):
-#     parms = list(Xref.keys())  # static x_basis
-#     yparm = list(Yref.keys())
-#     def f(x):  # anonymous function
-#         # set state
-#         for p, xi in zip(parms, x):
-#             Xref[p].set_value(xi)
-#         print(Xref,Yref)
-#         grp = (yparm, x, normalize)
-#         vals = [eval_ref(Yref[p],system,slv_info) / n for p, x, n in zip(*grp)]
-#         return vals  # n sized normal residual vector
-# 
-#     return f
-# 
-# def refroot_solve(
-#     system,
-#     Xref: dict,
-#     Yref: dict,
-#     Xo=None,
-#     normalize: np.array = None,
-#     reset=True,
-#     doset=True,
-#     fail=True,
-#     ret_ans=False,
-#     ffunc=f_lin_slv,
-#     **kw,
-# ):
-#     """find the input X to ensure the difference between two dictionaries of refernces, x references are changed in place, y will be solved to zero, options ensue for cases where the solution is not ideal
-# 
-#     :param Xref: dictionary of references to the x values
-#     :param Yref: dictionary of references to the y values
-#     :param Xo: initial guess for the x values as a list against Xref order, or a dictionary
-#     :param normalize: a dictionary of values to normalize the x values by, list also ok as long as same length and order as Xref
-#     :param reset: if the solution fails, reset the x values to their original state, if true will reset the x values to their original state on failure overiding doset.
-#     :param doset: if the solution is successful, set the x values to the solution by default, otherwise follows reset, if not successful reset is checked first, then doset
-#     """
-#     parms = list(Xref.keys())  # static x_basis
-#     if normalize is None:
-#         normalize = np.ones(len(parms))
-#     elif isinstance(normalize, (list, tuple, np.ndarray)):
-#         assert len(normalize) == len(parms), "bad length normalize"
-#     elif isinstance(normalize, (dict)):
-#         normalize = np.array([normalize[p] for p in parms])
-# 
-#     # make objective function
-#     f = ffunc(system, Xref, Yref, normalize)
-# 
-#     # get state
-#     if reset:
-#         x_pre = refset_get(Xref)  # record before changing
-# 
-#     if Xo is None:
-#         Xo = [Xref[p].value() for p in parms]
-# 
-#     elif isinstance(Xo, dict):
-#         Xo = [Xo[p] for p in parms]
-# 
-#     # solve
-#     ans = sciopt.root(f, Xo, **kw)
-#  
-#     return process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans)
-# 

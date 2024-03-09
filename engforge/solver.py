@@ -285,6 +285,9 @@ class SolverMixin(SolveableMixin):
             with ProblemExec(self,opts) as prb_ctx:
                 #self.info(f'prob: {prb_ctx.sys_refs}')
                 Xref = prb_ctx.Xref
+                if len(Xref) == 0:
+                    self.warning(f'no variables found for solver: {opts}')
+                    return
                 Yref = prb_ctx.Yref
 
                 opts.update(**prb_ctx.constraints)

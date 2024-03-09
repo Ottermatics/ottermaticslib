@@ -178,7 +178,9 @@ class ProblemExec:
 
         opt_in,opt_out = {},{}
         if opts:
+            #these go to the context instance optoins
             opt_in = {k:v for k,v in opts.items() if k in dflt_parse_kw}
+            #these go to system establishment
             opt_out = {k:v for k,v in opts.items() if k not in opt_in}
 
         if kw_dict is None:
@@ -232,6 +234,7 @@ class ProblemExec:
         #pass args without creating singleton (yet)
         if log.log_level < 5:
             self.info(f'establish {system} {kw_dict} {kwargs}')
+
         self.system = system
         assert isinstance(self.system,SolveableInterface), 'only solveable interfaces are supported for execution context'
 
@@ -279,12 +282,12 @@ class ProblemExec:
             if not isinstance(self,self._class_cache._session.__class__):
                 self.warning(f'change of execution class!')
             #global level number
-            self._class_cache._session.__class__.level_number += 1        
+            self._class_cache.level_number += 1        
             return self._class_cache._session
         
         #return New
         self._class_cache._session = self
-        self._class_cache._session.__class__.level_number = 0
+        self._class_cache.level_number = 0
    
         self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}')
         
@@ -325,7 +328,7 @@ class ProblemExec:
                 #Check if we missed a level name and its the top level, if so then we raise a real error!
                 if self._class_cache._session is self and not ext:
                     #never ever leave the top level without deleting the session
-                    self._class_cache._session.__class__.level_number = 0
+                    self._class_cache.level_number = 0
                     del self._class_cache._session 
                     raise KeyError(f'cant exit to level! {exc_value.level} not found!!')
             
@@ -390,11 +393,11 @@ class ProblemExec:
         if hasattr(ProblemExec,'_session') and self._class_cache._session is self:
             #TODO: restore state from `X_start` 
             self.debug(f'[{self.level_number}-{self.level_name}] closing execution session')
-            self._class_cache._session.__class__.level_number = 0
+            self._class_cache.level_number = 0
             del self._class_cache._session
         elif hasattr(self._class_cache,'_session'):
             #global level number
-            self._class_cache._session.__class__.level_number -= 1  
+            self._class_cache.level_number -= 1  
              
 
     #State Interfaces
@@ -501,11 +504,11 @@ class ProblemExec:
         self._ans = refmin_solve(self.system, Xref, Yref, ret_ans=True, **kw)
         output["ans"] = self._ans
 
-        self.handle_solution(self._ans,Xref,Yref,self.X_start,output)
+        self.handle_solution(self._ans,Xref,Yref,output)
 
         return output
 
-    def handle_solution(self,answer,Xref,Yref,Xreset,output):
+    def handle_solution(self,answer,Xref,Yref,output):
         #TODO: move exit condition handiling somewhere else, reduce cross over from process_ans
         thresh = self.convergence_threshold
         parms = list(Xref)
@@ -528,10 +531,6 @@ class ProblemExec:
 
         de = answer.fun
         if answer.success and de < thresh if thresh else True:
-            # Set Values
-
-            # Ref.refset_input(Xref, Xa)
-            # self.pre_execute()
             self.system._converged = True
             output["success"] = True
 
@@ -540,14 +539,10 @@ class ProblemExec:
             self.warning(
                 f"solver didnt fully solve equations! {answer.x} -> residual: {answer.fun}"
             )
-            # Ref.refset_input(Xref, Xreset)
-            # self.pre_execute()
             self.system._converged = False
             output["success"] = False  # only false with threshold
 
         else:
-            # Ref.refset_input(Xref, Xreset)
-            # self.pre_execute()
             self.system._converged = False
             if self.raise_on_opt_failure:
                 raise Exception(f"solver didnt converge: {answer}")

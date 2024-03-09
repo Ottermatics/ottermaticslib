@@ -258,7 +258,8 @@ class PlotInstance(AttributeInstance):
         self.system = system
 
         #
-        sys_ref = set(self.system.all_references.keys())
+        sys_refs = self.system.system_references()
+        sys_ref = set(sys_refs.keys())
 
         diff = set()
         parms = set()
@@ -282,7 +283,7 @@ class PlotInstance(AttributeInstance):
         if diff:
             raise KeyError(f"has system diff: {diff}")
 
-        self.refs = {k: self.system.all_references[k] for k in parms}
+        self.refs = {k: sys_refs[k] for k in parms}
 
     def plot(self, **kwargs):
         """applies the system dataframe to the plot"""

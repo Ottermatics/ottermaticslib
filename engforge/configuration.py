@@ -27,6 +27,7 @@ def name_generator(instance):
     log.debug(f"generated name: {out}")
     return out
 
+PROTECTED_NAMES = ['solver','dataframe']
 
 # Wraps Configuration with a decorator, similar to @attrs.define(**options)
 def forge(cls=None, **kwargs):
@@ -143,6 +144,8 @@ def signals_slots_handler(
     log.debug(f"transforming signals and slots for {cls.__name__}")
 
     for t in fields:
+        if t.name in PROTECTED_NAMES:
+            raise Exception(f"cannot use {k} as a field name, its protected")        
         if t.type is None:
             log.warning(f"{cls.__name__}.{t.name} has no type")
 
@@ -271,7 +274,7 @@ def signals_slots_handler(
         for o in out:
             if isinstance(o.type, Plot):
                 # print(o)
-                pass
+                continue
 
     # Merge Fields Checking if we are overriding an attribute with system_property
     # hack since TabulationMixin isn't available yet
@@ -342,7 +345,7 @@ class Configuration(AttributedBaseMixin):
     _subclass_init: bool = True
 
     # Configuration Information
-    def internal_configurations(self, check_config=True, use_dict=True) -> dict:
+    def internal_configurations(self, check_config=True, use_dict=True,none_ok=False) -> dict:
         """go through all attributes determining which are configuration objects
         additionally this skip any configuration that start with an underscore (private variable)
         """
@@ -351,7 +354,7 @@ class Configuration(AttributedBaseMixin):
         if check_config:
             chk = lambda k, v: isinstance(v, Configuration)
         else:
-            chk = lambda k, v: k in self.slots_attributes()
+            chk = lambda k, v: k in self.slots_attributes() and (none_ok or v is not None)
 
         obj = self.__dict__
         if not use_dict:  # slots
@@ -410,7 +413,7 @@ class Configuration(AttributedBaseMixin):
         return new_sys
 
     def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0, **kw
+        self, level=0, levels_to_descend=-1, parent_level=0, only_inst=True,**kw
     ):
         """A generator that will go through all internal configurations up to a certain level
         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
@@ -437,9 +440,11 @@ class Configuration(AttributedBaseMixin):
                 for skey, level, iconf in config.go_through_configurations(
                     level, levels_to_descend, parent_level
                 ):
-                    yield f"{key}.{skey}" if skey else key, level, iconf
+                    if not only_inst or iconf is not None :
+                        yield f"{key}.{skey}" if skey else key, level, iconf
             else:
-                yield key, level, config
+                if not only_inst or config is not None :
+                    yield key, level, config
 
     # Our Special Init Methodology
     def __on_init__(self):

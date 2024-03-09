@@ -225,7 +225,7 @@ class ATTR_BASE(attrs.Attribute):
         out = {}
         for k,v in cattr.items():
             inst = getattr(system,k)
-            if inst is None and getattr(cls.instance_class,'none_ok',False) or (cls.instance_class is not None and not isinstance(inst,cls.instance_class)):
+            if (inst is None and getattr(cls.instance_class,'none_ok',False)) or (cls.instance_class is not None and not isinstance(inst,cls.instance_class)):
                 log.warning(f"Attribute {k}|{inst} is not an instance of {cls.instance_class} in {system}")
                 continue
 

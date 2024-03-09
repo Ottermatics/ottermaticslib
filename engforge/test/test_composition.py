@@ -25,7 +25,7 @@ class MockComponent(Component):
         return self.input * self.input
 
 
-def limit_max(system):
+def limit_max(system,prb):
     return 4 - system.input
 
 
@@ -43,14 +43,17 @@ class MockSystem(System):
     # move component output to system
     post_sig = SIGNAL.define("output", "comp.output", mode="both")
 
-    solver =Solver.declare_var("in_out_diff", "input")
-    solver.add_constraint("min", 0)
-    solver.add_constraint("max", 1)
-    # solver.addConstraint('MAX','limit_max')
-    # solver.addConstraint('MIN', 0)
-    sol2 =Solver.declare_var("in2out2", "in2")
-    sol2.add_constraint("max", limit_max)
-    sol2.add_constraint("min", 0)
+    Solver.equality_constraint("in_out_diff")
+    Solver.equality_constraint("in2out2")
+
+    var_in =Solver.declare_var("input")
+    var_in.add_var_constraint(kind="min", value=0)
+    var_in.add_var_constraint(kind="max", value=1)
+
+    
+    sol2 =Solver.declare_var("in2")
+    sol2.add_var_constraint(kind="max", value=limit_max)
+    sol2.add_var_constraint(kind="min", value=0)
 
     comp = Slot.define(MockComponent)
 

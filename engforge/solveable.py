@@ -663,7 +663,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict,'skipped':skipped}
         
         #Go through all components
-        for key, lvl, conf in confobj.go_through_configurations():
+        for key, lvl, conf in confobj.go_through_configurations(**kw):
+
+            if conf is None:
+                continue
             
             if hasattr(conf,'_solver_override') and conf._solver_override:
                 continue
@@ -846,6 +849,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         """
         refs = {}
         for ckey, lvl, comp in self.go_through_configurations(**kw):
+            if comp is None:
+                continue
             for p, atr in comp.input_fields().items():
                 if p in SKIP_REF and not all:
                     continue

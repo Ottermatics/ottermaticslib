@@ -42,7 +42,7 @@ class Test(unittest.TestCase):
     test_dir = "~/"
 
     def setUp(self):
-        self.test_config = TestConfig()
+        self.test_config = TestConfig(name='testconfig')
         self.test_dir = tempfile.mkdtemp()
 
     def tearDown(self):
