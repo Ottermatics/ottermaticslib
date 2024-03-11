@@ -121,7 +121,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 comp.post_update_internal(eval_kw=eval_kw_comp, ignore=ignore)
         ignore.add(self)
 
-    def gather_update_refs(self,eval_kw=None,ignore=None):
+    def collect_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
         #TODO: add to solver contexts
         updt_refs = {}
@@ -157,7 +157,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         ignore.add(self)
         return updt_refs
 
-    def gather_post_update_refs(self,eval_kw=None,ignore=None):
+    def collect_post_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
         updt_refs = {}
         from engforge.components import Component
@@ -762,18 +762,30 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                    attr_dict[atype] = {}
         
         #Dynamic Variables Add, following the skipped items
+        dyn_refs = self.collect_dynamic_refs(conf)
+        #house keeping to organize special returns 
+        #TODO: generalize this with a function to update the attr dict serach result
+        out['dynamic_comps'] = dyn_refs.pop('dynamic_comps',{})
+        
+
         if check_atr_f or any([v for v in skipped.values()]):
             #print('skipped',skipped)
             skipd = set().union(*(set(v) for v in skipped.values()))
-            for pre,refs in self.collect_dynamic_refs().items():
+            for pre,refs in dyn_refs.items():
                 
                 if pre not in attr_dict:
                     attr_dict[pre] = {}
 
                 for parm,ref in refs.items():
                     
+                    is_ref = isinstance(ref,Ref) and ref.allow_set
+                    if not is_ref:
+                        conf.info(f'bad refs skip {pre,ref,val_type,skipd}')
+                        attr_dict[pre].update(**{parm:ref})
+                        continue
+
                     scoped_name = f'{key}{parm}'
-                    val_setskip = (isinstance(ref,Ref) and ref.allow_set and ref.key in skipd)
+                    val_setskip = ( is_ref and ref.key in skipd)
                     val_type = None
                     
                     if scoped_name in skipd:
@@ -794,7 +806,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         else:
             #There's no checks to be done, just add these
-            attr_dict.update(**self.collect_dynamic_refs(conf))                   
+            attr_dict.update(**dyn_refs)                   
 
         return out
 
@@ -809,7 +821,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         if conf is None:
             conf = self
 
-        dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{}}
+        dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{},'dynamic_comps':{}}
 
         for key, lvl, conf in conf.go_through_configurations(**kw):
             # FIXME: add a check for the dynamics mixin, that isn't hacky
@@ -822,6 +834,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             dynamics['dynamics.input'].update(scope(conf.Ut_ref))
             dynamics['dynamics.output'].update(scope(conf.Yt_ref))
             dynamics['dynamics.rate'].update(scope(conf.dXtdt_ref))
+            dynamics['dynamic_comps'][key] = conf
 
         return dynamics
 

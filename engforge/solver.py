@@ -278,15 +278,14 @@ class SolverMixin(SolveableMixin):
             #to your liking sir
             opts.update(kw) #your custom args!
                    
-            #TODO: warning for kw/opts conflicts
-            #TODO: handle objective / constraints addition in problem execution context
-
-            self.warning(f'starting solver: {opts}')
-            with ProblemExec(self,opts) as prb_ctx:
-                #self.info(f'prob: {prb_ctx.sys_refs}')
+            #use problem execution context
+            self.debug(f'starting solver: {opts}')
+            with ProblemExec(self,opts,level_name='sys_slvr') as prb_ctx:
+                pbx = prb_ctx
+                print(prb_ctx.level_name,prb_ctx.level_number)
                 Xref = prb_ctx.Xref
                 if len(Xref) == 0:
-                    self.warning(f'no variables found for solver: {opts}')
+                    self.debug(f'no variables found for solver: {opts}')
                     return
                 Yref = prb_ctx.Yref
 
@@ -294,8 +293,23 @@ class SolverMixin(SolveableMixin):
                 output['prb_ctx'] = prb_ctx
                 
                 out = prb_ctx.solve_min(Xref,Yref,output=output, **opts)
-                #self.info(f"solver output: {out}")
-                return out
+                if out['ans'].success:
+                    pbx.set_ref_values(out['Xans'])
+                    pbx.exit_to_level('sys_slvr',False)
+                else:
+                    #TODO: handle failure options
+
+                    if pbx.raise_on_opt_failure:
+                        raise ValueError(f"Solver failed to converge: {out['ans']}")
+                    
+                    if prb_ctx.fail_revert:
+                        pbx_ctx.exit_and_revert()
+                    else:
+                        pbx.exit_with_state()  
+
+
+
+            return out
 
 
 
@@ -446,7 +460,7 @@ class SolverMixin(SolveableMixin):
 #                 # handle threahold for success depending on if objective provided
 #                 if "thresh" not in opts:
 #                     # default threshold
-#                     opts["thresh"] = self.convergence_threshold if not obj else None
+#                     opts["thresh"] = self.success_thresh if not obj else None
 #                 elif obj:
 #                     opts["thresh"] = None
 # 

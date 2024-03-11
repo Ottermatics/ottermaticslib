@@ -216,19 +216,19 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         return np.zeros((self.state_size, max(self.input_size, 1)))
 
     def create_output_matrix(self, **kwargs) -> np.ndarray:
-        """creates the input matrix for the system, called B"""
+        """creates the input matrix for the system, called C"""
         return np.zeros((max(self.output_size, 1), self.state_size))
 
     def create_feedthrough_matrix(self, **kwargs) -> np.ndarray:
-        """creates the input matrix for the system, called B"""
+        """creates the input matrix for the system, called D"""
         return np.zeros((max(self.output_size, 1), max(self.input_size, 1)))
 
     def create_state_constants(self, **kwargs) -> np.ndarray:
-        """creates the input matrix for the system, called B"""
+        """creates the input matrix for the system, called F"""
         return np.zeros(self.state_size)
 
     def create_output_constants(self, **kwargs) -> np.ndarray:
-        """creates the input matrix for the system, called B"""
+        """creates the input matrix for the system, called O"""
         return np.zeros(max(self.output_size, 1))
 
     def create_dynamics(self, **kw):
@@ -510,111 +510,160 @@ class GlobalDynamics(DynamicsMixin):
         min_kw=None,
         run_solver=True,
         return_system=False,
+        return_data=False,
+        return_all=False,
         **kwargs,
     ) -> pandas.DataFrame:
         """runs a simulation over the course of time, and returns a dataframe of the results.
 
         A copy of this system is made, and the simulation is run on the copy, so as to not affect the state of the original system.
         """
-        # min_kw_dflt = {
-        #     "method": "SLSQP",
-        #     "doset": True,
-        #     "reset": False,
-        #     "fail": True,
-        # }
-        # #'tol':1e-6,'options':{'maxiter':100}}
-        # # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
-        # if min_kw is None:
-        #     min_kw = min_kw_dflt
-        # else:
-        #     min_kw_dflt.update(min_kw)
-        # mkw = min_kw_dflt
+        min_kw_dflt = {"method": "SLSQP",}
+        #'tol':1e-6,'options':{'maxiter':100}}
+        # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
+        if min_kw is None:
+            min_kw = min_kw_dflt
+        else:
+            min_kw_dflt.update(min_kw)
+        mkw = min_kw_dflt
 
         # Data Storage {time: data}
         data = {}  # output storage
-        # solver = expiringdict.ExpiringDict(100, 600)  # temp solver storage
-        # Time = np.arange(0, endtime + dt, dt)
+        solver = expiringdict.ExpiringDict(100, 600)  # temp solver storage
+        Time = np.arange(0, endtime + dt, dt)
 
-        # loop through components and do this (part of global)
-        # Orchestrate The Simulation
-        # system = self.copy_config_at_state()
-        # system.create_state_matrix()
-        # #system.comp.create_state_matrix() #TODO: recursively initalize transient components
-        # refs = system.collect_solver_refs()
-        # intl_refs = refs["tr_states"]
-        # out_refs = refs["tr_output"]
+        max_step_dt = kwargs.get("max_step", dt)
+
 
         # Initial State
-        # Create X & Index For Transient Variables
-        # X should be ordered by the order of the system states
-        # Get or Set Initial State
-        if X0 is None:
-            # get current
-            X0 = {k: v.value() for k, v in intl_refs.items()}
-        # else:
-        # refset_input(intl_refs,X0)
-        X0 = np.array([X0[p] for p in intl_refs])
-
         data = {}
 
+        #TODO: put copy system in problem context
+        system = self.copy_config_at_state()
+        system.create_state_matrix() #TODO: recursively initalize transient components
+
         #Time Iteration Context
-        with ProblemExec(self,level='',**kwargs) as pbx:
+        with ProblemExec(system,level_name='simulate',**kwargs) as pbx:
+
+            #Unpack Transient Problem
+            intl_refs = pbx.integrator_refs
+            refs = pbx.sys_refs
+
+            self.info(f'initial state {X0} {intl_refs}| {refs}')
+
+            if X0 is None:
+                # get current
+                X0 = {k: v.value() for k, v in intl_refs.items()}
+            X0 = np.array([X0[p] for p in intl_refs])
+
+            #Gather data
+            Xss = refs['attrs'].get("solver.var",{})
+            Xpm = refs['attrs'].get('time.parm',{})
+            Xdy = refs['attrs'].get('dynamics.state',{})
+
+            Yobj = refs['attrs'].get("solver.obj",{})
+            Yeq = refs['attrs'].get("solver.eq",{})
+            Yineq=refs['attrs'].get("solver.ineq",{})
+            Ydn = refs['attrs'].get("dynamics.output",{})
+
+            dXtmdt = refs['attrs'].get('time.rate',{})
+            dXdt = refs['attrs'].get("dynamics.rate",{})
+
+            #TODO: handle various cases of (obj,eq,ineq)
+            if not Yobj and Yeq:
+                #TODO: handle case of Yineq == None: root solve
+                self.info(f'making Yobj from Yeq: {Yeq}')
+                Yobj = {k:v.copy(eval_f = lambda v:1+v**2) for k,v in Yeq.items()}
+            elif not Yobj:
+                #minimize the product of all parameters, so the smallest value is the best that satisfies all constraints
+                self.info(f'making Yobj from X: {Xss}')
+                dflt = lambda sys,prb: (np.product(1+v.value()**2 for v in pbx.problem_vars.items()))**0.5
+                Yobj = {'smallness': Ref(system, dflt)}
+
+
+
+            #our anonymous integrator!
             def sim_iter(t, x, *args):
                 out = {p: np.nan for p in intl_refs}
+                Xin = {p: x[i] for i, p in enumerate(intl_refs)}
 
-                # set state to match x
-                for i, (k, v) in enumerate(intl_refs.items()):
-                    v.set_value(x[i])
+                if self.log_level < 10:
+                    self.info(f'sim_iter {t} {x} {Xin}')
 
-                # solver always gets a copy of x
-                solver[t] = x
+                with ProblemExec(system,level_name='tr_slvr',Xnew=Xin,**kwargs) as pbx:
 
-                # test for record time
-                if not data or t > max(data) + dt:
-                    data[t] = system.data_dict_tm(t)
+                    # solver always gets a copy of x
+                    solver[t] = x #TODO: stateful capture
+                    
+                    # test for record time #TODO: rates / events ect    
+                    #if not data or t > max(data) + dt:
+                    data[t] = cs = pbx.get_ref_values()
+                        #if self.log_level < 10:
+                        #    self.info(f'record {t}| {Xin==cs} |{Xin} == {cs} ')
 
-                # pre signals
-                # TODO: custom transient signals
-                # for sig, sdict in refs["signals"].items():
-                #     if sdict["mode"] in ["pre", "both"]:
-                #         sdict["target"].set_value(sdict["source"].value())
+                    #ad hoc time integration
+                    for name, trdct in pbx.integrators.items():
+                        out[trdct.parm] = trdct.current_rate
 
-                # ad hoc time integration
-                for parm, trdct in refs["tr_sets"].items():
-                    out[parm] = trdct["dpdt"].value()
+                    # dynamics
+                    for compnm, compdict in pbx.dynamic_comps.items():
+                        comp = compdict#["comp"]
+                        if not comp.dynamic_state_parms and not comp.dynamic_input_parms:
+                            continue
+                        Xds = np.array([r.value() for r in comp.Xt_ref.values()])
+                        Uds = np.array([r.value() for r in comp.Ut_ref.values()])
+                        # time updated in step
+                        system.info(f'comp {comp} {compnm} {Xds} {Uds}')
+                        dxdt = comp.step(t, dt, Xds, Uds, True)
 
-                # dynamics
-                for compnm, compdict in refs["dyn_comp"].items():
-                    comp = compdict["comp"]
-                    Xds = np.array([r.value() for r in comp.Xt_ref.values()])
-                    Uds = np.array([r.value() for r in comp.Ut_ref.values()])
-                    # time updated in step
-                    dxdt = comp.step(t, dt, Xds, Uds, True)
+                        for i, (p, ref) in enumerate(comp.Xt_ref.items()):
+                            out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
 
-                    for i, (p, ref) in enumerate(comp.Xt_ref.items()):
-                        out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
+                    # solvers
+                    if run_solver and pbx.solveable:
+                        # TODO: add in any transient
+                        with ProblemExec(system,level_name='ss_slvr',**kwargs) as pbx:
+                            
+                            #TODO: handle various cases of (obj,eq,ineq)
+                            #normally obj is handled via min/max objective
+                            #in case of eq and inequal constraints, we need to adapt to the situation. For many eq's we can use the root solver, otherwise we can mutiply the normalize the equalities all together as multiply by something like normal of all inputs to provide a default objective of something like "find the smallest input satisfying constraints"
 
-                # solvers
-                if run_solver:
-                    # TODO: add in any transient
-                    refmin_solve(self, refs["solver_vars"], refs["solver_cons"], **mkw)
 
-                # # last signals
-                # for sig, sdict in refs["signals"].items():
-                #     if sdict["mode"] in ["post", "both"]:
-                #         sdict["target"].set_value(sdict["source"].value())
+                            ss_out = pbx.solve_min(Xss, Yobj, **mkw)
+                            if ss_out['ans'].success:
+                                pbx.set_ref_values(ss_out['Xans'])
+                                pbx.exit_to_level('ss_slvr',False)
+                            else:
+                                #TODO: handle failure options
+                                if pbx.raise_on_opt_failure:
+                                    pbx.exit_to_level('simulate',pbx.fail_revert)
+                                else:
+                                    pbx.exit_to_level('ss_slvr',pbx.fail_revert)
 
-                return np.array([out[p] for p in intl_refs])
+                    #pbx.post_execute()
+                    V_dxdt =  np.array([out[p] for p in intl_refs])
+                    
+                    pbx.exit_to_level('tr_slvr',False)
+
+                if any( np.isnan(V_dxdt) ):
+                    raise ValueError(f'infeasible! nan result {V_dxdt} {out} {Xin} {cs}')
+
+                return V_dxdt
 
         
-            ans = solve_ivp(sim_iter, [0, endtime], X0, method="RK45", t_eval=Time)
+            ans = solve_ivp(sim_iter, [0, endtime], X0, method="RK45", t_eval=Time, max_step=max_step_dt)
 
         # convert to list with time
         data = [{"time": k, **v} for k, v in data.items()]
+
         df = pandas.DataFrame(data)
         self.format_columns(df)
+        if return_all:
+            return system,(data if return_data else df)
         if return_system:
-            return system, df
+            return system        
+        if return_data:
+            return data        
         return df
 
     def data_dict_tm(self, time, **kw):

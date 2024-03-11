@@ -68,11 +68,16 @@ import uuid
 #The KW Defaults for Solver via kw_dict
 slv_dflt_options = dict(combos='*',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None)
 #KW Defaults for context from **opts
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,convergence_threshold=10)
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10,dynamic_mode= False)
 
 #TODO: output options extend_dataframe=True,return_dataframe=True
 
+
+
 #Special exception classes handled in exit
+class IllegalArgument(Exception):
+    pass
+
 class ProblemExit(Exception):
     """an exception to exit the problem context, without error"""
     revert:bool
@@ -108,9 +113,12 @@ class ProblemExec:
     #Store refs for later
     _update_refs: dict 
     _post_update_refs: dict
+    
+    #Fundamental solver behavior options
+    dynamic_mode = False
 
     #runtime and exit options
-    convergence_threshold = 10
+    success_thresh = 10
     pre_exec: bool=True
     post_exec: bool=False
     fail_revert: bool = True
@@ -172,9 +180,13 @@ class ProblemExec:
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
         """
-        #print(system)
         #parse the options to change behavior of the context
-        level_name = opts.pop('level_name',None) #get arg if not set
+        if 'level_name' in opts:
+            level_name = opts.pop('level_name')
+        elif 'level_name' in kw_dict:
+            level_name = kw_dict.pop('level_name')
+        else:
+            level_name = None
 
         opt_in,opt_out = {},{}
         if opts:
@@ -195,10 +207,14 @@ class ProblemExec:
             #mirror the state of session (exactly)
             self.__dict__ = self._class_cache._session.__dict__.copy()
             if self.system is not system:
-                raise Exception(f'somethings wrong! change of comp! {self.system} -> {system}')
+                raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
 
             #modify things from the input
-            self.level_name = level_name
+            if level_name is None:
+                self.level_name = 'ctx_'+str(int(uuid.uuid4()))[0:15]
+            else:
+                self.level_name = level_name
+
             if opt_in: self.__dict__.update(opt_in) #level options ASAP
             self._temp_state = Xnew #input state exception to this
             if log.log_level < 5:
@@ -208,14 +224,16 @@ class ProblemExec:
             self.set_checkpoint()
 
         elif ctx_fail_new:
-            raise Exception(f'no execution context available')
+            raise IllegalArgument(f'no execution context available')
         
         else:
             #add the prob options to the context
             self.__dict__.update(opt_in)
             #supply the level name default as top if not set
-            if self.level_name is None:
+            if level_name is None:
                 self.level_name = 'top'
+            else:
+                self.level_name = level_name
 
             self._temp_state = Xnew
             self.name = system.name + '-' + str(uuid.uuid4())[:8]
@@ -225,6 +243,9 @@ class ProblemExec:
             self.set_checkpoint()        
 
             self.msg(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {self.slv_kw}')
+
+        if log.log_level < 10:
+            self.info(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {opts}')            
 
     def establish_system(self,system,kw_dict,**kwargs):
         """caches the system references, and parses the system arguments"""
@@ -256,14 +277,15 @@ class ProblemExec:
                 setattr(self,k,self.slv_kw[k])
 
         #Get the update method refs
-        self._update_refs = self.system.gather_update_refs()
-        self._post_update_refs = self.system.gather_post_update_refs()
+        self._update_refs = self.system.collect_update_refs()
+        self._post_update_refs = self.system.collect_post_update_refs()
         
         #Problem Variable Definitions
-        self.Xref = self.sys_solver_variables()
+        self.solver_vars = self.sys_solver_variables()
+        self.Xref = self.solver_vars['variables']
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
-        self.constraints = self.sys_solver_constraints(self.Xref,cons)
+        self.constraints = self.sys_solver_constraints(self.Xref,cons,)
 
         if log.log_level < 5:
             self.msg(f'established {self.slv_kw}')  
@@ -279,7 +301,7 @@ class ProblemExec:
         #Check for existing session        
         if hasattr(ProblemExec,'_session'):
             self.msg(f'[{self.level_number}-{self.level_name}][{self.level_number}-{self.level_name}] entering existing execution context')
-            if not isinstance(self,self._class_cache._session.__class__):
+            if not isinstance(self,self._class_cache):
                 self.warning(f'change of execution class!')
             #global level number
             self._class_cache.level_number += 1        
@@ -407,13 +429,25 @@ class ProblemExec:
         #refs = self.all_variable_refs
         refs = self.all_variables
         return Ref.refset_get(refs)     
+    
+    def get_ref_values(self,refs=None):
+        """returns the values of the refs"""
+        if refs is None:
+            refs = self.all_system_references
+        return Ref.refset_get(refs)
+    
+    def set_ref_values(self,values,refs=None):
+        """returns the values of the refs"""
+        #TODO: add checks for the refs
+        if refs is None:
+            refs = self.all_variables        
+        return Ref.refset_input(refs,values)    
 
     def set_checkpoint(self):
         """sets the checkpoint"""
         self.X_start = self.record_state
         if log.log_level < 5:
             self.debug(f'[{self.level_number}-{self.level_name}] set checkpoint: {list(self.X_start.values())}')
-        
 
     def revert_to_start(self):
         if log.log_level < 5:
@@ -422,11 +456,13 @@ class ProblemExec:
             self.debug(f'[{self.level_number}-{self.level_name}] reverting to start: {xs} -> {rs}')
         Ref.refset_input(self.all_variables,self.X_start)
 
-    def activate_temp_state(self):
-        if self._temp_state:
+    def activate_temp_state(self,new_state=None):
+        if new_state:
+            Ref.refset_input(self.all_variables,new_state)
+        elif self._temp_state:
+            self.debug(f'[{self.level_number}-{self.level_name}] activating temp state: {self._temp_state}')
             Ref.refset_input(self.all_variables,self._temp_state)
 
-            
     #System Events
     def apply_pre_signals(self):
         """applies all pre signals"""
@@ -480,7 +516,7 @@ class ProblemExec:
         :return: The output dictionary containing the results.
         """
 
-        thresh = kw.pop("thresh", self.convergence_threshold)
+        thresh = kw.pop("thresh", self.success_thresh)
 
         dflt = {
                 "Xstart": Ref.refset_get(Xref),
@@ -495,13 +531,15 @@ class ProblemExec:
         if output:
             dflt.update(output)
             output = dflt
+        else:
+            output = dflt
             
 
         #override constraints input
         kw.update(self.constraints)
         
 
-        self._ans = refmin_solve(self.system, Xref, Yref, ret_ans=True, **kw)
+        self._ans = refmin_solve(self.system, Xref, Yref, **kw)
         output["ans"] = self._ans
 
         self.handle_solution(self._ans,Xref,Yref,output)
@@ -510,7 +548,7 @@ class ProblemExec:
 
     def handle_solution(self,answer,Xref,Yref,output):
         #TODO: move exit condition handiling somewhere else, reduce cross over from process_ans
-        thresh = self.convergence_threshold
+        thresh = self.success_thresh
         parms = list(Xref)
 
         #Output Results
@@ -548,18 +586,28 @@ class ProblemExec:
                 raise Exception(f"solver didnt converge: {answer}")
             output["success"] = False
     
-        return output
-    
-    #Function assembly
-    def sys_solver_variables(self):
+        return output  
+
+    def sys_solver_variables(self,as_set=False,as_flat=False,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
         out = dict(dynamics=self.dynamic_state,integration=self.integrator_vars,variables=self.problem_vars)
         
-        flt = {}
-        for k,v in out.items():
-            flt.update(v)
-        return flt
+        # flt = {}
+        # for k,v in out.items():
+        #     flt.update(v)
+        # return flt
+
+        if as_set==True:
+            vars = set.union(*(set(v) for k,v in out.items()))
+            return vars
+        
+        if as_flat==True:
+            flt = {}
+            for k,v in out.items():
+                flt.update(v)
+            return flt
+        return out
 
     def sys_solver_objectives(self,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
@@ -816,12 +864,30 @@ class ProblemExec:
     @property
     def attr_inst(self):
         return self.sys_refs.get('type',{})
+    
+    @property
+    def dynamic_comps(self):
+        return self.sys_refs.get('dynamic_comps',{})
+
+
+    #Instances
+    @property
+    def integrators(self):
+        return self.attr_inst.get('time',{})
+    
+    @property
+    def signal_inst(self):
+        return self.attr_inst.get('signal',{})
+
+    @property
+    def solver_inst(self):
+        return self.attr_inst.get('solver',{})
 
     @property
     def kwargs(self):
         return self.slv_kw
 
-    #X solver variables
+    #X solver variable refs
     @property
     def problem_vars(self):
         return self.ref_attrs.get('solver.var',{})   
@@ -846,18 +912,6 @@ class ProblemExec:
     def integrator_rates(self):
         return self.ref_attrs.get('time.rate',{})
     
-    #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
-    @property
-    def all_variable_refs(self)->dict:
-        ing = self.integrator_vars
-        stt = self.dynamic_state
-        vars = self.problem_vars
-        return {**ing,**stt,**vars}
-    
-    @property
-    def all_variables(self)->dict:
-        return self.system.system_references()['attributes']
-    
     #Y solver variables
     @property
     def problem_objs(self):
@@ -881,7 +935,49 @@ class ProblemExec:
 
     @property
     def signals(self):
-        return self.ref_attrs.get('signal.signal',{})       
+        return self.ref_attrs.get('signal.signal',{})
+
+    #formatted output
+    @property
+    def solveable(self):
+        """checks the system's references to determine if its solveabl"""
+        if self.problem_vars:
+            #TODO: expand this
+            return True
+        return False
+
+    @property
+    def integrator_refs(self):
+        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target parameter names """
+        dc  = self.dynamic_state.copy()
+        for int_name,intinst in self.integrators.items():
+            if intinst.parm in dc:
+                raise KeyError(f'conflict with integrator name {intinst.parm} and dynamic state')
+            dc.update({intinst.parm:intinst.derivative})
+        return dc
+    
+    #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
+    @property
+    def all_variable_refs(self)->dict:
+        ing = self.integrator_vars
+        stt = self.dynamic_state
+        vars = self.problem_vars
+        return {**ing,**stt,**vars}
+    
+    @property
+    def all_variables(self)->dict:
+        #TODO: ensure system refes are fresh per system runtime events
+        return self.system.system_references(False)['attributes']
+    
+    @property
+    def all_system_references(self)->dict:
+        refs = self.system.system_references(False)
+        out = {}
+        out.update(refs['attributes'])
+        out.update(refs['properties'])
+        return out
+    
+
     
 #subclass before altering please!
 ProblemExec._class_cache = ProblemExec

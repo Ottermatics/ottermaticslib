@@ -27,7 +27,7 @@ def name_generator(instance):
     log.debug(f"generated name: {out}")
     return out
 
-PROTECTED_NAMES = ['solver','dataframe']
+PROTECTED_NAMES = ['solver','dataframe','t','time','_anything_changed']
 
 # Wraps Configuration with a decorator, similar to @attrs.define(**options)
 def forge(cls=None, **kwargs):
@@ -145,7 +145,7 @@ def signals_slots_handler(
 
     for t in fields:
         if t.name in PROTECTED_NAMES:
-            raise Exception(f"cannot use {k} as a field name, its protected")        
+            raise Exception(f"cannot use {t.name} as a field name, its protected")        
         if t.type is None:
             log.warning(f"{cls.__name__}.{t.name} has no type")
 
@@ -372,6 +372,7 @@ class Configuration(AttributedBaseMixin):
         :param level: the current level, defaults to 0 if not set
         """
         from engforge.configuration import Configuration
+        from engforge.components import SolveableInterface
 
         if changed is None:
             # top!
@@ -409,7 +410,12 @@ class Configuration(AttributedBaseMixin):
         # Finally make the new system with changed internals
         self.debug(f"changing with changes {self} {kwcomps} {kw}")
         new_sys = attrs.evolve(self, **kwcomps, **kw)
-        changed[self] = new_sys
+        changed[self] = new_sys 
+
+        #Finally change references!
+        if isinstance(new_sys, SolveableInterface):
+            new_sys.system_references(recache=True)
+
         return new_sys
 
     def go_through_configurations(

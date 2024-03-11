@@ -1,5 +1,5 @@
 import unittest
-from engforge.test.testing_components import *
+from engforge.test.solver_testing_components import *
 from engforge.problem_context import ProblemExec
 import itertools
 

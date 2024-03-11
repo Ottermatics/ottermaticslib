@@ -20,7 +20,7 @@ class IntegratorInstance(AttributeInstance):
     # TODO: add forward implicit solver
 
     def __init__(self, solver: "Time", system: "System") -> None:
-        self.solver = solver
+        self.class_attr = self.solver = solver
         self.system = system
         self.compile()
 
@@ -31,6 +31,26 @@ class IntegratorInstance(AttributeInstance):
 
     def as_ref_dict(self):
         return {'rate':self.derivative,'parm':self.parameter}
+    
+    @property
+    def rates(self):
+        return {self.name: self.class_attr.derivative}
+    
+    @property
+    def integrated(self):
+        return {self.name: self.class_attr.parameter}
+
+    @property
+    def parm(self):
+        return self.class_attr.parameter
+    
+    @property
+    def rate(self):
+        return self.class_attr.derivative
+    
+    @property
+    def current_rate(self):
+        return self.derivative.value()
 
 
 #TODO: depriciate modes and update for dynamicmixin strategies
@@ -48,6 +68,8 @@ class Time(ATTR_BASE):
         parameter: "attrs.Attribute",
         derivative: "system_property",
         mode: str = "euler",
+        active=True,
+        combos='default'
     ):
         """Defines an ODE like integrator that will be integrated over time with the defined integration rule.
 
@@ -57,13 +79,14 @@ class Time(ATTR_BASE):
         new_name = f"TRANSIENT_{mode}_{parameter}_{derivative}".replace(
             ".", "_"
         )
-        new_name = new_name + "_" + str(uuid.uuid4()).replace("-", "")[0:16]
+        #new_name = new_name
         new_dict = dict(
             mode=mode,
             name=new_name,
             parameter=parameter,
             derivative=derivative,
-            # type=cls,
+            active=active,
+            combos=cls.process_combos(combos)
         )
         return cls._setup_cls(new_name, new_dict)
 

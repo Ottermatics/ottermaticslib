@@ -14,11 +14,11 @@ start with single phase and move to others
 
 from engforge.components import Component
 from engforge.configuration import forge
+from engforge.system_reference import Ref
 from engforge.tabulation import (
     system_property,
     NUMERIC_VALIDATOR,
     STR_VALIDATOR,
-    Ref,
 )
 from engforge.eng.fluid_material import FluidMaterial
 from engforge.common import G_grav_constant

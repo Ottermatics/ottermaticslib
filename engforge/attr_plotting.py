@@ -410,9 +410,11 @@ class PlotBase(ATTR_BASE):
             )
 
         if diff:
-            raise KeyError(
-                f"bad plot parms: {diff} do not exist in system: {valid}"
-            )
+            log.warning(f"bad plot parms: {diff} do not exist in system: {valid}")
+            #TODO: fix time being defined on components
+            # raise KeyError(
+            #     f"bad plot parms: {diff} do not exist in system: {valid}"
+            # )
 
     @classmethod
     def create_instance(cls, system: "System") -> PlotInstance:

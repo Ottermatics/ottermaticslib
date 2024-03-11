@@ -61,7 +61,7 @@ def f_lin_min(system, Xref, Yref,weights=None, *args, **kw):
             vals,pos,neg = [],[],[]
             for p,n in zip(*grp):
                 ty = solver_types.get(p,None)
-                if ty is None or ty.solver.kind == 'min':
+                if ty is None or not hasattr(ty.solver,'kind')  or ty.solver.kind == 'min':
                     arry = pos
                 elif ty.solver.kind == 'max':
                     arry = neg
@@ -103,14 +103,16 @@ def objectify(function,system,Xrefs,solver_info=None,*args,**kwargs):
     """converts a function f(system,slv_info:dict) into a function that safely changes states to the desired values and then runs the function. A function is returend as f(x,*args,**kw)"""
     from engforge.problem_context import ProblemExec
     base_dict = dict(system=system,Xrefs=Xrefs,args=args,**kwargs)
-    alias_name = kwargs.pop("alias_name", f'{function.__name__}_obj')
+    lvl_name = f'obj_{function.__name__}'
+    alias_name = kwargs.pop("alias_name",lvl_name)
+
 
     def f_obj(x,*rt_args,**rt_kwargs):
         new_state = {p: x[i] for i, p in enumerate(Xrefs)}
         #with revert_X(system, Xrefs, Xnext=new_state ) as x_prev:
         
         #Enter existing problem context
-        with ProblemExec(system,{},Xnew=new_state,ctx_fail_new=True) as exc:
+        with ProblemExec(system,{},Xnew=new_state,ctx_fail_new=True,level_name=lvl_name) as exc:
             #print(locals()['solver_info'])
             updtinfo = base_dict.copy()
             updtinfo.update(x=x,rt_args=rt_args, **rt_kwargs)
@@ -136,7 +138,8 @@ def secondary_obj(
     from engforge.problem_context import ProblemExec
     parms = list(Xrefs.keys())  # static x_basis
     base_dict = dict(system=system,args=args,Xrefs=Xrefs,**kwargs)
-    alias_name = kwargs.pop("alias_name", f'{obj_f.__name__}_scndry')
+    lvl_name = f'{obj_f.__name__}_scndry'
+    alias_name = kwargs.pop("alias_name", lvl_name)
 
     def f(x,*rt_args,**rt_kwargs): 
 
@@ -145,7 +148,7 @@ def secondary_obj(
         #with revert_X(system, Xrefs,Xnext=new_state) as x_prev:
 
         #Enter existing problem context
-        with ProblemExec(system,{},Xnew=new_state,ctx_fail_new=True) as exc:
+        with ProblemExec(system,{},Xnew=new_state,ctx_fail_new=True,level_name=lvl_name) as exc:
             A = base_call(x)
             solver_info = base_dict.copy()
             solver_info.update(x=x,Xrefs=Xrefs,normalize=normalize,rt_args=rt_args, **rt_kwargs)
@@ -297,9 +300,6 @@ def refmin_solve(
     Xo=None,
     weights: np.array = None,
     reset=True,
-    doset=True,
-    fail=True,
-    ret_ans=False,
     ffunc=f_lin_min,
     **kw,
 ):
@@ -335,7 +335,8 @@ def refmin_solve(
     system.debug(f'minimize! {Fc.__name__,Xo,parms,kw}')
     kw.pop('info',None)
     ans = sciopt.minimize(Fc, Xo, **kw)
-    return process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans)
+    return ans
+    #return process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans)
 
 
 def handle_normalize(norm,Xref,Yref):
@@ -354,28 +355,28 @@ def handle_normalize(norm,Xref,Yref):
     return normX,normY  
 
 
-def process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans):
-    if ret_ans:
-        return ans
-
-    if ans.success:
-        ans_dct = {p: a for p, a in zip(parms, ans.x)}
-        if doset:
-            Ref.refset_input(Xref, ans_dct)
-        elif reset:
-            Ref.refset_input(Xref, x_pre)
-        return ans_dct
-
-    else:
-        min_dict = {p: a for p, a in zip(parms, ans.x)}
-        if reset:
-            Ref.refset_input(Xref, x_pre)
-        elif doset:
-            Ref.refset_input(Xref, min_dict)
-            return min_dict
-        if fail:
-            raise Exception(f"failed to solve {ans.message}")
-        return min_dict
+# def process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans):
+#     if ret_ans:
+#         return ans
+# 
+#     if ans.success:
+#         ans_dct = {p: a for p, a in zip(parms, ans.x)}
+#         if doset:
+#             Ref.refset_input(Xref, ans_dct)
+#         elif reset:
+#             Ref.refset_input(Xref, x_pre)
+#         return ans_dct
+# 
+#     else:
+#         min_dict = {p: a for p, a in zip(parms, ans.x)}
+#         if reset:
+#             Ref.refset_input(Xref, x_pre)
+#         elif doset:
+#             Ref.refset_input(Xref, min_dict)
+#             return min_dict
+#         if fail:
+#             raise Exception(f"failed to solve {ans.message}")
+#         return min_dict
 
 
 

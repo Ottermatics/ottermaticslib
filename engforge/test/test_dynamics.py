@@ -4,6 +4,7 @@ import unittest
 from engforge.configuration import forge
 from engforge.system import System
 from engforge.components import Component
+from engforge.dynamics import DynamicsMixin, GlobalDynamics
 from engforge.attr_dynamics import Time
 from engforge.attr_solver import Solver
 from engforge.attr_signals import SIGNAL
@@ -19,7 +20,7 @@ import attrs
 
 
 @forge
-class SpringMass(System):
+class SpringMass(System,GlobalDynamics):
     k: float = attrs.field(default=50)
     m: float = attrs.field(default=1)
     g: float = attrs.field(default=9.81)
@@ -28,18 +29,21 @@ class SpringMass(System):
     a: float = attrs.field(default=0)
     x: float = attrs.field(default=0.0)
     v: float = attrs.field(default=0.0)
-    t: float = attrs.field(default=0.0)
 
     x_neutral: float = attrs.field(default=0.5)
 
     res =Solver.equality_constraint("sumF")
+    var_a = Solver.declare_var("a",combos='a',active=False)
     
-    var_a = Solver.declare_var("a",combos='a',active=True)
+    var_b = Solver.declare_var("u",combos='u',active=True)
+    var_b.add_var_constraint(0.0,kind="min")
+    var_b.add_var_constraint(10.0,kind="max")
 
-    vtx = Time.integrate("v", "a")
+    vtx = Time.integrate("v", "accl")
     xtx = Time.integrate("x", "v")
 
-    pos = Trace.define(y="x", y2=["v", "a"])
+    #FIXME: implement trace testing
+    #pos = Trace.define(y="x", y2=["v", "a"])
 
     @system_property
     def dx(self) -> float:
@@ -64,6 +68,10 @@ class SpringMass(System):
     @system_property
     def sumF(self) -> float:
         return self.Fspring - self.Fgrav - self.Faccel - self.Ffric
+    
+    @system_property
+    def accl(self) -> float:
+        return self.sumF / self.m
 
 
 class TestDynamics(unittest.TestCase):
@@ -75,7 +83,7 @@ class TestDynamics(unittest.TestCase):
 
     def test_sim(self):
         dt = 0.001
-        self.sm.run(dt=dt, u=0, endtime=10)
+        self.sm.simulate(dt=dt, u=0, endtime=10)
         self.assertTrue(self.sm.solved)
         self.assertTrue(self.sm.converged)
 

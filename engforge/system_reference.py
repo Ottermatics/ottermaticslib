@@ -11,7 +11,7 @@ import collections
 import scipy.optimize as sciopt
 from contextlib import contextmanager
 from engforge.properties import *
-
+import copy
 
 class RefLog(LoggingMixin):
     pass
@@ -187,13 +187,13 @@ class Ref:
             changes["key"] = self.key
         if "comp" not in changes:
             changes["comp"] = self.comp
-        copy = copy.copy(self)
-        copy.set(**changes)
-        return copy
+        cy = copy.copy(self)
+        cy.set(**changes)
+        return cy
 
     def value(self,*args,**kw):
 
-        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 5:
+        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 2:
             self.comp.msg(f"REF[get] {self.comp} {self.key}")
 
         if self.key_override:
@@ -209,7 +209,7 @@ class Ref:
             o = self.eval_f(o)
         self._last = o
 
-        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 5:
+        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level <= 5:
             self.comp.msg(f"REF[get] {self.comp} {self.key} | got: {o}")
 
         return o
