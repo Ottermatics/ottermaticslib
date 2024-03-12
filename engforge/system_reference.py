@@ -225,16 +225,18 @@ class Ref:
             raise Exception(f"not allowed to set value on {self.key}")
 
     def __str__(self) -> str:
+        hxd = str(hex(id(self)))[-6:]
         if self.use_dict:
-            return f"REF[DICT.{self.key}]"
+            return f"REF[{hxd}][DICT.{self.key}]"
         if self.key_override:
-            return f"REF[{self.comp.classname}.{self.key.__name__}]"
-        return f"REF[{self.comp.classname}.{self.key}]"
+            return f"REF[{hxd}][{self.comp.classname}.{self.key.__name__}]"
+        return f"REF[{hxd}][{self.comp.classname}.{self.key}]"
 
     def __repr__(self) -> str:
+        hxd = str(hex(id(self)))[-6:]
         if self.key_override:
-            return f"REF[{self.comp.classname}.{self.key.__name__}]"        
-        return f"REF[{self.comp.classname}.{self.key}]"
+            return f"REF[{hxd}][{self.comp.classname}.{self.key.__name__}]"        
+        return f"REF[{hxd}][{self.comp.classname}.{self.key}]"
 
     # Utilty Methods
     refset_get = refset_get

@@ -540,20 +540,26 @@ class GlobalDynamics(DynamicsMixin):
 
         #TODO: put copy system in problem context
         system = self.copy_config_at_state()
-        system.create_state_matrix() #TODO: recursively initalize transient components
+
+        #TODO: recursively initalize transient components
+        system.create_state_matrix() 
 
         #Time Iteration Context
-        with ProblemExec(system,level_name='simulate',**kwargs) as pbx:
+        with ProblemExec(system,level_name='sim',**kwargs) as pbx:
 
             #Unpack Transient Problem
-            intl_refs = pbx.integrator_refs
+            intl_refs = pbx.integrator_parm_refs
             refs = pbx.sys_refs
 
-            self.info(f'initial state {X0} {intl_refs}| {refs}')
+            if self.log_level < 10:
+                self.debug(f'initial state {X0} {intl_refs}| {refs}')
 
+            x_cur = X0 = {k: v.value() for k, v in intl_refs.items()}
             if X0 is None:
                 # get current
-                X0 = {k: v.value() for k, v in intl_refs.items()}
+                X0 = x_cur
+            
+            #this will fail if X0 doesn't have solver parameteres
             X0 = np.array([X0[p] for p in intl_refs])
 
             #Gather data
@@ -573,7 +579,8 @@ class GlobalDynamics(DynamicsMixin):
             if not Yobj and Yeq:
                 #TODO: handle case of Yineq == None: root solve
                 self.info(f'making Yobj from Yeq: {Yeq}')
-                Yobj = {k:v.copy(eval_f = lambda v:1+v**2) for k,v in Yeq.items()}
+                Yobj = { k: v.copy(eval_f = lambda v:1+v**2) 
+                            for k,v in Yeq.items() }
             elif not Yobj:
                 #minimize the product of all parameters, so the smallest value is the best that satisfies all constraints
                 self.info(f'making Yobj from X: {Xss}')
@@ -590,16 +597,18 @@ class GlobalDynamics(DynamicsMixin):
                 if self.log_level < 10:
                     self.info(f'sim_iter {t} {x} {Xin}')
 
-                with ProblemExec(system,level_name='tr_slvr',Xnew=Xin,**kwargs) as pbx:
+                system.time = t
+
+                with ProblemExec(system,level_name='tr_slvr',Xnew=Xin) as pbx:
 
                     # solver always gets a copy of x
                     solver[t] = x #TODO: stateful capture
                     
                     # test for record time #TODO: rates / events ect    
-                    #if not data or t > max(data) + dt:
-                    data[t] = cs = pbx.get_ref_values()
-                        #if self.log_level < 10:
-                        #    self.info(f'record {t}| {Xin==cs} |{Xin} == {cs} ')
+                    if not data or t > max(data) + dt:
+                        data[t] = cs = pbx.get_ref_values()
+                        if self.log_level < 10:
+                            self.info(f'record {t}| {Xin}')
 
                     #ad hoc time integration
                     for name, trdct in pbx.integrators.items():
@@ -622,7 +631,7 @@ class GlobalDynamics(DynamicsMixin):
                     # solvers
                     if run_solver and pbx.solveable:
                         # TODO: add in any transient
-                        with ProblemExec(system,level_name='ss_slvr',**kwargs) as pbx:
+                        with ProblemExec(system,level_name='ss_slvr') as pbx:
                             
                             #TODO: handle various cases of (obj,eq,ineq)
                             #normally obj is handled via min/max objective
@@ -636,7 +645,7 @@ class GlobalDynamics(DynamicsMixin):
                             else:
                                 #TODO: handle failure options
                                 if pbx.raise_on_opt_failure:
-                                    pbx.exit_to_level('simulate',pbx.fail_revert)
+                                    pbx.exit_to_level('sim',pbx.fail_revert)
                                 else:
                                     pbx.exit_to_level('ss_slvr',pbx.fail_revert)
 
@@ -646,6 +655,8 @@ class GlobalDynamics(DynamicsMixin):
                     pbx.exit_to_level('tr_slvr',False)
 
                 if any( np.isnan(V_dxdt) ):
+                    pbx.exit_and_revert()
+                    #TODO: handle this better, seems to cause a warning
                     raise ValueError(f'infeasible! nan result {V_dxdt} {out} {Xin} {cs}')
 
                 return V_dxdt

@@ -30,14 +30,17 @@ class SpringMass(System,GlobalDynamics):
     x: float = attrs.field(default=0.0)
     v: float = attrs.field(default=0.0)
 
+    wo_f: float = attrs.field(default=1.0)
+    Fa: float = attrs.field(default=10.0)
+
     x_neutral: float = attrs.field(default=0.5)
 
     res =Solver.equality_constraint("sumF")
     var_a = Solver.declare_var("a",combos='a',active=False)
     
-    var_b = Solver.declare_var("u",combos='u',active=True)
+    var_b = Solver.declare_var("u",combos='u',active=False)
     var_b.add_var_constraint(0.0,kind="min")
-    var_b.add_var_constraint(10.0,kind="max")
+    var_b.add_var_constraint(1.0,kind="max")
 
     vtx = Time.integrate("v", "accl")
     xtx = Time.integrate("x", "v")
@@ -67,8 +70,12 @@ class SpringMass(System,GlobalDynamics):
 
     @system_property
     def sumF(self) -> float:
-        return self.Fspring - self.Fgrav - self.Faccel - self.Ffric
+        return self.Fspring - self.Fgrav - self.Faccel - self.Ffric + self.Fext
     
+    @system_property
+    def Fext(self) -> float:
+        return self.Fa * np.cos( self.time * self.wo_f )
+
     @system_property
     def accl(self) -> float:
         return self.sumF / self.m

@@ -587,7 +587,166 @@ class ProblemExec:
             output["success"] = False
     
         return output  
+         
 
+    #Logging to class logger
+    @property
+    def identity(self):
+        return f'PROB|{self.name}'
+
+    def msg(self,msg):
+        if log.log_level < 5:
+            log.msg(f'{self.identity}| {msg}')
+
+    def debug(self,msg):
+        if log.log_level <= 15:
+            log.debug(f'{self.identity}| {msg}')
+
+    def warning(self,msg):
+        log.warning(f'{self.identity}| {msg}')
+
+    def info(self,msg):
+        log.info(f'{self.identity}| {msg}')
+
+    def error(self,error,msg):
+        log.error(error,f'{self.identity}| {msg}')        
+
+    def critical(self,msg):
+        log.critical(f'{self.identity}| {msg}')
+
+    #Safe Access Methods
+    @property
+    def ref_attrs(self):
+        return self.sys_refs.get('attrs',{})
+
+    @property
+    def attr_inst(self):
+        return self.sys_refs.get('type',{})
+    
+    @property
+    def dynamic_comps(self):
+        return self.sys_refs.get('dynamic_comps',{})
+
+
+    #Instances
+    @property
+    def integrators(self):
+        return self.attr_inst.get('time',{})
+    
+    @property
+    def signal_inst(self):
+        return self.attr_inst.get('signal',{})
+
+    @property
+    def solver_inst(self):
+        return self.attr_inst.get('solver',{})
+
+    @property
+    def kwargs(self):
+        return self.slv_kw
+
+    #X solver variable refs
+    @property
+    def problem_vars(self):
+        return self.ref_attrs.get('solver.var',{})   
+
+    @property
+    def dynamic_state(self):
+        return self.ref_attrs.get('dynamics.state',{})
+    
+    @property
+    def dynamic_rate(self):
+        return self.ref_attrs.get('dynamics.rate',{})    
+    
+    @property
+    def problem_input(self):
+        return self.ref_attrs.get('dynamics.input',{})      
+
+    @property
+    def integrator_vars(self):
+        return self.ref_attrs.get('time.parm',{})
+    
+    @property
+    def integrator_rates(self):
+        return self.ref_attrs.get('time.rate',{})
+    
+    #Y solver variables
+    @property
+    def problem_objs(self):
+        return self.ref_attrs.get('solver.obj',{})   
+
+    @property
+    def problem_eq(self):
+        return self.ref_attrs.get('solver.eq',{})
+    
+    @property
+    def problem_ineq(self):
+        return self.ref_attrs.get('solver.ineq',{})
+    
+    @property
+    def signals_source(self):
+        return self.ref_attrs.get('signal.source',{})
+    
+    @property
+    def signals_target(self):
+        return self.ref_attrs.get('signal.target',{})
+
+    @property
+    def signals(self):
+        return self.ref_attrs.get('signal.signal',{})
+
+    #formatted output
+    @property
+    def solveable(self):
+        """checks the system's references to determine if its solveabl"""
+        if self.problem_vars:
+            #TODO: expand this
+            return True
+        return False
+
+    @property
+    def integrator_rate_refs(self):
+        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target parameter names """
+        dc  = self.dynamic_state.copy()
+        for int_name,intinst in self.integrators.items():
+            if intinst.parm in dc:
+                raise KeyError(f'conflict with integrator name {intinst.parm} and dynamic state')
+            dc.update({intinst.parm:intinst.derivative})
+        return dc
+    
+    @property
+    def integrator_parm_refs(self):
+        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target parameter names """
+        dc  = self.dynamic_state.copy()
+        for int_name,intinst in self.integrators.items():
+            if intinst.parm in dc:
+                raise KeyError(f'conflict with integrator name {intinst.parm} and dynamic state')
+            dc.update({intinst.parm:intinst.parameter})
+        return dc    
+    
+    #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
+    @property
+    def all_variable_refs(self)->dict:
+        ing = self.integrator_vars
+        stt = self.dynamic_state
+        vars = self.problem_vars
+        return {**ing,**stt,**vars}
+    
+    @property
+    def all_variables(self)->dict:
+        #TODO: ensure system refes are fresh per system runtime events
+        return self.system.system_references(False)['attributes']
+    
+    @property
+    def all_system_references(self)->dict:
+        refs = self.system.system_references(False)
+        out = {}
+        out.update(refs['attributes'])
+        out.update(refs['properties'])
+        return out
+    
+
+    #Solver Parsing Methods
     def sys_solver_variables(self,as_set=False,as_flat=False,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
@@ -829,154 +988,7 @@ class ProblemExec:
         #copy from data
         filtr = dict(list(filter(lambda kv: kv[1] is not None or kv[0] in _check_keys, output.items())))
         #print(f'got {combos} -> {comboos} from {kwargs} with {_check_keys}')
-        return filtr              
-
-    #Logging to class logger
-    @property
-    def identity(self):
-        return f'PROB|{self.name}'
-
-    def msg(self,msg):
-        if log.log_level < 5:
-            log.msg(f'{self.identity}| {msg}')
-
-    def debug(self,msg):
-        if log.log_level <= 15:
-            log.debug(f'{self.identity}| {msg}')
-
-    def warning(self,msg):
-        log.warning(f'{self.identity}| {msg}')
-
-    def info(self,msg):
-        log.info(f'{self.identity}| {msg}')
-
-    def error(self,error,msg):
-        log.error(error,f'{self.identity}| {msg}')        
-
-    def critical(self,msg):
-        log.critical(f'{self.identity}| {msg}')
-
-    #Safe Access Methods
-    @property
-    def ref_attrs(self):
-        return self.sys_refs.get('attrs',{})
-
-    @property
-    def attr_inst(self):
-        return self.sys_refs.get('type',{})
-    
-    @property
-    def dynamic_comps(self):
-        return self.sys_refs.get('dynamic_comps',{})
-
-
-    #Instances
-    @property
-    def integrators(self):
-        return self.attr_inst.get('time',{})
-    
-    @property
-    def signal_inst(self):
-        return self.attr_inst.get('signal',{})
-
-    @property
-    def solver_inst(self):
-        return self.attr_inst.get('solver',{})
-
-    @property
-    def kwargs(self):
-        return self.slv_kw
-
-    #X solver variable refs
-    @property
-    def problem_vars(self):
-        return self.ref_attrs.get('solver.var',{})   
-
-    @property
-    def dynamic_state(self):
-        return self.ref_attrs.get('dynamics.state',{})
-    
-    @property
-    def dynamic_rate(self):
-        return self.ref_attrs.get('dynamics.rate',{})    
-    
-    @property
-    def problem_input(self):
-        return self.ref_attrs.get('dynamics.input',{})      
-
-    @property
-    def integrator_vars(self):
-        return self.ref_attrs.get('time.parm',{})
-    
-    @property
-    def integrator_rates(self):
-        return self.ref_attrs.get('time.rate',{})
-    
-    #Y solver variables
-    @property
-    def problem_objs(self):
-        return self.ref_attrs.get('solver.obj',{})   
-
-    @property
-    def problem_eq(self):
-        return self.ref_attrs.get('solver.eq',{})
-    
-    @property
-    def problem_ineq(self):
-        return self.ref_attrs.get('solver.ineq',{})
-    
-    @property
-    def signals_source(self):
-        return self.ref_attrs.get('signal.source',{})
-    
-    @property
-    def signals_target(self):
-        return self.ref_attrs.get('signal.target',{})
-
-    @property
-    def signals(self):
-        return self.ref_attrs.get('signal.signal',{})
-
-    #formatted output
-    @property
-    def solveable(self):
-        """checks the system's references to determine if its solveabl"""
-        if self.problem_vars:
-            #TODO: expand this
-            return True
-        return False
-
-    @property
-    def integrator_refs(self):
-        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target parameter names """
-        dc  = self.dynamic_state.copy()
-        for int_name,intinst in self.integrators.items():
-            if intinst.parm in dc:
-                raise KeyError(f'conflict with integrator name {intinst.parm} and dynamic state')
-            dc.update({intinst.parm:intinst.derivative})
-        return dc
-    
-    #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
-    @property
-    def all_variable_refs(self)->dict:
-        ing = self.integrator_vars
-        stt = self.dynamic_state
-        vars = self.problem_vars
-        return {**ing,**stt,**vars}
-    
-    @property
-    def all_variables(self)->dict:
-        #TODO: ensure system refes are fresh per system runtime events
-        return self.system.system_references(False)['attributes']
-    
-    @property
-    def all_system_references(self)->dict:
-        refs = self.system.system_references(False)
-        out = {}
-        out.update(refs['attributes'])
-        out.update(refs['properties'])
-        return out
-    
+        return filtr     
 
     
 #subclass before altering please!
