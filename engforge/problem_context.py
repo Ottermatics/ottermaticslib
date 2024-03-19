@@ -66,7 +66,7 @@ import uuid
 
 
 #The KW Defaults for Solver via kw_dict
-slv_dflt_options = dict(combos='*',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None)
+slv_dflt_options = dict(combos='*',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None)
 #KW Defaults for context from **opts
 dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10,dynamic_mode= False)
 
@@ -147,10 +147,9 @@ class ProblemExec:
     #_sessions: dict = {} #TODO: support multiple systems
     X_start:dict = None
     X_end:dict = None
+    _dxdt = None #numeric/None/dict (True?)
 
-    
-
-    
+        
     def __init__(self,system,kw_dict=None,Xnew=None,ctx_fail_new=False,**opts):
         """
         Initializes the ProblemExec.
@@ -163,6 +162,7 @@ class ProblemExec:
         :param Xnew: The new state of the system to set wrt. reversion, optional
         :param ctx_fail_new: Whether to raise an error if no execution context is available, use in utility methods ect. Default is False.
         :param kw_dict: A keyword argument dictionary to be parsed for solver options, and removed from the outer context. Changes are made to this dictionary, so they are removed automatically from the outer context, and thus no longer passed to interior parameters.
+        :param dxdt: The dynamics integration method. Default is None meaning that dynamic parameters are not considered for minimization unless otherwise specified. Steady State can be specified by dxdt=0 all dynamic parameters are considered as solver variables, with the constraint that their rate of change is zero. If a dictionary is passed then the dynamic parameters are considered as solver variables, with the constraint that their rate of change is equal to the value in the dictionary, and all other unspecified rates are zero (steady).
 
         :param combos: The selection of combos. Default is '*' (select all).
         :param  ign_combos: The combos to be ignored.
@@ -180,6 +180,8 @@ class ProblemExec:
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
         """
+        self.debug(f'got keywords: {opts}')
+
         #parse the options to change behavior of the context
         if 'level_name' in opts:
             level_name = opts.pop('level_name')
@@ -196,8 +198,22 @@ class ProblemExec:
             opt_out = {k:v for k,v in opts.items() if k not in opt_in}
 
         if kw_dict is None:
-            kw_dict = {}
-        
+            kw_dict = {}   
+
+        #Define the handiling of rate integrals
+        dxdt = opts.pop('dxdt',None)
+        if dxdt is not None and dxdt is not False:
+            if dxdt == 0:
+                pass
+            elif dxdt is True:
+                pass
+            else:  # dxdt is a dictionary
+                # TODO: add dynamics integration (steady: dxdt==0, dxdt = C)
+                assert isinstance(dxdt, dict), f"not dict for dxdt: {dxdt}"
+                raise NotImplementedError(
+                    f"dynamic integration not yet implemented for dictionary based input: {dxdt}"
+                )
+        self._dxdt = dxdt        
             
         if hasattr(ProblemExec,'_session'):
             #TODO: update options for this instance
@@ -310,8 +326,9 @@ class ProblemExec:
         #return New
         self._class_cache._session = self
         self._class_cache.level_number = 0
-   
-        self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}')
+
+        refs = {k:v for k,v in self.sys_refs.get('attrs',{}).items() if v}
+        self.warning(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
         
 
 
@@ -321,11 +338,13 @@ class ProblemExec:
     def __exit__(self, exc_type, exc_value, traceback):
         #define exit action, to handle the error here return True. Otherwise error propigates up to top level      
 
-        #Last opprotunity to update the system
+        #Last opprotunity to update the system  at tsate
         if self.post_exec:
+            #a component cutsom callback + signals
             self.post_execute()
 
         if self.post_callback:
+            #a context custom callback
             self.post_callback()          
 
         #Exit Scenerio (boolean return important for context manager exit handling in heirarchy)
@@ -587,7 +606,34 @@ class ProblemExec:
             output["success"] = False
     
         return output  
-         
+    
+    #Dynamics Interface
+    def filter_vars(self,refs:list):
+        '''selects only settable refs'''
+        return {v.key:v for k,v in refs.items() if v.allow_set}
+    
+    def filter_prop(self,refs:list):
+        '''selects only settable refs'''
+        return {k:v for k,v in refs.items() if not v.allow_set}        
+
+    #X solver variable refs
+    @property
+    def problem_vars(self):
+        varx = self.ref_attrs.get('solver.var',{}) 
+        #Add the dynamic states
+        if self.dynamic_solve:
+            varx.update(self.filter_vars(self.dynamic_state))
+            varx.update(self.filter_vars(self.integrator_vars))
+        return varx
+
+    @property
+    def dynamic_solve(self)->bool:
+        dxdt = self._dxdt
+        in_type = isinstance(dxdt,(dict,float,int))
+        bool_type = (isinstance(dxdt,bool) and dxdt == True)
+        if in_type or bool_type:
+            return True
+        return False
 
     #Logging to class logger
     @property
@@ -626,8 +672,7 @@ class ProblemExec:
     @property
     def dynamic_comps(self):
         return self.sys_refs.get('dynamic_comps',{})
-
-
+    
     #Instances
     @property
     def integrators(self):
@@ -645,10 +690,6 @@ class ProblemExec:
     def kwargs(self):
         return self.slv_kw
 
-    #X solver variable refs
-    @property
-    def problem_vars(self):
-        return self.ref_attrs.get('solver.var',{})   
 
     @property
     def dynamic_state(self):
@@ -751,11 +792,6 @@ class ProblemExec:
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
         out = dict(dynamics=self.dynamic_state,integration=self.integrator_vars,variables=self.problem_vars)
-        
-        # flt = {}
-        # for k,v in out.items():
-        #     flt.update(v)
-        # return flt
 
         if as_set==True:
             vars = set.union(*(set(v) for k,v in out.items()))
@@ -766,6 +802,7 @@ class ProblemExec:
             for k,v in out.items():
                 flt.update(v)
             return flt
+        
         return out
 
     def sys_solver_objectives(self,**kw):
@@ -830,6 +867,9 @@ class ProblemExec:
         ex_arg = {"con_args": (),**kw}
         #Variable limit (function -> ineq, numeric -> bounds)
         for slvr, ref in sys_refs.get('solver.var',{}).items():
+            if slvr not in slv_inst:
+                self.warning(f'no solver instance for {slvr}')
+                continue
             slv = slv_inst[slvr]
             slv_constraints = slv.constraints
             if log.log_level < 7:

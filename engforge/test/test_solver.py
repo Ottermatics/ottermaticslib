@@ -7,7 +7,7 @@ import itertools
 class SolverRefSelection(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.sc = SolvSys()
+        self.sc = CubeSystem()
 
     def test_comps_solver_act(self):
         inv = 'ineq_cost,ineq_length,min_len'

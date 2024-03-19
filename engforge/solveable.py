@@ -51,9 +51,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
     # Update Flow
     def update(self, parent, *args, **kwargs):
+        """Kwargs comes from eval_kw in solver"""
         pass
 
     def post_update(self, parent, *args, **kwargs):
+        """Kwargs comes from eval_kw in solver"""
         pass
 
     def update_internal(self, eval_kw=None, ignore=None, *args, **kw):

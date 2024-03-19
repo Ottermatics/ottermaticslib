@@ -11,6 +11,7 @@ from engforge.properties import system_property
 from engforge.dynamics import DynamicsMixin,GlobalDynamics
 from engforge.logging import LoggingMixin
 
+
 import attrs
 import numpy as np
 
@@ -119,7 +120,7 @@ class SpaceMixin(SolveableInterface):
         return self.cost / self.volume 
 
 @forge(auto_attribs=True)
-class SolvComp(Component,SpaceMixin,DynamicsMixin):
+class CubeComp(Component,SpaceMixin,DynamicsMixin):
     # this should be energy neutral 🤞
     
     dynamic_state_parms: list = ["x", "y", "z"]
@@ -138,11 +139,11 @@ class SolvComp(Component,SpaceMixin,DynamicsMixin):
     
 
 @forge(auto_attribs=True)
-class SolvSys(System,SpaceMixin,GlobalDynamics):
+class CubeSystem(System,SpaceMixin,GlobalDynamics):
     
     dynamic_state_parms: list = ["x", "y", "z"]
 
-    comp = Slot.define(SolvComp)
+    comp = Slot.define(CubeComp)
 
     x: float = attrs.field(default=0.5)
     y: float = attrs.field(default=0.5)
@@ -198,3 +199,174 @@ class SolvSys(System,SpaceMixin,GlobalDynamics):
     @system_property
     def system_length(self) -> float:
         return self.combine_length + self.comp.combine_length
+    
+
+@forge(auto_attribs=True)
+class DynamicComponent(Component, DynamicsMixin):
+    dynamic_state_parms: list = ["x", "v"]
+    x: float = 1
+    v: float = 0
+
+    b: float = 0.1
+    K: float = 10
+    M: float = 100
+
+    x0: float = 0.5
+
+    nonlinear: bool = False
+    Fext: float = 0
+
+    acc =Solver.declare_var("x0")
+    no_load = Solver.equality_constraint("a")
+
+    def create_state_matrix(self, **kwargs) -> np.ndarray:
+        """creates the state matrix for the system"""
+        return np.array([[0, 1], [-self.K / self.M, -self.b / self.M]])
+
+    def create_state_constants(self, **kwargs) -> np.ndarray:
+        """creates the input matrix for the system, called B"""
+        return np.array([0, self.K * self.x0 / self.M])
+
+    def update_state_constants(self, t, F, X) -> np.ndarray:
+        """override"""
+        F = F.copy()
+        F[-1] = (self.K * self.x0 - self.Fext) / self.M
+        return F
+
+    @system_property
+    def a(self) -> float:
+        return (-self.v * self.b - (self.x - self.x0) * self.K) / self.M
+
+@forge(auto_attribs=True)
+class TransientSys(Component):
+    x: float = 0
+    v: float = 0
+    a: float = 0
+
+    speed = Time.integrate("x", "v", mode="euler")
+    accel = Time.integrate("v", "a", mode="euler")
+
+@forge(auto_attribs=True)
+class DynamicSystem(System, GlobalDynamics):
+    dynamic_state_parms: list = ["x", "v"]
+
+    x: float = 0
+    v: float = 0
+    a: float = 0
+
+    Force: float = 0.0
+    Damp: float = 10
+    Mass: float = 100.0
+    K: float = 20
+
+    Fref: float = 10
+    omega: float = 1
+
+    comp = Slot.define(DynamicComponent)
+    trns = Slot.define(TransientSys)
+
+    sig = Signal.define("trns.a", "spring_accel")
+    fig = Signal.define("comp.Fext", "Force")
+    slv =Solver.declare_var( "Force")
+    #slv = Solver.declare_var("delta_a")
+
+    nonlinear: bool = True
+
+    @system_property
+    def spring_accel(self) -> float:
+        # print(self.comp.v,self.comp.x,self.comp.a)
+        return (
+            -self.comp.v * self.comp.b
+            - (self.comp.x - self.comp.x0) * self.comp.K
+        ) / self.comp.M
+
+    @system_property
+    def delta_a(self) -> float:
+        return (
+            self.Fref * np.cos(self.omega * self.time)
+            - self.Force
+            + self.v * self.Damp
+            - self.K * self.x
+        ) / self.Mass - self.spring_accel
+
+    def create_state_matrix(self, *args, **kwargs) -> np.ndarray:
+        """creates the state matrix for the system"""
+        return np.array(
+            [[0, 1.0], [-self.K / self.Mass, -1 * self.Damp / self.Mass]]
+        )
+
+    def create_state_constants(self, *args, **kwargs) -> np.ndarray:
+        """creates the input matrix for the system, called B"""
+        return np.array([0, self.Force / self.Mass])
+
+    def update_state_nonlinear(self, *args, **kwargs) -> np.ndarray:
+        """creates the state matrix for the system"""
+        return np.array(
+            [[0, 1.0], [-self.K / self.Mass, -1 * self.Damp / self.Mass]]
+        )
+
+    def update_state_constants(self, *args, **kwargs) -> np.ndarray:
+        """creates the input matrix for the system, called B"""
+        return np.array([0, self.Force / self.Mass])    
+    
+
+@forge
+class SpringMass(System,GlobalDynamics):
+    k: float = attrs.field(default=50)
+    m: float = attrs.field(default=1)
+    g: float = attrs.field(default=9.81)
+    u: float = attrs.field(default=0.3)
+
+    a: float = attrs.field(default=0)
+    x: float = attrs.field(default=0.0)
+    v: float = attrs.field(default=0.0)
+
+    wo_f: float = attrs.field(default=1.0)
+    Fa: float = attrs.field(default=10.0)
+
+    x_neutral: float = attrs.field(default=0.5)
+
+    res =Solver.equality_constraint("sumF")
+    var_a = Solver.declare_var("a",combos='a',active=False)
+    
+    var_b = Solver.declare_var("u",combos='u',active=False)
+    var_b.add_var_constraint(0.0,kind="min")
+    var_b.add_var_constraint(1.0,kind="max")
+
+    vtx = Time.integrate("v", "accl")
+    xtx = Time.integrate("x", "v")
+
+    #FIXME: implement trace testing
+    #pos = Trace.define(y="x", y2=["v", "a"])
+
+    @system_property
+    def dx(self) -> float:
+        return self.x_neutral - self.x
+
+    @system_property
+    def Fspring(self) -> float:
+        return self.k * self.dx
+
+    @system_property
+    def Fgrav(self) -> float:
+        return self.g * self.m
+
+    @system_property
+    def Faccel(self) -> float:
+        return self.a * self.m
+
+    @system_property
+    def Ffric(self) -> float:
+        return self.u * self.v
+
+    @system_property
+    def sumF(self) -> float:
+        return self.Fspring - self.Fgrav - self.Faccel - self.Ffric + self.Fext
+    
+    @system_property
+    def Fext(self) -> float:
+        return self.Fa * np.cos( self.time * self.wo_f )
+
+    @system_property
+    def accl(self) -> float:
+        return self.sumF / self.m
