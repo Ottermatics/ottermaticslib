@@ -37,14 +37,14 @@ The `_fail` argument can be used to raise an error if no solvables are selected.
 
 # Exit Mode Handling
 
-The ProblemExec supports the following exit mode handling parameters:
+The ProblemExec supports the following exit mode handling vars:
 
 - `fail_revert`: Whether to raise an error if no solvables are selected. Default is True.
 - `revert_last`: Whether to revert the last change. Default is True.
 - `revert_every`: Whether to revert every change. Default is True.
 - `exit_on_failure`: Whether to exit on first failure. Default is True.
 
-These parameters control the behavior of the ProblemExec when an error occurs or when no solvables are selected.
+These vars control the behavior of the ProblemExec when an error occurs or when no solvables are selected.
 
 """
 
@@ -161,8 +161,8 @@ class ProblemExec:
         :param system: The system to be executed.
         :param Xnew: The new state of the system to set wrt. reversion, optional
         :param ctx_fail_new: Whether to raise an error if no execution context is available, use in utility methods ect. Default is False.
-        :param kw_dict: A keyword argument dictionary to be parsed for solver options, and removed from the outer context. Changes are made to this dictionary, so they are removed automatically from the outer context, and thus no longer passed to interior parameters.
-        :param dxdt: The dynamics integration method. Default is None meaning that dynamic parameters are not considered for minimization unless otherwise specified. Steady State can be specified by dxdt=0 all dynamic parameters are considered as solver variables, with the constraint that their rate of change is zero. If a dictionary is passed then the dynamic parameters are considered as solver variables, with the constraint that their rate of change is equal to the value in the dictionary, and all other unspecified rates are zero (steady).
+        :param kw_dict: A keyword argument dictionary to be parsed for solver options, and removed from the outer context. Changes are made to this dictionary, so they are removed automatically from the outer context, and thus no longer passed to interior vars.
+        :param dxdt: The dynamics integration method. Default is None meaning that dynamic vars are not considered for minimization unless otherwise specified. Steady State can be specified by dxdt=0 all dynamic vars are considered as solver variables, with the constraint that their rate of change is zero. If a dictionary is passed then the dynamic vars are considered as solver variables, with the constraint that their rate of change is equal to the value in the dictionary, and all other unspecified rates are zero (steady).
 
         :param combos: The selection of combos. Default is '*' (select all).
         :param  ign_combos: The combos to be ignored.
@@ -180,12 +180,16 @@ class ProblemExec:
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
         """
-        self.debug(f'got keywords: {opts}')
+        if self.log_level < 15:
+            if hasattr(ProblemExec,'_session'):
+                self.debug(f'subctx{self.level_number}|  keywords: {kw_dict} and misc: {opts}')
+            else:
+                self.debug(f'context| keywords: {kw_dict} and misc: {opts}')
 
         #parse the options to change behavior of the context
-        if 'level_name' in opts:
+        if opts and 'level_name' in opts:
             level_name = opts.pop('level_name')
-        elif 'level_name' in kw_dict:
+        elif kw_dict and 'level_name' in kw_dict:
             level_name = kw_dict.pop('level_name')
         else:
             level_name = None
@@ -198,10 +202,15 @@ class ProblemExec:
             opt_out = {k:v for k,v in opts.items() if k not in opt_in}
 
         if kw_dict is None:
-            kw_dict = {}   
+            kw_dict = {}
 
         #Define the handiling of rate integrals
-        dxdt = opts.pop('dxdt',None)
+        if 'dxdt' in opts:
+            dxdt = opts.pop('dxdt')
+        elif 'dxdt' in kw_dict:
+            dxdt = kw_dict.pop('dxdt')
+        else:
+            dxdt = None        
         if dxdt is not None and dxdt is not False:
             if dxdt == 0:
                 pass
@@ -213,7 +222,7 @@ class ProblemExec:
                 raise NotImplementedError(
                     f"dynamic integration not yet implemented for dictionary based input: {dxdt}"
                 )
-        self._dxdt = dxdt        
+        self._dxdt = dxdt                 
             
         if hasattr(ProblemExec,'_session'):
             #TODO: update options for this instance
@@ -274,18 +283,19 @@ class ProblemExec:
 
         self.system = system
         assert isinstance(self.system,SolveableInterface), 'only solveable interfaces are supported for execution context'
+        self.system._last_context = self
 
         #Recache system references
         if isinstance(self.system, System):
             #get the fresh references!
             self.system.system_references(recache=True)
         
-        #Extract solver parameters and set them on this object, they will be distributed to any new further execution context's via monkey patch above
+        #Extract solver vars and set them on this object, they will be distributed to any new further execution context's via monkey patch above
         in_kw = self.get_extra_kws(kwargs,slv_dflt_options,use_defaults=False)
         self.slv_kw = self.get_extra_kws(kw_dict,slv_dflt_options,rmv=True)
         self.slv_kw.update(in_kw) #update with input!
 
-        self.sys_refs = self.system.solver_parameters(**self.slv_kw)
+        self.sys_refs = self.system.solver_vars(**self.slv_kw)
 
         #Grab inputs and set to system
         for k,v in dflt_parse_kw.items():
@@ -297,8 +307,8 @@ class ProblemExec:
         self._post_update_refs = self.system.collect_post_update_refs()
         
         #Problem Variable Definitions
-        self.solver_vars = self.sys_solver_variables()
-        self.Xref = self.solver_vars['variables']
+        #self.solver_vars = self.sys_solver_variables()
+        self.Xref = self.problem_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
         self.constraints = self.sys_solver_constraints(self.Xref,cons,)
@@ -360,10 +370,12 @@ class ProblemExec:
             if isinstance(exc_value,ProblemExitAtLevel):
                 #should we stop?
                 if exc_value.level == self.level_name:
-                    self.debug(f'[{self.level_number}-{self.level_name}] exit at level {exc_value}')
+                    if self.log_level <= 11:
+                        self.debug(f'[{self.level_number}-{self.level_name}] exit at level {exc_value}')
                     ext = True                     
                 else:
-                    self.msg(f'[{self.level_number}-{self.level_name}] exit not at level {exc_value}')
+                    if self.log_level <= 5:
+                        self.msg(f'[{self.level_number}-{self.level_name}] exit not at level {exc_value}')
                     ext = False
 
                 #Check if we missed a level name and its the top level, if so then we raise a real error!
@@ -375,7 +387,8 @@ class ProblemExec:
             
             #TODO: expand this per options
             else:
-                self.info(f'[{self.level_number}-{self.level_name}] problem exit revert={exc_value.revert}')
+                if self.log_level <= 18:
+                    self.info(f'[{self.level_number}-{self.level_name}] problem exit revert={exc_value.revert}')
 
                 ext = True
 
@@ -417,7 +430,8 @@ class ProblemExec:
 
     def error_action(self,error):
         """handles the error action wrt to the problem"""
-        self.debug(f'[{self.level_number}-{self.level_name}] with input: {self.kwargs}')
+        if self.log_level <= 11:
+            self.debug(f'[{self.level_number}-{self.level_name}] with input: {self.kwargs}')
         
         if self.fail_revert:
             self.revert_to_start()
@@ -432,8 +446,9 @@ class ProblemExec:
     
     def clean_context(self):
         if hasattr(ProblemExec,'_session') and self._class_cache._session is self:
-            #TODO: restore state from `X_start` 
-            self.debug(f'[{self.level_number}-{self.level_name}] closing execution session')
+            #TODO: restore state from `X_start`
+            if self.log_level <= 11:
+                self.debug(f'[{self.level_number}-{self.level_name}] closing execution session')
             self._class_cache.level_number = 0
             del self._class_cache._session
         elif hasattr(self._class_cache,'_session'):
@@ -524,9 +539,9 @@ class ProblemExec:
         self,Xref,Yref,output=None,**kw
     ):
         """
-        Solve the minimization problem using the given parameters. And sets the system state to the solution depending on input of 
+        Solve the minimization problem using the given vars. And sets the system state to the solution depending on input of 
 
-        Solve the root problem using the given parameters.
+        Solve the root problem using the given vars.
         :param Xref: The reference input values.
         :param Yref: The reference objective values to minimize.
         :param output: The output dictionary to store the results. (default: None)
@@ -568,10 +583,10 @@ class ProblemExec:
     def handle_solution(self,answer,Xref,Yref,output):
         #TODO: move exit condition handiling somewhere else, reduce cross over from process_ans
         thresh = self.success_thresh
-        parms = list(Xref)
+        vars = list(Xref)
 
         #Output Results
-        Xa = {p: answer.x[i] for i, p in enumerate(parms)}
+        Xa = {p: answer.x[i] for i, p in enumerate(vars)}
         output["Xans"] = Xa
         Ref.refset_input(Xref,Xa)
 
@@ -619,6 +634,7 @@ class ProblemExec:
     #X solver variable refs
     @property
     def problem_vars(self):
+        """solver variables + dynamics states when dynamic_solve is True"""
         varx = self.ref_attrs.get('solver.var',{}) 
         #Add the dynamic states
         if self.dynamic_solve:
@@ -628,6 +644,7 @@ class ProblemExec:
 
     @property
     def dynamic_solve(self)->bool:
+        """indicates if the system is dynamic"""
         dxdt = self._dxdt
         in_type = isinstance(dxdt,(dict,float,int))
         bool_type = (isinstance(dxdt,bool) and dxdt == True)
@@ -638,7 +655,11 @@ class ProblemExec:
     #Logging to class logger
     @property
     def identity(self):
-        return f'PROB|{self.name}'
+        return f'PROB|{self.level_name}'
+
+    @property
+    def log_level(self):
+        return log.log_level
 
     def msg(self,msg):
         if log.log_level < 5:
@@ -705,7 +726,7 @@ class ProblemExec:
 
     @property
     def integrator_vars(self):
-        return self.ref_attrs.get('time.parm',{})
+        return self.ref_attrs.get('time.var',{})
     
     @property
     def integrator_rates(self):
@@ -747,22 +768,22 @@ class ProblemExec:
 
     @property
     def integrator_rate_refs(self):
-        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target parameter names """
+        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target var names """
         dc  = self.dynamic_state.copy()
         for int_name,intinst in self.integrators.items():
-            if intinst.parm in dc:
-                raise KeyError(f'conflict with integrator name {intinst.parm} and dynamic state')
-            dc.update({intinst.parm:intinst.derivative})
+            if intinst.var in dc:
+                raise KeyError(f'conflict with integrator name {intinst.var} and dynamic state')
+            dc.update({intinst.var:intinst.rate})
         return dc
     
     @property
-    def integrator_parm_refs(self):
-        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target parameter names """
+    def integrator_var_refs(self):
+        """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target var names """
         dc  = self.dynamic_state.copy()
         for int_name,intinst in self.integrators.items():
-            if intinst.parm in dc:
-                raise KeyError(f'conflict with integrator name {intinst.parm} and dynamic state')
-            dc.update({intinst.parm:intinst.parameter})
+            if intinst.var in dc:
+                raise KeyError(f'conflict with integrator name {intinst.var} and dynamic state')
+            dc.update({intinst.var:intinst.var})
         return dc    
     
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
@@ -829,17 +850,18 @@ class ProblemExec:
         activated = ext_str_list(extra_kw,'activate',[]) if 'activate' in extra_kw and  extra_kw['activate'] else []
 
         slv_inst = sys_refs.get('type',{}).get('solver',{})
+        trv_inst = {v.var:v for v in sys_refs.get('type',{}).get('time',{}).values()}
         sys_refs = sys_refs.get('attrs',{})
 
         if add_con is None:
             add_con = {}
         
 
-        #The official definition of X parameter order
-        Xparms = list(Xrefs)
+        #The official definition of X var order
+        Xvars = list(Xrefs)
 
         # constraints lookup
-        bnd_list = [[None, None]] * len(Xparms)
+        bnd_list = [[None, None]] * len(Xvars)
         con_list = []
         con_info = [] #names of constraints 
         constraints = {"constraints": con_list, "bounds": bnd_list,"info":con_info}
@@ -866,63 +888,68 @@ class ProblemExec:
         # Add Constraints
         ex_arg = {"con_args": (),**kw}
         #Variable limit (function -> ineq, numeric -> bounds)
-        for slvr, ref in sys_refs.get('solver.var',{}).items():
-            if slvr not in slv_inst:
-                self.warning(f'no solver instance for {slvr}')
+        for slvr, ref in self.problem_vars.items():
+            if slvr in slv_inst:
+                slv = slv_inst[slvr]
+            elif slvr in trv_inst:
+                slv = trv_inst[slvr]
+            else:
+                self.warning(f'no solver instance for {slvr} ')
                 continue
-            slv = slv_inst[slvr]
+            
             slv_constraints = slv.constraints
             if log.log_level < 7:
                 self.debug(f'[{self.level_number}-{self.level_name}] constraints {slvr} {slv_constraints}')
             for ctype in slv_constraints:
                 cval = ctype['value']
                 kind = ctype['type']       
-                parm = ctype['parm']
+                var = ctype['var']
                 if log.log_level < 3:
                     self.msg(f'[{self.level_number}-{self.level_name}]const: {slvr} {ctype}')
-                if cval is not None and slvr in Xparms:
+                if cval is not None and slvr in Xvars:
                     
                     #Check for combos & activation
                     combos = None
                     if 'combos' in ctype:
                         combos = ctype['combos']
-                        combo_parm = ctype['combo_parm']
+                        combo_var = ctype['combo_var']
                         active = ctype.get('active',True)
-                        in_activate = any([arg_parm_compare(combo_parm,v) for v in activated]) if activated else False
-                        in_deactivate = any([arg_parm_compare(combo_parm,v) for v in deactivated]) if deactivated else False
+                        in_activate = any([arg_var_compare(combo_var,v) for v in activated]) if activated else False
+                        in_deactivate = any([arg_var_compare(combo_var,v) for v in deactivated]) if deactivated else False
 
                         #Check active or activated
                         if not active and not activated:
                             if log.log_level < 3:
-                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {parm} {slvr} {ctype}')
+                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
                             continue
+                        
                         elif not active and not in_activate:
                             if log.log_level < 3:
-                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {parm} {slvr} {ctype}')
+                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
                             continue
 
                         elif active and in_deactivate:
                             if log.log_level < 3:
-                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: deactivated {parm} {slvr} ')
+                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: deactivated {var} {slvr} ')
                             continue
 
                         
 
                     if combos and combo_filter:
-                        filt = filt_combo_vars(combo_parm,slv, extra_kw,combos)
+                        filt = filt_combo_vars(combo_var,slv, extra_kw,combos)
                         if not filt:
                             if log.log_level < 5:
-                                self.debug(f'[{self.level_number}-{self.level_name}] filtering constraint={filt} {parm} {slv} {ctype} | {combos} {ext_str_list(extra_kw,"combos",None)}')                        
+                                self.debug(f'[{self.level_number}-{self.level_name}] filtering constraint={filt} {var} {slv} {ctype} | {combos} {ext_str_list(extra_kw,"combos",None)}')                        
                             continue
                     
                     if log.log_level < 10:
-                        self.debug(f'[{self.level_number}-{self.level_name}] adding var constraint {parm,slvr,ctype,combos}') 
+                        self.debug(f'[{self.level_number}-{self.level_name}] adding var constraint {var,slvr,ctype,combos}') 
 
-                    x_inx = Xparms.index(slvr)            
-                    #print(cval,kind,parm)
+                    x_inx = Xvars.index(slvr)            
+                    #print(cval,kind,var)
                     if (
                         kind in ("min", "max")
-                        and slvr in Xparms
+                        and slvr in Xvars
                         and isinstance(cval, (int, float))
                     ):
                         minv, maxv = bnd_list[x_inx]
@@ -932,10 +959,10 @@ class ProblemExec:
                             ]
                         
                     #add the bias of cval to the objective function
-                    elif kind in ('min','max') and slvr in Xparms:
-                        parmref = Xrefs[slvr]
+                    elif kind in ('min','max') and slvr in Xvars:
+                        varref = Xrefs[slvr]
                         #Ref Case
-                        cval = ref_to_val_constraint(system,Xrefs,parmref,kind,cval,*args,**kw)
+                        cval = ref_to_val_constraint(system,Xrefs,varref,kind,cval,*args,**kw)
                         con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
                         con_list.append(cval)
 

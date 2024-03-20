@@ -96,7 +96,7 @@ def maybe_attr_inst(can,astype=None):
 @contextmanager
 def revert_X(system, refs, Xnext=None, pre_exec=True, post_exec=False):
     """
-    Stores the _X parameter at present, the reverts to that state when done
+    Stores the _X var at present, the reverts to that state when done
 
     #TODO: add a system,ref.key pair based global storage, this will allow for the use of the same ref in different systems. This will allow set/value caching to speed up write-time from the current method of looking up value before write, which is faster than just writing on average.    
     """

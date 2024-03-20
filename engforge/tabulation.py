@@ -39,8 +39,8 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     index = 0  # Not an attr on purpose, we want pandas to provide the index
 
     # override per class:
-    _skip_table_parms: list = None
-    _skip_plot_parms: list
+    _skip_table_vars: list = None
+    _skip_plot_vars: list
 
     # Cached and private
     _table: dict = None
@@ -179,9 +179,9 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     @instance_cached
     def skip_attr(self) -> list:
         base = list((self.internal_configurations()).keys())
-        if self._skip_table_parms is None:
+        if self._skip_table_vars is None:
             return base
-        return self._skip_table_parms + base
+        return self._skip_table_vars + base
 
     def format_label_attr(self, k, attr_prop):
         if attr_prop.metadata and "label" in attr_prop.metadata:

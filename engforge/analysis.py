@@ -248,7 +248,7 @@ class Analysis(Configuration, TabulationMixin, PlottingMixin, DataframeMixin):
 #             y = list([yval for yval in y if yval in self.dataframe.columns])
 #             rmv_y = set.difference(old_y, set(y))
 #             if rmv_y:
-#                 self.warning(f"parameters not found: {rmv_y}")
+#                 self.warning(f"vars not found: {rmv_y}")
 #
 #         if self.solved and y:
 #             df = self.dataframe

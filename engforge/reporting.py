@@ -248,7 +248,7 @@ class GdriveReporter(PlotReporter, TemporalReporterMixin):
 #         if len(self.TABLE) <= 1:
 #             yield 1,self.TABLE[1],self.data_label
 #         else:
-#             #wide outerloop over parms
+#             #wide outerloop over vars
 #             for label in set.union(*[set(tuple(row.keys())) for i,row in self.TABLE.items()]):
 #                 #inner loop over data
 #                 col = [row[label] if label in row else None for inx,row in self.TABLE.items()]

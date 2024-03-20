@@ -246,7 +246,7 @@ class PlottingMixin:
 
 
 class PlotInstance(AttributeInstance):
-    """combine plotclass parms with system info"""
+    """combine plotclass vars with system info"""
 
     plot_cls: "Plot"
     system: "System"
@@ -262,18 +262,18 @@ class PlotInstance(AttributeInstance):
         sys_ref = set(sys_refs.keys())
 
         diff = set()
-        parms = set()
-        for k, vers in self.plot_cls.plot_parms().items():
+        vars = set()
+        for k, vers in self.plot_cls.plot_vars().items():
             if isinstance(vers, list):
                 for v in vers:
                     if v not in sys_ref:
                         diff.add(v)
                     else:
-                        parms.add(v)
+                        vars.add(v)
             elif vers not in sys_ref:
                 diff.add(vers)
             else:
-                parms.add(vers)
+                vars.add(vers)
 
         if self.system.log_level < 10:
             log.debug(f"system references: {sys_ref}")
@@ -283,7 +283,7 @@ class PlotInstance(AttributeInstance):
         if diff:
             raise KeyError(f"has system diff: {diff}")
 
-        self.refs = {k: sys_refs[k] for k in parms}
+        self.refs = {k: sys_refs[k] for k in vars}
 
     def plot(self, **kwargs):
         """applies the system dataframe to the plot"""
@@ -291,7 +291,7 @@ class PlotInstance(AttributeInstance):
 
     def __call__(self, **override_kw):
         """
-        method allowing a similar type.kind(**override_kw,**default) (ie. relplot.scatterplot(x=different parameter))
+        method allowing a similar type.kind(**override_kw,**default) (ie. relplot.scatterplot(x=different var))
         #TODO: override strategy
         """
         if not self.system.solved:
@@ -301,7 +301,7 @@ class PlotInstance(AttributeInstance):
         f = self.plot_cls.plot_func
 
         # Defaults
-        args = PC.plot_parms()
+        args = PC.plot_vars()
         if hasattr(PC, "kind"):
             args["kind"] = kind = PC.kind.replace("plot", "")
 
@@ -315,7 +315,7 @@ class PlotInstance(AttributeInstance):
 
         # Announce Override
         if override_kw:
-            log.debug(f"overriding parms {override_kw}")
+            log.debug(f"overriding vars {override_kw}")
             args.update(**override_kw)
 
         log.info(
@@ -354,12 +354,12 @@ class PlotBase(ATTR_BASE):
     config_cls: "System"
     title: str = None
     kind: str
-    cls_parms = {"x", "y"}
+    cls_vars = {"x", "y"}
     instance_class = PlotInstance
 
     @classmethod
-    def plot_parms(cls) -> dict:
-        """gathers seaborn plot parms that will scope from system.dataframe"""
+    def plot_vars(cls) -> dict:
+        """gathers seaborn plot vars that will scope from system.dataframe"""
         p = {}
         p["x"] = cls.x
         p["y"] = cls.y
@@ -371,24 +371,24 @@ class PlotBase(ATTR_BASE):
             p["row"] = cls.row
 
         # Add the options
-        parm_opts = cls.type_parm_options[cls.type]
+        var_opts = cls.type_var_options[cls.type]
         for k, arg in cls.plot_args.items():
-            if k in parm_opts:
+            if k in var_opts:
                 p[k] = arg
         return p
 
     @classmethod
     def plot_extra(cls):
-        plot_parms = cls.plot_parms()
+        plot_vars = cls.plot_vars()
         out = {}
         for k, arg in cls.plot_args.items():
-            if k not in plot_parms:
+            if k not in plot_vars:
                 out[k] = arg
         return out
 
     @classmethod
     def validate_plot_args(cls, system: "System"):
-        """Checks system.system_references that cls.plot_parms exists"""
+        """Checks system.system_references that cls.plot_vars exists"""
         log.info(f"validating: {system}")
         sys_ref = system.system_references()
         attr_keys = set(sys_ref["attributes"].keys())
@@ -396,7 +396,7 @@ class PlotBase(ATTR_BASE):
         valid = attr_keys.union(prop_keys)
 
         diff = set()
-        for k, vers in cls.plot_parms().items():
+        for k, vers in cls.plot_vars().items():
             if isinstance(vers, list):
                 for v in vers:
                     if v not in valid:
@@ -406,14 +406,14 @@ class PlotBase(ATTR_BASE):
 
         if log.log_level <= 10:
             log.debug(
-                f"{cls.__name__} has parms: {attr_keys} and bad input: {diff}"
+                f"{cls.__name__} has vars: {attr_keys} and bad input: {diff}"
             )
 
         if diff:
-            log.warning(f"bad plot parms: {diff} do not exist in system: {valid}")
+            log.warning(f"bad plot vars: {diff} do not exist in system: {valid}")
             #TODO: fix time being defined on components
             # raise KeyError(
-            #     f"bad plot parms: {diff} do not exist in system: {valid}"
+            #     f"bad plot vars: {diff} do not exist in system: {valid}"
             # )
 
     @classmethod
@@ -432,7 +432,7 @@ class TraceInstance(PlotInstance):
 
     def __call__(self, **override_kw):
         """
-        method allowing a similar type.kind(**override_kw,**default) (ie. relplot.scatterplot(x=different parameter))
+        method allowing a similar type.kind(**override_kw,**default) (ie. relplot.scatterplot(x=different var))
         #TODO: override strategy
         """
         if not self.system.solved:
@@ -465,7 +465,7 @@ class TraceInstance(PlotInstance):
 
         # Announce Override
         if override_kw:
-            log.debug(f"overriding parms {override_kw}")
+            log.debug(f"overriding vars {override_kw}")
             args.update(**override_kw)
 
         log.info(
@@ -537,7 +537,7 @@ class TraceInstance(PlotInstance):
 
 
 class Trace(PlotBase):
-    """trace is a plot for transients, with y and y2 axes which can have multiple parameters each"""
+    """trace is a plot for transients, with y and y2 axes which can have multiple vars each"""
 
     types = ["scatter", "line"]
     type = "scatter"
@@ -551,8 +551,8 @@ class Trace(PlotBase):
     plot_args: dict
     extra_args: dict
 
-    # Extended parameters per option
-    type_parm_options = {
+    # Extended vars per option
+    type_var_options = {
         "scatter": ("size", "color"),
         "line": ("color", "marker", "linestyle"),
     }
@@ -583,15 +583,15 @@ class Trace(PlotBase):
         :param kind: specify the kind of type of plot scatter or line, with the default being line
 
         # Dependents & Independents:
-        :param x: the x parameter for each plot, by default 'time'
-        :param y: the y parameter for each plot, required
-        :param y2: the y2 parameter for each plot, optional
+        :param x: the x var for each plot, by default 'time'
+        :param y: the y var for each plot, required
+        :param y2: the y2 var for each plot, optional
 
         # Additional Parameters:
         :param title: this title will be applied to the figure.suptitle()
-        :param xlabel: the x label, by default the capitalized parameter
-        :param ylabel: the x label, by default the capitalized parameter
-        :param y2label: the x label, by default the capitalized parameter
+        :param xlabel: the x label, by default the capitalized var
+        :param ylabel: the x label, by default the capitalized var
+        :param y2label: the x label, by default the capitalized var
         """
 
         if x is None or y is None:
@@ -621,16 +621,16 @@ class Trace(PlotBase):
             title = kwargs.pop("title")
 
         # Remove special args
-        non_parm_args = cls.valid_non_parms(kind)
-        parm_args = cls.valid_parms_options(kind)
+        non_var_args = cls.valid_non_vars(kind)
+        var_args = cls.valid_vars_options(kind)
         extra = {}
 
         for k in list(kwargs.keys()):
-            if k in non_parm_args:
+            if k in non_var_args:
                 extra[k] = kwargs.pop(k)
 
         # Validate Args
-        assert set(kwargs).issubset(parm_args), f"invalid plot args {kwargs}"
+        assert set(kwargs).issubset(var_args), f"invalid plot args {kwargs}"
         plot_args = kwargs
         plot_args["x"] = x
         plot_args["y"] = y
@@ -659,19 +659,19 @@ class Trace(PlotBase):
         return new_plot
 
     @classmethod
-    def valid_non_parms(cls, type) -> set:
+    def valid_non_vars(cls, type) -> set:
         s = set(cls.all_options)
         s = s.union(set(cls.type_options[type]))
         return s
 
     @classmethod
-    def valid_parms_options(cls, type) -> set:
+    def valid_vars_options(cls, type) -> set:
         s = set(cls.always)
-        s = s.union(set(cls.type_parm_options[type]))
+        s = s.union(set(cls.type_var_options[type]))
         return s
 
     @classmethod
-    def plot_parms(cls) -> set:
+    def plot_vars(cls) -> set:
         pa = cls.plot_args.copy()
 
         y1 = pa.pop("y")
@@ -708,13 +708,13 @@ class Plot(PlotBase):
     x: str
     y: str
 
-    # optional, must be parm
+    # optional, must be var
     hue: str
     col: str
     row: str
 
-    # Extended parameters per option
-    type_parm_options = {
+    # Extended vars per option
+    type_var_options = {
         "displot": (),
         "relplot": ("style", "shape"),
         "catplot": (),
@@ -743,13 +743,13 @@ class Plot(PlotBase):
         :param kind: specify the kind of type of plot (ie. scatterplot of relplot)
 
         # Dependents & Independents:
-        :param x: the x parameter for each plot
-        :param y: the y parameter for each plot
+        :param x: the x var for each plot
+        :param y: the y var for each plot
 
         # Additional Parameters:
-        :param row: create a grid of data with row parameter
-        :param col: create a grid of data with column parameter
-        :param hue: provide an additional dimension of color based on this parameter
+        :param row: create a grid of data with row var
+        :param col: create a grid of data with column var
+        :param hue: provide an additional dimension of color based on this var
         :param title: this title will be applied to the figure.suptitle()
         """
 
@@ -768,7 +768,7 @@ class Plot(PlotBase):
         # Validate Args
         pfunc = getattr(sns, _type)
         kfunc = getattr(sns, kind)
-        args = set(inspect.signature(kfunc).parameters.keys())
+        args = set(inspect.signature(kfunc).vars.keys())
         assert set(kwargs).issubset(args), f"only {args} allowed for kw"
         plot_args = kwargs
 
@@ -797,8 +797,8 @@ class Plot(PlotBase):
         return new_plot
 
     @classmethod
-    def plot_parms(cls) -> dict:
-        """gathers seaborn plot parms that will scope from system.dataframe"""
+    def plot_vars(cls) -> dict:
+        """gathers seaborn plot vars that will scope from system.dataframe"""
         p = {}
         p["x"] = cls.x
         p["y"] = cls.y
@@ -810,9 +810,9 @@ class Plot(PlotBase):
             p["row"] = cls.row
 
         # Add the options
-        parm_opts = cls.type_parm_options[cls.type]
+        var_opts = cls.type_var_options[cls.type]
         for k, arg in cls.plot_args.items():
-            if k in parm_opts:
+            if k in var_opts:
                 p[k] = arg
         return p
 

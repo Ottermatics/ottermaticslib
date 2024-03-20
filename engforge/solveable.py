@@ -335,14 +335,14 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         method_kw: dict = None,
         **kwargs,
     ):
-        """applies a permutation of input parameters for parameters. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist.
+        """applies a permutation of input vars for vars. runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist.
 
         :param revert: will reset the values of X that were recorded at the beginning of the run.
         :param cb: a callback function that takes the system as an argument cb(system)
         :param sequence: a list of dictionaries that should be run in order per the outer-product of kwargs
         :param eval_kw: a dictionary of keyword arguments to pass to the eval function of each component by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
         :param sys_kw: a dictionary of keyword arguments to pass to the eval function of each system by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
-        :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
+        :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped vars (system.var or system.slot.var)
 
 
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
@@ -353,7 +353,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             f"running [SOLVER].{method} {self.identity} with input {kwargs}"
         )
 
-        # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
+        # TODO: allow setting sub-component vars with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
 
         # create iterable null for sequence
         if sequence is None or not sequence:
@@ -375,10 +375,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             inputs = {}
             result = {"output": output, "input_sets": inputs}
 
-            if revert:
-                # revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
-                sys_refs = self.get_system_input_refs(all=True)
-                revert_x = Ref.refset_get(sys_refs)
+            # if revert:
+            #     # revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
+            #     sys_refs = self.get_system_input_refs(all=True)
+            #     revert_x = Ref.refset_get(sys_refs)
 
             # prep references for keys
             refs = {}
@@ -397,13 +397,15 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             # Iterate over components (they are assigned to the system by call)
             for itercomp in self._iterate_components():
                 # Iterate over inputs
-                for parms in itertools.product(*ingrp):
+                for vars in itertools.product(*ingrp):
                     # Set the reference aliases
-                    cur = {k: v for k, v in zip(keys, parms)}
+                    cur = {k: v for k, v in zip(keys, vars)}
+
                     # Iterate over Sequence (or run once)
                     for seq in sequence:
                         #apply sequence values
                         icur = cur.copy()
+                        #apply sequence values
                         if seq:
                             icur.update(**seq)
 
@@ -425,9 +427,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             # Pre Run Callback with current state
             self.post_run_callback(eval_kw=eval_kw, sys_kw=sys_kw, **kwargs)
 
-            # pre-revert by default
-            if revert and revert_x:
-                Ref.refset_input(sys_refs, revert_x)
+            # # pre-revert by default
+            # if revert and revert_x:
+            #     Ref.refset_input(sys_refs, revert_x)
 
             # reapply solved state
             self._solved = True
@@ -478,14 +480,14 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
         """
         # Validate OTher Arguments By Parameter Or Comp-Recursive
-        parm_args = {k: v for k, v in kwargs.items() if "." not in k}
+        var_args = {k: v for k, v in kwargs.items() if "." not in k}
         comp_args = {k: v for k, v in kwargs.items() if "." in k}
 
-        # check parms
+        # check vars
         inpossible = set.union(
             set(self.input_fields()), set(self.slots_attributes())
         )
-        argdiff = set(parm_args).difference(inpossible)
+        argdiff = set(var_args).difference(inpossible)
         assert not argdiff, f"bad input {argdiff}"
 
         # check components
@@ -498,7 +500,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             lambda v, add: isinstance(v, (int, float, str, *add)) or v is None
         )
 
-        # parameters input
+        # vars input
         for k, v in kwargs.items():
             # If a slot check the type is applicable
             subslot = self.check_ref_slot_type(k)
@@ -557,7 +559,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return val
 
     def locate_ref(self, key, fail=True, **kw):
-        """Pass a string of a relative parm or property on this system or pass a callable to get a reference to a function. If the key has a `.` in it the comp the lowest level component will be returned, unless a callable is passed in which case this component will be used or the `comp` passed in the kw will be used.
+        """Pass a string of a relative var or property on this system or pass a callable to get a reference to a function. If the key has a `.` in it the comp the lowest level component will be returned, unless a callable is passed in which case this component will be used or the `comp` passed in the kw will be used.
         :param key: the key to locate, or a callable to be used as a reference
         :param comp: the component to use if a callable is passed
         :returns: the instance assigned to this system. If the key has a `.` in it the comp the lowest level component will be returned
@@ -678,7 +680,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             rawattr = conf.collect_inst_attributes(handle_inst=False)
             key = f'{key}.' if key else ''
             comp_dict[key] = conf
-            #Gather attribute heirarchy and make key.parm the dictionary entry
+            #Gather attribute heirarchy and make key.var the dictionary entry
             for atype,aval in atrs.items():
                 
                 ck_type = rawattr[atype]
@@ -712,17 +714,17 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                         val_type = ck_type[pre_var]
 
-                        #Otherwise assign the data from last parm and the compoenent name
-                        parm_name = pre_var #prer alias
+                        #Otherwise assign the data from last var and the compoenent name
+                        var_name = pre_var #prer alias
                         if slv_type:
-                            parm_name = slv_type.get_alias(pre)
+                            var_name = slv_type.get_alias(pre)
                         
                         #Keep reference to the original type and name
-                        scope_name = f'{key}{parm_name}'
+                        scope_name = f'{key}{var_name}'
                         cls_dict[atype][scope_name] = val_type
                         
                         if conf.log_level <= 5:
-                            conf.msg(f'rec: {parm_name} {k} {pre} {val} {slv_type}')
+                            conf.msg(f'rec: {var_name} {k} {pre} {val} {slv_type}')
 
                         #Check to skip this item
                         #keep references even if null
@@ -731,7 +733,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             attr_dict[pre] = {}
                         
                         if isinstance(val,Ref) and val.allow_set:
-                            #its a parameter, skip it if it's already been skipped
+                            #its a var, skip it if it's already been skipped
                             current_skipped = [set(v) for v in skipped.values()]
                             if current_skipped and val.key in set.union(*current_skipped):
                                 continue
@@ -778,15 +780,15 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 if pre not in attr_dict:
                     attr_dict[pre] = {}
 
-                for parm,ref in refs.items():
+                for var,ref in refs.items():
                     
                     is_ref = isinstance(ref,Ref) and ref.allow_set
                     if not is_ref:
                         conf.info(f'bad refs skip {pre,ref,val_type,skipd}')
-                        attr_dict[pre].update(**{parm:ref})
+                        attr_dict[pre].update(**{var:ref})
                         continue
 
-                    scoped_name = f'{key}{parm}'
+                    scoped_name = f'{key}{var}'
                     val_setskip = ( is_ref and ref.key in skipd)
                     val_type = None
                     
@@ -800,7 +802,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         
                     elif check_atr_f and check_atr_f(pre,ref.key,val_type,check_kw):
                         conf.msg(f'dynvar add {pre,ref.key,val_type,skipd}')
-                        attr_dict[pre].update(**{parm:ref})
+                        attr_dict[pre].update(**{var:ref})
                     else:
                         conf.msg(f'dynvar endskip {pre,ref.key,val_type,skipd}')
                         if check_atr_f: #then it didn't checkout

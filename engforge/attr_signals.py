@@ -100,12 +100,12 @@ class Signal(ATTR_BASE):
 
         system = cls.config_cls
 
-        parm_type = system.locate(cls.target)
-        if parm_type is None:
+        var_type = system.locate(cls.target)
+        if var_type is None:
             raise Exception(f"target not found: {cls.target}")
         assert isinstance(
-            parm_type, attrs.Attribute
-        ), f"bad parm {cls.target} not attribute: {parm_type}"
+            var_type, attrs.Attribute
+        ), f"bad var {cls.target} not attribute: {var_type}"
 
         driv_type = system.locate(cls.source)
         if driv_type is None:

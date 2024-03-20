@@ -133,7 +133,7 @@ class SolverInstance(AttributeInstance):
             return self.solver.constraints
         else:
             #just me
-            return [{'type':self.slvtype,'parm':self.solver.lhs,'value':self.const_f}]
+            return [{'type':self.slvtype,'var':self.solver.lhs,'value':self.const_f}]
         
 
     @property
@@ -154,10 +154,6 @@ class SolverInstance(AttributeInstance):
             return self._active        
         return self.solver.active
     
-    @property
-    def combos(self):   
-        return self.solver.combos        
-
     def get_alias(self,pre):
         if self.solver.slvtype  == 'var':
             return self.var.key #direct ref
@@ -190,8 +186,10 @@ class Solver(ATTR_BASE):
     slvtype: str
     constraints: dict
     combos: list = None
+    
     normalize: ref_type
     allow_constraint_override: bool = True
+
     attr_prefix = "SOLVER"
     active: bool
     instance_class = SolverInstance
@@ -207,14 +205,14 @@ class Solver(ATTR_BASE):
         pre_name = cls.name #random attr name
         super(Solver,cls).configure_for_system(name,config_class,cb,**kwargs)
 
-        #change name of constraint  parm if 
+        #change name of constraint  var if 
         if cls.slvtype == "var":
-            #provide defaults ot constraints, and update combo_parm with attribut name
+            #provide defaults ot constraints, and update combo_var with attribut name
             for const in cls.constraints:
-                if 'combo_parm' in const and const['combo_parm'] == pre_name:
-                    const['combo_parm'] = name #update me
-                elif 'combo_parm' not in const:
-                    const['combo_parm'] = name #update me
+                if 'combo_var' in const and const['combo_var'] == pre_name:
+                    const['combo_var'] = name #update me
+                elif 'combo_var' not in const:
+                    const['combo_var'] = name #update me
                 
                 if 'combo' not in const:
                     const['combo'] = 'default'
@@ -234,7 +232,7 @@ class Solver(ATTR_BASE):
         combos = kwargs.get("combos", var)
 
         new_name = f"SOLVER_var_{var}".replace(".", "_")
-        bkw = {"parm": var, "value": None}
+        bkw = {"var": var, "value": None}
         constraints = [{"type": "min", **bkw}, {"type": "max", **bkw}]
         new_dict = dict(
             name=new_name, #until configured for system, it gets the assigned name
@@ -255,7 +253,7 @@ class Solver(ATTR_BASE):
 
         :param obj: The var attribute for the solver variable.
         :param combos: The combinations of the solver variable.
-        :parma kind: the kind of optimization, either min or max
+        :vara kind: the kind of optimization, either min or max
         :return: The setup class for the solver variable.
         """
         # Create A New Signals Class
@@ -265,7 +263,7 @@ class Solver(ATTR_BASE):
         assert kind in ("min", "max")
 
         new_name = f"SOLVER_obj_{obj}_{kind}".replace(".", "_")
-        bkw = {"parm": obj, "value": None}
+        bkw = {"var": obj, "value": None}
         new_dict = dict(
             name=new_name,
             active=active,
@@ -338,16 +336,16 @@ class Solver(ATTR_BASE):
         # TODO: add a check for the solver to be a valid solver type
 
         if cls.slvtype == "var":
-            parm_type = system.locate(cls.var)
-            if parm_type is None:
+            var_type = system.locate(cls.var)
+            if var_type is None:
                 raise Exception(f"var not found: {cls.var}")
             assert isinstance(
-                parm_type, attrs.Attribute
-            ), f"bad parm {cls.var} not attribute: {parm_type}"
-            assert parm_type.type in (
+                var_type, attrs.Attribute
+            ), f"bad var {cls.var} not attribute: {var_type}"
+            assert var_type.type in (
                 int,
                 float,
-            ), f"bad parm {cls.var} not numeric"
+            ), f"bad var {cls.var} not numeric"
 
         elif cls.slvtype in ["ineq", "eq"]:
             driv_type = system.locate(cls.lhs)
@@ -375,7 +373,7 @@ class Solver(ATTR_BASE):
     def add_var_constraint(cls, value, kind="ineq",**kwargs):
         """adds a `type` constraint to the solver. If value is numeric it is used as a bound with `scipy` optimize.
 
-        If value is a function it should be of the form value(Xarray) and will establish an inequality constraint that var parameter must be:
+        If value is a function it should be of the form value(Xarray) and will establish an inequality constraint that var var must be:
             1. less than for max
             2. more than for min
 
@@ -385,13 +383,13 @@ class Solver(ATTR_BASE):
         :value: either a numeric (int,float), or a function, f(system)
         """
         assert cls is not SOLVER, f"must set constraint on SOLVER subclass"
-        # assert not cls.constraint_exists(type=kind,parm=parm), f"constraint already exists!"
+        # assert not cls.constraint_exists(type=kind,var=var), f"constraint already exists!"
         assert isinstance(value, (int, float)) or callable(
             value
         ), f"only int,float or callables allow. Callables must take system as argument"
 
-        parm = cls.var
-        assert parm is not None, "must provide parm on non-var solvers"
+        var = cls.var
+        assert var is not None, "must provide var on non-var solvers"
         assert cls.slvtype == "var", "only Solver.declare_var can have constraints"
         assert kind in ("min", "max")
 
@@ -399,19 +397,21 @@ class Solver(ATTR_BASE):
         if isinstance(combos,str):
             combos = ','.split(combos)
         active = kwargs.get("active", True)
-        const = {"type": kind, "value": value, "parm": parm, "active": active, "combos": combos, 'combo_parm':cls.name}
+        const = {"type": kind, "value": value, "var": var, "active": active, "combos": combos, 'combo_var':cls.name}
         #print(const,cls.__dict__)
 
-        if (
-            cls.allow_constraint_override
-            and (cinx := cls.constraint_exists(type=kind, parm=parm))
-            is not None
-        ):
-            #print(f'replacing constraint {cinx} with {kind} {value} {parm}')
+        cinx = cls.constraint_exists(type=kind, var=var)
+        inix = cinx is not None
+        if cls.allow_constraint_override and inix:
+            #print(f'replacing constraint {cinx} with {kind} {value} {var}')
             constraint = cls.constraints[cinx]
             constraint.update(const)
+        elif not cls.allow_constraint_override and inix:
+            cnx = cls.constraints[cinx]
+            raise Exception(f"constraint already exists! {cnx}")
         else:
             cls.constraints.append(const)
+
 
     @classmethod
     def constraint_exists(cls, **kw):

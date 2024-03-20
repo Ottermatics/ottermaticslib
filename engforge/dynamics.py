@@ -131,9 +131,9 @@ class DynamicsIntegratorMixin(SolveableMixin):
 class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
     """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the Time integrating attributes, and will raise an error if a conflict is detected #TODO."""
 
-    dynamic_state_parms: list = attrs.field(factory=list)
-    dynamic_input_parms: list = attrs.field(factory=list)
-    dynamic_output_parms: list = attrs.field(factory=list)
+    dynamic_state_vars: list = attrs.field(factory=list)
+    dynamic_input_vars: list = attrs.field(factory=list)
+    dynamic_output_vars: list = attrs.field(factory=list)
 
     # state variables
     dynamic_A = None
@@ -169,41 +169,41 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         # fields =
         fields = attrs.fields_dict(self.__class__)
         system_property = self.system_properties_def
-        for p in self.dynamic_state_parms:
-            assert p in fields, f"state parameter {p} not in attr: {fields}"
-        for p in self.dynamic_output_parms:
-            assert p in fields, f"output parameter {p} not in attr: {fields}"
-        for p in self.dynamic_input_parms:
-            assert p in fields, f"input parameter {p} not in attr: {fields}"
+        for p in self.dynamic_state_vars:
+            assert p in fields, f"state var {p} not in attr: {fields}"
+        for p in self.dynamic_output_vars:
+            assert p in fields, f"output var {p} not in attr: {fields}"
+        for p in self.dynamic_input_vars:
+            assert p in fields, f"input var {p} not in attr: {fields}"
 
     @instance_cached
     def state_size(self):
-        return len(self.dynamic_state_parms)
+        return len(self.dynamic_state_vars)
 
     @instance_cached
     def input_size(self):
-        return len(self.dynamic_input_parms)
+        return len(self.dynamic_input_vars)
 
     @instance_cached
     def output_size(self):
-        return len(self.dynamic_output_parms)
+        return len(self.dynamic_output_vars)
 
     @property
     def state(self) -> np.array:
         return np.array(
-            [getattr(self, parm, np.nan) for parm in self.dynamic_state_parms]
+            [getattr(self, var, np.nan) for var in self.dynamic_state_vars]
         )
 
     @property
     def input(self) -> np.array:
         return np.array(
-            [getattr(self, parm, np.nan) for parm in self.dynamic_input_parms]
+            [getattr(self, var, np.nan) for var in self.dynamic_input_vars]
         )
 
     @property
     def output(self) -> np.array:
         return np.array(
-            [getattr(self, parm, np.nan) for parm in self.dynamic_output_parms]
+            [getattr(self, var, np.nan) for var in self.dynamic_output_vars]
         )
 
     # TODO: add sparse mode
@@ -368,7 +368,7 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         out = self.nonlinear_output(t, dt, X, U, update=False)
 
         if set_Y:
-            for i, p in enumerate(self.dynamic_output_parms):
+            for i, p in enumerate(self.dynamic_output_vars):
                 self.Yt_ref[p].set_value(out[p])
 
         return dXdt
@@ -381,7 +381,7 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         out = self.linear_output(t, dt, X, U)
 
         if set_Y:
-            for i, p in enumerate(self.dynamic_output_parms):
+            for i, p in enumerate(self.dynamic_output_vars):
                 self.Yt_ref[p].set_value(out[p])
 
         return dXdt
@@ -396,25 +396,25 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
     @property
     def Xt_ref(self):
         """alias for state values"""
-        d = [(parm, Ref(self, parm)) for parm in self.dynamic_state_parms]
+        d = [(var, Ref(self, var)) for var in self.dynamic_state_vars]
         return OrderedDict(d)
 
     @property
     def Yt_ref(self):
         """alias for output values"""
-        d = [(parm, Ref(self, parm)) for parm in self.dynamic_output_parms]
+        d = [(var, Ref(self, var)) for var in self.dynamic_output_vars]
         return OrderedDict(d)
 
     @property
     def Ut_ref(self):
         """alias for input values"""
-        d = [(parm, Ref(self, parm)) for parm in self.dynamic_input_parms]
+        d = [(var, Ref(self, var)) for var in self.dynamic_input_vars]
         return OrderedDict(d)
     
     @property
     def dXtdt_ref(self):
-        """a dictionary of state parm rates"""
-        d = [(parm, self.ref_dXdt(parm)) for parm in self.dynamic_state_parms]
+        """a dictionary of state var rates"""
+        d = [(var, self.ref_dXdt(var)) for var in self.dynamic_state_vars]
         return OrderedDict(d)
 
     @solver_cached
@@ -432,9 +432,9 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
 
     def ref_dXdt(self, name: str):
         """returns the reference to the time differential of the state"""
-        parms = self.dynamic_state_parms
-        assert name in parms, f"name {name} not in state parms"
-        inx = parms.index(name)
+        vars = self.dynamic_state_vars
+        assert name in vars, f"name {name} not in state vars"
+        inx = vars.index(name)
         accss = lambda comp: comp.cache_dXdt[inx]
         return Ref(self, name, accss)
     
@@ -548,7 +548,7 @@ class GlobalDynamics(DynamicsMixin):
         with ProblemExec(system,level_name='sim',**kwargs) as pbx:
 
             #Unpack Transient Problem
-            intl_refs = pbx.integrator_parm_refs
+            intl_refs = pbx.integrator_var_refs
             refs = pbx.sys_refs
 
             if self.log_level < 10:
@@ -559,12 +559,12 @@ class GlobalDynamics(DynamicsMixin):
                 # get current
                 X0 = x_cur
             
-            #this will fail if X0 doesn't have solver parameteres
+            #this will fail if X0 doesn't have solver vares
             X0 = np.array([X0[p] for p in intl_refs])
 
             #Gather data
             Xss = refs['attrs'].get("solver.var",{})
-            Xpm = refs['attrs'].get('time.parm',{})
+            Xpm = refs['attrs'].get('time.var',{})
             Xdy = refs['attrs'].get('dynamics.state',{})
 
             Yobj = refs['attrs'].get("solver.obj",{})
@@ -582,7 +582,7 @@ class GlobalDynamics(DynamicsMixin):
                 Yobj = { k: v.copy(eval_f = lambda v:1+v**2) 
                             for k,v in Yeq.items() }
             elif not Yobj:
-                #minimize the product of all parameters, so the smallest value is the best that satisfies all constraints
+                #minimize the product of all vars, so the smallest value is the best that satisfies all constraints
                 self.info(f'making Yobj from X: {Xss}')
                 dflt = lambda sys,prb: (np.product(1+v.value()**2 for v in pbx.problem_vars.items()))**0.5
                 Yobj = {'smallness': Ref(system, dflt)}
@@ -612,12 +612,12 @@ class GlobalDynamics(DynamicsMixin):
 
                     #ad hoc time integration
                     for name, trdct in pbx.integrators.items():
-                        out[trdct.parm] = trdct.current_rate
+                        out[trdct.var] = trdct.current_rate
 
                     # dynamics
                     for compnm, compdict in pbx.dynamic_comps.items():
                         comp = compdict#["comp"]
-                        if not comp.dynamic_state_parms and not comp.dynamic_input_parms:
+                        if not comp.dynamic_state_vars and not comp.dynamic_input_vars:
                             continue
                         Xds = np.array([r.value() for r in comp.Xt_ref.values()])
                         Uds = np.array([r.value() for r in comp.Ut_ref.values()])

@@ -39,14 +39,14 @@ def f_lin_min(system, Xref, Yref,weights=None, *args, **kw):
     ykey = "_".join(Yref.keys())
     alias_name = kw.pop("alias_name", f'min_X_{xkey}_Y_[{ykey}]')
 
-    parms = list(Xref.keys())  # static x_basis
-    yparm = list(Yref.keys())
+    vars = list(Xref.keys())  # static x_basis
+    yvar = list(Yref.keys())
     weights = weights if weights is not None else np.ones(len(Yref))
 
     def f(x, *rt_a,**rt_kw):
         # anonymous function
         
-        Xnext = {p:xi for p, xi in zip(parms, x)}
+        Xnext = {p:xi for p, xi in zip(vars, x)}
 
         if rt_a or rt_kw:
             slv_info = base_dict.copy()
@@ -57,7 +57,7 @@ def f_lin_min(system, Xref, Yref,weights=None, *args, **kw):
         #with revert_X(system,Xref,Xnext=Xnext):
         #Enter existing problem context
         with ProblemExec(system,{},Xnew=Xnext,ctx_fail_new=True) as exc:
-            grp = (yparm, weights)
+            grp = (yvar, weights)
             vals,pos,neg = [],[],[]
             for p,n in zip(*grp):
                 ty = solver_types.get(p,None)
@@ -136,7 +136,7 @@ def secondary_obj(
 ):  
     """modifies an objective function with a secondary function that is only considered when the primary function is minimized."""
     from engforge.problem_context import ProblemExec
-    parms = list(Xrefs.keys())  # static x_basis
+    vars = list(Xrefs.keys())  # static x_basis
     base_dict = dict(system=system,args=args,Xrefs=Xrefs,**kwargs)
     lvl_name = f'{obj_f.__name__}_scndry'
     alias_name = kwargs.pop("alias_name", lvl_name)
@@ -164,12 +164,12 @@ def secondary_obj(
 
     return f
 
-def ref_to_val_constraint(system,Xrefs,parm_ref,kind,val,*args,**kwargs):
-    """takes a parameter reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the parameter value and the value.
+def ref_to_val_constraint(system,Xrefs,var_ref,kind,val,*args,**kwargs):
+    """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
     """
     
-    info = {'system':system,'Xrefs':Xrefs,'parm_ref':parm_ref,'kind':kind,'val':val,'args':args,'kwargs':kwargs}
-    p = parm_ref
+    info = {'system':system,'Xrefs':Xrefs,'var_ref':var_ref,'kind':kind,'val':val,'args':args,'kwargs':kwargs}
+    p = var_ref
     if isinstance(val,Ref):
         if kind == 'min':
             fun = lambda system,info: p.value(system,info) - val.value(system,info)
@@ -202,9 +202,9 @@ def ref_to_val_constraint(system,Xrefs,parm_ref,kind,val,*args,**kwargs):
 def create_constraint(
     system,Xref, contype: str, ref, con_args=None,*args, **kwargs
 ):
-    """creates a constraint with bounded solver input from a constraint definition in dictionary with type and value. If value is a function it will be evaluated with the extra arguments provided. If parm is None, then the constraint is assumed to be not in reference to the system x parameters, otherwise lookups are made to that parameter.
+    """creates a constraint with bounded solver input from a constraint definition in dictionary with type and value. If value is a function it will be evaluated with the extra arguments provided. If var is None, then the constraint is assumed to be not in reference to the system x vars, otherwise lookups are made to that var.
     
-    Creates F(x_solver:array) such that the current parameters of system are reverted to after the function has returned, which is used directly by SciPy's optimize.minimize
+    Creates F(x_solver:array) such that the current vars of system are reverted to after the function has returned, which is used directly by SciPy's optimize.minimize
     
     """
     assert contype in (
@@ -222,7 +222,7 @@ def create_constraint(
     return cons
 
 def misc_to_ref(system,val,*args,**kwargs):
-    """takes a parameter reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the parameter value and the value.
+    """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
     """
     if isinstance(val,Ref):
         #fun = lambda *a,**kw:val.value()
@@ -259,7 +259,7 @@ def calcJacobean(
     assert len(Xrefs) == len(X0)
     assert len(Yrefs) >= 1
 
-    with sys.revert_X(refs=Xrefs):
+    with sys.revert_X(refs=Xrefs): #TODO: replace with context manager
         # initalize here
         refset_input(Xrefs, X0)
 
@@ -269,7 +269,7 @@ def calcJacobean(
         for k, v in Xrefs.items():
             x = v.value()
             if not isinstance(x, (float, int)):
-                sys.warning(f"parm: {k} is not numeric {x}, skpping")
+                sys.warning(f"var: {k} is not numeric {x}, skpping")
                 continue
 
             if abs(x) > pct:
@@ -313,7 +313,7 @@ def refmin_solve(
     :param doset: if the solution is successful, set the x values to the solution by default, otherwise follows reset, if not successful reset is checked first, then doset
     #TODO: add 
     """
-    parms = list(Xref.keys())  # static x_basis
+    vars = list(Xref.keys())  # static x_basis
     
     norm_x,weights = handle_normalize(weights,Xref,Yref)
 
@@ -326,41 +326,41 @@ def refmin_solve(
         x_pre = refset_get(Xref)  # record before changing
 
     if Xo is None:
-        Xo = [Xref[p].value() for p in parms]
+        Xo = [Xref[p].value() for p in vars]
 
     elif isinstance(Xo, dict):
-        Xo = [Xo[p] for p in parms]
+        Xo = [Xo[p] for p in vars]
 
     # TODO: IO for jacobean and state estimations (complex as function definition, requires learning)
-    system.debug(f'minimize! {Fc.__name__,Xo,parms,kw}')
+    system.debug(f'minimize! {Fc.__name__,Xo,vars,kw}')
     kw.pop('info',None)
     ans = sciopt.minimize(Fc, Xo, **kw)
     return ans
-    #return process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans)
+    #return process_ans(ans,vars,Xref,x_pre,doset,reset,fail,ret_ans)
 
 
 def handle_normalize(norm,Xref,Yref):
-    parms = list(Xref.keys())  # static x_basis
+    vars = list(Xref.keys())  # static x_basis
     if norm is None:
-        normX = np.ones(len(parms))
+        normX = np.ones(len(vars))
         normY = np.ones(len(Yref))
     elif isinstance(norm, (list, tuple, np.ndarray)):
-        assert len(norm) == len(parms), "bad length-X norm input"
+        assert len(norm) == len(vars), "bad length-X norm input"
         normX = np.array(norm)
         normY = np.ones(len(Yref)) #default to 1
     elif isinstance(norm, (dict)):
-        normX = np.array([norm[p] if p in norm else 1 for p in parms])
+        normX = np.array([norm[p] if p in norm else 1 for p in vars])
         normY = np.array([norm[p] if p in norm else 1 for p in Yref])
 
     return normX,normY  
 
 
-# def process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans):
+# def process_ans(ans,vars,Xref,x_pre,doset,reset,fail,ret_ans):
 #     if ret_ans:
 #         return ans
 # 
 #     if ans.success:
-#         ans_dct = {p: a for p, a in zip(parms, ans.x)}
+#         ans_dct = {p: a for p, a in zip(vars, ans.x)}
 #         if doset:
 #             Ref.refset_input(Xref, ans_dct)
 #         elif reset:
@@ -368,7 +368,7 @@ def handle_normalize(norm,Xref,Yref):
 #         return ans_dct
 # 
 #     else:
-#         min_dict = {p: a for p, a in zip(parms, ans.x)}
+#         min_dict = {p: a for p, a in zip(vars, ans.x)}
 #         if reset:
 #             Ref.refset_input(Xref, x_pre)
 #         elif doset:
@@ -386,11 +386,11 @@ def handle_normalize(norm,Xref,Yref):
 
 
 #Parsing Utilities
-def arg_parm_compare(parm,seq):
+def arg_var_compare(var,seq):
     if '*' in seq:
-        return fnmatch.fnmatch(parm,seq)
+        return fnmatch.fnmatch(var,seq)
     else:
-        return parm == seq
+        return var == seq
     
 def str_list_f(out:list,sep=','):
     if isinstance(out,str):
@@ -405,7 +405,7 @@ def ext_str_list(extra_kw,key,default=None):
         out = default
     return out
 
-def filt_combo_vars(parm,inst,extra_kw=None,combos_in=None):
+def filt_combo_vars(var,inst,extra_kw=None,combos_in=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -427,28 +427,28 @@ def filt_combo_vars(parm,inst,extra_kw=None,combos_in=None):
         combos = str_list_f(combos_in)
     
     if not combos:
-        log.info(f'no combos for {parm} {combos} {groups}')
+        log.info(f'no combos for {var} {combos} {groups}')
         return None #no combos to filter to match, its permanent
     
-    for parm in combos:
-        initial_match = [grp for grp in groups if arg_parm_compare(parm,grp)]
+    for var in combos:
+        initial_match = [grp for grp in groups if arg_var_compare(var,grp)]
         if not any(initial_match):
             if log.log_level < 3:
-                log.msg(f'skip {parm}: nothing ')
+                log.msg(f'skip {var}: nothing ')
             continue #not even 
-        if onlygrp and not any(arg_parm_compare(parm,grp) for grp in onlygrp):
+        if onlygrp and not any(arg_var_compare(var,grp) for grp in onlygrp):
             if log.log_level < 3:
-                log.msg(f'skip {parm} not in {onlygrp}')
+                log.msg(f'skip {var} not in {onlygrp}')
             continue
-        if igngrp and any(arg_parm_compare(parm,grp) for grp in igngrp):
+        if igngrp and any(arg_var_compare(var,grp) for grp in igngrp):
             if log.log_level < 3:
-                log.msg(f'skip {parm} in {igngrp}')
+                log.msg(f'skip {var} in {igngrp}')
             continue
         return True
     
     return False    
     
-def filt_parm_vars(parm,inst,extra_kw=None):
+def filt_var_vars(var,inst,extra_kw=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -463,22 +463,22 @@ def filt_parm_vars(parm,inst,extra_kw=None):
     igngrp = ext_str_list(extra_kw,'ign_vars',None)
     onlygrp = ext_str_list(extra_kw,'only_vars',None)
 
-    initial_match = [grp for grp in groups if arg_parm_compare(parm,grp)]
+    initial_match = [grp for grp in groups if arg_var_compare(var,grp)]
     if not any(initial_match):
         if log.log_level < 3:
-            log.msg(f'skip {parm}: nothing')
+            log.msg(f'skip {var}: nothing')
         return False
-    if onlygrp and not any(arg_parm_compare(parm,grp) for grp in onlygrp):
+    if onlygrp and not any(arg_var_compare(var,grp) for grp in onlygrp):
         if log.log_level < 3:
-            log.msg(f'skip {parm} not in {onlygrp}')
+            log.msg(f'skip {var} not in {onlygrp}')
         return False    
-    if igngrp and any(arg_parm_compare(parm,grp) for grp in igngrp):
+    if igngrp and any(arg_var_compare(var,grp) for grp in igngrp):
         if log.log_level < 3:
-            log.msg(f'skip {parm} in {igngrp}')
+            log.msg(f'skip {var} in {igngrp}')
         return False
     return True
 
-def filt_active(parm,inst,extra_kw=None,dflt=False):
+def filt_active(var,inst,extra_kw=None,dflt=False):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -495,17 +495,17 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
     #check for possibilities of activation
     if not act and not activate:
         if log.log_level < 3:
-            log.msg(f'skip {parm}: not active')
+            log.msg(f'skip {var}: not active')
         return False #shortcut
-    if activate and any(arg_parm_compare(parm,grp) for grp in activate):
+    if activate and any(arg_var_compare(var,grp) for grp in activate):
         if log.log_level < 3:
-            log.msg(f'{parm} activated!')
+            log.msg(f'{var} activated!')
         return True
-    if deactivate and any(arg_parm_compare(parm,grp) for grp in deactivate):
+    if deactivate and any(arg_var_compare(var,grp) for grp in deactivate):
         if log.log_level < 3:
-            log.msg(f'{parm} deactivated!')
+            log.msg(f'{var} deactivated!')
         return False
-    log.msg(f'{parm} is {act}!')
+    log.msg(f'{var} is {act}!')
     return act
 
 
@@ -518,15 +518,15 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
 
 
 # def solve_root(
-#     self, Xref, Yref, Xreset, parms, output=None, fail=True, **kw
+#     self, Xref, Yref, Xreset, vars, output=None, fail=True, **kw
 # ):
 #     """
-#     Solve the root problem using the given parameters.
+#     Solve the root problem using the given vars.
 # 
 #     :param Xref: The reference input values.
 #     :param Yref: The reference output values.
 #     :param Xreset: The reset input values.
-#     :param parms: The list of parameter names.
+#     :param vars: The list of var names.
 #     :param output: The output dictionary to store the results. (default: None)
 #     :param fail: Flag indicating whether to raise an exception if the solver doesn't converge. (default: True)
 #     :param kw: Additional keyword arguments.
@@ -536,7 +536,7 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
 #     if output is None:
 #         output = {
 #             "Xstart": Xreset,
-#             "parms": parms,
+#             "vars": vars,
 #             "Xans": None,
 #             "success": None,
 #         }
@@ -547,7 +547,7 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
 #     output["ans"] = self._ans
 #     if self._ans.success:
 #         # Set Values
-#         Xa = {p: self._ans.x[i] for i, p in enumerate(parms)}
+#         Xa = {p: self._ans.x[i] for i, p in enumerate(vars)}
 #         output["Xans"] = Xa
 #         Ref.refset_input(Xref, Xa)
 #         self.pre_execute()
@@ -574,14 +574,14 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
 #### TODO: solve equillibrium case first using root solver for tough problems
 # # make anonymous function
 # def f_lin_slv(system, Xref: dict, Yref: dict, normalize=None,slv_info=None):
-#     parms = list(Xref.keys())  # static x_basis
-#     yparm = list(Yref.keys())
+#     vars = list(Xref.keys())  # static x_basis
+#     yvar = list(Yref.keys())
 #     def f(x):  # anonymous function
 #         # set state
-#         for p, xi in zip(parms, x):
+#         for p, xi in zip(vars, x):
 #             Xref[p].set_value(xi)
 #         print(Xref,Yref)
-#         grp = (yparm, x, normalize)
+#         grp = (yvar, x, normalize)
 #         vals = [eval_ref(Yref[p],system,slv_info) / n for p, x, n in zip(*grp)]
 #         return vals  # n sized normal residual vector
 # 
@@ -609,13 +609,13 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
 #     :param reset: if the solution fails, reset the x values to their original state, if true will reset the x values to their original state on failure overiding doset.
 #     :param doset: if the solution is successful, set the x values to the solution by default, otherwise follows reset, if not successful reset is checked first, then doset
 #     """
-#     parms = list(Xref.keys())  # static x_basis
+#     vars = list(Xref.keys())  # static x_basis
 #     if normalize is None:
-#         normalize = np.ones(len(parms))
+#         normalize = np.ones(len(vars))
 #     elif isinstance(normalize, (list, tuple, np.ndarray)):
-#         assert len(normalize) == len(parms), "bad length normalize"
+#         assert len(normalize) == len(vars), "bad length normalize"
 #     elif isinstance(normalize, (dict)):
-#         normalize = np.array([normalize[p] for p in parms])
+#         normalize = np.array([normalize[p] for p in vars])
 # 
 #     # make objective function
 #     f = ffunc(system, Xref, Yref, normalize)
@@ -625,13 +625,13 @@ def filt_active(parm,inst,extra_kw=None,dflt=False):
 #         x_pre = refset_get(Xref)  # record before changing
 # 
 #     if Xo is None:
-#         Xo = [Xref[p].value() for p in parms]
+#         Xo = [Xref[p].value() for p in vars]
 # 
 #     elif isinstance(Xo, dict):
-#         Xo = [Xo[p] for p in parms]
+#         Xo = [Xo[p] for p in vars]
 # 
 #     # solve
 #     ans = sciopt.root(f, Xo, **kw)
 #  
-#     return process_ans(ans,parms,Xref,x_pre,doset,reset,fail,ret_ans)
+#     return process_ans(ans,vars,Xref,x_pre,doset,reset,fail,ret_ans)
 # 
