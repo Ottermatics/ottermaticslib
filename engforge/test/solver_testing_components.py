@@ -123,7 +123,7 @@ class SpaceMixin(SolveableInterface):
 class CubeComp(Component,SpaceMixin,DynamicsMixin):
     # this should be energy neutral 🤞
     
-    dynamic_state_parms: list = ["x", "y", "z"]
+    dynamic_state_vars: list = ["x", "y", "z"]
 
     base_cost: float = attrs.field(default=10)
     cost_x: float = attrs.field(default=10)
@@ -141,7 +141,7 @@ class CubeComp(Component,SpaceMixin,DynamicsMixin):
 @forge(auto_attribs=True)
 class CubeSystem(System,SpaceMixin,GlobalDynamics):
     
-    dynamic_state_parms: list = ["x", "y", "z"]
+    dynamic_state_vars: list = ["x", "y", "z"]
 
     comp = Slot.define(CubeComp)
 
@@ -203,7 +203,7 @@ class CubeSystem(System,SpaceMixin,GlobalDynamics):
 
 @forge(auto_attribs=True)
 class DynamicComponent(Component, DynamicsMixin):
-    dynamic_state_parms: list = ["x", "v"]
+    dynamic_state_vars: list = ["x", "v"]
     x: float = 1
     v: float = 0
 
@@ -248,7 +248,7 @@ class TransientSys(Component):
 
 @forge(auto_attribs=True)
 class DynamicSystem(System, GlobalDynamics):
-    dynamic_state_parms: list = ["x", "v"]
+    dynamic_state_vars: list = ["x", "v"]
 
     x: float = 0
     v: float = 0

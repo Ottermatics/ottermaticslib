@@ -766,7 +766,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                    attr_dict[atype] = {}
         
         #Dynamic Variables Add, following the skipped items
-        dyn_refs = self.collect_dynamic_refs(conf)
+        dyn_refs = self.collect_dynamic_refs(confobj)
         #house keeping to organize special returns 
         #TODO: generalize this with a function to update the attr dict serach result
         out['dynamic_comps'] = dyn_refs.pop('dynamic_comps',{})

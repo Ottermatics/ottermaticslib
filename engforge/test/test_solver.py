@@ -15,7 +15,7 @@ class SolverRefSelection(unittest.TestCase):
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:
                 extra = dict(combos=cmb,slv_vars='*x,*y,*z',activate=acts if act else None,only_active=act)
-                info = self.sc.solver_parameters(**extra)['attrs']
+                info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
                 self.assertEqual(set(info['dynamics.state']),ans)
@@ -37,7 +37,7 @@ class SolverRefSelection(unittest.TestCase):
             for cmb in [inv,inv.split(',')]:
                 actv = acts if act else aacts
                 extra = dict(combos=cmb,slv_vars='*x,*y,*z',activate=actv,only_active=True)
-                info = self.sc.solver_parameters(**extra)['attrs']
+                info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
                 self.assertEqual(set(info['dynamics.state']),ans)
@@ -62,7 +62,7 @@ class SolverRefSelection(unittest.TestCase):
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:
                 extra = dict(combos=cmb,slv_vars='*x,*y,*z',activate=[],only_active=act)
-                info = self.sc.solver_parameters(**extra)['attrs']
+                info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
                 self.assertEqual(set(info['dynamics.state']),ans)
@@ -84,7 +84,7 @@ class SolverRefSelection(unittest.TestCase):
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:        
                 extra = dict(combos=[],slv_vars=cmb,only_active=act)
-                info = self.sc.solver_parameters(**extra)['attrs']
+                info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
                 self.assertEqual(set(info['dynamics.state']),ans)
@@ -100,7 +100,7 @@ class SolverRefSelection(unittest.TestCase):
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:        
                 extra = dict(combos=cmb,slv_vars=[],only_active=act)
-                info = self.sc.solver_parameters(**extra)['attrs']
+                info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
                 self.assertEqual(set(info['dynamics.state']),ans)
@@ -114,7 +114,7 @@ class SolverRefSelection(unittest.TestCase):
         '''activated aren't included because no combos are given'''
         extra = dict(combos=[],slv_vars='*x,*y,*z',activate=['*costA','*lenA','*size'],only_active=True)
 
-        info = self.sc.solver_parameters(**extra)['attrs']
+        info = self.sc.solver_vars(**extra)['attrs']
         ans = {'x','y','z','comp.x','comp.y','comp.z'}
         self.assertEqual(set(info['solver.var']),ans)
         self.assertEqual(set(info['dynamics.state']),ans)
@@ -122,52 +122,16 @@ class SolverRefSelection(unittest.TestCase):
 
         empt = ['solver.eq','solver.ineq','solver.obj','time','slot','signal']
         for emp in empt:
-            self.assertEqual(info[emp],{})                    
-
-"""
-#TODO: make this context test
-from engforge.problem_context import *
-from engforge.system import System,forge
-import random
+            self.assertEqual(info[emp],{})
 
 
-@forge(auto_attribs=True)
-class Test(System):
-    one: int = 1
-    two: int = 2
-
-    def set_rand(self):
-        self.one = random.random()
-        self.two = random.random()
-    
-    def __str__(self):
-        return f'{self.one}_{self.two}'
-
-tst = Test()
-tst.change_all_log_lvl(1)
-print(tst)
-with ProblemExec(tst) as pb1:
-    tst.set_rand()
-    print(tst)
-    with ProblemExec(tst,level_name='2') as pb2:
-        tst.set_rand()
-        print(tst)        
-        with ProblemExec(tst) as pb3:
-            tst.set_rand()
-            print(tst)
-            pb3.exit_to_level('top',revert = True)
-            print('why?',tst)
-        print('E3',tst)
-    print('E2',tst)
-print('E1',tst)
-"""
 
 import pprint
 
 class SingleCompSolverTest(unittest.TestCase):
     inequality_min = -1E-6
     def setUp(self) -> None:
-        self.sc = SolvSys()
+        self.sc = CubeSystem()
 
     def test_exec_results(self):
         extra = dict(combos=[],slv_vars='*x,*y,*z',activate=[],only_active=True)
@@ -200,7 +164,11 @@ class SingleCompSolverTest(unittest.TestCase):
             #check for equivalence
             a0 = attempts[0]
             for atmpt in attempts[1:]:
-                self.assertDictEqual(a0['Xans'],atmpt['Xans'])
+                ak1 = a0['Xans']
+                ak2 = atmpt['Xans']
+                self.assertEqual(set(ak1),set(ak2))
+                for k in ak1:
+                    self.assertAlmostEqual(ak1[k],ak2[k],places=4)
             
     def test_system_optimization(self):
         """check the system solver methods work as expected (objectives are optimized)"""

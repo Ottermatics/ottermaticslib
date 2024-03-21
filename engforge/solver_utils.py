@@ -164,11 +164,11 @@ def secondary_obj(
 
     return f
 
-def ref_to_val_constraint(system,Xrefs,var_ref,kind,val,*args,**kwargs):
+def ref_to_val_constraint(system,ctx,Xrefs,var_ref,kind,val,*args,**kwargs):
     """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
     """
-    
-    info = {'system':system,'Xrefs':Xrefs,'var_ref':var_ref,'kind':kind,'val':val,'args':args,'kwargs':kwargs}
+    inf = ctx
+    # info = {'system':system,'Xrefs':Xrefs,'var_ref':var_ref,'kind':kind,'val':val,'args':args,'kwargs':kwargs}
     p = var_ref
     if isinstance(val,Ref):
         if kind == 'min':
@@ -260,7 +260,7 @@ def calcJacobean(
     assert len(Yrefs) >= 1
 
     with sys.revert_X(refs=Xrefs): #TODO: replace with context manager
-        # initalize here
+        #initalize here
         refset_input(Xrefs, X0)
 
         rows = []

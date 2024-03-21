@@ -212,16 +212,16 @@ class ProblemExec:
         else:
             dxdt = None        
         if dxdt is not None and dxdt is not False:
-            if dxdt == 0:
+            if dxdt == 0 and dxdt is not False:
                 pass
             elif dxdt is True:
                 pass
-            else:  # dxdt is a dictionary
-                # TODO: add dynamics integration (steady: dxdt==0, dxdt = C)
-                assert isinstance(dxdt, dict), f"not dict for dxdt: {dxdt}"
-                raise NotImplementedError(
-                    f"dynamic integration not yet implemented for dictionary based input: {dxdt}"
-                )
+            elif isinstance(dxdt, dict):  # dxdt is a dictionary
+                #provide a set of values or function to have the solver solve for
+                pass
+            else:
+                raise IllegalArgument(f'bad dxdt value {dxdt}')
+                
         self._dxdt = dxdt                 
             
         if hasattr(ProblemExec,'_session'):
@@ -338,7 +338,7 @@ class ProblemExec:
         self._class_cache.level_number = 0
 
         refs = {k:v for k,v in self.sys_refs.get('attrs',{}).items() if v}
-        self.warning(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
+        self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
         
 
 
@@ -633,7 +633,7 @@ class ProblemExec:
 
     #X solver variable refs
     @property
-    def problem_vars(self):
+    def problem_vars(self)->dict:
         """solver variables + dynamics states when dynamic_solve is True"""
         varx = self.ref_attrs.get('solver.var',{}) 
         #Add the dynamic states
@@ -773,7 +773,7 @@ class ProblemExec:
         for int_name,intinst in self.integrators.items():
             if intinst.var in dc:
                 raise KeyError(f'conflict with integrator name {intinst.var} and dynamic state')
-            dc.update({intinst.var:intinst.rate})
+            dc.update({intinst.var:intinst.rate_ref})
         return dc
     
     @property
@@ -781,9 +781,9 @@ class ProblemExec:
         """combine the dynamic state and the integrator rates to get the transient state of the system, but convert their keys to the target var names """
         dc  = self.dynamic_state.copy()
         for int_name,intinst in self.integrators.items():
-            if intinst.var in dc:
-                raise KeyError(f'conflict with integrator name {intinst.var} and dynamic state')
-            dc.update({intinst.var:intinst.var})
+            if intinst.var_ref in dc:
+                raise KeyError(f'conflict with integrator name {intinst.var_ref} and dynamic state')
+            dc.update({intinst.var:intinst.var_ref})
         return dc    
     
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
@@ -889,10 +889,13 @@ class ProblemExec:
         ex_arg = {"con_args": (),**kw}
         #Variable limit (function -> ineq, numeric -> bounds)
         for slvr, ref in self.problem_vars.items():
+            assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
             if slvr in slv_inst:
                 slv = slv_inst[slvr]
+                slv_var = True
             elif slvr in trv_inst:
                 slv = trv_inst[slvr]
+                slv_var = False
             else:
                 self.warning(f'no solver instance for {slvr} ')
                 continue
@@ -922,7 +925,7 @@ class ProblemExec:
                             if log.log_level < 3:
                                 self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
                             continue
-                        
+
                         elif not active and not in_activate:
                             if log.log_level < 3:
                                 self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
@@ -932,8 +935,6 @@ class ProblemExec:
                             if log.log_level < 3:
                                 self.msg(f'[{self.level_number}-{self.level_name}]skip con: deactivated {var} {slvr} ')
                             continue
-
-                        
 
                     if combos and combo_filter:
                         filt = filt_combo_vars(combo_var,slv, extra_kw,combos)
@@ -945,9 +946,34 @@ class ProblemExec:
                     if log.log_level < 10:
                         self.debug(f'[{self.level_number}-{self.level_name}] adding var constraint {var,slvr,ctype,combos}') 
 
-                    x_inx = Xvars.index(slvr)            
-                    #print(cval,kind,var)
-                    if (
+                    
+                    x_inx = Xvars.index(slvr)        
+                    
+                    #lookup rates
+                    if isinstance(self._dxdt,dict) and not slv_var:
+                        rate_val = self._dxdt.get(slvr,0)
+                    elif not slv_var:
+                        rate_val = 0
+                    else:
+                        rate_val = None
+
+                    #add the dynamic parameters when configured
+                    if not slv_var and rate_val is not None:
+                        #if kind in ('min','max') and slvr in Xvars:
+                        varref = Xrefs[slvr]
+                        #varref = slv.rate_ref
+                        #Ref Case
+                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,*args,**kw)
+                        #con_list.append(ccst)
+                        con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
+                        con_list.append(
+                            create_constraint(
+                                system,Xrefs, 'eq', ccst, *args, **kw
+                            )
+                        )                        
+                                
+                    if ( #establish simple bounds w/ solver
+                        slv_var and
                         kind in ("min", "max")
                         and slvr in Xvars
                         and isinstance(cval, (int, float))
@@ -959,12 +985,12 @@ class ProblemExec:
                             ]
                         
                     #add the bias of cval to the objective function
-                    elif kind in ('min','max') and slvr in Xvars:
+                    elif slv_var and kind in ('min','max') and slvr in Xvars:
                         varref = Xrefs[slvr]
                         #Ref Case
-                        cval = ref_to_val_constraint(system,Xrefs,varref,kind,cval,*args,**kw)
+                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,*args,**kw)
                         con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
-                        con_list.append(cval)
+                        con_list.append(ccst)
 
                     else:
                         self.warning(f"bad constraint: {cval} {kind} {slvr}")
