@@ -25,8 +25,12 @@ class SolveableInterface(Configuration,TabulationMixin,SolveableMixin):
 
     @property
     def last_context(self):
+        """get the last context run, or the parent's"""
         if hasattr(self,"_last_context"):
-            return self._last_context
+            return self._last_context 
+        elif self.parent and (ctx:=self.parent.last_context):
+            return ctx
+        return None
 
 #NOTE: components / systems not interchangable, systems are like components but are have solver capabilities
 #TODO: justify separation of components and systems, and not making system a subclass of component. Otherwise make system a subclass of component

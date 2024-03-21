@@ -422,17 +422,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             inputs[max(inputs) + 1 if inputs else 0] = icur
 
             # nice
+            #TODO: wrap this with context manager
             self._solved = True
 
             # Pre Run Callback with current state
             self.post_run_callback(eval_kw=eval_kw, sys_kw=sys_kw, **kwargs)
-
-            # # pre-revert by default
-            # if revert and revert_x:
-            #     Ref.refset_input(sys_refs, revert_x)
-
-            # reapply solved state
-            self._solved = True
 
             if return_results:
                 return result

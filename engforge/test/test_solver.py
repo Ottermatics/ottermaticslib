@@ -180,7 +180,7 @@ class SingleCompSolverTest(unittest.TestCase):
         self.assertGreater(H['Yobj']['hght'],V['Yobj']['hght'])
         self.assertGreater(V['Yobj']['obj'],H['Yobj']['obj'])
 
-# 
+#TODO: rewrite these tests
 #     def test_selective_exec(self):
 #         extra = dict(combos='*fun*,goal',ign_combos=['z_sym_eq','*size*','*eff*'])
 #         o = self.sc.execute(**extra)
