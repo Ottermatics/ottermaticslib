@@ -768,7 +768,7 @@ class Plot(PlotBase):
         # Validate Args
         pfunc = getattr(sns, _type)
         kfunc = getattr(sns, kind)
-        args = set(inspect.signature(kfunc).vars.keys())
+        args = set(inspect.signature(kfunc).parameters.keys())
         assert set(kwargs).issubset(args), f"only {args} allowed for kw"
         plot_args = kwargs
 

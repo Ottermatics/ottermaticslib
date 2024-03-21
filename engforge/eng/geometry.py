@@ -602,12 +602,18 @@ class ShapelySection(Profile2D):
         
     def estimate_stress(self, n=0, vx=0, vy=0, mxx=0, myy=0, mzz=0,value=False,calc_margin=2,min_est_records=100,calc_every=25,pre_train_margin=2,force_calc=False)->float:
         """uses a support vector machine to estimate stresses and returns the ratio of the allowable stress, also known as the failure fracion if prediction is set to True, otherwise calculates stress"""
-        Nrec = len(self._prediction_records) if self._prediction_records else 0
-        under_size = Nrec <= min_est_records
+        
+        Nrec = 0
+        under_size = True    
+        if self.prediction:
+            pr = self.prediction_records
+            Nrec = len(pr) if pr else 0
+            under_size = Nrec <= min_est_records     
+
         do_calc = not self.prediction or not self._fitted or under_size
         if do_calc or force_calc:
-            if self._do_print:
-                print(f'calc till {len(self._prediction_records)} <= {min_est_records}')
+            if self._do_print and self.prediction:
+                print(f'calc till {len(self.prediction_records)} <= {min_est_records}')
             stress = calculate_stress(self,n=n, vx=vx, vy=vy, mxx=mxx, myy=myy, mzz=mzz,value=value)
             return stress 
         else:
@@ -626,7 +632,8 @@ class ShapelySection(Profile2D):
             if not self.trained:
                 #calc when in doubt   
                 calc_margin = calc_margin*pre_train_margin 
-                
+            
+
             #calculate stress if close to failure within saftey margin
             err = 1-val
             mrg = self.fail_frac_criteria(calc_margin=calc_margin)
@@ -683,7 +690,7 @@ class ShapelySection(Profile2D):
         """determines if stress record should be added to prediction_records"""
         if not self.prediction:
             return
-        if len(self._prediction_records) > self.max_records:
+        if len(self.prediction_records) > self.max_records:
             return
         #Add the data to the stress records
         #TODO: add logic to determine if stress record should be added to prediction_records
@@ -770,7 +777,7 @@ class ShapelySection(Profile2D):
 
             self._basis = np.array([max([abs(v.get(p,1E6))  for k,v in res.items() ]) for p in self._prediction_parms])
 
-            self.N_base = len(self._prediction_records)
+            self.N_base = len(self.prediction_records)
 
         #Second Pareto Value Calc
         if pareto_front:
@@ -787,7 +794,7 @@ class ShapelySection(Profile2D):
                         if not self._symmetric:
                             self.solve_fail(fail_parm,base_kw,guess=guesstimate,mult=-1*mult) #alternato
     
-            self.N_pareto = len(self._prediction_records)
+            self.N_pareto = len(self.prediction_records)
     
     def basis_expand(self,expand_values=[0.9,0.75,0.5,0.1,0.01],Nparm=4,est=True,normalize=True):
         """run combinations of parameters and permutations of weights against the basis values to populate the stress records, by default using estimation logic to speed up the process"""

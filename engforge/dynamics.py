@@ -35,6 +35,13 @@ from scipy.integrate import solve_ivp
 
 
 # Index maps are used to translate between different indexes (local & global)
+
+def valid_mtx(arr):
+    if arr is None:
+        return False
+    elif arr.size == 0:
+        return 0
+    return True
 class INDEX_MAP:
     oppo = {str: int, int: str}
 
@@ -112,10 +119,10 @@ class DynamicsIntegratorMixin(SolveableMixin):
             return self.rate_linear(t, dt, X, U, *args, **kwargs)
 
     def rate_linear(self, t, dt, X, U, *args, **kwargs):
-        pass
+        raise NotImplemented()
 
     def rate_nonlinear(self, t, dt, X, U, *args, **kwargs):
-        pass
+        raise NotImplemented()
 
     def reset_sim(self):
         """reset the system to the initial state"""
@@ -206,7 +213,16 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
             [getattr(self, var, np.nan) for var in self.dynamic_output_vars]
         )
 
-    # TODO: add sparse mode
+    def create_dynamic_matricies(self,**kwargs):
+        """creates all dynamic matricies"""
+        self.create_state_matrix(**kwargs)
+        self.create_state_input_matrix(**kwargs)
+        self.create_output_matrix(**kwargs)
+        self.create_feedthrough_matrix(**kwargs)
+        self.create_state_constants(**kwargs)
+        self.create_output_constants(**kwargs)
+
+
     def create_state_matrix(self, **kwargs) -> np.ndarray:
         """creates the state matrix for the system"""
         return np.zeros((self.state_size, self.state_size))
@@ -291,11 +307,17 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
     # linear and nonlinear system level IO
     def rate_linear(self, t, dt, X, U=None):
         """simulate the system over the course of time. Return time differential of the state."""
-        O = self.static_A @ X
-        if U is not None and self.static_B.size and U.size:
+        
+        O = 0
+        if valid_mtx(self.static_A) and valid_mtx(X):
+            O = self.static_A @ X
+
+        if valid_mtx(U) and valid_mtx(self.static_B):
             O += self.static_B @ U
-        if self.static_F.size:
+
+        if valid_mtx(self.static_F):
             O += self.static_F
+
         return O
 
     def linear_output(self, t, dt, X, U=None):
@@ -309,10 +331,14 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         Returns:
             np.array: time differential of the state
         """
-        O = self.static_C @ X
-        if U is not None and self.static_D.size and U.size:
+        O = 0
+        if valid_mtx(self.static_C) and valid_mtx(X):
+            O = self.static_C @ X
+
+        if valid_mtx(U) and valid_mtx(self.static_D):
             O += self.static_D @ U
-        if self.static_K.size:
+
+        if valid_mtx(self.static_K):
             O += self.static_K
         return O
 
@@ -330,11 +356,15 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         """
         if update:
             self.update_dynamics(t, X, U)
-        O = self.dynamic_A @ X
-        if U is not None and self.dynamic_B.size and U.size:
+        
+        O = 0
+        if valid_mtx(self.dynamic_A) and valid_mtx(X):
+            O = self.dynamic_A @ X
+
+        if valid_mtx(U) and valid_mtx(self.dynamic_B):
             O += self.dynamic_B @ U
 
-        if self.dynamic_F.size:
+        if valid_mtx(self.dynamic_F):
             O += self.dynamic_F
         return O
 
@@ -351,10 +381,15 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         """
         if update:
             self.update_dynamics(t, X, U)
-        O = self.dynamic_C @ X
-        if U is not None and self.dynamic_D.size and U.size:
+        
+        O = 0
+        if valid_mtx(self.dynamic_C)and valid_mtx(X):
+            O = self.dynamic_C @ X
+
+        if valid_mtx(U) and valid_mtx(self.dynamic_D):
             O += self.dynamic_D @ U
-        if self.dynamic_K.size:
+
+        if valid_mtx(self.dynamic_K):
             O += self.dynamic_K
         return O
 
@@ -363,7 +398,7 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         """Optimal nonlinear steps"""
         self.time = t
         self.update_dynamics(t, X, U)
-        # print(self.dynamic_A,self.dynamic_B,X,U)
+        
         dXdt = self.rate_nonlinear(t, dt, X, U, update=False)
         out = self.nonlinear_output(t, dt, X, U, update=False)
 
@@ -469,8 +504,14 @@ class GlobalDynamics(DynamicsMixin):
     """This object is inherited by configurations that collect other dynamicMixins and orchestrates their simulation, and steady state analysis
 
     #TODO: establish bounds in solver
-    #TODO: establish steady date analysis
     """
+
+    def setup_global_dynamics(self, **kwargs):
+        """recursively creates numeric matricies for the simulation"""
+        for skey,lvl,conf in self.go_through_configurations():
+            if isinstance(conf,DynamicsMixin):
+                conf.create_dynamic_matricies(**kwargs)
+    
 
     def sim_matrix(self, eval_kw=None, sys_kw=None, *args, **kwargs):
         """simulate the system over the course of time.
@@ -541,8 +582,8 @@ class GlobalDynamics(DynamicsMixin):
         #TODO: put copy system in problem context
         system = self.copy_config_at_state()
 
-        #TODO: recursively initalize transient components
-        system.create_state_matrix() 
+        #recursively initalize transient components
+        system.setup_global_dynamics()
 
         #Time Iteration Context
         with ProblemExec(system,level_name='sim',**kwargs) as pbx:

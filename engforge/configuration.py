@@ -27,7 +27,7 @@ def name_generator(instance):
     log.debug(f"generated name: {out}")
     return out
 
-PROTECTED_NAMES = ['solver','dataframe','t','time','_anything_changed']
+PROTECTED_NAMES = ['solver','dataframe','time','_anything_changed']
 
 # Wraps Configuration with a decorator, similar to @attrs.define(**options)
 def forge(cls=None, **kwargs):
