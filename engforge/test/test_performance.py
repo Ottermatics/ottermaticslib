@@ -7,20 +7,52 @@
 
 from engforge.test.solver_testing_components import *
 from engforge.logging import LoggingMixin
+from cProfile import Profile
+from pstats import Stats
+import unittest
+import time
 
 class PerfTest(LoggingMixin): pass
 log = PerfTest()
 
-def test_steady_state():
+def eval_steady_state(dxdt=0):
     """test that the ss answer is equal to the result with damping"""
     sm = SpringMass()
-    sm.run(dxdt=0)
+    sm.run(dxdt=dxdt)
     df = sm.dataframe
 
-def test_transient():
+def eval_transient(endtime=10,dt=0.001,run_solver=False):
     """test that the ss answer is equal to the result with damping"""
     sm = SpringMass()
-    df = sm.simulate(dt=0.001, endtime=10,run_solver=False)
+    df = sm.simulate(dt=dt, endtime=endtime,run_solver=run_solver)
+
+class TestPerformance(unittest.TestCase):
+
+    def test_steady_state(self):
+        
+        with Profile() as pr:
+            start = time.time()
+            eval_steady_state()
+            
+        stats = Stats(pr)
+        stats.sort_stats('tottime').print_stats(10)
+        
+        end = time.time()
+        self.assertLessEqual((end-start), 1.0)
+
+    def test_transient(self):
+        endtime = 10
+        with Profile() as pr:
+            start = time.time()
+            eval_transient(endtime=endtime,dt=0.001,run_solver=False)
+            
+        stats = Stats(pr)
+        stats.sort_stats('tottime').print_stats(10)
+        end = time.time()
+        self.assertLessEqual((end-start),endtime)
+
+
+
 
 
 if __name__ == "__main__":
@@ -41,7 +73,7 @@ if __name__ == "__main__":
         log.info(f'running all: {run_all} | {sys.argv}')
         if args.steady_state or run_all:
             log.info(f'running steady state test')
-            test_steady_state()
+            eval_steady_state()
         if args.transient or run_all:
-            log.info(f'running steady state test')
-            test_transient()
+            log.info(f'running transient integration test')
+            eval_transient()

@@ -119,8 +119,8 @@ class ProblemExec:
 
     #runtime and exit options
     success_thresh = 10
-    pre_exec: bool=True
-    post_exec: bool=False
+    pre_exec: bool = True
+    post_exec: bool = True
     fail_revert: bool = True
     revert_last: bool = True
     revert_every: bool = True
@@ -311,7 +311,7 @@ class ProblemExec:
         self.Xref = self.problem_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
-        self.constraints = self.sys_solver_constraints(self.Xref,cons,)
+        self.constraints = self.sys_solver_constraints(self.Xref,cons)
 
         if log.log_level < 5:
             self.msg(f'established {self.slv_kw}')  
@@ -337,11 +337,9 @@ class ProblemExec:
         self._class_cache._session = self
         self._class_cache.level_number = 0
 
-        refs = {k:v for k,v in self.sys_refs.get('attrs',{}).items() if v}
-        self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
-        
-
-
+        if self.log_level < 10:
+            refs = {k:v for k,v in self.sys_refs.get('attrs',{}).items() if v}
+            self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
 
         return self
 
@@ -635,7 +633,7 @@ class ProblemExec:
     @property
     def problem_vars(self)->dict:
         """solver variables + dynamics states when dynamic_solve is True"""
-        varx = self.ref_attrs.get('solver.var',{}) 
+        varx = self.ref_attrs.get('solver.var',{}).copy()
         #Add the dynamic states
         if self.dynamic_solve:
             varx.update(self.filter_vars(self.dynamic_state))
@@ -684,28 +682,28 @@ class ProblemExec:
     #Safe Access Methods
     @property
     def ref_attrs(self):
-        return self.sys_refs.get('attrs',{})
+        return self.sys_refs.get('attrs',{}).copy()
 
     @property
     def attr_inst(self):
-        return self.sys_refs.get('type',{})
+        return self.sys_refs.get('type',{}).copy()
     
     @property
     def dynamic_comps(self):
-        return self.sys_refs.get('dynamic_comps',{})
+        return self.sys_refs.get('dynamic_comps',{}).copy()
     
     #Instances
     @property
     def integrators(self):
-        return self.attr_inst.get('time',{})
+        return self.attr_inst.get('time',{}).copy()
     
     @property
     def signal_inst(self):
-        return self.attr_inst.get('signal',{})
+        return self.attr_inst.get('signal',{}).copy()
 
     @property
     def solver_inst(self):
-        return self.attr_inst.get('solver',{})
+        return self.attr_inst.get('solver',{}).copy()
 
     @property
     def kwargs(self):
@@ -714,48 +712,48 @@ class ProblemExec:
 
     @property
     def dynamic_state(self):
-        return self.ref_attrs.get('dynamics.state',{})
+        return self.ref_attrs.get('dynamics.state',{}).copy()
     
     @property
     def dynamic_rate(self):
-        return self.ref_attrs.get('dynamics.rate',{})    
+        return self.ref_attrs.get('dynamics.rate',{}).copy()    
     
     @property
     def problem_input(self):
-        return self.ref_attrs.get('dynamics.input',{})      
+        return self.ref_attrs.get('dynamics.input',{}).copy()      
 
     @property
     def integrator_vars(self):
-        return self.ref_attrs.get('time.var',{})
+        return self.ref_attrs.get('time.var',{}).copy()
     
     @property
     def integrator_rates(self):
-        return self.ref_attrs.get('time.rate',{})
+        return self.ref_attrs.get('time.rate',{}).copy()
     
     #Y solver variables
     @property
     def problem_objs(self):
-        return self.ref_attrs.get('solver.obj',{})   
+        return self.ref_attrs.get('solver.obj',{}).copy()   
 
     @property
     def problem_eq(self):
-        return self.ref_attrs.get('solver.eq',{})
+        return self.ref_attrs.get('solver.eq',{}).copy()
     
     @property
     def problem_ineq(self):
-        return self.ref_attrs.get('solver.ineq',{})
+        return self.ref_attrs.get('solver.ineq',{}).copy()
     
     @property
     def signals_source(self):
-        return self.ref_attrs.get('signal.source',{})
+        return self.ref_attrs.get('signal.source',{}).copy()
     
     @property
     def signals_target(self):
-        return self.ref_attrs.get('signal.target',{})
+        return self.ref_attrs.get('signal.target',{}).copy()
 
     @property
     def signals(self):
-        return self.ref_attrs.get('signal.signal',{})
+        return self.ref_attrs.get('signal.signal',{}).copy()
 
     #formatted output
     @property
@@ -966,30 +964,31 @@ class ProblemExec:
                         ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,*args,**kw)
                         #con_list.append(ccst)
                         con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
-                        con_list.append(ccst)                        
-                                
-                    if ( #establish simple bounds w/ solver
-                        slv_var and
-                        kind in ("min", "max")
-                        and slvr in Xvars
-                        and isinstance(cval, (int, float))
-                    ):
-                        minv, maxv = bnd_list[x_inx]
-                        bnd_list[x_inx] = [
-                            cval if kind == "min" else minv,
-                            cval if kind == "max" else maxv,
-                            ]
-                        
-                    #add the bias of cval to the objective function
-                    elif slv_var and kind in ('min','max') and slvr in Xvars:
-                        varref = Xrefs[slvr]
-                        #Ref Case
-                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,*args,**kw)
-                        con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
-                        con_list.append(ccst)
+                        con_list.append(ccst) 
 
-                    else:
-                        self.warning(f"bad constraint: {cval} {kind} {slv_var}|{slvr}")
+                    elif slv_var:                       
+                        #establish simple bounds w/ solver  
+                        if ( 
+                            kind in ("min", "max")
+                            and slvr in Xvars
+                            and isinstance(cval, (int, float))
+                        ):
+                            minv, maxv = bnd_list[x_inx]
+                            bnd_list[x_inx] = [
+                                cval if kind == "min" else minv,
+                                cval if kind == "max" else maxv,
+                                ]
+                                
+                        #add the bias of cval to the objective function
+                        elif  kind in ('min','max') and slvr in Xvars:
+                            varref = Xrefs[slvr]
+                            #Ref Case
+                            ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,*args,**kw)
+                            con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
+                            con_list.append(ccst)
+
+                        else:
+                            self.warning(f"bad constraint: {cval} {kind} {slv_var}|{slvr}")
 
         # Add Constraints
         for slvr, ref in sys_refs.get('solver.ineq',{}).items():

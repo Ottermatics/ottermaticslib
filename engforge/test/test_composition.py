@@ -8,6 +8,7 @@ from engforge.attr_solver import Solver
 from engforge.attr_signals import SIGNAL
 from engforge.attr_slots import Slot
 from engforge.properties import *
+from engforge.problem_context import ProblemExec
 
 import attrs
 
@@ -82,14 +83,6 @@ class TestComposition(unittest.TestCase):
         self.comp = MockComponent(comp=self.comp2)
         self.system = MockSystem(input=5, comp=self.comp)
 
-        # FIXME: turn off
-        # self.comp2.log_level = 1
-        # self.comp2.resetLog()
-        # self.comp.log_level = 1
-        # self.comp.resetLog()
-        # self.system.log_level = 1
-        # self.system.resetLog()
-
     def test_signals(self):
         self.system.post_sig.signal.mode = "post"  # usually its both
 
@@ -98,23 +91,21 @@ class TestComposition(unittest.TestCase):
         compstart = self.system.comp.input
         self.assertNotEqual(sysstart, compstart)  # no signals transfering input
 
-        # Use The Signals
-        self.system.pre_execute()
+        with ProblemExec(self.system,{},post_exec=True,pre_exec=True) as pbx:
+            sysend = self.system.input
+            compend = self.system.comp.input
+            self.assertEqual(sysend, compend)  # signals should work as defined
+            self.assertEqual(sysstart, sysend)  # input should remain the same
+            self.assertNotEqual(compstart, compend)  # input on comp changes
 
-        sysend = self.system.input
-        compend = self.system.comp.input
-        self.assertEqual(sysend, compend)  # signals should work as defined
-        self.assertEqual(sysstart, sysend)  # input should remain the same
-        self.assertNotEqual(compstart, compend)  # input on comp changes
+            sysstart = self.system.output
+            compstart = self.system.comp.output
+            self.assertNotEqual(sysstart, compstart)  # they aren't aligned
+            
+            #preserve changes
+            pbx.exit_with_state()
 
-        # Do POST
-        sysstart = self.system.output
-        compstart = self.system.comp.output
-        self.assertNotEqual(sysstart, compstart)  # they aren't aligned
-
-        # Use The Signals
-        self.system.post_execute()
-
+        #now post signals should be applied
         sysend = self.system.output
         compend = self.system.comp.output
         self.assertEqual(sysend, compend)  # signals should work

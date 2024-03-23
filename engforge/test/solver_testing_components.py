@@ -167,9 +167,9 @@ class CubeSystem(System,SpaceMixin,GlobalDynamics):
     x_lim = Solver.ineq_con('x','comp.x',combos='tierd_top',active=False)
     y_lim = Solver.ineq_con('y','comp.y',combos='tierd_top',active=False)
 
-    sig_x = Signal.define('comp.cost_x','cost_x',mode='both',combos='mirror_costs',active=False)
-    sig_y = Signal.define('comp.cost_y','cost_y',mode='both',combos='mirror_costs',active=False)
-    sig_z = Signal.define('comp.cost_z','cost_z',mode='both',combos='mirror_costs',active=False)
+    sig_x_cst = Signal.define('comp.cost_x','cost_x',mode='both',combos='mirror_costs',active=False)
+    sig_y_cst = Signal.define('comp.cost_y','cost_y',mode='both',combos='mirror_costs',active=False)
+    sig_z_cst = Signal.define('comp.cost_z','cost_z',mode='both',combos='mirror_costs',active=False)
 
     @system_property
     def total_budget(self)->float:

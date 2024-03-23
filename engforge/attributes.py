@@ -229,10 +229,11 @@ class ATTR_BASE(attrs.Attribute):
                 log.warning(f"Attribute {k}|{inst} is not an instance of {cls.instance_class} in {system}")
                 continue
 
-            if handle_inst:
+            if inst and handle_inst:
                 inst = cls.handle_instance(inst)
-
-            out[k] = inst
+                
+            if inst is not None:
+                out[k] = inst
         return out
 
     @staticmethod

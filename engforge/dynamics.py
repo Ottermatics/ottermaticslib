@@ -213,15 +213,6 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
             [getattr(self, var, np.nan) for var in self.dynamic_output_vars]
         )
 
-    def create_dynamic_matricies(self,**kwargs):
-        """creates all dynamic matricies"""
-        self.create_state_matrix(**kwargs)
-        self.create_state_input_matrix(**kwargs)
-        self.create_output_matrix(**kwargs)
-        self.create_feedthrough_matrix(**kwargs)
-        self.create_state_constants(**kwargs)
-        self.create_output_constants(**kwargs)
-
 
     def create_state_matrix(self, **kwargs) -> np.ndarray:
         """creates the state matrix for the system"""
@@ -247,7 +238,7 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         """creates the input matrix for the system, called O"""
         return np.zeros(max(self.output_size, 1))
 
-    def create_dynamics(self, **kw):
+    def create_dynamic_matricies(self, **kw):
         """creates a dynamics object for the system"""
         # State + Control
         self.static_A = self.create_state_matrix(**kw)
@@ -511,6 +502,7 @@ class GlobalDynamics(DynamicsMixin):
         for skey,lvl,conf in self.go_through_configurations():
             if isinstance(conf,DynamicsMixin):
                 conf.create_dynamic_matricies(**kwargs)
+
     
 
     def sim_matrix(self, eval_kw=None, sys_kw=None, *args, **kwargs):
@@ -628,6 +620,7 @@ class GlobalDynamics(DynamicsMixin):
                 dflt = lambda sys,prb: (np.product(1+v.value()**2 for v in pbx.problem_vars.items()))**0.5
                 Yobj = {'smallness': Ref(system, dflt)}
 
+            #TODO: add simulation time to context
             pbx.last_time = 0
 
             #our anonymous integrator!
@@ -666,7 +659,7 @@ class GlobalDynamics(DynamicsMixin):
                         Xds = np.array([r.value() for r in comp.Xt_ref.values()])
                         Uds = np.array([r.value() for r in comp.Ut_ref.values()])
                         # time updated in step
-                        system.info(f'comp {comp} {compnm} {Xds} {Uds}')
+                        #system.info(f'comp {comp} {compnm} {Xds} {Uds}')
                         dxdt = comp.step(t, dt, Xds, Uds, True)
 
                         for i, (p, ref) in enumerate(comp.Xt_ref.items()):

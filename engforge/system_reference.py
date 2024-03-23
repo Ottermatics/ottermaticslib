@@ -146,6 +146,7 @@ class Ref:
         "key_override",
         '_value_eval',
         '_log_func',
+        'hxd'
     ]
     comp: "TabulationMixin"
     key: str
@@ -188,27 +189,32 @@ class Ref:
             self.allow_set = allow_set
             self.eval_f = eval_f
 
+        self.hxd = str(hex(id(self)))[-6:]
+
         self.setup_calls()
 
     def setup_calls(self):
         """caches anonymous functions for value and logging speedup"""
-        if self.comp and self.comp.log_level < 2 and isinstance(self.comp,LoggingMixin):
-            self._log_func = lambda val: self.comp.msg(f"REF[get] {self.comp} {self.key} -> {val}")
+        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 2:
+            self._log_func = lambda val: self.comp.msg(f"REF[get] {self} -> {val}")
         else:
             self._log_func = None
 
         if self.key_override:
             self._value_eval = lambda *a,**kw: self.key(*a,**kw)
         else:
+            #do not cross reference vars!
             if self.use_dict:
-                g = lambda *a,**kw: self.comp.get(self.key)
+                p = lambda *a,**kw: self.comp.get(self.key)
             elif self.key in self.comp.__dict__:
-                g = lambda *a,**kw: self.comp.__dict__[self.key]
+                p = lambda *a,**kw: self.comp.__dict__[self.key]
             else:
-                g = lambda *a,**kw: getattr(self.comp, self.key)
+                p = lambda *a,**kw: getattr(self.comp, self.key)
 
             if self.eval_f:
-                g = lambda *a,**kw: self.eval_f(g(*a,**kw))
+                g = lambda *a,**kw: self.eval_f(p(*a,**kw))
+            else:
+                g = p
 
             self._value_eval = g
 
@@ -233,24 +239,22 @@ class Ref:
         if self.allow_set:
             if self.value() != val: #this increases perf. by reducing writes
                 if self.comp and self.comp.log_level < 10:
-                    self.comp.msg(f"REF[set] {self} -> {val}")
+                    self.comp.msg(f"REF[set] {self} <- {val}")
                 return setattr(self.comp, self.key, val)
         else:
             raise Exception(f"not allowed to set value on {self.key}")
 
     def __str__(self) -> str:
-        hxd = str(hex(id(self)))[-6:]
         if self.use_dict:
-            return f"REF[{hxd}][DICT.{self.key}]"
+            return f"REF[{self.hxd}][DICT.{self.key}]"
         if self.key_override:
-            return f"REF[{hxd}][{self.comp.classname}.{self.key.__name__}]"
-        return f"REF[{hxd}][{self.comp.classname}.{self.key}]"
+            return f"REF[{self.hxd}][{self.comp.classname}.{self.key.__name__}]"
+        return f"REF[{self.hxd}][{self.comp.classname}.{self.key}]"
 
     def __repr__(self) -> str:
-        hxd = str(hex(id(self)))[-6:]
         if self.key_override:
-            return f"REF[{hxd}][{self.comp.classname}.{self.key.__name__}]"        
-        return f"REF[{hxd}][{self.comp.classname}.{self.key}]"
+            return f"REF[{self.hxd}][{self.comp.classname}.{self.key.__name__}]"        
+        return f"REF[{self.hxd}][{self.comp.classname}.{self.key}]"
 
     # Utilty Methods
     refset_get = refset_get

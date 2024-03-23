@@ -8,10 +8,9 @@ class TestDynamics(unittest.TestCase):
 
     def test_dynamics(self):
         dc = DynamicComponent()
-        dc.create_dynamics()
-
         ds = DynamicSystem(comp=dc)
-        ds.create_dynamics()
+        ds.setup_global_dynamics()
+        
         # ds.update_dynamics()
         ds.collect_dynamic_refs()
         # ds2 = ds.copy_config_at_state()

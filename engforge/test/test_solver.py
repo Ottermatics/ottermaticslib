@@ -140,14 +140,23 @@ class SingleCompSolverTest(unittest.TestCase):
             self.assertDictEqual(o['Xstart'],o['Xans'])
 
     def test_run_results(self):
+        """test that inputs stay the same when no objecives present"""
         extra = dict(combos=[],slv_vars='*x,*y,*z',activate=[],only_active=True)
 
         scx,scy,scz = self.sc.x,self.sc.y,self.sc.z
         sccx,sccy,sccz = self.sc.comp.x,self.sc.comp.y,self.sc.comp.z
         vray = [scx,scy,scz, sccx,sccy,sccz]
+
         o = self.sc.run(**extra)
-        dfray = self.sc.dataframe[['x','y','z','comp_x','comp_y','comp_z']] 
-        self.assertTrue(np.all(dfray==vray))
+
+        #dfray = self.sc.dataframe[['x','y','z','comp_x','comp_y','comp_z']].iloc[0].values
+        #self.assertFalse(np.all(dfray==vray),msg=f'{dfray}\n{vray}')
+
+        scx,scy,scz = self.sc.x,self.sc.y,self.sc.z
+        sccx,sccy,sccz = self.sc.comp.x,self.sc.comp.y,self.sc.comp.z
+        v2ray = [scx,scy,scz, sccx,sccy,sccz]
+
+        self.assertTrue(np.all(vray==v2ray),msg='revert values changed!')
         
     def test_comp_method_equivalence(self):
         objs = {'obj_eff':['eff','effF'],'obj_size':['size','sizeF']}

@@ -53,7 +53,7 @@ class Airfilter(System):
     set_filter_w = SIGNAL.define("filt.w", "w", mode="both")
 
     var_w = Solver.declare_var('w',combos='w',active=True)
-    var_w.add_var_constraint(0.1, kind="min",combos=['min_len'])
+    var_w.add_var_constraint(0.0, kind="min",combos=['min_len'])
     flow_balance = Solver.equality_constraint('sum_dP')
 
     flow_curve = Plot.define(

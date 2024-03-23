@@ -16,8 +16,6 @@ class IntegratorInstance(AttributeInstance):
 
     __slots__ = ["system", "solver", "var_ref", "rate_ref"]
 
-    # TODO: add forward implicit solver
-
     def __init__(self, solver: "Time", system: "System") -> None:
         self.class_attr = self.solver = solver
         self.system = system
@@ -26,7 +24,7 @@ class IntegratorInstance(AttributeInstance):
     def compile(self):
         self.var_ref = self.system.locate_ref(self.solver.var)
         self.rate_ref = self.system.locate_ref(self.solver.rate)
-        self.system.info(f"integrating {self.var_ref} with {self.rate_ref}")
+        self.system.debug(f"integrating {self.var_ref} with {self.rate_ref}")
 
     def as_ref_dict(self):
         return {'rate':self.rate_ref,'var':self.var_ref}
