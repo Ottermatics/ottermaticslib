@@ -80,13 +80,16 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
 
 # add to any SolvableMixin to allow solver use from its namespace
 class SolverMixin(SolveableMixin):
+    """A base class inherited by solveable items providing the ability to solve itself"""
+    #TODO: move to problem context
     _run_id: str = None
     _solved = None
     _trans_opts = None
-
     _converged = False
-    custom_solver = False
-    solver_option = "minimize" #or root #TODO: implement equality solver as root
+
+    #TODO: implement equality solver as root
+    solver_option = "minimize" #or root 
+    
 
     # Configuration Information
     @property
@@ -131,9 +134,12 @@ class SolverMixin(SolveableMixin):
 
     def run(self, *args, **kwargs):
         """the steady state run metsolverhod for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
+        
+        if 'dxdt' not in kwargs:
+            kwargs['dxdt'] = 0 #steady state, by default
 
         with ProblemExec(self,kwargs,level_name='run') as pbx:
-            return self._iterate_input_matrix(self._run,*args, **kwargs)
+            return self._iterate_input_matrix(self._run, *args, **kwargs)
 
     def _run(self, refs, icur, eval_kw=None, sys_kw=None, *args, **kwargs):
         """the steady state run method for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
@@ -154,16 +160,17 @@ class SolverMixin(SolveableMixin):
         #TODO: move to problem context!!! add plug-play functionality
         self._run_start = datetime.datetime.now()
         if self._run_id is None:
-            self._run_id = int(uuid.uuid4())        
+            self._run_id = int(uuid.uuid4())   
+
         if isinstance(self, System):
-            self.system_references(
-                recache=True
-            )  # recache is important for iterators
+            self.system_references(recache=True)  
+            #recache is important for iterators
             #TODO: only recache when iterators are present
 
         #call solver in scope
         self.eval(cb=cb, eval_kw=eval_kw, sys_kw=sys_kw, **method_kw)
 
+        #TODO: move to problem context
         self._run_end = datetime.datetime.now()
         self._run_time = self._run_end - self._run_start
 
@@ -193,9 +200,9 @@ class SolverMixin(SolveableMixin):
     def eval(
         self, cb=None, eval_kw: dict = None, sys_kw: dict = None, **kw
     ):
-        """Evaluates the system with additional inputs for execute()
+        """Evaluates the system with pre/post execute methodology
         :param kw: kwargs come from `sys_kw` input in run ect.
-        :param cb: an optional callback taking the system as an argument of the form (self,eval_kw,sys_kw,*args,**kw)
+        :param cb: an optional callback taking the system as an argument of the form (self,eval_kw,sys_kw,**kw)
         """
 
         if self.log_level < 20:
@@ -208,13 +215,14 @@ class SolverMixin(SolveableMixin):
             self.index += 1
             out = self.execute( **kw)
             pbx.post_execute( **kw)
+            #TODO: move to problem context
             self.save_data(index=self.index)
 
             #TODO: define exit behavior for the problem context
             pbx.exit_to_level(level='eval',revert=False)
 
         if cb:
-            cb(self, eval_kw, sys_kw, *args, **kw)
+            cb(self, eval_kw, sys_kw, **kw)
 
         return out
 
@@ -239,6 +247,8 @@ class SolverMixin(SolveableMixin):
         ):
             """
             runs the system solver using the current system state and modifying it. This is the default solver for the system, and it is recommended to add additional options or methods via the execute method.
+
+            
 
             :param obj: the objective function to minimize, by default will minimize the sum of the squares of the residuals. Objective function should be a function(system,Xs,Xt) where Xs is the system state and Xt is the system transient state. The objective function will be argmin(X)|(1+custom_objective)*residual_RSS when `add_obj` is True in kw otherwise argmin(X)|custom_objective with constraints on the system as balances instead of first objective being included.
             :param cons: the constraints to be used in the solver, by default will use the system's constraints will be enabled when True. If a dictionary is passed the solver will use the dictionary as the constraints in addition to system constraints. These can be individually disabled by key=None in the dictionary.

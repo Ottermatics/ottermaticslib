@@ -144,7 +144,8 @@ class Ref:
         "allow_set",
         "eval_f",
         "key_override",
-        '_last'
+        '_value_eval',
+        '_log_func',
     ]
     comp: "TabulationMixin"
     key: str
@@ -153,6 +154,8 @@ class Ref:
     allow_set: bool
     eval_f: callable
     key_override: bool
+    _value_eval: callable
+    _log_func: callable
 
     def __init__(self, comp, key, use_call=True, allow_set=True, eval_f=None):
         self.set(comp, key, use_call, allow_set, eval_f)
@@ -185,6 +188,31 @@ class Ref:
             self.allow_set = allow_set
             self.eval_f = eval_f
 
+        self.setup_calls()
+
+    def setup_calls(self):
+        """caches anonymous functions for value and logging speedup"""
+        if self.comp and self.comp.log_level < 2 and isinstance(self.comp,LoggingMixin):
+            self._log_func = lambda val: self.comp.msg(f"REF[get] {self.comp} {self.key} -> {val}")
+        else:
+            self._log_func = None
+
+        if self.key_override:
+            self._value_eval = lambda *a,**kw: self.key(*a,**kw)
+        else:
+            if self.use_dict:
+                g = lambda *a,**kw: self.comp.get(self.key)
+            elif self.key in self.comp.__dict__:
+                g = lambda *a,**kw: self.comp.__dict__[self.key]
+            else:
+                g = lambda *a,**kw: getattr(self.comp, self.key)
+
+            if self.eval_f:
+                g = lambda *a,**kw: self.eval_f(g(*a,**kw))
+
+            self._value_eval = g
+
+
     def copy(self, **changes):
         """copy the reference, and make changes to the copy"""
         if "key" not in changes:
@@ -196,26 +224,9 @@ class Ref:
         return cy
 
     def value(self,*args,**kw):
-
-        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 2:
-            self.comp.msg(f"REF[get] {self.comp} {self.key}")
-
-        if self.key_override:
-            return self.key(*args,**kw)
-
-        if self.use_dict:
-            o = self.comp.get(self.key)
-        else:
-            o = getattr(self.comp, self.key)
-        if self.use_call and callable(o):
-            o = o()
-        if self.eval_f:
-            o = self.eval_f(o)
-        self._last = o
-
-        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level <= 5:
-            self.comp.msg(f"REF[get] {self.comp} {self.key} | got: {o}")
-
+        o = self._value_eval(*args,**kw)
+        if self._log_func:
+            self._log_func(o)
         return o
 
     def set_value(self, val):
@@ -223,7 +234,6 @@ class Ref:
             if self.value() != val: #this increases perf. by reducing writes
                 if self.comp and self.comp.log_level < 10:
                     self.comp.msg(f"REF[set] {self} -> {val}")
-                self._last = val
                 return setattr(self.comp, self.key, val)
         else:
             raise Exception(f"not allowed to set value on {self.key}")

@@ -22,19 +22,22 @@ import attrs
 
 
 class TestDynamics(unittest.TestCase):
-    def setUp(self) -> None:
-        self.sm = SpringMass(Fa=0,u=0)
-
-        # the analytical answer
-        self.w_ans = np.sqrt(self.sm.k / self.sm.m)
 
     def test_sim(self):
+        """tests free undamped motion"""
+
+        sm = SpringMass(Fa=0,u=0)
+
+        #the analytical answer
+        self.w_ans = np.sqrt(sm.k / sm.m)
+
         dt = 0.001
-        #FIXME: input on simulate not working
-        df = self.sm.simulate(dt=dt, endtime=10,run_solver=False)
+        #FIXME: input on simulate not working 
+
+        df = sm.simulate(dt=dt, endtime=10,run_solver=False)
         #TODO: add passing flag to context
-        #self.assertTrue(self.sm.solved)
-        #self.assertTrue(self.sm.converged)
+        #self.assertTrue(sm.solved)
+        #self.assertTrue(sm.converged)
         
         X = df.x
         T = df.time
@@ -58,10 +61,10 @@ class TestDynamics(unittest.TestCase):
             ls,
             p0,
             args=(t, x),
-            ftol=1e-12,
+            ftol=1e-14,
             jac="cs",
-            xtol=1e-12,
-            gtol=1e-12,
+            xtol=1e-14,
+            gtol=1e-14,
             x_scale=2,
         )
         if not ans.success:
@@ -69,8 +72,13 @@ class TestDynamics(unittest.TestCase):
 
         self.assertAlmostEqual(ans.x[1], self.w_ans, delta=0.01)
 
-        # fig,ax = subplots()
-        # ax.plot(t,x,label='data')
-        # ax.plot(t,f(p0,t,x),label='guess')
-        # ax.plot(t,f(ans.x,t,x),label='fit')
-        # legend()
+
+    def test_damping(self):
+        """test that the ss answer is equal to the result with damping"""
+        sm = SpringMass(Fa=0,u=5)
+        sm.run(dxdt=0)
+
+        dfss =sm.dataframe
+        df = sm.simulate(dt=0.001, endtime=10,run_solver=False)
+
+        self.assertAlmostEqual(df.iloc[-1].x,dfss.iloc[0].x, delta=0.01)

@@ -539,7 +539,7 @@ class ProblemExec:
         self,Xref,Yref,output=None,**kw
     ):
         """
-        Solve the minimization problem using the given vars. And sets the system state to the solution depending on input of 
+        Solve the minimization problem using the given vars and constraints. And sets the system state to the solution depending on input of the following:
 
         Solve the root problem using the given vars.
         :param Xref: The reference input values.
@@ -892,10 +892,10 @@ class ProblemExec:
             assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
             if slvr in slv_inst:
                 slv = slv_inst[slvr]
-                slv_var = True
+                slv_var = True #mark a static varible
             elif slvr in trv_inst:
                 slv = trv_inst[slvr]
-                slv_var = False
+                slv_var = False #a dynamic variable
             else:
                 self.warning(f'no solver instance for {slvr} ')
                 continue
@@ -966,11 +966,7 @@ class ProblemExec:
                         ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,*args,**kw)
                         #con_list.append(ccst)
                         con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
-                        con_list.append(
-                            create_constraint(
-                                system,Xrefs, 'eq', ccst, *args, **kw
-                            )
-                        )                        
+                        con_list.append(ccst)                        
                                 
                     if ( #establish simple bounds w/ solver
                         slv_var and
@@ -993,7 +989,7 @@ class ProblemExec:
                         con_list.append(ccst)
 
                     else:
-                        self.warning(f"bad constraint: {cval} {kind} {slvr}")
+                        self.warning(f"bad constraint: {cval} {kind} {slv_var}|{slvr}")
 
         # Add Constraints
         for slvr, ref in sys_refs.get('solver.ineq',{}).items():

@@ -559,7 +559,7 @@ class GlobalDynamics(DynamicsMixin):
 
         A copy of this system is made, and the simulation is run on the copy, so as to not affect the state of the original system.
         """
-        min_kw_dflt = {"method": "SLSQP",}
+        min_kw_dflt = {"method": "SLSQP"}
         #'tol':1e-6,'options':{'maxiter':100}}
         # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
         if min_kw is None:
@@ -586,7 +586,7 @@ class GlobalDynamics(DynamicsMixin):
         system.setup_global_dynamics()
 
         #Time Iteration Context
-        with ProblemExec(system,level_name='sim',**kwargs) as pbx:
+        with ProblemExec(system,level_name='sim',dxdt=True,**kwargs) as pbx:
 
             #Unpack Transient Problem
             intl_refs = pbx.integrator_var_refs
@@ -628,7 +628,7 @@ class GlobalDynamics(DynamicsMixin):
                 dflt = lambda sys,prb: (np.product(1+v.value()**2 for v in pbx.problem_vars.items()))**0.5
                 Yobj = {'smallness': Ref(system, dflt)}
 
-
+            pbx.last_time = 0
 
             #our anonymous integrator!
             def sim_iter(t, x, *args):
@@ -645,9 +645,12 @@ class GlobalDynamics(DynamicsMixin):
                     # solver always gets a copy of x
                     solver[t] = x #TODO: stateful capture
                     
-                    # test for record time #TODO: rates / events ect    
-                    if not data or t > max(data) + dt:
+                    # test for record time 
+                    #TODO: rates / events ect 
+                    #TODO: faster way to get last time vs max(data)  
+                    if not data or t > pbx.last_time + dt:
                         data[t] = cs = pbx.get_ref_values()
+                        pbx.last_time = t
                         if self.log_level < 10:
                             self.info(f'record {t}| {Xin}')
 

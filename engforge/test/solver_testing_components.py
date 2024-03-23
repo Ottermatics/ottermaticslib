@@ -312,6 +312,7 @@ class DynamicSystem(System, GlobalDynamics):
 
 @forge
 class SpringMass(System,GlobalDynamics):
+    
     k: float = attrs.field(default=50)
     m: float = attrs.field(default=1)
     g: float = attrs.field(default=9.81)
