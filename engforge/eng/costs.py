@@ -286,7 +286,7 @@ class CostModel(Configuration,TabulationMixin):
             comp = getattr(self,slot)
 
             if comp in saved:
-                print(f'skipping {slot}:{comp}')
+                #print(f'skipping {slot}:{comp}')
                 continue
 
             elif isinstance(comp,Configuration):
@@ -305,7 +305,7 @@ class CostModel(Configuration,TabulationMixin):
                 sub = eval_slot_cost(dflt,saved)                
                 log.debug(f'{self} adding slot: {comp}.{slot}: {sub}+{sub_tot}')
                 cst= [sub_tot,sub]
-                sub_tot = numpy.nansum(cst)
+                sub_tot  = numpy.nansum(cst)
 
             #add base class slot values when comp was nonee
             if comp is None:
@@ -410,7 +410,7 @@ class Economics(Component):
         self._comp_costs = dict()        
 
     def update(self,parent:parent_types):
-
+        
         if self.log_level < 5 :
             self.msg(f'updating costs: {parent}')
         
@@ -676,7 +676,7 @@ class Economics(Component):
                 self._cost_categories['category.'+cc].append(ref)
                 self._comp_categories[bse+'category.'+cc].append(ref)
 
-        #add slot costs with now current items:
+        #add slot costs with current items (skip class defaults)
         for slot_name, slot_value in conf._slot_costs.items():
             #Skip items that are internal components
             if slot_name in conf.internal_components():
@@ -700,11 +700,12 @@ class Economics(Component):
         #add base class slot values when comp was nonee
         for compnm,comp in conf.internal_configurations(False).items():
             if comp is None:
-                
+                self.msg(f'looking up base class costs for {compnm}')
                 comp_cls = conf.slots_attributes()[compnm].type.accepted
                 for cc in comp_cls:
                     if issubclass(cc,CostModel):
                         if cc._slot_costs:
+                            self.msg(f'looking up base slot cost for {cc}')
                             for k,v in cc._slot_costs.items():
                                 _key=bse+compnm+'.'+k+'.cost.item_cost'
                                 if _key in CST:
@@ -722,7 +723,10 @@ class Economics(Component):
                                     self._cost_categories['category.'+cc].append(ref)
                                     self._comp_categories[bse+'category.'+cc].append(ref)
                                 
-                            break #only add once      
+                            break #only add once 
+
+            else:
+                self.debug(f'actual costs for {compnm}')
 
     @property
     def cost_references(self):

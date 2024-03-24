@@ -441,6 +441,7 @@ class Configuration(AttributedBaseMixin):
         level += 1
         if "check_config" not in kw:
             kw["check_config"] = False
+        
         for key, config in self.internal_configurations(**kw).items():
             if isinstance(config, Configuration):
                 for skey, level, iconf in config.go_through_configurations(
