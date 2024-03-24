@@ -505,7 +505,7 @@ class GlobalDynamics(DynamicsMixin):
 
     
 
-    def sim_matrix(self, eval_kw=None, sys_kw=None, *args, **kwargs):
+    def sim_matrix(self, eval_kw=None, sys_kw=None, **kwargs):
         """simulate the system over the course of time.
         return a dictionary of dataframes
         """
@@ -517,7 +517,7 @@ class GlobalDynamics(DynamicsMixin):
 
         if isinstance(self, SolveableMixin):
             sim = lambda *args, **kw: self.simulate(
-                dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw, *args, **kw
+                dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw,  **kw
             )
             self._iterate_input_matrix(
                 sim,
@@ -526,7 +526,6 @@ class GlobalDynamics(DynamicsMixin):
                 eval_kw=eval_kw,
                 sys_kw=sys_kw,
                 return_results=True,
-                *args,
                 **kwargs,
             )
         else:

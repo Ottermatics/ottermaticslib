@@ -146,7 +146,8 @@ class Ref:
         "key_override",
         '_value_eval',
         '_log_func',
-        'hxd'
+        'hxd',
+        '_name'
     ]
     comp: "TabulationMixin"
     key: str
@@ -173,6 +174,7 @@ class Ref:
         self.comp = comp
         if isinstance(self.comp, dict):
             self.use_dict = True
+            self._name = 'dict'
         else:
             self.use_dict = False
 
@@ -183,11 +185,17 @@ class Ref:
             self.use_call = False
             self.allow_set = False
             self.eval_f = eval_f
+            self._name = 'callable'
         else:
             self.key = key
             self.use_call = use_call
             self.allow_set = allow_set
             self.eval_f = eval_f
+            if not self.use_dict:
+                self._name = self.comp.classname
+
+        if not hasattr(self, '_name'):
+            self._name = "NULL"
 
         self.hxd = str(hex(id(self)))[-6:]
 
@@ -248,13 +256,13 @@ class Ref:
         if self.use_dict:
             return f"REF[{self.hxd}][DICT.{self.key}]"
         if self.key_override:
-            return f"REF[{self.hxd}][{self.comp.classname}.{self.key.__name__}]"
-        return f"REF[{self.hxd}][{self.comp.classname}.{self.key}]"
+            return f"REF[{self.hxd}][{self._name}.{self.key.__name__}]"
+        return f"REF[{self.hxd}][{self._name}.{self.key}]"
 
     def __repr__(self) -> str:
         if self.key_override:
-            return f"REF[{self.hxd}][{self.comp.classname}.{self.key.__name__}]"        
-        return f"REF[{self.hxd}][{self.comp.classname}.{self.key}]"
+            return f"REF[{self.hxd}][{self._name}.{self.key.__name__}]"        
+        return f"REF[{self.hxd}][{self._name}.{self.key}]"
 
     # Utilty Methods
     refset_get = refset_get

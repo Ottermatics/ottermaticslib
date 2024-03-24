@@ -57,7 +57,6 @@ from engforge.solver_utils import *
 class ProbLog(LoggingMixin): pass
 log = ProbLog()
 
-import fnmatch
 import uuid
 
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
@@ -76,6 +75,7 @@ dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on
 
 #Special exception classes handled in exit
 class IllegalArgument(Exception):
+    """an exception to exit the problem context as specified"""
     pass
 
 class ProblemExit(Exception):
@@ -131,9 +131,6 @@ class ProblemExec:
     post_callback: callable = None #callback that will be called on the system each time it is reverted, it should take args(system,current_problem_exec)
     level_name: str = None #target this context with the level name
     level_number: int = 0 #TODO: keep track of level on the global context
-    #TODO: add an exit system to handle exiting multiple levels 
-    #TODO: add an exit system that allows preservation of state for each level
-    #TODO: exit system should abide by update / signals options
 
     #solver references raw
     sys_refs: dict
@@ -153,6 +150,8 @@ class ProblemExec:
     def __init__(self,system,kw_dict=None,Xnew=None,ctx_fail_new=False,**opts):
         """
         Initializes the ProblemExec.
+        
+        #TODO: exit system should abide by update / signals options
 
         #TODO: provide data storage options for dataframe / table storage history/ record keeping (ss vs transient data)
         
@@ -353,7 +352,9 @@ class ProblemExec:
 
         if self.post_callback:
             #a context custom callback
-            self.post_callback()          
+            self.post_callback()
+
+        # TODO: save state to dataframe
 
         #Exit Scenerio (boolean return important for context manager exit handling in heirarchy)
         if isinstance(exc_value,ProblemExit):     
@@ -511,11 +512,13 @@ class ProblemExec:
     def update_system(self,*args,**kwargs):
         """updates the system"""
         for ukey,uref in self._update_refs.items():
+            self.debug(f'context updating {ukey}')
             uref.value(*args,**kwargs)
 
     def post_update_system(self,*args,**kwargs):
         """updates the system"""
         for ukey,uref in self._post_update_refs.items():
+            self.debug(f'context post updating {ukey}')
             uref.value(*args,**kwargs)
 
     def pre_execute(self,*args,**kwargs):

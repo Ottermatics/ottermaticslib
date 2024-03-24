@@ -5,64 +5,8 @@
 
 
 import unittest
-from engforge.configuration import forge
-from engforge.eng.costs import CostModel, Economics, cost_property
-from engforge.attr_slots import Slot
-from engforge.system import System
 from engforge.components import Component
-from engforge.component_collections import ComponentIterator
-
-from engforge.properties import system_property
-
-import numpy as np
-import attrs
-@forge
-class Norm(Component,CostModel):
-    pass
-
-@forge
-class Comp1(Component,CostModel):
-    norm = Slot.define(Norm,none_ok=True)
-    not_cost = Slot.define(Component)
-
-@forge
-class Comp2(Norm,CostModel):
-
-    comp1 = Slot.define(Comp1,none_ok=True,default_ok=False)
-
-quarterly = lambda inst,term: True if (term+1)%3==0 else False
-@forge
-class TermCosts(Comp1,CostModel):
-
-    @cost_property(category='capex')
-    def cost_init(self):
-        return 100
-    
-    @cost_property(mode='maintenance',category='opex')
-    def cost_maintenance(self):
-        return 10
-
-    @cost_property(mode='always',category='tax')
-    def cost_tax(self):
-        return 1
-    
-    @cost_property(mode=quarterly,category='opex,tax',label='quarterly wage tax')
-    def cost_wage_tax(self):
-        return 5*3
-    
-
-@forge
-class EconDefault(System,CostModel):
-    econ = Slot.define(Economics)
-    comp = Slot.define(Component,none_ok=True)
-    comp1 = Slot.define(Comp1,none_ok=True)
-
-@forge
-class EconRecursive(System,CostModel):
-    econ = Slot.define(Economics)
-    comp1 = Slot.define(Comp1,none_ok=True)
-    comp2 = Slot.define(Comp2,none_ok=True)
-
+from engforge.test.solver_testing_components import *
 
 class TestEconDefaults(unittest.TestCase):
 
@@ -85,9 +29,6 @@ class TestEconDefaults(unittest.TestCase):
         ed.run()
         self.assertEqual(ed.combine_cost,10)
         self.assertEqual(ed.econ.combine_cost,10)
-        
-
-
 
 
 class TestCategoriesAndTerms(unittest.TestCase):
@@ -144,7 +85,7 @@ class TestCategoriesAndTerms(unittest.TestCase):
         er.run(revert=False,**inkw)
         
         d = er.data_dict
-        print(d)
+        
         self.assertEqual(d['econ.lifecycle.term_cost'],161)
         self.assertEqual(d['econ.summary.total_cost'],161)
         self.assertEqual(d['combine_cost'],161)
@@ -183,7 +124,7 @@ class TestEconomicsAccounting(unittest.TestCase):
         Comp2.default_cost('comp1',Comp1(cost_per_item=5))
         EconRecursive.default_cost('comp2',Comp2(cost_per_item=3))
         er = EconRecursive(cost_per_item=50)
-        c2 = er.comp2
+        #c2 = er.comp2
         self.assertEqual(er.combine_cost, 78)
         self.assertEqual(er.sub_items_cost , 28)
 
@@ -198,7 +139,7 @@ class TestEconomicsAccounting(unittest.TestCase):
 
     def test_recursive_null(self,ANS=75):
 
-        Comp1.default_cost('norm',5) #BUGFIX: can't make this work, no cls domain makes it impossible?
+        Comp1.default_cost('norm',5) 
         Comp2.default_cost('comp1',10)
         EconRecursive.default_cost('comp1',3)
         EconRecursive.default_cost('comp2',7)
@@ -329,68 +270,6 @@ class TestCostModel(unittest.TestCase):
         self.assertEqual(c2.combine_cost, 18)
         self.assertEqual(c2.sub_items_cost , 15)
 
-
-
-#FAN System test
-@forge
-class Fan(Component,CostModel):
-    """a fan component"""
-    blade_cost_com: float = attrs.field(default=100.0)
-    area:float = attrs.field(default=10.0)
-    V:float = attrs.field(default=5.0)
-
-    @system_property
-    def volumetric_flow(self) -> float:
-        return self.V * self.area
-    
-    @cost_property(category='capex,mfg,material',mode='initial')
-    def blade_cost(self):
-        return self.area * self.blade_cost_com
-    
-    @cost_property(category='labor,opex',mode='maintenance')
-    def repair_cost(self):
-        return self.volumetric_flow * 0.1     
-    
-@forge
-class Motor(Component,CostModel):
-    """a fan component"""
-    spc_motor_cost: float = attrs.field(default=100.0)
-
-    @system_property
-    def power(self) -> float:
-        return self.parent.fan.volumetric_flow * self.parent.fan.V
-    
-    @cost_property(category='capex,mfg,electrical',mode='initial')
-    def motor_cost(self):
-        return self.power * self.spc_motor_cost  
-    
-    @cost_property(category='labor,opex',mode='maintenance')
-    def repair_cost(self):
-        return self.power * 0.1    
-
-@forge
-class MetalBase(Component,CostModel):
-
-    cost_per_item = 1000
-        
-@forge
-class SysEcon(Economics):
-
-    terms_per_year = 12
-
-    def calculate_production(self,parent,term):
-        return self.parent.fan.volumetric_flow
-
-@forge
-class FanSystem(System,CostModel):
-
-    base = Slot.define(Component)
-    fan = Slot.define(Fan)
-    motor = Slot.define(Motor)
-
-    econ = Slot.define(SysEcon)
-
-FanSystem.default_cost('base',100)
 
 class TestFanSystemDataFrame(unittest.TestCase):
 

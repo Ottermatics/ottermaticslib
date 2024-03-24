@@ -31,7 +31,25 @@ SKIP_REF = ["run_id", "converged", "name", "index"]
 
 log = SolvableLog()
 
+#Anonymous Update Funcs (solve scoping issue)
+def _update_func(comp,eval_kw):
+    def updt(*args,**kw):
+        eval_kw.update(kw)
+        return comp.update(comp.parent, *args, **eval_kw)
+    if log.log_level <= 5:
+        log.msg(f'create method| {comp.name}| {eval_kw}')
+    return updt
 
+def _post_update_func(comp,eval_kw):
+    def updt(*args,**kw):
+        eval_kw.update(kw)
+        return comp.update(comp.parent, *args, **eval_kw)
+    if log.log_level <= 5:
+        log.msg(f'create post method| {comp.name}| {eval_kw}')
+    return updt
+
+
+    
 class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     """commonality for components,systems that identifies subsystems and states for solving.
 
@@ -52,11 +70,13 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     # Update Flow
     def update(self, parent, *args, **kwargs):
         """Kwargs comes from eval_kw in solver"""
-        pass
+        if log.log_level <= 5:
+            log.debug(f"void updating {self.__class__.__name__}.{self}")
 
     def post_update(self, parent, *args, **kwargs):
         """Kwargs comes from eval_kw in solver"""
-        pass
+        if log.log_level <= 5:
+            log.debug(f"void post-updating {self.__class__.__name__}.{self}")
 
     def update_internal(self, eval_kw=None, ignore=None, *args, **kw):
         """update internal elements with input arguments"""
@@ -125,7 +145,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
     def collect_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
-        #TODO: add to solver contexts
         updt_refs = {}
         from engforge.components import Component
         from engforge.component_collections import ComponentIter
@@ -143,17 +162,16 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             if not isinstance(comp,SolveableMixin):
                 continue            
 
-            # provide add eval_kw
+            #provide add eval_kw
             if eval_kw and key in eval_kw:
                 eval_kw_comp = eval_kw[key]
             else:
                 eval_kw_comp = {}
+            ekw = eval_kw_comp
 
             #Add if its a unique update method (not the passthrough)
             if comp.__class__.update != SolveableMixin.update:
-                f = lambda *args,**kw: comp.update(comp.parent, *args, **kw)
-                f.__name__ = f'{comp.name}_update'
-                ref = Ref(comp,f)
+                ref = Ref(comp,_update_func(comp,ekw))
                 updt_refs[key] =  ref
 
         ignore.add(self)
@@ -183,11 +201,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 eval_kw_comp = eval_kw[key]
             else:
                 eval_kw_comp = {}
+            
+            ekw = eval_kw_comp
+                
             #Add if its a unique update method (not the passthrough)
             if comp.__class__.post_update != SolveableMixin.post_update:
-                f = lambda *args, **kw: comp.update(comp.parent, *args, **kw)
-                f.__name__ = f'{comp.name}_post_update'
-                ref = Ref(comp,f)
+                ref = Ref(comp,_post_update_func(comp,ekw))
                 updt_refs[key] =  ref
 
         ignore.add(self)

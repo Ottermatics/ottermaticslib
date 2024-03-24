@@ -134,9 +134,6 @@ class SolverMixin(SolveableMixin):
 
     def run(self, *args, **kwargs):
         """the steady state run metsolverhod for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
-        
-        if 'dxdt' not in kwargs:
-            kwargs['dxdt'] = 0 #steady state, by default
 
         with ProblemExec(self,kwargs,level_name='run') as pbx:
             return self._iterate_input_matrix(self._run, *args, **kwargs)

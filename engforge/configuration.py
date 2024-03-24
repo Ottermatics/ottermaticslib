@@ -476,7 +476,7 @@ class Configuration(AttributedBaseMixin):
         if self._subclass_init:
             try:
                 for comp in self.__class__.mro():
-                    if hasattr(comp, "__on_init__"):
+                    if hasattr(comp, "__pre_init__") and comp.__pre_init__ != Configuration.__pre_init__:
                         comp.__pre_init__(self)
             except Exception as e:
                 self.error(e, f"error in __pre_init__ {e}")
@@ -501,7 +501,7 @@ class Configuration(AttributedBaseMixin):
         if self._subclass_init:
             try:
                 for comp in self.__class__.mro():
-                    if hasattr(comp, "__on_init__"):
+                    if hasattr(comp, "__on_init__") and comp.__on_init__ != Configuration.__on_init__:
                         comp.__on_init__(self)
             except Exception as e:
                 self.error(e, f"error in __on_init__")

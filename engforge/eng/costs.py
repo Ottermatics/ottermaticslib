@@ -136,11 +136,9 @@ class CostModel(Configuration,TabulationMixin):
 
     cost_per_item: float = attrs.field(default=numpy.nan)
 
-    #TODO: add dictionary & category implementations for economics comp to sum groups of
-    #cost_category: str = attrs.field(default=None)
-
     def __on_init__(self):
         self.set_default_costs()
+        self.debug(f'setting default costs {self._slot_costs}')
 
     def update_dflt_costs(self,callback=None):
         """updates internal default slot costs if the current component doesn't exist or isn't a cost model, this is really a component method but we will use it never the less.
@@ -181,6 +179,7 @@ class CostModel(Configuration,TabulationMixin):
     @classmethod
     def subcls_compile(cls):
         assert not issubclass(cls,ComponentIter), 'component iter not supported'
+        log.debug(f'compiling costs {cls}')
         cls.reset_cls_costs()
 
     @classmethod
@@ -214,7 +213,8 @@ class CostModel(Configuration,TabulationMixin):
         atypes = atrb.type.accepted
         if warn_on_non_costmodel and not any([issubclass(at,CostModel) for at in atypes]):
             self.warning(f'assigning cost to non CostModel based slot {slot_name}')
-            
+
+        #convert from classinfo    
         if self._slot_costs is self.__class__._slot_costs:
             self._slot_costs =  self.__class__._slot_costs.copy()
         self._slot_costs[slot_name] = cost
@@ -286,7 +286,7 @@ class CostModel(Configuration,TabulationMixin):
             comp = getattr(self,slot)
 
             if comp in saved:
-                #print(f'skipping {slot}:{comp}')
+                print(f'skipping {slot}:{comp}')
                 continue
 
             elif isinstance(comp,Configuration):
@@ -410,7 +410,9 @@ class Economics(Component):
         self._comp_costs = dict()        
 
     def update(self,parent:parent_types):
-        #self.parent = parent
+
+        if self.log_level < 5 :
+            self.msg(f'updating costs: {parent}')
         
         self.parent = parent
 
@@ -422,11 +424,6 @@ class Economics(Component):
             self.warning(f'no economic output!')
         if self._costs is None:
             self.warning(f'no economic costs!')
-
-        # #Update child cost elements with parents
-        # for slot,comp in self.internal_components().items():
-        #     if isinstance(comp,CostModel):
-        #         comp.update(self)
 
     def calculate_production(self,parent,term)->float:
         """must override this function and set economic_output"""

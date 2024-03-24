@@ -11,6 +11,15 @@ from engforge.properties import system_property
 from engforge.dynamics import DynamicsMixin,GlobalDynamics
 from engforge.logging import LoggingMixin
 
+import unittest
+from engforge.configuration import forge
+from engforge.eng.costs import CostModel, Economics, cost_property
+from engforge.attr_slots import Slot
+from engforge.system import System
+from engforge.components import Component
+from engforge.component_collections import ComponentIterator
+
+from engforge.properties import system_property
 
 import attrs
 import numpy as np
@@ -373,3 +382,114 @@ class SpringMass(System,GlobalDynamics):
     @system_property
     def accl(self) -> float:
         return self.sumF / self.m
+    
+
+
+@forge
+class Norm(Component,CostModel):
+    pass
+
+@forge
+class Comp1(Component,CostModel):
+    norm = Slot.define(Norm,none_ok=True)
+    not_cost = Slot.define(Component)
+
+@forge
+class Comp2(Norm,CostModel):
+
+    comp1 = Slot.define(Comp1,none_ok=True,default_ok=False)
+
+quarterly = lambda inst,term: True if (term+1)%3==0 else False
+@forge
+class TermCosts(Comp1,CostModel):
+
+    @cost_property(category='capex')
+    def cost_init(self):
+        return 100
+    
+    @cost_property(mode='maintenance',category='opex')
+    def cost_maintenance(self):
+        return 10
+
+    @cost_property(mode='always',category='tax')
+    def cost_tax(self):
+        return 1
+    
+    @cost_property(mode=quarterly,category='opex,tax',label='quarterly wage tax')
+    def cost_wage_tax(self):
+        return 5*3
+    
+
+@forge
+class EconDefault(System,CostModel):
+    econ = Slot.define(Economics)
+    comp = Slot.define(Component,none_ok=True)
+    comp1 = Slot.define(Comp1,none_ok=True)
+
+@forge
+class EconRecursive(System,CostModel):
+    econ = Slot.define(Economics)
+    comp1 = Slot.define(Comp1,none_ok=True)
+    comp2 = Slot.define(Comp2,none_ok=True)
+
+
+#FAN System test
+@forge
+class Fan(Component,CostModel):
+    """a fan component"""
+    blade_cost_com: float = attrs.field(default=100.0)
+    area:float = attrs.field(default=10.0)
+    V:float = attrs.field(default=5.0)
+
+    @system_property
+    def volumetric_flow(self) -> float:
+        return self.V * self.area
+    
+    @cost_property(category='capex,mfg,material',mode='initial')
+    def blade_cost(self):
+        return self.area * self.blade_cost_com
+    
+    @cost_property(category='labor,opex',mode='maintenance')
+    def repair_cost(self):
+        return self.volumetric_flow * 0.1     
+    
+@forge
+class Motor(Component,CostModel):
+    """a fan component"""
+    spc_motor_cost: float = attrs.field(default=100.0)
+
+    @system_property
+    def power(self) -> float:
+        return self.parent.fan.volumetric_flow * self.parent.fan.V
+    
+    @cost_property(category='capex,mfg,electrical',mode='initial')
+    def motor_cost(self):
+        return self.power * self.spc_motor_cost  
+    
+    @cost_property(category='labor,opex',mode='maintenance')
+    def repair_cost(self):
+        return self.power * 0.1    
+
+@forge
+class MetalBase(Component,CostModel):
+
+    cost_per_item = 1000
+        
+@forge
+class SysEcon(Economics):
+
+    terms_per_year = 12
+
+    def calculate_production(self,parent,term):
+        return self.parent.fan.volumetric_flow
+
+@forge
+class FanSystem(System,CostModel):
+
+    base = Slot.define(Component)
+    fan = Slot.define(Fan)
+    motor = Slot.define(Motor)
+
+    econ = Slot.define(SysEcon)
+
+FanSystem.default_cost('base',100)
