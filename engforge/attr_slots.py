@@ -4,9 +4,15 @@ import attrs
 import uuid
 from engforge.attributes import ATTR_BASE, AttributeInstance
 import typing as typ
+from engforge.logging import LoggingMixin
 
 SLOT_TYPES = typ.Union["Component", "System"]
 ITERATOR = typ.Union["ComponentIterator"]
+
+class SlotLog(LoggingMixin):pass
+log = SlotLog()
+
+    
 
 
 class Slot(ATTR_BASE):
@@ -76,6 +82,7 @@ class Slot(ATTR_BASE):
         ), "Not System Or Component Input"
 
         ### Cost models should always default to None
+        #FIXME: is this nessicary?
         if any([issubclass(c, CostModel) for c in component_or_systems]):
             default_ok = False
             none_ok = True
@@ -91,7 +98,7 @@ class Slot(ATTR_BASE):
 
         #slot
         new_name = cls.attr_prefix+'_'
-        new_sig = cls._setup_cls(new_name, new_dict)
+        new_sig = cls._setup_cls(new_name, new_dict)     
         return new_sig
 
     @classmethod
@@ -142,8 +149,8 @@ class Slot(ATTR_BASE):
                 default_options=cls.default_options.copy(),
             ),
         )
-        # new_slot.default_options['validator'] = new_slot.configure_instance
-        # new_slot.default_options['default'] =  new_slot.make_factory()
+        new_slot.default_options['validator'] = new_slot.configure_instance
+        new_slot.default_options['default'] =  new_slot.make_factory()
         return new_slot
 
     # Create a validator function
@@ -174,18 +181,23 @@ class Slot(ATTR_BASE):
     @classmethod
     def make_factory(cls, **kwargs):
         accepted = cls.accepted
-        # print(f'slot instance factory: {cls} {accepted}, {kwargs}')
+        print(f'slot instance factory: {cls} {accepted}, {kwargs}')
 
         if isinstance(accepted, (tuple, list)) and len(accepted) > 0:
             accepted = accepted[0]
 
-        # print(accepted,cls.dflt_kw,cls.default_ok)
+        print(f'slot factory: {accepted},{cls.dflt_kw},{cls.default_ok}')
         if cls.dflt_kw:
-            return attrs.Factory(lambda: accepted(**cls.dflt_kw), False)
+            return attrs.Factory(cls.make_accepted(accepted,**cls.dflt_kw), False)
         elif cls.default_ok:
             return attrs.Factory(accepted, False)
         else:
             return None
+    @classmethod
+    def make_accepted(cls,accepted,**kw):
+        print(f'making accepted: {cls.instance_class} {kw}')
+        return lambda: accepted(**kw)
+    
         
     @classmethod
     def handle_instance(cls,canidate):

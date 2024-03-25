@@ -384,7 +384,8 @@ class SpringMass(System,GlobalDynamics):
         return self.sumF / self.m
     
 
-
+#COSTS Testing
+    
 @forge
 class Norm(Component,CostModel):
     pass
@@ -396,7 +397,6 @@ class Comp1(Component,CostModel):
 
 @forge
 class Comp2(Norm,CostModel):
-
     comp1 = Slot.define(Comp1,none_ok=True,default_ok=False)
 
 quarterly = lambda inst,term: True if (term+1)%3==0 else False
