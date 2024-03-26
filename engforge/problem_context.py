@@ -93,7 +93,7 @@ class ProblemExitAtLevel(ProblemExit):
     def __init__(self,level:str,revert=None):
         assert level is not None, 'level must be defined'
         assert isinstance(level,str), 'level must be a string'
-        self.level = level
+        self.level = level.lower()
         self.revert = revert
 
     def __str__(self) -> str:
@@ -187,9 +187,9 @@ class ProblemExec:
 
         #parse the options to change behavior of the context
         if opts and 'level_name' in opts:
-            level_name = opts.pop('level_name')
+            level_name = opts.pop('level_name').lower()
         elif kw_dict and 'level_name' in kw_dict:
-            level_name = kw_dict.pop('level_name')
+            level_name = kw_dict.pop('level_name').lower()
         else:
             level_name = None
 
@@ -378,7 +378,13 @@ class ProblemExec:
                     ext = False
 
                 #Check if we missed a level name and its the top level, if so then we raise a real error!
-                if self._class_cache._session is self and not ext:
+                #always exit with level_name='top' at outer context
+                if not ext and self._class_cache._session is self and exc_value.level=='top':
+                    if self.log_level <= 11:
+                        self.debug(f'[{self.level_number}-{self.level_name}] exit at top')                
+                    ext = True
+
+                elif self._class_cache._session is self and not ext:
                     #never ever leave the top level without deleting the session
                     self._class_cache.level_number = 0
                     del self._class_cache._session 
@@ -446,7 +452,7 @@ class ProblemExec:
     def clean_context(self):
         if hasattr(ProblemExec,'_session') and self._class_cache._session is self:
             #TODO: restore state from `X_start`
-            if self.log_level <= 11:
+            if self.log_level <= 10:
                 self.debug(f'[{self.level_number}-{self.level_name}] closing execution session')
             self._class_cache.level_number = 0
             del self._class_cache._session
@@ -479,7 +485,7 @@ class ProblemExec:
     def set_checkpoint(self):
         """sets the checkpoint"""
         self.X_start = self.record_state
-        if log.log_level < 5:
+        if log.log_level <= 7:
             self.debug(f'[{self.level_number}-{self.level_name}] set checkpoint: {list(self.X_start.values())}')
 
     def revert_to_start(self):

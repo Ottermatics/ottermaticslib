@@ -370,7 +370,7 @@ class Solver(ATTR_BASE):
         return SolverInstance(cls, system)
 
     @classmethod
-    def add_var_constraint(cls, value, kind="ineq",**kwargs):
+    def add_var_constraint(cls, value, kind="min",**kwargs):
         """adds a `type` constraint to the solver. If value is numeric it is used as a bound with `scipy` optimize.
 
         If value is a function it should be of the form value(Xarray) and will establish an inequality constraint that var var must be:
@@ -403,7 +403,7 @@ class Solver(ATTR_BASE):
         cinx = cls.constraint_exists(type=kind, var=var)
         inix = cinx is not None
         if cls.allow_constraint_override and inix:
-            #print(f'replacing constraint {cinx} with {kind} {value} {var}')
+            log.debug(f'replacing constraint {cinx} with {kind} {value} {var}')
             constraint = cls.constraints[cinx]
             constraint.update(const)
         elif not cls.allow_constraint_override and inix:
