@@ -16,6 +16,8 @@ class Widget(Component,CostModel):
 
 Economics models sum CostModel.cost_properties recursively on the parent they are defined. Economics computes the grouped category costs for each item recursively as well as summary properties like annualized values and levalized cost. Economic output is determined by a `fixed_output` or overriding `calculate_production(self,parent)` to dynamically calculate changing economics based on factors in the parent.
 
+Default costs can be set on any CostModel.Slot attribute, by using default_cost(<slot_name>,<cost>) on the class, this will provide a default cost for the slot if no cost is set on the instance. Custom costs can be set on the instance with custom_cost(<slot_name>,<cost>). If cost is a CostModel, it will be assigned to the slot if it is not already assigned.
+
 The economics term_length applies costs over the term, using the `cost_property.mode` to determine at which terms a cost should be applied.
 
 @forge
@@ -293,7 +295,7 @@ class CostModel(Configuration,TabulationMixin):
 
             if isinstance(comp,CostModel):
                 sub = comp.sum_costs(saved,categories,term)
-                log.debug(f'{self.identity} adding: {comp.identity}: {sub}+{sub_tot}')
+                log.debug(f'{self.identity} adding: {comp.identity if comp else comp}: {sub}+{sub_tot}')
                 cst = [sub_tot,sub]
                 sub_tot = numpy.nansum(cst)
 
@@ -302,7 +304,7 @@ class CostModel(Configuration,TabulationMixin):
                 #Add default costs from direct slots
                 dflt = self._slot_costs[slot]
                 sub = eval_slot_cost(dflt,saved)                
-                log.debug(f'sub: {self.identity} adding slot: {comp.identity}.{slot}: {sub}+{sub_tot}')
+                log.debug(f'sub: {self.identity} adding slot: {comp.identity if comp else comp}.{slot}: {sub}+{sub_tot}')
                 cst= [sub_tot,sub]
                 sub_tot  = numpy.nansum(cst)
 
@@ -620,7 +622,8 @@ class Economics(Component):
             _base = key.split('.')
             kbase = '.'.join(_base[:-1])
             comp_key = _base[-1]
-            print(kbase,comp_key)
+            
+            self.debug(f'checking {key} {comp_key} {kbase}')
 
             #Get Costs Directly From the cost model instance
             if isinstance(conf,CostModel):
@@ -695,7 +698,7 @@ class Economics(Component):
                 self._comp_categories[bse+'category.'+cc].append(ref)
 
         comps_act = conf.internal_components()
-        self.info(f'active components: {comps_act}')
+        if self.log_level < 10: self.msg(f'{conf.identity if conf else conf} active components: {comps_act}')
         #add slot costs with current items (skip class defaults)
         for slot_name, slot_value in conf._slot_costs.items():
             #Skip items that are internal components
@@ -719,22 +722,23 @@ class Economics(Component):
                 self.debug(f'skipping key {_key}')
 
         #add base class slot values when comp was none
-        for compnm,comp in conf.internal_configurations(False).items():
+        for compnm,comp in conf.internal_configurations(False,none_ok=True).items():
             if comp is None:
                 if self.log_level < 5: 
-                    self.msg(f'looking up base class costs for {compnm}')
+                    self.msg(f'{conf} looking up base class costs for {compnm}')
                 comp_cls = conf.slots_attributes()[compnm].type.accepted
                 for cc in comp_cls:
                     if issubclass(cc,CostModel):
                         if cc._slot_costs:
                             if self.log_level < 5: 
-                                self.msg(f'looking up base slot cost for {cc}')
+                                self.msg(f'{conf} looking up base slot cost for {cc}')
                             for k,v in cc._slot_costs.items():
                                 _key=bse+compnm+'.'+k+'.cost.item_cost'
                                 if _key in CST:
                                     if self.log_level < 10: 
-                                        self.debug(f'skipping dflt key {_key}')
-                                    break #skip if already added
+                                        self.debug(f'{conf} skipping dflt key {_key}')
+                                    #break #skip if already added
+                                    continue
 
                                 if isinstance(v,CostModel):
                                     self._extract_cost_references(v,bse+compnm+'.'+k+'.')
@@ -752,7 +756,7 @@ class Economics(Component):
 
             elif isinstance(comp,CostModel):
                 if self.log_level < 10: 
-                    self.debug(f'using actual costs for {comp}')
+                    self.debug(f'{conf} using actual costs for {comp}')
 
     @property
     def cost_references(self):

@@ -181,21 +181,22 @@ class Slot(ATTR_BASE):
     @classmethod
     def make_factory(cls, **kwargs):
         accepted = cls.accepted
-        print(f'slot instance factory: {cls} {accepted}, {kwargs}')
+        log.debug(f'slot instance factory: {cls} {accepted}, {kwargs}')
 
         if isinstance(accepted, (tuple, list)) and len(accepted) > 0:
             accepted = accepted[0]
 
-        print(f'slot factory: {accepted},{cls.dflt_kw},{cls.default_ok}')
+        log.debug(f'slot factory: {accepted},{cls.dflt_kw},{cls.default_ok}')
         if cls.dflt_kw:
             return attrs.Factory(cls.make_accepted(accepted,**cls.dflt_kw), False)
         elif cls.default_ok:
             return attrs.Factory(accepted, False)
         else:
             return None
+
     @classmethod
     def make_accepted(cls,accepted,**kw):
-        print(f'making accepted: {cls.instance_class} {kw}')
+        log.debug(f'making accepted: {cls.instance_class} {kw}')
         return lambda: accepted(**kw)
     
         
