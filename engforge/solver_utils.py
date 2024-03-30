@@ -8,7 +8,7 @@ class SolverUtilLog(LoggingMixin): pass
 log = SolverUtilLog() 
 
 # Objective functions & Utilities
-def f_lin_min(system, Xref, Yref,weights=None, *args, **kw):
+def f_lin_min(system,prob, Xref, Yref,weights=None, *args, **kw):
     """
     Creates an anonymous function with stored references to system, Yref, weights, that returns a scipy optimize friendly function of (x, Xref, *a, **kw) x which corresponds to the order of Xref dicts, and the other inputs are up to application.
 
@@ -69,7 +69,7 @@ def f_lin_min(system, Xref, Yref,weights=None, *args, **kw):
                     system.warning(f'non minmax obj: {p} {ty.solver.kind}')
 
                 ref = Yref[p]
-                val = eval_ref(ref,system,slv_info) * n
+                val = eval_ref(ref,system,prob) * n
                 arry.append( val )
                 vals.append( val )
 
@@ -99,12 +99,14 @@ def f_lin_min(system, Xref, Yref,weights=None, *args, **kw):
     return f
 
 # signature in solve: refmin_solve(system,system,Xref)
-def objectify(function,system,Xrefs,solver_info=None,*args,**kwargs):
+def objectify(function,system,Xrefs,prob=None,*args,**kwargs):
     """converts a function f(system,slv_info:dict) into a function that safely changes states to the desired values and then runs the function. A function is returend as f(x,*args,**kw)"""
     from engforge.problem_context import ProblemExec
     base_dict = dict(system=system,Xrefs=Xrefs,args=args,**kwargs)
     lvl_name = f'obj_{function.__name__}'
     alias_name = kwargs.pop("alias_name",lvl_name)
+    
+    prob = prob
 
 
     def f_obj(x,*rt_args,**rt_kwargs):
@@ -113,12 +115,11 @@ def objectify(function,system,Xrefs,solver_info=None,*args,**kwargs):
         
         #Enter existing problem context
         with ProblemExec(system,{},Xnew=new_state,ctx_fail_new=True,level_name=lvl_name) as exc:
-            #print(locals()['solver_info'])
             updtinfo = base_dict.copy()
             updtinfo.update(x=x,rt_args=rt_args, **rt_kwargs)
-            solver_info = locals().get('solver_info',updtinfo)
+            prob = locals().get('prob',updtinfo)
 
-            out= function(system,solver_info)
+            out= function(system,prob)
             if system.log_level < 5:
                 system.msg(f'obj {alias_name}: {x} -> {out}')
             return out        
@@ -127,7 +128,7 @@ def objectify(function,system,Xrefs,solver_info=None,*args,**kwargs):
         system.msg(f'obj setup {function} - > {f_obj}')
         system.msg(inspect.getsource(function))
 
-    fo = lambda x,*a,**kw: f_obj(x,solver_info,*a,**kw)
+    fo = lambda x,*a,**kw: f_obj(x,prob,*a,**kw)
     fo.__name__ =f'OBJ_{function.__name__}'
     return fo
 
@@ -167,8 +168,8 @@ def secondary_obj(
 def ref_to_val_constraint(system,ctx,Xrefs,var_ref,kind,val,*args,**kwargs):
     """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
     """
-    inf = ctx
-    # info = {'system':system,'Xrefs':Xrefs,'var_ref':var_ref,'kind':kind,'val':val,'args':args,'kwargs':kwargs}
+    info = ctx
+    #info = {'system':system,'Xrefs':Xrefs,'var_ref':var_ref,'kind':kind,'val':val,'args':args,'kwargs':kwargs}
     p = var_ref
     if isinstance(val,Ref):
         if kind == 'min':
@@ -267,7 +268,7 @@ def calcJacobean(
         dxs = []
         Fbase = refset_get(Yrefs)
         for k, v in Xrefs.items():
-            x = v.value()
+            x = v.value()#TODO: add context manager,sys
             if not isinstance(x, (float, int)):
                 sys.warning(f"var: {k} is not numeric {x}, skpping")
                 continue
@@ -295,6 +296,7 @@ def calcJacobean(
 #TODO: integrate / merge with ProblemExec (all below)
 def refmin_solve(
     system,
+    prob,
     Xref: dict,
     Yref: dict,
     Xo=None,
@@ -318,12 +320,8 @@ def refmin_solve(
     norm_x,weights = handle_normalize(weights,Xref,Yref)
 
     # make objective function
-    Fc = ffunc(system,Xref,Yref,weights)
+    Fc = ffunc(system,prob,Xref,Yref,weights)
     Fc.__name__ = ffunc.__name__
-
-    # get state
-    if reset:
-        x_pre = refset_get(Xref)  # record before changing
 
     if Xo is None:
         Xo = [Xref[p].value() for p in vars]
@@ -333,6 +331,7 @@ def refmin_solve(
 
     # TODO: IO for jacobean and state estimations (complex as function definition, requires learning)
     system.debug(f'minimize! {Fc.__name__,Xo,vars,kw}')
+    kw.pop('prob',None)
     kw.pop('info',None)
     ans = sciopt.minimize(Fc, Xo, **kw)
     return ans

@@ -308,7 +308,7 @@ class DynamicSystem(System, GlobalDynamics):
         """creates the input matrix for the system, called B"""
         return np.array([0, self.Force / self.Mass])
 
-    def update_state_nonlinear(self, *args, **kwargs) -> np.ndarray:
+    def update_state(self, *args, **kwargs) -> np.ndarray:
         """creates the state matrix for the system"""
         return np.array(
             [[0, 1.0], [-self.K / self.Mass, -1 * self.Damp / self.Mass]]

@@ -3,41 +3,54 @@ from engforge.dynamics import GlobalDynamics,DynamicsMixin
 from engforge.components import forge, Component
 from engforge.attr_solver import Solver
 from engforge.properties import system_property
+from engforge.eng.costs import cost_property,CostModel
+
+from engforge.eng.solid_materials import *
 
 import numpy as np
 
-@forge(auto_attibutes=True)
-class SliderCrank(System,GlobalDynamics):
+@forge(auto_attribs=True)
+class SliderCrank(System,GlobalDynamics,CostModel):
 
-    dynamic_state_vars = ['theta','omega','x']
-
-    dynamic_input_vars = ['Tg']
+    dynamic_state_vars:list = ['theta','omega']
+    dynamic_input_vars:list = ['Tg']
 
     #outer gear
     Ro: float = 0.33
+    gear_thickness: float = 0.0127 #1/2 in
+    gear_material: SolidMaterial = ANSI_4130() #try aluminum and mild steel
+
     #motor gear
     Tg: float = 0
     Rg: float = 0.03
-    Tg_max: float = 100
-    omg_g_max: float = 1000
+    Tg_max: float = 10 #Nm
+    omg_g_max: float = 3000*(2*3.14159/60) #3000 rpm
     
     #crank 
     Rc: float = 0.25
     Lo: float = 0.3
+    Lo_factor: float = 2.0001
 
     #rotation position
     theta: float = 0.
     omega: float = 0.
-    b_rot: float = 0.
+    b_rot: float = 0.0
 
-    #pushrod
-    x: float = 1
-    x_offset: float = 0
+    #pushrod & spring
+    k_spring: float = 0.0
+    bf_rod: float = 0.0
     y_offset: float = 0
+    x_offset: float = 0
+    X_spring_center: float = 0
+    
+    #signal targets or input
+    F_external_x: float = 0
+    F_external_y: float = 0
+    dX_actuator: float = 1
 
     #Radius Design Variables
     rc_slv = Solver.declare_var('Rc',combos='design')
-    rc_slv.add_var_constraint(lambda s,p: s.Ro,'max')
+    rc_slv.add_var_constraint(lambda s,p: s.Ro,'max',combos='max_crank')
     rc_slv.add_var_constraint(0,'min')
 
     ro_slv = Solver.declare_var('Ro',combos='design')
@@ -47,39 +60,133 @@ class SliderCrank(System,GlobalDynamics):
     rg_slv.add_var_constraint(0,'min')
 
     rg_slv = Solver.declare_var('Lo',combos='design')
-    rg_slv.add_var_constraint(lambda s,p: s.Rc,'min')    
+    rg_slv.add_var_constraint(lambda s,p: s.Rc*s.Lo_factor,'min')    
 
-    off_slv = Solver.declare_var('y_offset',combos='design')
-    off_slv = Solver.declare_var('x_offset',combos='design')
+    offy_slv = Solver.declare_var('y_offset',combos='design')
+    offx_slv = Solver.declare_var('x_offset',combos='design')
 
-    l_eq_slv = Solver.equality_constraint('Lo','Lcalc',combos='design')
 
+
+    #Dynamics
+    nonlinear: bool = True #sinusoidal-isms
+    #TODO: v_pos = Transient.time_derivative('x_pos)
+
+    #Forces & Torques
     @system_property
-    def gear_ratio(self) ->  float:
-        return self.Ro/self.Rg
+    def input_torque(self)-> float:
+        return self.Tg * self.motor_gear_ratio* self.crank_gear_ratio
     
     @system_property
-    def rotational_drag(self) -> float:
-        return self.omega * self.b_rot
+    def reaction_torque(self) -> float:
+        return self.Rc_x * self.Freact_y - self.Rc_y * self.Fslide_tot
+
+    @system_property
+    def Freact_y(self)-> float:
+        return np.sin(self.gamma)*np.cos(self.gamma)*self.Fslide_tot + self.F_external_y
+
+    @system_property
+    def Fslide_tot(self) -> float:
+        return self.Fslide_fric + self.Fslide_spring + self.F_external_x
+    
+    @system_property
+    def Fslide_fric(self) -> float:
+        return -1 * self.bf_rod * self.v_pos
+    
+    @system_property
+    def Fslide_spring(self) -> float:
+        return -1 * self.k_spring * (self.x_pos - self.X_spring_center)
+
+    #Positions & Angles
+    @system_property
+    def crank_angle(self) -> float:
+        """angle between the crank and the vertical axis"""
+        return np.rad2deg(self.theta)
+    
+    @system_property
+    def alpha(self) -> float:
+        '''angle between the crank and the horizontal axis'''
+        return self.theta - np.pi/2
+
+    @system_property
+    def gamma(self) -> float:
+        '''angle between the rod and the horizontal axis'''
+        return np.arcsin(np.sin(self.alpha)*(self.Rc/self.Lo))
+
+    @system_property
+    def dX_range(self) -> float:
+        return (self.Lo**2 - (self.y_pos)**2)**0.5
     
     @system_property
     def Rc_x(self)-> float:
-        return self.Rc * np.sin(self.theta)
+        return self.Rc * np.cos(self.theta)
     
     @system_property
     def Rc_y(self)-> float:
-        return self.Rc * np.cos(self.theta)    
+        return self.Rc * np.sin(self.theta)    
 
     @system_property
-    def dXr(self) -> float:
-        return self.x + self.x_offset - self.Rc_x
+    def x_pos(self) -> float:
+        return self.Rc_x + self.x_offset
     
     @system_property
-    def dYr(self) -> float:
-        return self.y_offset - self.Rc_y
+    def y_pos(self) -> float:
+        return self.Rc_y - self.y_offset
     
     @system_property
-    def Lcalc(self):
-        return (self.dYr**2 + self.dXr**2)**0.5
+    def v_pos(self) -> float:
+        #TODO:replace with v_pos = Transient.time_derivative('x_pos)
+        omega_rad = self.omega
+        th = self.theta
+        A = self.Rc*omega_rad
+        
+        s = (self.Rc*np.sin(th) - self.y_offset)
+        N = s*np.cos(th)
+        D = (self.Lo**2 - s**2)**0.5
+        return A*((N/D) - np.sin(th))
     
+
+    #Gear Properties
+    @system_property
+    def mass_main_gear(self) -> float:
+        return  (np.pi * self.gear_material.density * self.Ro**2  * self.gear_thickness)
     
+    @system_property
+    def Imain_gear(self) -> float:
+        return self.mass_main_gear * (self.Ro**2)
+
+    @cost_property
+    def gear_cost(self) -> float:
+        return self.gear_material.cost_per_kg * self.mass_main_gear
+    
+    @system_property
+    def motor_gear_ratio(self) ->  float:
+        return self.Ro/self.Rg
+    
+    @system_property
+    def crank_gear_ratio(self) ->  float:
+        return self.Rc/self.Ro
+    
+    @system_property
+    def crank_rod_ratio(self) ->  float:
+        return self.Lo/self.Rc
+
+    #Dynamics Matricies
+    def create_state_matrix(self,*args,**kw):
+        #TODO: add rotational-positional parasitics (if any)
+
+        return np.array([[0,1],[0,-self.b_rot/self.Imain_gear]])  
+    
+    def create_state_input_matrix(self, **kwargs) -> np.ndarray:
+        return np.array([[0],[1/self.Imain_gear]])
+    
+    def create_state_constants(self, **kwargs) -> np.ndarray:
+        return np.array([0,0])
+    
+    def update_state(self,t, A, X):
+        return np.array([[0,1],[0,-self.b_rot/self.Imain_gear]])    
+    
+    def update_state_constants(self, t, F, X) -> np.ndarray:
+        #TODO: add torque & force interactions
+        accl_input = self.input_torque / self.Imain_gear
+        accl_react = self.reaction_torque / self.Imain_gear
+        return np.array([0,accl_input+accl_react]) 

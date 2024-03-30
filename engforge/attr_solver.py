@@ -82,7 +82,7 @@ class SolverInstance(AttributeInstance):
                 bias=None
                 power=None
                 #careful with kw vs positional args here
-                fun = lambda sys,info: maybe_ref(self.lhs,SolverInstance,sys=sys,info=info,mult=mult,bias=bias,power=power) - maybe_ref(self.rhs,SolverInstance,sys=sys,info=info,mult=mult,bias=bias,power=power)
+                fun = lambda sys,prob: maybe_ref(self.lhs,SolverInstance,sys=sys,prob=prob,mult=mult,bias=bias,power=power) - maybe_ref(self.rhs,SolverInstance,sys=sys,prob=prob,mult=mult,bias=bias,power=power)
                 fun.__name__ = f"{self.lhs}_{self.rhs}_{self.solver.slvtype}"
                 objfunc = Ref(self.system,fun)
             else:
@@ -101,7 +101,7 @@ class SolverInstance(AttributeInstance):
                 bias=None
                 power=None
 
-            fun = lambda sys,info: maybe_ref(self.obj_ref,SolverInstance,sys=sys,info=info,mult=mult,bias=bias,power=power)  
+            fun = lambda sys,prob: maybe_ref(self.obj_ref,SolverInstance,sys=sys,prob=prob,mult=mult,bias=bias,power=power)  
             fun.__name__ = f"obj_{self.solver.obj}_{self.solver.kind}"
             self.obj = Ref(self.system,fun)
             #self.obj = self.system.locate_ref(fun)

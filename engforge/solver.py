@@ -208,10 +208,10 @@ class SolverMixin(SolveableMixin):
         #execute with problem context and execute signals
         with ProblemExec(self,kw,level_name='eval',**kw) as pbx:
             #FIXME: change the eval_kw / sys_kw 
-            pbx.pre_execute(**kw)
+            #pbx.pre_execute(**kw)
             self.index += 1
             out = self.execute( **kw)
-            pbx.post_execute( **kw)
+            #pbx.post_execute( **kw)
             #TODO: move to problem context
             self.save_data(index=self.index)
 

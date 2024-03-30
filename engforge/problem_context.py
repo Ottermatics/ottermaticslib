@@ -266,10 +266,10 @@ class ProblemExec:
             #Finally we record where we started!
             self.set_checkpoint()        
 
-            self.msg(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {self.slv_kw}')
-
         if log.log_level < 10:
-            self.info(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {opts}')            
+            self.info(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {opts} | {self.slv_kw}')            
+        elif log.log_level <= 3:
+            self.msg(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {self.slv_kw}')
 
     def establish_system(self,system,kw_dict,**kwargs):
         """caches the system references, and parses the system arguments"""
@@ -307,13 +307,13 @@ class ProblemExec:
         
         #Problem Variable Definitions
         #self.solver_vars = self.sys_solver_variables()
-        self.Xref = self.problem_vars
+        self.Xref = self.problem_opt_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
         self.constraints = self.sys_solver_constraints(self.Xref,cons)
 
         if log.log_level < 5:
-            self.msg(f'established {self.slv_kw}')  
+            self.msg(f'established sys context: {self} {self.slv_kw}')  
 
     #Context Manager Interface
     def __enter__(self):
@@ -418,14 +418,20 @@ class ProblemExec:
 
     def exit_action(self):
         """handles the exit action wrt system"""
-        if self.revert_last and self._class_cache._session is self:
+        if self.revert_last and (self._class_cache._session is self or self.level_name == 'top'):
+            if self.log_level <= 8:
+                self.debug(f'[{self.level_number}-{self.level_name}] reverting to start')
             self.revert_to_start()
-            #run execute 
+            
+            #run execute
             if self.pre_exec:
                 self.pre_execute()
 
         elif self.revert_every:
+            if self.log_level <= 8:
+                self.debug(f'[{self.level_number}-{self.level_name}] to {self.X_start}')
             self.revert_to_start()
+            
             #run execute 
             if self.pre_exec:
                 self.pre_execute()
@@ -560,8 +566,8 @@ class ProblemExec:
         thresh = kw.pop("thresh", self.success_thresh)
 
         dflt = {
-                "Xstart": Ref.refset_get(Xref),
-                "Ystart": Ref.refset_get(Yref,sys=self.system,info=self),
+                "Xstart": Ref.refset_get(Xref,sys=self.system,prob=self),
+                "Ystart": Ref.refset_get(Yref,sys=self.system,prob=self),
                 "Xans": None,
                 "success": None,
                 "Xans":None,
@@ -578,9 +584,15 @@ class ProblemExec:
 
         #override constraints input
         kw.update(self.constraints)
+
+        if len(kw['bounds']) != len(Xref):
+            raise ValueError(f"bounds {len(self.constraints['bounds'])} != Xref {len(Xref)}")
+
+        if self.log_level < 10:
+            self.debug(f"minimize {Xref} {Yref} {kw}")
         
 
-        self._ans = refmin_solve(self.system, Xref, Yref, **kw)
+        self._ans = refmin_solve(self.system,self,Xref, Yref, **kw)
         output["ans"] = self._ans
 
         self.handle_solution(self._ans,Xref,Yref,output)
@@ -640,7 +652,12 @@ class ProblemExec:
 
     #X solver variable refs
     @property
-    def problem_vars(self)->dict:
+    def problem_opt_vars(self)->dict:
+        """solver variables"""
+        return self.ref_attrs.get('solver.var',{}).copy()
+    
+    @property
+    def all_problem_vars(self)->dict:
         """solver variables + dynamics states when dynamic_solve is True"""
         varx = self.ref_attrs.get('solver.var',{}).copy()
         #Add the dynamic states
@@ -719,6 +736,7 @@ class ProblemExec:
         return self.slv_kw
 
 
+
     @property
     def dynamic_state(self):
         return self.ref_attrs.get('dynamics.state',{}).copy()
@@ -768,7 +786,7 @@ class ProblemExec:
     @property
     def solveable(self):
         """checks the system's references to determine if its solveabl"""
-        if self.problem_vars:
+        if self.problem_opt_vars:
             #TODO: expand this
             return True
         return False
@@ -798,7 +816,7 @@ class ProblemExec:
     def all_variable_refs(self)->dict:
         ing = self.integrator_vars
         stt = self.dynamic_state
-        vars = self.problem_vars
+        vars = self.problem_opt_vars
         return {**ing,**stt,**vars}
     
     @property
@@ -819,7 +837,7 @@ class ProblemExec:
     def sys_solver_variables(self,as_set=False,as_flat=False,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
-        out = dict(dynamics=self.dynamic_state,integration=self.integrator_vars,variables=self.problem_vars)
+        out = dict(dynamics=self.dynamic_state,integration=self.integrator_vars,variables=self.problem_opt_vars)
 
         if as_set==True:
             vars = set.union(*(set(v) for k,v in out.items()))
@@ -895,7 +913,7 @@ class ProblemExec:
         # Add Constraints
         ex_arg = {"con_args": (),**kw}
         #Variable limit (function -> ineq, numeric -> bounds)
-        for slvr, ref in self.problem_vars.items():
+        for slvr, ref in self.problem_opt_vars.items():
             assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
             if slvr in slv_inst:
                 slv = slv_inst[slvr]

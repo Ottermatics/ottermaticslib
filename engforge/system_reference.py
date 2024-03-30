@@ -31,22 +31,30 @@ def refset_input(refs, delta_dict,chk=True):
 
 
 def refset_get(refs,*args,**kw):
-    return {k: refs[k].value(*args,**kw) for k in refs}
+    out = {}
+    for k in refs:
+        try:
+            out[k] = refs[k].value(*args,**kw)
+        except Exception as e:
+            rf = refs[k]
+            log.error(e,f'issue with ref: {rf}|{rf.key}|{rf.comp}')
+
+    return out
 
 
-def f_root(ResRef: collections.OrderedDict, norm: dict = None):
-    residual = [v.value() / (norm[k] if norm else 1) for k, v in ResRef.items()]
-    res = np.array(residual)
-    return res
-
-
-def f_min(ResRef: collections.OrderedDict, norm: dict = None):
-    res = [v.value() / (norm[k] if norm else 1) for k, v in ResRef.items()]
-    ans = np.linalg.norm(res, 2)
-
-    if ans < 1:
-        return ans**0.5
-    return ans
+# def f_root(ResRef: collections.OrderedDict, norm: dict = None):
+#     residual = [v.value() / (norm[k] if norm else 1) for k, v in ResRef.items()]
+#     res = np.array(residual)
+#     return res
+# 
+# 
+# def f_min(ResRef: collections.OrderedDict, norm: dict = None):
+#     res = [v.value() / (norm[k] if norm else 1) for k, v in ResRef.items()]
+#     ans = np.linalg.norm(res, 2)
+# 
+#     if ans < 1:
+#         return ans**0.5
+#     return ans
 
 
 def eval_ref(canidate,*args,**kw):
@@ -204,7 +212,7 @@ class Ref:
     def setup_calls(self):
         """caches anonymous functions for value and logging speedup"""
         if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 2:
-            self._log_func = lambda val: self.comp.msg(f"REF[get] {self} -> {val}")
+            self._log_func = lambda val: self.comp.msg(f"REF[get] {str(self):<50} -> {val}")
         else:
             self._log_func = None
 
@@ -238,10 +246,19 @@ class Ref:
         return cy
 
     def value(self,*args,**kw):
-        o = self._value_eval(*args,**kw)
-        if self._log_func:
-            self._log_func(o)
-        return o
+        if log.log_level <= 10:
+            try:
+                o = self._value_eval(*args,**kw)
+                if self._log_func:
+                    self._log_func(o)
+                return o
+            except Exception as e:
+                log.error(e,f'issue with ref: {self}|{self.key}|{self.comp}')
+        else:
+            o = self._value_eval(*args,**kw)
+            if self._log_func:
+                self._log_func(o)
+            return o
 
     def set_value(self, val):
         if self.allow_set:

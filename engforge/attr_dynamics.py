@@ -47,7 +47,7 @@ class IntegratorInstance(AttributeInstance):
     
     @property
     def current_rate(self):
-        return self.rate_ref.value()
+        return self.rate_ref.value(self.system, self.system.last_context)
     
     @property
     def constraint_refs(self):
