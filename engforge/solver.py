@@ -54,7 +54,6 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
     if extra_kw.get('only_active',True):
 
         outa  =  filt_active(var_name,solver_inst,extra_kw=extra_kw,dflt=False)
-        #log.info(f'only active: {outa}| {var_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
         if not outa:
             log.msg(f'filt not active: {var_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
             return False
@@ -65,7 +64,7 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
     #if the combo filter didn't explicitly fail, check the var filter
     if attr_name in SLVR_SCOPE_PARM:
         outp = filt_var_vars(var_name,solver_inst, extra_kw)
-        outr = any((outp,outc)) #redundant per above
+        outr = all((outp,outc)) #redundant per above
     else:
         outr = outc
     
@@ -73,9 +72,9 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
     fin =  bool(outr) and outa
 
     if not fin:
-        log.msg(f'filter: {var_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
+        log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
     elif fin:
-        log.msg(f'filter: {var_name:>10} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos} {extra_kw}')
+        log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos}')
     return fin 
 
 # add to any SolvableMixin to allow solver use from its namespace
@@ -117,11 +116,11 @@ class SolverMixin(SolveableMixin):
         return out    
     
     #Official Solver Interface
-    def solver_vars(self,**kwargs):
+    def solver_vars(self,check_dynamics=True,**kwargs):
         """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations"""
         from engforge.solver import combo_filter
-        #TODO: group solver vars (group_solver_refs())
-        return self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs)
+
+        return self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs,check_dynamics=check_dynamics)
     
 
     def post_run_callback(self, **kwargs):

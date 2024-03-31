@@ -32,7 +32,7 @@ def f_lin_min(system,prob, Xref, Yref,weights=None, *args, **kw):
     inputs = [mult_neg,exp_neg,mult_pos,exp_pos,gam,norm_base]
     is_lin = all(v==1 for v in inputs)
 
-    solver_ref =  system.collect_solver_refs(conv=False)
+    solver_ref =  system.collect_solver_refs()
     solver_types = solver_ref.get('type',{}).get('solver',{})
     base_dict = {'system':system,'Yref':Yref,'weights':weights,'args':args,'kw':kw}
     xkey = "_".join(Xref.keys())
@@ -413,17 +413,14 @@ def filt_combo_vars(var,inst,extra_kw=None,combos_in=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
-    groups = ext_str_list(extra_kw,'combos',None)
+    groups = ext_str_list(extra_kw,'combos','')
     if groups is None:
-        #print('no combo args',inst)
-        return None #"no groups"
+        return True #filter no groups
+    
     igngrp = ext_str_list(extra_kw,'ign_combos',None)
     onlygrp = ext_str_list(extra_kw,'only_combos',None)
 
-    if not combos_in:
-        combos = str_list_f(getattr(inst,'combos', ''))
-    else:
-        combos = str_list_f(combos_in)
+    combos = str_list_f(getattr(inst,'combos', 'default'))
     
     if not combos:
         log.info(f'no combos for {var} {combos} {groups}')
@@ -456,9 +453,10 @@ def filt_var_vars(var,inst,extra_kw=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
-    groups = ext_str_list(extra_kw,'slv_vars',None)
+    groups = ext_str_list(extra_kw,'slv_vars','')
     if groups is None:
-        return True #"no groups, assume yes"
+        return True #filter no vars
+    
     igngrp = ext_str_list(extra_kw,'ign_vars',None)
     onlygrp = ext_str_list(extra_kw,'only_vars',None)
 
@@ -504,7 +502,7 @@ def filt_active(var,inst,extra_kw=None,dflt=False):
         if log.log_level < 3:
             log.msg(f'{var} deactivated!')
         return False
-    log.msg(f'{var} is {act}!')
+    log.msg(f'{var} is active={act}!')
     return act
 
 

@@ -129,7 +129,7 @@ class SpaceMixin(SolveableInterface):
         return self.cost / self.volume 
 
 @forge(auto_attribs=True)
-class CubeComp(Component,SpaceMixin,DynamicsMixin):
+class CubeComp(Component,SpaceMixin):
     # this should be energy neutral 🤞
     
     dynamic_state_vars: list = ["x", "y", "z"]
@@ -142,6 +142,8 @@ class CubeComp(Component,SpaceMixin,DynamicsMixin):
     budget: float = attrs.field(default=300)
     max_length: float = attrs.field(default=100)
     volume_goal: float = attrs.field(default=100)
+
+
 
 
 
@@ -211,7 +213,7 @@ class CubeSystem(System,SpaceMixin):
     
 
 @forge(auto_attribs=True)
-class DynamicComponent(Component, DynamicsMixin):
+class DynamicComponent(Component):
     dynamic_state_vars: list = ["x", "v"]
     x: float = 1
     v: float = 0

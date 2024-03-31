@@ -54,6 +54,7 @@ def _cost_update(comp):
         return comp.update_dflt_costs()
     return updt
 
+dflt_dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{},'dynamic_comps':{}}
 
     
 class SolveableMixin(AttributedBaseMixin):  #'Configuration'
@@ -672,7 +673,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return out
     
     
-    def collect_solver_refs(self,conf:"Configuration"=None,conv=None,check_atr_f=None,check_kw=None,**kw):
+    def collect_solver_refs(self,conf:"Configuration"=None,check_atr_f=None,check_kw=None,check_dynamics=True,**kw):
         """collects all the references for the system grouped by function and prepended with the system key"""    
         from engforge.attributes import ATTR_BASE
         from engforge.engforge_attributes import AttributedBaseMixin
@@ -685,8 +686,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         attr_dict = {}
         cls_dict = {}
         skipped = {}
-
-        conv = conv if conv is not None else None
 
         out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict,'skipped':skipped}
         
@@ -770,7 +769,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                                 skipped[pre] = []
 
                             if isinstance(val,Ref) and val.allow_set:
-                                skipped[pre].append(f'{key}{val.key}') #its a var
+                                #its a var
+                                skipped[pre].append(f'{key}{val.key}') 
                             else:
                                 #not objective or settable, must be a obj/cond
                                 skipped[pre].append(scope_name)
@@ -790,51 +790,58 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                    attr_dict[atype] = {}
         
         #Dynamic Variables Add, following the skipped items
-        dyn_refs = self.collect_dynamic_refs(confobj)
-        #house keeping to organize special returns 
-        #TODO: generalize this with a function to update the attr dict serach result
-        out['dynamic_comps'] = dyn_refs.pop('dynamic_comps',{})
-        
+        if check_dynamics:
+            dyn_refs = self.collect_dynamic_refs(confobj)
+            #house keeping to organize special returns 
+            #TODO: generalize this with a function to update the attr dict serach result
+            out['dynamic_comps'] = dyn_refs.pop('dynamic_comps',{})
+            
 
-        if check_atr_f or any([v for v in skipped.values()]):
-            #print('skipped',skipped)
-            skipd = set().union(*(set(v) for v in skipped.values()))
-            for pre,refs in dyn_refs.items():
-                
-                if pre not in attr_dict:
-                    attr_dict[pre] = {}
-
-                for var,ref in refs.items():
+            if check_atr_f or any([v for v in skipped.values()]):
+                #print('skipped',skipped)
+                skipd = set().union(*(set(v) for v in skipped.values()))
+                for pre,refs in dyn_refs.items():
                     
-                    is_ref = isinstance(ref,Ref) and ref.allow_set
-                    if not is_ref:
-                        conf.info(f'bad refs skip {pre,ref,val_type,skipd}')
-                        attr_dict[pre].update(**{var:ref})
-                        continue
+                    if pre not in attr_dict:
+                        attr_dict[pre] = {}
 
-                    scoped_name = f'{key}{var}'
-                    val_setskip = ( is_ref and ref.key in skipd)
-                    val_type = None
-                    
-                    if scoped_name in skipd:
-                        conf.msg(f'dynvar skip {pre,ref.key,val_type,skipd}')
-                        continue
-
-                    elif val_setskip:
-                        conf.msg(f'dynvar r-skip {pre,ref.key,val_type,skipd}')
-                        continue
+                    for var,ref in refs.items():
                         
-                    elif check_atr_f and check_atr_f(pre,ref.key,val_type,check_kw):
-                        conf.msg(f'dynvar add {pre,ref.key,val_type,skipd}')
-                        attr_dict[pre].update(**{var:ref})
-                    else:
-                        conf.msg(f'dynvar endskip {pre,ref.key,val_type,skipd}')
-                        if check_atr_f: #then it didn't checkout
-                            skipped[pre].append(scope_name)
+                        is_ref = isinstance(ref,Ref) and ref.allow_set
+                        if not is_ref:
+                            conf.info(f'bad refs skip {pre,ref,val_type,skipd}')
+                            attr_dict[pre].update(**{var:ref})
+                            continue
 
+                        scoped_name = f'{key}{var}'
+                        val_setskip = ( is_ref and ref.key in skipd)
+                        val_type = None
+                        
+                        if scoped_name in skipd:
+                            conf.msg(f'dynvar skip {pre,ref.key,val_type,skipd}')
+                            continue
+
+                        elif val_setskip:
+                            conf.msg(f'dynvar r-skip {pre,ref.key,val_type,skipd}')
+                            continue
+                            
+                        elif check_atr_f and check_atr_f(pre,ref.key,val_type,check_kw):
+                            conf.msg(f'dynvar add {pre,ref.key,val_type,skipd}')
+                            attr_dict[pre].update(**{var:ref})
+                        else:
+                            conf.msg(f'dynvar endskip {pre,ref.key,val_type,skipd}')
+                            if check_atr_f: #then it didn't checkout
+                                skipped[pre].append(scope_name)
+
+            else:
+                #There's no checks to be done, just add these
+                attr_dict.update(**dyn_refs)
         else:
-            #There's no checks to be done, just add these
-            attr_dict.update(**dyn_refs)                   
+            cpy = dflt_dynamics.copy()
+            cpy.pop('dynamic_comps',{})
+            attr_dict.update(cpy)
+            
+                         
 
         return out
 
@@ -846,16 +853,19 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         1. Time.integrate
         2. Dynamic Instances
         """
+        from engforge.dynamics import DynamicsMixin
         if conf is None:
             conf = self
-
-        dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{},'dynamic_comps':{}}
+        dynamics = {k:{} for k in dflt_dynamics}
 
         for key, lvl, conf in conf.go_through_configurations(**kw):
             # FIXME: add a check for the dynamics mixin, that isn't hacky
             # BUG: importing dynamicsmixin resolves as different class in different modules, weird
-            if "dynamicsmixin" not in str(conf.__class__.mro()).lower():
+            # if "dynamicsmixin" not in str(conf.__class__.mro()).lower():
+            #     continue
+            if not isinstance(conf, DynamicsMixin) or not conf.is_dynamic:
                 continue
+
             sval = f'{key}.' if key else ''
             scope = lambda d: {f'{sval}{k}':v for k,v in d.items()}
             dynamics['dynamics.state'].update(scope(conf.Xt_ref))

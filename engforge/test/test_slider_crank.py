@@ -73,17 +73,17 @@ class SliderCrank(System,CostModel):
     main_gear_speed_min: float = 20*(2*3.14159/60)
     main_gear_speed_max: float = 120*(2*3.14159/60)
 
-    cost_slv = Solver.objective('combine_cost',kind='min',combos='design')
+    cost_slv = Solver.objective('combine_cost',kind='min',combos='design,cost,goal')
 
     #constraints
-    gear_speed_slv = Solver.eq_con('dx_goal',combos='design')
-    range_slv = Solver.eq_con('ds_goal',combos='design')
+    gear_speed_slv = Solver.eq_con('dx_goal',combos='design,gear')
+    range_slv = Solver.eq_con('ds_goal',combos='design,goal')
     sym_slv = Solver.eq_con('end_force_diff',combos='spring_sym')
     
 
-    gear_pos_slv = Solver.con_ineq('final_gear_ratio',combos='design')
-    crank_pos_slv = Solver.con_ineq('crank_gear_ratio',combos='design')
-    motor_pos_slv = Solver.con_ineq('motor_gear_ratio',combos='design')
+    gear_pos_slv = Solver.con_ineq('final_gear_ratio',combos='design,gear')
+    crank_pos_slv = Solver.con_ineq('crank_gear_ratio',combos='design,gear')
+    motor_pos_slv = Solver.con_ineq('motor_gear_ratio',combos='design,gear')
 
 
 

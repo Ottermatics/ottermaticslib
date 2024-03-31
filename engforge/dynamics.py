@@ -158,6 +158,12 @@ class DynamicsMixin(Configuration, SolveableMixin):
         self.time = 0.0
 
     @instance_cached
+    def is_dynamic(self):
+        if self.dynamic_state_vars:
+            return True
+        return False
+
+    @instance_cached
     def dynamic_state_size(self):
         return len(self.dynamic_state_vars)
 
@@ -505,9 +511,8 @@ class GlobalDynamics(DynamicsMixin):
     def setup_global_dynamics(self, **kwargs):
         """recursively creates numeric matricies for the simulation"""
         for skey,lvl,conf in self.go_through_configurations():
-            if isinstance(conf,DynamicsMixin):
+            if isinstance(conf,DynamicsMixin) and conf.is_dynamic:
                 conf.create_dynamic_matricies(**kwargs)
-
     
 
     def sim_matrix(self, eval_kw=None, sys_kw=None, **kwargs):
@@ -748,12 +753,3 @@ class GlobalDynamics(DynamicsMixin):
             if debug_fail:
                 return system,pbx
             raise e
-
-    def data_dict_tm(self, time, **kw):
-        """returns the data dictionary"""
-        dd = self.data_dict
-        dd["time"] = time
-        dd.update(kw)  # TODO: check for typing
-        # print(dd)
-        return dd
-

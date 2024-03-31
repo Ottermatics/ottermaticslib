@@ -33,8 +33,6 @@ The `only_active` argument can be used to select only active items. The `activat
 
 `add_obj` can be used to add an objective to the solver. 
 
-The `_fail` argument can be used to raise an error if no solvables are selected.
-
 # Exit Mode Handling
 
 The ProblemExec supports the following exit mode handling vars:
@@ -206,24 +204,21 @@ class ProblemExec:
         else:
             #these go to the context instance optoins
             kw_in = {k:v for k,v in kw_dict.items() if k in dflt_parse_kw}
-            kw_out = {k:v for k,v in kw_dict.items() if k not in opt_in}
             opt_in.update(kw_in)
+            kw_out = {k:v for k,v in kw_dict.items() if k not in opt_in}
             #these go to system establishment
             opt_out.update(kw_out)
-            #remove from kw_dict
-            for k in kw_in.keys():
-                kw_dict.pop(k)
-
 
         #Define the handiling of rate integrals
         if 'dxdt' in opts:
             dxdt = opts.pop('dxdt')
-        elif 'dxdt' in kw_dict:
+        if 'dxdt' in kw_dict:
             dxdt = kw_dict.pop('dxdt')
         else:
-            dxdt = None        
+            dxdt = None  #by default dont consider dynamics
+
         if dxdt is not None and dxdt is not False:
-            if dxdt == 0 and dxdt is not False:
+            if dxdt == 0:
                 pass
             elif dxdt is True:
                 pass
@@ -272,7 +267,6 @@ class ProblemExec:
                 self.level_name = level_name
 
             self._temp_state = Xnew
-            self.name = system.name + '-' + str(uuid.uuid4())[:8]
             self.establish_system(system,kw_dict=kw_dict,**opt_out)
             
             #Finally we record where we started!
@@ -289,7 +283,8 @@ class ProblemExec:
         from engforge.system import System 
 
         #pass args without creating singleton (yet)
-        self._session_id = uuid.uuid4()        
+        self._session_id = uuid.uuid4()
+        self.name = system.name + '-' + str(self._session_id)[:8]
         if log.log_level < 5:
             self.info(f'establish {system}| {kw_dict} {kwargs}')
 
@@ -307,7 +302,8 @@ class ProblemExec:
         self.slv_kw = self.get_extra_kws(kw_dict,slv_dflt_options,rmv=True)
         self.slv_kw.update(in_kw) #update with input!
 
-        self.sys_refs = self.system.solver_vars(**self.slv_kw)
+        check_dynamics = self._dxdt is not None and self._dxdt is not False
+        self.sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,**self.slv_kw)
 
         #Grab inputs and set to system
         for k,v in dflt_parse_kw.items():
@@ -485,86 +481,6 @@ class ProblemExec:
             self._class_cache.level_number -= 1  
              
 
-    #State Interfaces
-    @property
-    def record_state(self)->dict:
-        """records the state of the system"""
-        #refs = self.all_variable_refs
-        refs = self.all_variables
-        return Ref.refset_get(refs)     
-    
-    def get_ref_values(self,refs=None):
-        """returns the values of the refs"""
-        if refs is None:
-            refs = self.all_system_references
-        return Ref.refset_get(refs)
-    
-    def set_ref_values(self,values,refs=None):
-        """returns the values of the refs"""
-        #TODO: add checks for the refs
-        if refs is None:
-            refs = self.all_variables        
-        return Ref.refset_input(refs,values)    
-
-    def set_checkpoint(self):
-        """sets the checkpoint"""
-        self.X_start = self.record_state
-        if log.log_level <= 7:
-            self.debug(f'[{self.level_number}-{self.level_name}] set checkpoint: {list(self.X_start.values())}')
-
-    def revert_to_start(self):
-        if log.log_level < 5:
-            xs = list(self.X_start.values())
-            rs = list(self.record_state.values())
-            self.debug(f'[{self.level_number}-{self.level_name}] reverting to start: {xs} -> {rs}')
-        Ref.refset_input(self.all_variables,self.X_start)
-
-    def activate_temp_state(self,new_state=None):
-        if new_state:
-            Ref.refset_input(self.all_variables,new_state)
-        elif self._temp_state:
-            self.debug(f'[{self.level_number}-{self.level_name}] activating temp state: {self._temp_state}')
-            Ref.refset_input(self.all_variables,self._temp_state)
-
-    #System Events
-    def apply_pre_signals(self):
-        """applies all pre signals"""
-        for signame, sig in self.signals.items():
-            if sig.mode == "pre" or sig.mode == "both":
-                sig.apply()
-
-    def apply_post_signals(self):
-        """applies all post signals"""
-        for signame, sig in self.signals.items():
-            if sig.mode == "post" or sig.mode == "both":
-                sig.apply()
-
-    def update_system(self,*args,**kwargs):
-        """updates the system"""
-        for ukey,uref in self._update_refs.items():
-            self.debug(f'context updating {ukey}')
-            uref.value(*args,**kwargs)
-
-    def post_update_system(self,*args,**kwargs):
-        """updates the system"""
-        for ukey,uref in self._post_update_refs.items():
-            self.debug(f'context post updating {ukey}')
-            uref.value(*args,**kwargs)
-
-    def pre_execute(self,*args,**kwargs):
-        """Updates the pre/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
-        if log.log_level < 5:
-            self.msg(f"pre execute")
-        self.apply_pre_signals()
-        self.update_system(*args,**kwargs)
-
-
-    def post_execute(self,*args,**kwargs):
-        """Updates the post/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
-        if log.log_level < 5:
-            self.msg(f"post execute")
-        self.apply_post_signals()
-        self.post_update_system(*args,**kwargs)
 
     def solve_min(
         self,Xref,Yref,output=None,**kw
@@ -659,7 +575,360 @@ class ProblemExec:
                 self.warning(f"solver didnt converge: {answer}")
             output["success"] = False
     
-        return output  
+        return output 
+
+    #Solver Parsing Methods
+    def sys_solver_variables(self,as_set=False,as_flat=False,**kw):
+        """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
+        """
+        out = dict(variables=self.problem_opt_vars)
+
+        if self._dxdt is not None:
+            out.update(dynamics=self.dynamic_state,integration=self.integrator_vars)
+
+        if as_set==True:
+            vars = set.union(*(set(v) for k,v in out.items()))
+            return vars
+        
+        if as_flat==True:
+            flt = {}
+            for k,v in out.items():
+                flt.update(v)
+            return flt
+        
+        return out
+
+    def sys_solver_objectives(self,**kw):
+        """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
+        """
+        sys_refs = self.sys_refs
+
+        #Convert result per kind of objective (min/max ect)
+        objs = sys_refs.get('attrs',{}).get('solver.obj',{})
+        return {k:v for k,v in objs.items()}
+
+    def sys_solver_constraints(self,Xrefs,add_con=None,combo_filter=True, *args, **kw):
+        """formatted as arguments for the solver
+        """
+        from engforge.solver_utils import create_constraint
+
+        system = self.system
+        sys_refs = self.sys_refs
+
+        extra_kw = self.kwargs
+        
+        #TODO: move to kwarg parsing on setup
+        deactivated = ext_str_list(extra_kw,'deactivate',[]) if 'deactivate' in extra_kw and extra_kw['deactivate'] else []
+        activated = ext_str_list(extra_kw,'activate',[]) if 'activate' in extra_kw and  extra_kw['activate'] else []
+
+        slv_inst = sys_refs.get('type',{}).get('solver',{})
+        trv_inst = {v.var:v for v in sys_refs.get('type',{}).get('time',{}).values()}
+        sys_refs = sys_refs.get('attrs',{})
+
+        if add_con is None:
+            add_con = {}
+        
+
+        #The official definition of X var order
+        Xvars = list(Xrefs)
+
+        # constraints lookup
+        bnd_list = [[None, None]] * len(Xvars)
+        con_list = []
+        con_info = [] #names of constraints 
+        constraints = {"constraints": con_list, "bounds": bnd_list,"info":con_info}
+        
+
+        if isinstance(add_con, dict):
+            # Remove None Values
+            nones = {k for k, v in add_con.items() if v is None}
+            for ki in nones:
+                constraints.pop(ki, None)
+            assert all(
+                [callable(v) for k, v in add_con.items()]
+            ), f"all custom input for constraints must be callable with X as argument"
+            constraints["constraints"].extend(
+                [v for k, v in add_con.items() if v is not None]
+            )
+
+        if add_con is False:
+            constraints = {} #youre free!
+            return constraints
+        
+        
+
+        # Add Constraints
+        ex_arg = {"con_args": (),**kw}
+        #Variable limit (function -> ineq, numeric -> bounds)
+        for slvr, ref in self.problem_opt_vars.items():
+            assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
+            if slvr in slv_inst:
+                slv = slv_inst[slvr]
+                slv_var = True #mark a static varible
+            elif slvr in trv_inst:
+                slv = trv_inst[slvr]
+                slv_var = False #a dynamic variable
+            else:
+                self.warning(f'no solver instance for {slvr} ')
+                continue
+            
+            slv_constraints = slv.constraints
+            if log.log_level < 7:
+                self.debug(f'[{self.level_number}-{self.level_name}] constraints {slvr} {slv_constraints}')
+                
+            for ctype in slv_constraints:
+                cval = ctype['value']
+                kind = ctype['type']       
+                var = ctype['var']
+                if log.log_level < 3:
+                    self.msg(f'[{self.level_number}-{self.level_name}]const: {slvr} {ctype}')
+
+                if cval is not None and slvr in Xvars:
+                    
+                    #Check for combos & activation
+                    combos = None
+                    if 'combos' in ctype:
+                        combos = ctype['combos']
+                        combo_var = ctype['combo_var']
+                        active = ctype.get('active',True)
+                        in_activate = any([arg_var_compare(combo_var,v) for v in activated]) if activated else False
+                        in_deactivate = any([arg_var_compare(combo_var,v) for v in deactivated]) if deactivated else False
+
+                        #Check active or activated
+                        if not active and not activated:
+                            if log.log_level < 3:
+                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
+                            continue
+
+                        elif not active and not in_activate:
+                            if log.log_level < 3:
+                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
+                            continue
+
+                        elif active and in_deactivate:
+                            if log.log_level < 3:
+                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: deactivated {var} {slvr} ')
+                            continue
+
+                    if combos and combo_filter:
+                        filt = filt_combo_vars(combo_var,slv, extra_kw,combos)
+                        if not filt:
+                            if log.log_level < 5:
+                                self.debug(f'[{self.level_number}-{self.level_name}] filtering constraint={filt} {var} |{combos}')  
+                            continue
+                    
+                    if log.log_level < 10:
+                        self.debug(f'[{self.level_number}-{self.level_name}] adding var constraint {var,slvr,ctype,combos}') 
+
+                    #get the index of the variable
+                    x_inx = Xvars.index(slvr)        
+                    
+                    #lookup rates
+                    rate_val = None
+                    if self._dxdt is not None:
+                        if isinstance(self._dxdt,dict) and not slv_var:
+                            rate_val = self._dxdt.get(slvr,0)
+                        elif not slv_var:
+                            rate_val = 0
+
+                    #add the dynamic parameters when configured
+                    if not slv_var and rate_val is not None:
+                        #if kind in ('min','max') and slvr in Xvars:
+                        varref = Xrefs[slvr]
+                        #varref = slv.rate_ref
+                        #Ref Case
+                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,*args,**kw)
+                        #con_list.append(ccst)
+                        con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
+                        con_list.append(ccst) 
+
+                    elif slv_var:                       
+                        #establish simple bounds w/ solver  
+                        if ( 
+                            kind in ("min", "max")
+                            and slvr in Xvars
+                            and isinstance(cval, (int, float))
+                        ):
+                            minv, maxv = bnd_list[x_inx]
+                            bnd_list[x_inx] = [
+                                cval if kind == "min" else minv,
+                                cval if kind == "max" else maxv,
+                                ]
+                                
+                        #add the bias of cval to the objective function
+                        elif  kind in ('min','max') and slvr in Xvars:
+                            varref = Xrefs[slvr]
+                            #Ref Case
+                            ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,*args,**kw)
+                            con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
+                            con_list.append(ccst)
+
+                        else:
+                            self.warning(f"bad constraint: {cval} {kind} {slv_var}|{slvr}")
+
+        # Add Constraints
+        for slvr, ref in sys_refs.get('solver.ineq',{}).items():
+            slv = slv_inst[slvr]
+            slv_constraints = slv.constraints
+            for ctype in slv_constraints:
+                cval = ctype['value']
+                kind = ctype['type']                    
+                if cval is not None:
+                    con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
+                    con_list.append(
+                        create_constraint(
+                            system,Xrefs, 'ineq', cval, *args, **kw
+                        )
+                    )
+
+        for slvr, ref in sys_refs.get('solver.eq',{}).items():
+            slv = slv_inst[slvr]
+            slv_constraints = slv.constraints
+            for ctype in slv_constraints:
+                cval = ctype['value']
+                kind = ctype['type']                    
+                if cval is not None:
+                    con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
+                    con_list.append(
+                        create_constraint(
+                            system,Xrefs, 'eq', cval, *args, **kw
+                        )
+                    )
+
+
+        return constraints 
+
+    # General method to distribute input to internal components
+    @classmethod
+    def parse_default(self,key,defaults,input_dict,rmv=False,empty_str=True):
+        """splits strings or lists and returns a list of options for the key, if nothing found returns None if fail set to True raises an exception, otherwise returns the default value"""
+        if key in input_dict:
+            #kwargs will no longer have key!
+            if not rmv:
+                option = input_dict.get(key)
+            else:
+                option = input_dict.pop(key)
+            #print(f'removing option {key} {option}')
+            if option is None:
+                return option,False
+            elif isinstance(option,(int,float,bool)):
+                return option,False
+            elif isinstance(option,str):
+                if not empty_str and not option:
+                     return None,False
+                option = option.split(',')
+                    
+            return option,False 
+        elif key in defaults:
+            return defaults[key],True
+        return None,None
+        
+
+    @classmethod
+    def get_extra_kws(cls,kwargs,_check_keys:dict=slv_dflt_options,rmv=False,use_defaults=True):
+        """extracts the combo input from the kwargs"""
+        # extract combo input
+        if not _check_keys:
+            return {}
+        _check_keys = _check_keys.copy()
+        #TODO: allow extended check_keys / defaults to be passed in, now every value in check_keys has a default
+        cur_in = kwargs
+        output = {}
+        for p,dflt in _check_keys.items():
+            val,is_dflt = cls.parse_default(p,_check_keys,cur_in,rmv=rmv)
+            if not is_dflt:
+                output[p] = val
+            elif use_defaults:
+                output[p] = val
+            if rmv:
+                cur_in.pop(p,None)
+
+        #copy from data
+        filtr = dict(list(filter(lambda kv: kv[1] is not None or kv[0] in _check_keys, output.items())))
+        #print(f'got {combos} -> {comboos} from {kwargs} with {_check_keys}')
+        return filtr    
+
+    #State Interfaces
+    @property
+    def record_state(self)->dict:
+        """records the state of the system"""
+        #refs = self.all_variable_refs
+        refs = self.all_variables
+        return Ref.refset_get(refs)     
+    
+    def get_ref_values(self,refs=None):
+        """returns the values of the refs"""
+        if refs is None:
+            refs = self.all_system_references
+        return Ref.refset_get(refs)
+    
+    def set_ref_values(self,values,refs=None):
+        """returns the values of the refs"""
+        #TODO: add checks for the refs
+        if refs is None:
+            refs = self.all_variables        
+        return Ref.refset_input(refs,values)    
+
+    def set_checkpoint(self):
+        """sets the checkpoint"""
+        self.X_start = self.record_state
+        if log.log_level <= 7:
+            self.debug(f'[{self.level_number}-{self.level_name}] set checkpoint: {list(self.X_start.values())}')
+
+    def revert_to_start(self):
+        if log.log_level < 5:
+            xs = list(self.X_start.values())
+            rs = list(self.record_state.values())
+            self.debug(f'[{self.level_number}-{self.level_name}] reverting to start: {xs} -> {rs}')
+        Ref.refset_input(self.all_variables,self.X_start)
+
+    def activate_temp_state(self,new_state=None):
+        if new_state:
+            Ref.refset_input(self.all_variables,new_state)
+        elif self._temp_state:
+            self.debug(f'[{self.level_number}-{self.level_name}] activating temp state: {self._temp_state}')
+            Ref.refset_input(self.all_variables,self._temp_state)
+
+    #System Events
+    def apply_pre_signals(self):
+        """applies all pre signals"""
+        for signame, sig in self.signals.items():
+            if sig.mode == "pre" or sig.mode == "both":
+                sig.apply()
+
+    def apply_post_signals(self):
+        """applies all post signals"""
+        for signame, sig in self.signals.items():
+            if sig.mode == "post" or sig.mode == "both":
+                sig.apply()
+
+    def update_system(self,*args,**kwargs):
+        """updates the system"""
+        for ukey,uref in self._update_refs.items():
+            self.debug(f'context updating {ukey}')
+            uref.value(*args,**kwargs)
+
+    def post_update_system(self,*args,**kwargs):
+        """updates the system"""
+        for ukey,uref in self._post_update_refs.items():
+            self.debug(f'context post updating {ukey}')
+            uref.value(*args,**kwargs)
+
+    def pre_execute(self,*args,**kwargs):
+        """Updates the pre/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
+        if log.log_level < 5:
+            self.msg(f"pre execute")
+        self.apply_pre_signals()
+        self.update_system(*args,**kwargs)
+
+
+    def post_execute(self,*args,**kwargs):
+        """Updates the post/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
+        if log.log_level < 5:
+            self.msg(f"post execute")
+        self.apply_post_signals()
+        self.post_update_system(*args,**kwargs)
+
     
     #Dynamics Interface
     def filter_vars(self,refs:list):
@@ -857,277 +1126,7 @@ class ProblemExec:
         return out
     
 
-    #Solver Parsing Methods
-    def sys_solver_variables(self,as_set=False,as_flat=False,**kw):
-        """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
-        """
-        out = dict(dynamics=self.dynamic_state,integration=self.integrator_vars,variables=self.problem_opt_vars)
-
-        if as_set==True:
-            vars = set.union(*(set(v) for k,v in out.items()))
-            return vars
-        
-        if as_flat==True:
-            flt = {}
-            for k,v in out.items():
-                flt.update(v)
-            return flt
-        
-        return out
-
-    def sys_solver_objectives(self,**kw):
-        """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
-        """
-        sys_refs = self.sys_refs
-
-        #Convert result per kind of objective (min/max ect)
-        objs = sys_refs.get('attrs',{}).get('solver.obj',{})
-        return {k:v for k,v in objs.items()}
-
-    def sys_solver_constraints(self,Xrefs,add_con=None,combo_filter=True, *args, **kw):
-        """formatted as arguments for the solver
-        """
-        from engforge.solver_utils import create_constraint
-
-        system = self.system
-        sys_refs = self.sys_refs
-
-        extra_kw = self.kwargs
-        
-        #TODO: move to kwarg parsing on setup
-        deactivated = ext_str_list(extra_kw,'deactivate',[]) if 'deactivate' in extra_kw and extra_kw['deactivate'] else []
-        activated = ext_str_list(extra_kw,'activate',[]) if 'activate' in extra_kw and  extra_kw['activate'] else []
-
-        slv_inst = sys_refs.get('type',{}).get('solver',{})
-        trv_inst = {v.var:v for v in sys_refs.get('type',{}).get('time',{}).values()}
-        sys_refs = sys_refs.get('attrs',{})
-
-        if add_con is None:
-            add_con = {}
-        
-
-        #The official definition of X var order
-        Xvars = list(Xrefs)
-
-        # constraints lookup
-        bnd_list = [[None, None]] * len(Xvars)
-        con_list = []
-        con_info = [] #names of constraints 
-        constraints = {"constraints": con_list, "bounds": bnd_list,"info":con_info}
-        
-
-        if isinstance(add_con, dict):
-            # Remove None Values
-            nones = {k for k, v in add_con.items() if v is None}
-            for ki in nones:
-                constraints.pop(ki, None)
-            assert all(
-                [callable(v) for k, v in add_con.items()]
-            ), f"all custom input for constraints must be callable with X as argument"
-            constraints["constraints"].extend(
-                [v for k, v in add_con.items() if v is not None]
-            )
-
-        if add_con is False:
-            constraints = {} #youre free!
-            return constraints
-        
-        
-
-        # Add Constraints
-        ex_arg = {"con_args": (),**kw}
-        #Variable limit (function -> ineq, numeric -> bounds)
-        for slvr, ref in self.problem_opt_vars.items():
-            assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
-            if slvr in slv_inst:
-                slv = slv_inst[slvr]
-                slv_var = True #mark a static varible
-            elif slvr in trv_inst:
-                slv = trv_inst[slvr]
-                slv_var = False #a dynamic variable
-            else:
-                self.warning(f'no solver instance for {slvr} ')
-                continue
-            
-            slv_constraints = slv.constraints
-            if log.log_level < 7:
-                self.debug(f'[{self.level_number}-{self.level_name}] constraints {slvr} {slv_constraints}')
-            for ctype in slv_constraints:
-                cval = ctype['value']
-                kind = ctype['type']       
-                var = ctype['var']
-                if log.log_level < 3:
-                    self.msg(f'[{self.level_number}-{self.level_name}]const: {slvr} {ctype}')
-                if cval is not None and slvr in Xvars:
-                    
-                    #Check for combos & activation
-                    combos = None
-                    if 'combos' in ctype:
-                        combos = ctype['combos']
-                        combo_var = ctype['combo_var']
-                        active = ctype.get('active',True)
-                        in_activate = any([arg_var_compare(combo_var,v) for v in activated]) if activated else False
-                        in_deactivate = any([arg_var_compare(combo_var,v) for v in deactivated]) if deactivated else False
-
-                        #Check active or activated
-                        if not active and not activated:
-                            if log.log_level < 3:
-                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
-                            continue
-
-                        elif not active and not in_activate:
-                            if log.log_level < 3:
-                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: inactive {var} {slvr} {ctype}')
-                            continue
-
-                        elif active and in_deactivate:
-                            if log.log_level < 3:
-                                self.msg(f'[{self.level_number}-{self.level_name}]skip con: deactivated {var} {slvr} ')
-                            continue
-
-                    if combos and combo_filter:
-                        filt = filt_combo_vars(combo_var,slv, extra_kw,combos)
-                        if not filt:
-                            if log.log_level < 5:
-                                self.debug(f'[{self.level_number}-{self.level_name}] filtering constraint={filt} {var} {slv} {ctype} | {combos} {ext_str_list(extra_kw,"combos",None)}')                        
-                            continue
-                    
-                    if log.log_level < 10:
-                        self.debug(f'[{self.level_number}-{self.level_name}] adding var constraint {var,slvr,ctype,combos}') 
-
-                    
-                    x_inx = Xvars.index(slvr)        
-                    
-                    #lookup rates
-                    if isinstance(self._dxdt,dict) and not slv_var:
-                        rate_val = self._dxdt.get(slvr,0)
-                    elif not slv_var:
-                        rate_val = 0
-                    else:
-                        rate_val = None
-
-                    #add the dynamic parameters when configured
-                    if not slv_var and rate_val is not None:
-                        #if kind in ('min','max') and slvr in Xvars:
-                        varref = Xrefs[slvr]
-                        #varref = slv.rate_ref
-                        #Ref Case
-                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,*args,**kw)
-                        #con_list.append(ccst)
-                        con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
-                        con_list.append(ccst) 
-
-                    elif slv_var:                       
-                        #establish simple bounds w/ solver  
-                        if ( 
-                            kind in ("min", "max")
-                            and slvr in Xvars
-                            and isinstance(cval, (int, float))
-                        ):
-                            minv, maxv = bnd_list[x_inx]
-                            bnd_list[x_inx] = [
-                                cval if kind == "min" else minv,
-                                cval if kind == "max" else maxv,
-                                ]
-                                
-                        #add the bias of cval to the objective function
-                        elif  kind in ('min','max') and slvr in Xvars:
-                            varref = Xrefs[slvr]
-                            #Ref Case
-                            ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,*args,**kw)
-                            con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
-                            con_list.append(ccst)
-
-                        else:
-                            self.warning(f"bad constraint: {cval} {kind} {slv_var}|{slvr}")
-
-        # Add Constraints
-        for slvr, ref in sys_refs.get('solver.ineq',{}).items():
-            slv = slv_inst[slvr]
-            slv_constraints = slv.constraints
-            for ctype in slv_constraints:
-                cval = ctype['value']
-                kind = ctype['type']                    
-                if cval is not None:
-                    con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
-                    con_list.append(
-                        create_constraint(
-                            system,Xrefs, 'ineq', cval, *args, **kw
-                        )
-                    )
-
-        for slvr, ref in sys_refs.get('solver.eq',{}).items():
-            slv = slv_inst[slvr]
-            slv_constraints = slv.constraints
-            for ctype in slv_constraints:
-                cval = ctype['value']
-                kind = ctype['type']                    
-                if cval is not None:
-                    con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
-                    con_list.append(
-                        create_constraint(
-                            system,Xrefs, 'eq', cval, *args, **kw
-                        )
-                    )
-
-
-        return constraints 
-
-    # General method to distribute input to internal components
-    @classmethod
-    def parse_default(self,key,defaults,input_dict,rmv=False):
-        """splits strings or lists and returns a list of options for the key, if nothing found returns None if fail set to True raises an exception, otherwise returns the default value"""
-        if key in input_dict:
-            #kwargs will no longer have key!
-            if not rmv:
-                option = input_dict.get(key)
-            else:
-                option = input_dict.pop(key)
-            #print(f'removing option {key} {option}')
-            if option is None:
-                return option,False
-            elif isinstance(option,(int,float,bool)):
-                return option,False
-            elif isinstance(option,str):
-                if not option:
-                    return None,False
-                option = option.split(',')
-            else:
-                if input_dict.get('_fail',True):
-                    assert isinstance(option,list),f"str or list combos: {option}"
-                    #this is OK!
-                else:
-                    log.warning(f'bad option {option} for {key}| {input_dict}')
-                    
-            return option,False
-        elif key in defaults:
-            return defaults[key],True
-        return None,None
-        
-
-    @classmethod
-    def get_extra_kws(cls,kwargs,_check_keys:dict=slv_dflt_options,rmv=False,use_defaults=True):
-        """extracts the combo input from the kwargs"""
-        # extract combo input
-        if not _check_keys:
-            return {}
-        _check_keys = _check_keys.copy()
-        #TODO: allow extended check_keys / defaults to be passed in, now every value in check_keys has a default
-        cur_in = kwargs
-        output = {}
-        for p,dflt in _check_keys.items():
-            val,is_dflt = cls.parse_default(p,_check_keys,cur_in,rmv=rmv)
-            if not is_dflt:
-                output[p] = val
-            elif use_defaults:
-                output[p] = val
-            if rmv:
-                cur_in.pop(p,None)
-
-        #copy from data
-        filtr = dict(list(filter(lambda kv: kv[1] is not None or kv[0] in _check_keys, output.items())))
-        #print(f'got {combos} -> {comboos} from {kwargs} with {_check_keys}')
-        return filtr     
+ 
 
     
 #subclass before altering please!
