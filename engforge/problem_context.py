@@ -109,6 +109,7 @@ class ProblemExec:
 
     system: "System"
     _session: "ProblemExec"
+    _session_id = None
     entered: bool = False
     exited: bool = False
 
@@ -288,8 +289,9 @@ class ProblemExec:
         from engforge.system import System 
 
         #pass args without creating singleton (yet)
+        self._session_id = uuid.uuid4()        
         if log.log_level < 5:
-            self.info(f'establish {system} {kw_dict} {kwargs}')
+            self.info(f'establish {system}| {kw_dict} {kwargs}')
 
         self.system = system
         assert isinstance(self.system,SolveableInterface), 'only solveable interfaces are supported for execution context'
@@ -697,7 +699,7 @@ class ProblemExec:
     #Logging to class logger
     @property
     def identity(self):
-        return f'PROB|{self.level_name}'
+        return f'PROB|{self.level_name}|{str(self._session_id)[0:5]}'
 
     @property
     def log_level(self):

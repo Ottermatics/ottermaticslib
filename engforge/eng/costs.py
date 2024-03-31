@@ -153,7 +153,7 @@ class CostModel(Configuration,TabulationMixin):
             for k,v in self._slot_costs.items():
                 #Check if the cost model will  be accessed
                 no_comp = k not in current_comps
-                is_cost = isinstance(current_comps[k],CostModel)
+                is_cost = not no_comp and isinstance(current_comps[k],CostModel)
                 dflt_is_cost_comp = all([isinstance(v,CostModel),isinstance(v,Component)])
                 if no_comp and not is_cost and dflt_is_cost_comp:
                     self.debug('Updating default {k}')

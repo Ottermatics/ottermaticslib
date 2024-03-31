@@ -148,7 +148,7 @@ class CubeComp(Component,SpaceMixin,DynamicsMixin):
     
 
 @forge(auto_attribs=True)
-class CubeSystem(System,SpaceMixin,GlobalDynamics):
+class CubeSystem(System,SpaceMixin):
     
     dynamic_state_vars: list = ["x", "y", "z"]
 
@@ -256,7 +256,7 @@ class TransientSys(Component):
     accel = Time.integrate("v", "a", mode="euler")
 
 @forge(auto_attribs=True)
-class DynamicSystem(System, GlobalDynamics):
+class DynamicSystem(System):
     dynamic_state_vars: list = ["x", "v"]
 
     x: float = 0
@@ -320,7 +320,7 @@ class DynamicSystem(System, GlobalDynamics):
     
 
 @forge
-class SpringMass(System,GlobalDynamics):
+class SpringMass(System):
     
     k: float = attrs.field(default=50)
     m: float = attrs.field(default=1)

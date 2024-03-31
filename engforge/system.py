@@ -34,6 +34,7 @@ from engforge.configuration import Configuration, forge
 from engforge.components import SolveableInterface
 from engforge.solver import SolverMixin
 from engforge.attr_plotting import PlottingMixin
+from engforge.dynamics import GlobalDynamics
 
 import copy
 import collections
@@ -50,7 +51,7 @@ log = SystemsLog()
 
 #NOTE: solver must come before solvable interface since it overrides certain methods
 @forge
-class System(SolverMixin, SolveableInterface, PlottingMixin):
+class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
     """A system defines SlotS for Components, and data flow between them using SIGNALS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
@@ -59,6 +60,12 @@ class System(SolverMixin, SolveableInterface, PlottingMixin):
 
     When solving by default the run(revert=True) call will revert the system state to what it was before the system began.
     """
+    
+    #default to nothing
+    dynamic_input_vars: list = attrs.field(factory=list)
+    dynamic_state_vars: list = attrs.field(factory=list)
+    dynamic_output_vars: list = attrs.field(factory=list)
+    
 
     _anything_changed_ = True
     _solver_override: bool = False #this comp will run with run_internal_systems when True, otherwise it resolves to global solver behavior, also prevents the solver from reaching into this system

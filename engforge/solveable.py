@@ -17,6 +17,7 @@ from engforge.properties import *
 from engforge.system_reference import *
 from engforge.system_reference import Ref
 from engforge.solver_utils import *
+
 import collections
 import itertools
 
@@ -46,6 +47,11 @@ def _post_update_func(comp,eval_kw):
         return comp.update(comp.parent, *args, **eval_kw)
     if log.log_level <= 5:
         log.msg(f'create post method| {comp.name}| {eval_kw}')
+    return updt
+
+def _cost_update(comp):
+    def updt(*args,**kw):
+        return comp.update_dflt_costs()
     return updt
 
 
@@ -177,7 +183,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 updt_refs[key] =  ref
 
             if isinstance(comp,CostModel):
-                ref = Ref(comp,lambda *a,**kw: comp.update_dflt_costs() )
+                ref = Ref(comp,_cost_update(comp))
                 updt_refs[key+'._cost_model_'] =  ref
 
         ignore.add(self)

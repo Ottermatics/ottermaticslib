@@ -179,7 +179,7 @@ class SingleCompSolverTest(unittest.TestCase):
                 for k in ak1:
                     self.assertAlmostEqual(ak1[k],ak2[k],places=4)
             
-    def test_system_optimization(self):
+    def test_system_execute(self):
         """check the system solver methods work as expected (objectives are optimized)"""
         extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
 
@@ -188,6 +188,37 @@ class SingleCompSolverTest(unittest.TestCase):
 
         self.assertGreater(H['Yobj']['hght'],V['Yobj']['hght'])
         self.assertGreater(V['Yobj']['obj'],H['Yobj']['obj'])
+
+
+    def test_system_run(self):
+        """check the system solver methods work as expected (objectives are optimized)"""
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+
+        H = self.sc.run(**extra,weights={'hght':1,'obj':0})
+        V = self.sc.run(**extra,weights={'hght':0,'obj':1})
+
+        self.assertGreater(H['Yobj']['hght'],V['Yobj']['hght'])
+        self.assertGreater(V['Yobj']['obj'],H['Yobj']['obj'])
+
+    def test_system_solver(self):
+        """check the system solver methods work as expected (objectives are optimized)"""
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+
+        H = self.sc.solver(**extra,weights={'hght':1,'obj':0})
+        V = self.sc.solver(**extra,weights={'hght':0,'obj':1})
+
+        self.assertGreater(H['Yobj']['hght'],V['Yobj']['hght'])
+        self.assertGreater(V['Yobj']['obj'],H['Yobj']['obj'])
+
+    def test_system_eval(self):
+        """check the system solver methods work as expected (objectives are optimized)"""
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+
+        H = self.sc.eval(**extra,weights={'hght':1,'obj':0})
+        V = self.sc.eval(**extra,weights={'hght':0,'obj':1})
+
+        self.assertGreater(H['Yobj']['hght'],V['Yobj']['hght'])
+        self.assertGreater(V['Yobj']['obj'],H['Yobj']['obj'])                     
 
 #TODO: rewrite these tests
 #     def test_selective_exec(self):

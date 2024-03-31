@@ -57,11 +57,11 @@ class Test(unittest.TestCase):
     def test_attrs_labels(self):
         # Default
         self.assertEqual(
-            self.test_config.attr_labels, ["name",'parent',"attrs_prop", "attrs_str"]
+            self.test_config.attr_labels, ["name",'parent','time',"attrs_prop", "attrs_str"]
         )
 
     def test_attrs_vals(self):
-        self.assertEqual(self.test_config.attr_row, ["testconfig", 1.0, "hey now"])
+        self.assertEqual(self.test_config.attr_row, ["testconfig", 0.0, 1.0, "hey now"])
 
     def test_property_labels(self):
         ans = set(["four", "test_two", "test_one", "three"])

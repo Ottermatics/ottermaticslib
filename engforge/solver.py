@@ -206,13 +206,13 @@ class SolverMixin(SolveableMixin):
             self.debug(f"running with kw:{kw}")
         
         #execute with problem context and execute signals
-        with ProblemExec(self,kw,level_name='eval',**kw) as pbx:
+        with ProblemExec(self,kw,level_name='eval',eval_kw=eval_kw, sys_kw=sys_kw,post_callback=cb) as pbx:
             #FIXME: change the eval_kw / sys_kw 
             #pbx.pre_execute(**kw)
             self.index += 1
-            out = self.execute( **kw)
+            out = self.execute(**kw)
             #pbx.post_execute( **kw)
-            #TODO: move to problem context
+            #TODO: move to problem context, and
             self.save_data(index=self.index)
 
             #TODO: define exit behavior for the problem context
@@ -228,7 +228,7 @@ class SolverMixin(SolveableMixin):
 
         Override this function for custom solving functions, and call `solver` to use default solver functionality.
 
-        :returns: the result of this function is returned from eval()
+        :returns: the result of this function is returned from solver()
         """
         #TODO: pass to execution context!!!!
         # steady state
@@ -249,6 +249,7 @@ class SolverMixin(SolveableMixin):
 
             :param obj: the objective function to minimize, by default will minimize the sum of the squares of the residuals. Objective function should be a function(system,Xs,Xt) where Xs is the system state and Xt is the system transient state. The objective function will be argmin(X)|(1+custom_objective)*residual_RSS when `add_obj` is True in kw otherwise argmin(X)|custom_objective with constraints on the system as balances instead of first objective being included.
             :param cons: the constraints to be used in the solver, by default will use the system's constraints will be enabled when True. If a dictionary is passed the solver will use the dictionary as the constraints in addition to system constraints. These can be individually disabled by key=None in the dictionary.
+
             :param X0: the initial guess for the solver, by default will use the current system state. If a dictionary is passed the solver will use the dictionary as the initial guess in addition to the system state.
             :param dXdt: can be 0 to indicate steady-state, or None to not run the transient constraints. Otherwise a partial dictionary of vars for the dynamics rates can be given, those not given will be assumed steady state or 0.
 

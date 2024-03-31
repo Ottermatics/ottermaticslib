@@ -96,37 +96,6 @@ class INDEX_MAP:
         return oop2
 
 
-class DynamicsIntegratorMixin(SolveableMixin):
-    nonlinear: bool = True  # enables matrix modification for nonlinear dynamics
-
-    time: float = 0.0
-
-    def rate(self, t, dt, X, U, *args, **kwargs):
-        """simulate the system over the course of time.
-
-        Args:
-            dt (float): interval to integrate over in time
-            X (np.ndarray): state input
-            U (np.ndarray): control input
-            subsystems (bool, optional): simulate subsystems. Defaults to True.
-
-        Returns:
-            dataframe: tabulated data
-        """
-        if self.nonlinear:
-            return self.rate_nonlinear(t, dt, X, U, *args, **kwargs)
-        else:
-            return self.rate_linear(t, dt, X, U, *args, **kwargs)
-
-    def rate_linear(self, t, dt, X, U, *args, **kwargs):
-        raise NotImplemented()
-
-    def rate_nonlinear(self, t, dt, X, U, *args, **kwargs):
-        raise NotImplemented()
-
-    def reset_sim(self):
-        """reset the system to the initial state"""
-        self.time = 0.0
 
 
 
@@ -134,13 +103,15 @@ class DynamicsIntegratorMixin(SolveableMixin):
 # TODO: How to add delay, and feedback?
 # TODO: How to add control and limits in general?
 # TODO: add time as a state variable
-@forge(auto_attribs=True)
-class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
+@forge
+class DynamicsMixin(Configuration, SolveableMixin):
     """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the Time integrating attributes, and will raise an error if a conflict is detected #TODO."""
 
-    dynamic_state_vars: list = attrs.field(factory=list)
-    dynamic_input_vars: list = attrs.field(factory=list)
-    dynamic_output_vars: list = attrs.field(factory=list)
+    time: float = attrs.field(default=0.0)
+
+    dynamic_state_vars: list = []#attrs.field(factory=list)
+    dynamic_input_vars: list =  []#attrs.field(factory=list)
+    dynamic_output_vars: list =  []#attrs.field(factory=list)
 
     # state variables
     dynamic_A = None
@@ -161,16 +132,15 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
     # TODO:
     # dynamic_control_module = None
     # control_interval:float = 0.0 ##TODO: how often to update the control
-
-    update_interval: float = (
-        0.0  # TODO: how often to update the physics, 0 is everytime
-    )
-    delay_ms: float = None  # TODO: delay in milliseconds for output buffering
+    # TODO: how often to update the physics, 0 is everytime
+    update_interval: float =  0
+    #delay_ms: float = attrs.field(default=None)
     nonlinear: bool = False
 
     # TODO: add integration state dynamic cache to handle relative time steps
     # TODO: add control module with PID control and pole placement design
 
+    #### State Space Model
     def __pre_init__(self, **kwargs):
         """override this method to define the class"""
         # fields =
@@ -182,33 +152,37 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
             assert p in fields, f"output var {p} not in attr: {fields}"
         for p in self.dynamic_input_vars:
             assert p in fields, f"input var {p} not in attr: {fields}"
+        
+    def reset_sim(self):
+        """reset the system to the initial state"""
+        self.time = 0.0
 
     @instance_cached
-    def state_size(self):
+    def dynamic_state_size(self):
         return len(self.dynamic_state_vars)
 
     @instance_cached
-    def input_size(self):
+    def dynamic_input_size(self):
         return len(self.dynamic_input_vars)
 
     @instance_cached
-    def output_size(self):
+    def dynamic_output_size(self):
         return len(self.dynamic_output_vars)
 
     @property
-    def state(self) -> np.array:
+    def dynamic_state(self) -> np.array:
         return np.array(
             [getattr(self, var, np.nan) for var in self.dynamic_state_vars]
         )
 
     @property
-    def input(self) -> np.array:
+    def dynamic_input(self) -> np.array:
         return np.array(
             [getattr(self, var, np.nan) for var in self.dynamic_input_vars]
         )
 
     @property
-    def output(self) -> np.array:
+    def dynamic_output(self) -> np.array:
         return np.array(
             [getattr(self, var, np.nan) for var in self.dynamic_output_vars]
         )
@@ -216,27 +190,27 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
 
     def create_state_matrix(self, **kwargs) -> np.ndarray:
         """creates the state matrix for the system"""
-        return np.zeros((self.state_size, self.state_size))
+        return np.zeros((self.dynamic_state_size, self.dynamic_state_size))
 
     def create_state_input_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called B"""
-        return np.zeros((self.state_size, max(self.input_size, 1)))
+        return np.zeros((self.dynamic_state_size, max(self.dynamic_input_size, 1)))
 
     def create_output_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called C"""
-        return np.zeros((max(self.output_size, 1), self.state_size))
+        return np.zeros((max(self.dynamic_output_size, 1), self.dynamic_state_size))
 
     def create_feedthrough_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called D"""
-        return np.zeros((max(self.output_size, 1), max(self.input_size, 1)))
+        return np.zeros((max(self.dynamic_output_size, 1), max(self.dynamic_input_size, 1)))
 
     def create_state_constants(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called F"""
-        return np.zeros(self.state_size)
+        return np.zeros(self.dynamic_state_size)
 
     def create_output_constants(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called O"""
-        return np.zeros(max(self.output_size, 1))
+        return np.zeros(max(self.dynamic_output_size, 1))
 
     def create_dynamic_matricies(self, **kw):
         """creates a dynamics object for the system"""
@@ -304,6 +278,24 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
         #     raise e         
 
     # linear and nonlinear system level IO
+
+    def rate(self, t, dt, X, U, *args, **kwargs):
+        """simulate the system over the course of time.
+
+        Args:
+            dt (float): interval to integrate over in time
+            X (np.ndarray): state input
+            U (np.ndarray): control input
+            subsystems (bool, optional): simulate subsystems. Defaults to True.
+
+        Returns:
+            dataframe: tabulated data
+        """
+        if self.nonlinear:
+            return self.rate_nonlinear(t, dt, X, U, *args, **kwargs)
+        else:
+            return self.rate_linear(t, dt, X, U, *args, **kwargs)            
+
     def rate_linear(self, t, dt, X, U=None):
         """simulate the system over the course of time. Return time differential of the state."""
         
@@ -490,12 +482,12 @@ class DynamicsMixin(Configuration, DynamicsIntegratorMixin):
 
         if self.nonlinear:
             self.update_dynamics(t, X, U)
-            Mb = self.dynamic_B @ U if self.input_size > 0 else 0
+            Mb = self.dynamic_B @ U if self.dynamic_input_size > 0 else 0
             Mx = self.dynamic_F + Mb
             return np.linalg.solve(self.dynamic_A, -Mx)
 
         # static state
-        Mb = self.static_B @ U if self.input_size > 0 else 0
+        Mb = self.static_B @ U if self.dynamic_input_size > 0 else 0
         Mx = Mb + self.static_F
         return np.linalg.solve(self.static_A, -Mx)
 

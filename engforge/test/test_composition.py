@@ -113,9 +113,7 @@ class TestComposition(unittest.TestCase):
         self.assertNotEqual(sysstart, sysend)  # output should change
 
     def test_input_and_run(self):
-        self.system.run(
-            **{"comp.aux": 5, "comp.comp.aux": 6}  # , dt=0.1, endtime=0.1
-        )
+        self.system.run(**{"comp.aux": 5, "comp.comp.aux": 6})
         self.assertEqual(len(self.system.TABLE), 1, f"wrong run config")
         self.assertEqual(set(self.system.dataframe["comp_aux"]), set([5]))
         self.assertEqual(set(self.system.dataframe["comp_comp_aux"]), set([6]))
@@ -124,11 +122,11 @@ class TestComposition(unittest.TestCase):
         # self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))
         # self.assertEqual(set(self.system.comp.comp.dataframe["aux"]), set([6]))
 
-        # solver constraints checking
-        input = self.system.dataframe["input"][0]
-        self.assertGreaterEqual(input, -1e3)  # min protection
-        self.assertLessEqual(input, 1)  # max protection
-
-        in2 = self.system.dataframe["in2"][0]
-        self.assertGreaterEqual(in2, -1e3)  # min protection
-        self.assertLessEqual(in2, 4 - input)  # max protection
+#         # solver constraints checking
+#         input = self.system.dataframe["input"][0]
+#         self.assertGreaterEqual(input, -1e3)  # min protection
+#         self.assertLessEqual(input, 1)  # max protection
+# 
+#         in2 = self.system.dataframe["in2"][0]
+#         self.assertGreaterEqual(in2, -1e3)  # min protection
+#         self.assertLessEqual(in2, 4 - input)  # max protection

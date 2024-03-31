@@ -7,6 +7,7 @@ from engforge.tabulation import TabulationMixin, system_property
 from engforge.configuration import forge, Configuration
 from engforge.solver import SolveableMixin
 from engforge.properties import class_cache
+from engforge.dynamics import DynamicsMixin
 
 
 import os, sys
@@ -35,7 +36,7 @@ class SolveableInterface(Configuration,TabulationMixin,SolveableMixin):
 #NOTE: components / systems not interchangable, systems are like components but are have solver capabilities
 #TODO: justify separation of components and systems, and not making system a subclass of component. Otherwise make system a subclass of component
 @forge
-class Component(SolveableInterface):
+class Component(SolveableInterface,DynamicsMixin):
     """Component is an Evaluatable configuration with tabulation, and solvable functionality"""
     pass
 

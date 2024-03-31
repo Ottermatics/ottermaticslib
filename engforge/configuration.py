@@ -6,6 +6,7 @@ from engforge.properties import *
 from engforge.env_var import EnvVariable
 import randomname
 import datetime
+import copy
 
 
 # make a module logger
@@ -27,7 +28,7 @@ def name_generator(instance):
     log.debug(f"generated name: {out}")
     return out
 
-PROTECTED_NAMES = ['solver','dataframe','time','_anything_changed']
+PROTECTED_NAMES = ['solver','dataframe','_anything_changed']
 
 # Wraps Configuration with a decorator, similar to @attrs.define(**options)
 def forge(cls=None, **kwargs):
@@ -101,6 +102,7 @@ def meta(title, desc=None, **kwargs):
 
 # Class Definition Wrapper Methods
 def property_changed(instance, variable, value):
+    """a callback for when a property changes, this will set the _anything_changed flag to True, and change value when appropriate"""
     from engforge.tabulation import TabulationMixin
 
     if not isinstance(instance, (TabulationMixin)):
@@ -110,25 +112,21 @@ def property_changed(instance, variable, value):
         # Bypass Check since we've already flagged for an update
         return value
 
-    if log.log_level <= 10:
+    if log.log_level <= 6:
         log.msg(f"checking property changed {instance}{variable.name} {value}")
 
-    # Check if shoudl be updated
+    #Check if should be updated
     cur = getattr(instance, variable.name)
     attrs = attr.fields(instance.__class__)
     if variable in attrs and value != cur:
-        if log.log_level <= 10:
+        if log.log_level < 5:
             instance.debug(f"changing variables: {variable.name} {value}")
         instance._anything_changed = True
 
-    elif log.log_level <= 10 and variable in attrs:
+    elif log.log_level < 4 and variable in attrs:
         instance.warning(
             f"didnt change variables {variable.name}| {value} == {cur}"
         )
-
-    elif log.log_level <= 10:
-        instance.critical(f"missing variable {variable.name} not in {attrs}")
-
     return value
 
 
@@ -184,9 +182,6 @@ def signals_slots_handler(
         out.append(name)
 
     # Assert there is no time in attributes if not a transient
-    assert (
-        "time" not in field_names
-    ), f"`time` is a reserved attribute for transient operations, it will automatically appear in systems with transient configuration"
 
     # Index
     # assert 'index' not in field_names, f'`index` is a reserved attribute'
@@ -268,13 +263,13 @@ def signals_slots_handler(
 
     created_fields = set([o.name for o in out])
     # print options
-    if cls.log_level < 10:
-        from engforge.attr_plotting import Plot
-
-        for o in out:
-            if isinstance(o.type, Plot):
-                # print(o)
-                continue
+#     if cls.log_level < 10:
+#         from engforge.attr_plotting import Plot
+# 
+#         for o in out:
+#             if isinstance(o.type, Plot):
+#                 # print(o)
+#                 continue
 
     # Merge Fields Checking if we are overriding an attribute with system_property
     # hack since TabulationMixin isn't available yet
@@ -283,6 +278,8 @@ def signals_slots_handler(
         cls_properties = cls.system_properties_classdef(True)
     else:
         cls_properties = {}
+    cls_dict = cls.__dict__.copy()
+    cls.__anony_store = {}
     # print(f'tab found!! {cls_properties.keys()}')
     for k, o in in_fields.items():
         if k not in created_fields:
@@ -290,6 +287,13 @@ def signals_slots_handler(
                 log.warning(
                     f"{cls.__name__} overriding inherited attr: {o.name} as a system property overriding it"
                 )
+            elif o.inherited and k in cls_dict:
+                log.warning(
+                    f"{cls.__name__} overriding inherited attr: {o.name} as {cls_dict[k]} in cls"
+                )
+                #FIXME: should we deepcopy?
+                cls.__anony_store[k] = sscb = lambda: copy.copy(cls_dict[k])
+                out.append(o.evolve(default=attrs.Factory(sscb)))
             else:
                 log.msg(f"{cls.__name__} adding attr: {o.name}")
                 out.append(o)

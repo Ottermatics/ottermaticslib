@@ -1,6 +1,7 @@
 import unittest
 from engforge.problem_context import *
 from engforge.system import System,forge
+from engforge.test.solver_testing_components import SpringMass
 import random
 
 
@@ -16,6 +17,28 @@ class SimpleContext(System):
     def __str__(self):
         return f'{self.one}_{self.two}'
     
+
+class TestSession(unittest.TestCase):
+    """Test lifecycle of a problem and IO of the context"""
+
+    def test_system_last_context(self):
+        sm = SpringMass(Fa=0,u=5)
+        sm.run(dxdt=0)
+        ssid = sm.last_context._session_id
+        sm.run(dxdt=0)
+        trid = sm.last_context._session_id
+        self.assertNotEqual(ssid,trid,'Session ID should change after a run')
+
+    def test_system_change_context(self):
+        sm = SpringMass(Fa=0,u=5)
+        sm.run(dxdt=0)
+        ssid = sm.last_context._session_id
+        sm.run(dxdt=0)
+        trid = sm.last_context._session_id
+        self.assertNotEqual(ssid,trid,'Session ID should change after a run')
+
+
+
 
 
     
