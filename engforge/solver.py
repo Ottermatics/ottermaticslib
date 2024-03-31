@@ -283,6 +283,8 @@ class SolverMixin(SolveableMixin):
                 if len(Xref) == 0:
                     self.debug(f'no variables found for solver: {opts}')
                     return
+                
+                #TODO: swap between vars depending on dxdt=True
                 Yref = pbx.Yref
 
                 opts.update(**pbx.constraints)

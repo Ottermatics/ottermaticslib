@@ -228,6 +228,9 @@ class system_property(engforge_prop):
 
     def deleter(self, fdel):
         return type(self)(self.fget, self.fset, fdel, self.__doc__)
+#aliases
+sys_prop = system_property
+system_prop = system_property
 
 
 class cached_system_property(system_property):
@@ -274,6 +277,9 @@ class cached_system_property(system_property):
         setattr(instance, self.private_var, val)
         return val
 
+#aliases
+cached_sys_prop = system_property
+cached_system_prop = system_property
 
 # TODO: install solver reset / declarative instance cache+
 class solver_cached(cache_prop):
@@ -344,7 +350,6 @@ class instance_cached(cache_prop):
         return val
 
 
-# TODO: make a system_property_cache = system_property + solver_cache
 class class_cache(cache_prop):
     """a property that caches a value on the class at runtime, and then maintains that value for the duration of the program. A flag with the class name ensures the class is correct. Intended for instance methods"""
 

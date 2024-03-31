@@ -544,6 +544,7 @@ class GlobalDynamics(DynamicsMixin):
         else:
             self.simulate(dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw)
 
+    #TODO: swap between vars and constraints depending on dxdt=True
     def simulate(
         self,
         dt,
@@ -592,7 +593,7 @@ class GlobalDynamics(DynamicsMixin):
             system.setup_global_dynamics()
 
             #Time Iteration Context
-            with ProblemExec(system,level_name='sim',dxdt=True,**kwargs) as pbx:
+            with ProblemExec(system,kwargs,level_name='sim',dxdt=True) as pbx:
                 
                 #Unpack Transient Problem
                 intl_refs = pbx.integrator_var_refs
@@ -646,7 +647,9 @@ class GlobalDynamics(DynamicsMixin):
                             out = out*(1+val**2)**0.5
                         return 1
                     
-                    Yobj = {'smallness': Ref(system, dflt)}
+                    Yobj = {'synthetic': Ref(system, dflt)}
+                    #transfer!!!
+                    pbx.sys_refs['attrs']['solver.obj'] = Yobj.copy() 
 
                 #TODO: add simulation time to context
                 pbx.last_time = 0
@@ -698,7 +701,7 @@ class GlobalDynamics(DynamicsMixin):
                             # TODO: add in any transient
                             with ProblemExec(system,level_name='ss_slvr') as pbx:
                                 
-                                #TODO: handle various cases of (obj,eq,ineq)
+                                #TODO: handle various cases of (obj,eq,ineq) dynamically
                                 #normally obj is handled via min/max objective
                                 #in case of eq and inequal constraints, we need to adapt to the situation. For many eq's we can use the root solver, otherwise we can mutiply the normalize the equalities all together as multiply by something like normal of all inputs to provide a default objective of something like "find the smallest input satisfying constraints"
 

@@ -142,11 +142,9 @@ class CostModel(Configuration,TabulationMixin):
         self.set_default_costs()
         self.debug(f'setting default costs {self._slot_costs}')
 
-    def update_dflt_costs(self,callback=None):
+    def update_dflt_costs(self):
         """updates internal default slot costs if the current component doesn't exist or isn't a cost model, this is really a component method but we will use it never the less.
         
-        The cost model can be updated with a callback(dflt,parent) after update
-
         This should be called from Component.update() if default costs are used
         """
 
@@ -160,9 +158,6 @@ class CostModel(Configuration,TabulationMixin):
                 if no_comp and not is_cost and dflt_is_cost_comp:
                     self.debug('Updating default {k}')
                     v.update(self)
-
-                    if callback:
-                        callback(v,self)
                  
     def set_default_costs(self):
         """set default costs if no costs are set"""

@@ -245,52 +245,52 @@ def misc_to_ref(system,val,*args,**kwargs):
 
 # Reference Jacobean Calculation
 #TODO: hessian ect...
-def calcJacobean(
-    sys, Yrefs: dict, Xrefs: dict, X0: dict = None, pct=0.001, diff=0.0001
-):
-    """
-    returns the jacobiean by modifying X' <= X*pct + diff and recording the differences. When abs(x) < pct x' = x*1.1 + diff.
-
-    jacobean will be ordered by Xrefs/Yrefs, so use ordered dict to keep order
-    """
-
-    if X0 is None:
-        X0 = refset_get(Xrefs)
-
-    assert len(Xrefs) == len(X0)
-    assert len(Yrefs) >= 1
-
-    with sys.revert_X(refs=Xrefs): #TODO: replace with context manager
-        #initalize here
-        refset_input(Xrefs, X0)
-
-        rows = []
-        dxs = []
-        Fbase = refset_get(Yrefs)
-        for k, v in Xrefs.items():
-            x = v.value()#TODO: add context manager,sys
-            if not isinstance(x, (float, int)):
-                sys.warning(f"var: {k} is not numeric {x}, skpping")
-                continue
-
-            if abs(x) > pct:
-                new_x = x * (1 + pct) + diff
-            else:
-                new_x = x * (1.1) + diff
-            dx = new_x - x
-            #print(dx, new_x, x)
-            dxs.append(dx)
-
-            v.set_value(new_x)  # set delta
-            sys.pre_execute()
-
-            F_ = refset_get(Yrefs)
-            Fmod = [(F_[k] - fb) / dx for k, fb in Fbase.items()]
-
-            rows.append(Fmod)
-            v.set_value(x)  # reset value
-
-    return np.column_stack(rows)
+# def calcJacobean(
+#     sys, Yrefs: dict, Xrefs: dict, X0: dict = None, pct=0.001, diff=0.0001
+# ):
+#     """
+#     returns the jacobiean by modifying X' <= X*pct + diff and recording the differences. When abs(x) < pct x' = x*1.1 + diff.
+# 
+#     jacobean will be ordered by Xrefs/Yrefs, so use ordered dict to keep order
+#     """
+# 
+#     if X0 is None:
+#         X0 = refset_get(Xrefs)
+# 
+#     assert len(Xrefs) == len(X0)
+#     assert len(Yrefs) >= 1
+# 
+#     with sys.revert_X(refs=Xrefs): #TODO: replace with context manager
+#         #initalize here
+#         refset_input(Xrefs, X0)
+# 
+#         rows = []
+#         dxs = []
+#         Fbase = refset_get(Yrefs)
+#         for k, v in Xrefs.items():
+#             x = v.value()#TODO: add context manager,sys
+#             if not isinstance(x, (float, int)):
+#                 sys.warning(f"var: {k} is not numeric {x}, skpping")
+#                 continue
+# 
+#             if abs(x) > pct:
+#                 new_x = x * (1 + pct) + diff
+#             else:
+#                 new_x = x * (1.1) + diff
+#             dx = new_x - x
+#             #print(dx, new_x, x)
+#             dxs.append(dx)
+# 
+#             v.set_value(new_x)  # set delta
+#             sys.pre_execute()
+# 
+#             F_ = refset_get(Yrefs)
+#             Fmod = [(F_[k] - fb) / dx for k, fb in Fbase.items()]
+# 
+#             rows.append(Fmod)
+#             v.set_value(x)  # reset value
+# 
+#     return np.column_stack(rows)
 
 
 #TODO: integrate / merge with ProblemExec (all below)

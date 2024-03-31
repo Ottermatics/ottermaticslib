@@ -145,6 +145,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
     def collect_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
+        from engforge.eng.costs import CostModel
+
         updt_refs = {}
         from engforge.components import Component
         from engforge.component_collections import ComponentIter
@@ -173,6 +175,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             if comp.__class__.update != SolveableMixin.update:
                 ref = Ref(comp,_update_func(comp,ekw))
                 updt_refs[key] =  ref
+
+            if isinstance(comp,CostModel):
+                ref = Ref(comp,lambda *a,**kw: comp.update_dflt_costs() )
+                updt_refs[key+'._cost_model_'] =  ref
 
         ignore.add(self)
         return updt_refs
@@ -344,7 +350,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     def _iterate_input_matrix(
         self,
         method,
-        revert=True,
         cb=None,
         sequence: list = None,
         eval_kw: dict = None,

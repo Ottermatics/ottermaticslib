@@ -101,36 +101,36 @@ def maybe_attr_inst(can,astype=None):
 #Important State Preservation
 #TODO: check for hidden X dependents / circular references ect.
 #TODO: move to execution context
-@contextmanager
-def revert_X(system, refs, Xnext=None, pre_exec=True, post_exec=False):
-    """
-    Stores the _X var at present, the reverts to that state when done
-
-    #TODO: add a system,ref.key pair based global storage, this will allow for the use of the same ref in different systems. This will allow set/value caching to speed up write-time from the current method of looking up value before write, which is faster than just writing on average.    
-    """
-
-    #print('revert_X',system,refs)
-
-    X_now = Ref.refset_get(refs)
-
-    #Change the current state
-    if Xnext:
-        Ref.refset_input(refs, Xnext)
-        if pre_exec:
-            system.pre_execute()
-        if post_exec:
-            system.post_execute()
-
-    try:  # Change Variables To Input
-        yield X_now
-        
-    finally:
-        #revert and call pre/post execute
-        Ref.refset_input(refs, X_now)
-        if pre_exec:
-            system.pre_execute()
-        if post_exec:
-            system.pre_execute()
+# @contextmanager
+# def revert_X(system, refs, Xnext=None, pre_exec=True, post_exec=False):
+#     """
+#     Stores the _X var at present, the reverts to that state when done
+# 
+#     #TODO: add a system,ref.key pair based global storage, this will allow for the use of the same ref in different systems. This will allow set/value caching to speed up write-time from the current method of looking up value before write, which is faster than just writing on average.    
+#     """
+# 
+#     #print('revert_X',system,refs)
+# 
+#     X_now = Ref.refset_get(refs)
+# 
+#     #Change the current state
+#     if Xnext:
+#         Ref.refset_input(refs, Xnext)
+#         if pre_exec:
+#             system.pre_execute()
+#         if post_exec:
+#             system.post_execute()
+# 
+#     try:  # Change Variables To Input
+#         yield X_now
+#         
+#     finally:
+#         #revert and call pre/post execute
+#         Ref.refset_input(refs, X_now)
+#         if pre_exec:
+#             system.pre_execute()
+#         if post_exec:
+#             system.pre_execute()
 
 
 #TODO: make global storage for Ref's based on the comp,key pair. This 

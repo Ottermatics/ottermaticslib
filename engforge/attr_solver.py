@@ -279,7 +279,7 @@ class Solver(ATTR_BASE):
     obj = objective  
 
     @classmethod
-    def equality_constraint(
+    def constraint_equality(
         cls, lhs: "system_property", rhs: "system_property" = 0, **kwargs
     ):
         """Defines an equality constraint based on a required lhs of equation, and an optional rhs, the difference of which will be driven to zero"""
@@ -300,10 +300,10 @@ class Solver(ATTR_BASE):
         )
         return cls._setup_cls(new_name, new_dict)
 
-    eq_con = equality_constraint
+    eq_con = constraint_equality
 
     @classmethod
-    def inequality_constraint(cls, lhs: ref_type, rhs: ref_type = 0, **kwargs):
+    def constraint_inequality(cls, lhs: ref_type, rhs: ref_type = 0, **kwargs):
         """Defines an inequality constraint"""
         combos = kwargs.get("combos", "default")
         active = kwargs.get("active", True)
@@ -322,7 +322,7 @@ class Solver(ATTR_BASE):
         )
         return cls._setup_cls(new_name, new_dict)
 
-    ineq_con = inequality_constraint
+    con_ineq = constraint_inequality
 
     # TODO: add minimize / maximize / objective options
 

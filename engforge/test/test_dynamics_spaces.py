@@ -18,6 +18,7 @@ class TestDynamics(unittest.TestCase):
 
         min_kw = {"normalize": np.array([1 / 1000])}
         sim, df = ds.simulate(dt, endtime, run_solver=False, return_all=True)
+        
         # ax = df.plot("time", ["x", "comp_x", "trns_x", "comp_x0"])
         # # ax.set_ylim(-1,5)
         # ax2 = ax.twinx()

@@ -44,8 +44,8 @@ class MockSystem(System):
     # move component output to system
     post_sig = SIGNAL.define("output", "comp.output", mode="both")
 
-    Solver.equality_constraint("in_out_diff")
-    Solver.equality_constraint("in2out2")
+    Solver.constraint_equality("in_out_diff")
+    Solver.constraint_equality("in2out2")
 
     var_in =Solver.declare_var("input")
     var_in.add_var_constraint(kind="min", value=0)

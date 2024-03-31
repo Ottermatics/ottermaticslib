@@ -54,7 +54,7 @@ class Airfilter(System):
 
     var_w = Solver.declare_var('w',combos='w',active=True)
     var_w.add_var_constraint(0.0, kind="min",combos=['min_len'])
-    flow_balance = Solver.equality_constraint('sum_dP')
+    flow_balance = Solver.constraint_equality('sum_dP')
 
     flow_curve = Plot.define(
         "throttle", "w", kind="lineplot", title="Flow Curve"

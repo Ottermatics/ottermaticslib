@@ -69,16 +69,16 @@ class SpaceMixin(SolveableInterface):
     #Zvar.add_var_constraint(Fun_minz, kind="min",combos=['len_fun_z'])
 
     #Constraints by function
-    sym = Solver.equality_constraint("x",'y',combos='sym',active=False)
+    sym = Solver.constraint_equality("x",'y',combos='sym',active=False)
 
-    costA = Solver.ineq_con('budget','cost',combos='ineq_cost',active=False)
-    costF = Solver.ineq_con(wrap_f(Fun_cm),combos='ineq_cost',active=False)
-    costP = Solver.ineq_con('cost_margin',combos='ineq_cost',active=False)
+    costA = Solver.con_ineq('budget','cost',combos='ineq_cost',active=False)
+    costF = Solver.con_ineq(wrap_f(Fun_cm),combos='ineq_cost',active=False)
+    costP = Solver.con_ineq('cost_margin',combos='ineq_cost',active=False)
 
     #Constraints by length
-    lenA = Solver.ineq_con('max_length','combine_length',combos='ineq_length',active=False)
-    lenF = Solver.ineq_con(wrap_f(Fun_em),combos='ineq_length',active=False)
-    lenP = Solver.ineq_con('edge_margin',combos='ineq_length',active=False)
+    lenA = Solver.con_ineq('max_length','combine_length',combos='ineq_length',active=False)
+    lenF = Solver.con_ineq(wrap_f(Fun_em),combos='ineq_length',active=False)
+    lenP = Solver.con_ineq('edge_margin',combos='ineq_length',active=False)
 
     #Objectives
     size_goal = Solver.objective('goal',combos='prop_goal',kind='min',active=False)
@@ -164,17 +164,17 @@ class CubeSystem(System,SpaceMixin,GlobalDynamics):
 
     goal_vol_frac: float = 0.5
 
-    sys_budget = Solver.ineq_con('total_budget','system_cost',combos='total_budget')
+    sys_budget = Solver.con_ineq('total_budget','system_cost',combos='total_budget')
 
-    sys_length = Solver.ineq_con('total_length','system_length',combos='total_length')
+    sys_length = Solver.con_ineq('total_length','system_length',combos='total_length')
 
     volfrac = Solver.eq_con('goal_vol_frac','vol_frac',combos='vol_frac_eq',active=False)
 
     obj = Solver.objective('total_volume',combos='volume',kind='max')
     hght = Solver.objective('total_height',combos='height',kind='max')
 
-    x_lim = Solver.ineq_con('x','comp.x',combos='tierd_top',active=False)
-    y_lim = Solver.ineq_con('y','comp.y',combos='tierd_top',active=False)
+    x_lim = Solver.con_ineq('x','comp.x',combos='tierd_top',active=False)
+    y_lim = Solver.con_ineq('y','comp.y',combos='tierd_top',active=False)
 
     sig_x_cst = Signal.define('comp.cost_x','cost_x',mode='both',combos='mirror_costs',active=False)
     sig_y_cst = Signal.define('comp.cost_y','cost_y',mode='both',combos='mirror_costs',active=False)
@@ -226,7 +226,7 @@ class DynamicComponent(Component, DynamicsMixin):
     Fext: float = 0
 
     acc =Solver.declare_var("x0")
-    no_load = Solver.equality_constraint("a")
+    no_load = Solver.constraint_equality("a")
 
     def create_state_matrix(self, **kwargs) -> np.ndarray:
         """creates the state matrix for the system"""
@@ -336,7 +336,7 @@ class SpringMass(System,GlobalDynamics):
 
     x_neutral: float = attrs.field(default=0.5)
 
-    res =Solver.equality_constraint("sumF")
+    res =Solver.constraint_equality("sumF")
     var_a = Solver.declare_var("a",combos='a',active=False)
     
     var_b = Solver.declare_var("u",combos='u',active=False)

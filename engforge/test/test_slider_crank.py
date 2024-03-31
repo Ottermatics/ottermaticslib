@@ -9,6 +9,8 @@ from engforge.eng.solid_materials import *
 
 import numpy as np
 
+theta = np.concatenate((np.linspace(0,2*np.pi,120),np.array([0])))
+
 @forge(auto_attribs=True)
 class SliderCrank(System,GlobalDynamics,CostModel):
 
@@ -64,6 +66,24 @@ class SliderCrank(System,GlobalDynamics,CostModel):
 
     offy_slv = Solver.declare_var('y_offset',combos='design')
     offx_slv = Solver.declare_var('x_offset',combos='design')
+    spring_slv = Solver.declare_var('X_spring_center',combos='spring_sym')
+
+    #objectives
+    goal_dx_range: float = 0.25
+    main_gear_speed_min: float = 20*(2*3.14159/60)
+    main_gear_speed_max: float = 120*(2*3.14159/60)
+
+    cost_slv = Solver.objective('combine_cost',kind='min',combos='design')
+
+    #constraints
+    gear_speed_slv = Solver.eq_con('dx_goal',combos='design')
+    range_slv = Solver.eq_con('ds_goal',combos='design')
+    sym_slv = Solver.eq_con('end_force_diff',combos='spring_sym')
+    
+
+    gear_pos_slv = Solver.con_ineq('final_gear_ratio',combos='design')
+    crank_pos_slv = Solver.con_ineq('crank_gear_ratio',combos='design')
+    motor_pos_slv = Solver.con_ineq('motor_gear_ratio',combos='design')
 
 
 
@@ -74,7 +94,12 @@ class SliderCrank(System,GlobalDynamics,CostModel):
     #Forces & Torques
     @system_property
     def input_torque(self)-> float:
-        return self.Tg * self.motor_gear_ratio* self.crank_gear_ratio
+        return self.Tg * self.final_gear_ratio
+    
+    @system_property
+    def end_force_diff(self)-> float:
+        x = self.motion_curve
+        return ((x.max()-self.X_spring_center)-(x.min()-self.X_spring_center))
     
     @system_property
     def reaction_torque(self) -> float:
@@ -112,9 +137,29 @@ class SliderCrank(System,GlobalDynamics,CostModel):
         '''angle between the rod and the horizontal axis'''
         return np.arcsin(np.sin(self.alpha)*(self.Rc/self.Lo))
 
+    @solver_cached
+    def motion_curve(self) -> np.ndarray:
+        x = self.Rc*np.cos(theta) + (self.Lo**2 - (self.Rc*np.sin(theta)-self.y_offset)**2)**0.5
+        return x
+
     @system_property
-    def dX_range(self) -> float:
-        return (self.Lo**2 - (self.y_pos)**2)**0.5
+    def max_dx_range(self) -> float:
+        x = self.motion_curve
+        return max(x.max() - x.min(),0)
+    
+    @system_property
+    def max_x_theta(self) -> float:
+        x = self.motion_curve
+        return theta[np.argmax(x)]
+
+    @system_property
+    def min_x_theta(self) -> float:
+        x = self.motion_curve
+        return theta[np.argmin(x)]
+
+    @system_property
+    def dx_goal(self)->float:
+        return (self.max_dx_range - self.goal_dx_range)
     
     @system_property
     def Rc_x(self)-> float:
@@ -147,6 +192,11 @@ class SliderCrank(System,GlobalDynamics,CostModel):
 
     #Gear Properties
     @system_property
+    def ds_goal(self)->float:
+        dS = self.main_gear_speed_max - self.omg_g_max/self.motor_gear_ratio
+        return dS
+
+    @system_property
     def mass_main_gear(self) -> float:
         return  (np.pi * self.gear_material.density * self.Ro**2  * self.gear_thickness)
     
@@ -154,9 +204,21 @@ class SliderCrank(System,GlobalDynamics,CostModel):
     def Imain_gear(self) -> float:
         return self.mass_main_gear * (self.Ro**2)
 
+    @system_property
+    def mass_pwr_gear(self) -> float:
+        return  (np.pi*self.gear_material.density*self.Rg**2*self.gear_thickness)
+    
+    @system_property
+    def Ipwr_gear(self) -> float:
+        return self.mass_main_gear * (self.Rg**2)    
+
+    @cost_property
+    def main_gear_cost(self) -> float:
+        return self.gear_material.cost_per_kg * self.mass_main_gear
+    
     @cost_property
     def gear_cost(self) -> float:
-        return self.gear_material.cost_per_kg * self.mass_main_gear
+        return self.gear_material.cost_per_kg * self.mass_pwr_gear
     
     @system_property
     def motor_gear_ratio(self) ->  float:
@@ -165,6 +227,10 @@ class SliderCrank(System,GlobalDynamics,CostModel):
     @system_property
     def crank_gear_ratio(self) ->  float:
         return self.Rc/self.Ro
+    
+    @system_property
+    def final_gear_ratio(self) ->  float:
+        return self.motor_gear_ratio* self.crank_gear_ratio
     
     @system_property
     def crank_rod_ratio(self) ->  float:

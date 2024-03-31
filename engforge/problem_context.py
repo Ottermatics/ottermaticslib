@@ -60,14 +60,14 @@ log = ProbLog()
 import uuid
 
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
-#TODO: define the dataframe / data sotrage feature
+#TODO: define the dataframe / data storage feature
 
 
 
 #The KW Defaults for Solver via kw_dict
-slv_dflt_options = dict(combos='*',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None)
+slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None)
 #KW Defaults for context from **opts
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10,dynamic_mode= False)
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = False,level_name='top',post_callback=None,success_thresh=10)
 
 #TODO: output options extend_dataframe=True,return_dataframe=True
 
@@ -109,13 +109,12 @@ class ProblemExec:
 
     system: "System"
     _session: "ProblemExec"
+    entered: bool = False
+    exited: bool = False
 
     #Store refs for later
     _update_refs: dict 
     _post_update_refs: dict
-    
-    #Fundamental solver behavior options
-    dynamic_mode = False
 
     #runtime and exit options
     success_thresh = 10
@@ -193,6 +192,7 @@ class ProblemExec:
         else:
             level_name = None
 
+        #Merge kwdict(stateful) and opts (current level)
         opt_in,opt_out = {},{}
         if opts:
             #these go to the context instance optoins
@@ -202,6 +202,17 @@ class ProblemExec:
 
         if kw_dict is None:
             kw_dict = {}
+        else:
+            #these go to the context instance optoins
+            kw_in = {k:v for k,v in kw_dict.items() if k in dflt_parse_kw}
+            kw_out = {k:v for k,v in kw_dict.items() if k not in opt_in}
+            opt_in.update(kw_in)
+            #these go to system establishment
+            opt_out.update(kw_out)
+            #remove from kw_dict
+            for k in kw_in.keys():
+                kw_dict.pop(k)
+
 
         #Define the handiling of rate integrals
         if 'dxdt' in opts:
@@ -303,6 +314,7 @@ class ProblemExec:
 
         #Get the update method refs
         self._update_refs = self.system.collect_update_refs()
+        #TODO: find subsystems that are not-subsolvers and execute them
         self._post_update_refs = self.system.collect_post_update_refs()
         
         #Problem Variable Definitions
@@ -318,6 +330,7 @@ class ProblemExec:
     #Context Manager Interface
     def __enter__(self):
         #Set the new state
+        
         self.activate_temp_state()
         
         if self.pre_exec:
@@ -329,7 +342,8 @@ class ProblemExec:
             if not isinstance(self,self._class_cache):
                 self.warning(f'change of execution class!')
             #global level number
-            self._class_cache.level_number += 1        
+            self._class_cache.level_number += 1     
+            self.entered = True   
             return self._class_cache._session
         
         #return New
@@ -339,7 +353,7 @@ class ProblemExec:
         if self.log_level < 10:
             refs = {k:v for k,v in self.sys_refs.get('attrs',{}).items() if v}
             self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
-
+        self.entered = True
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -388,6 +402,7 @@ class ProblemExec:
                     #never ever leave the top level without deleting the session
                     self._class_cache.level_number = 0
                     del self._class_cache._session 
+                    self.exited = True
                     raise KeyError(f'cant exit to level! {exc_value.level} not found!!')
             
             #TODO: expand this per options
@@ -404,6 +419,7 @@ class ProblemExec:
 
         self.clean_context()
 
+        self.exited = True
         return ext
     
     #Multi Context Exiting:
@@ -637,6 +653,8 @@ class ProblemExec:
             self.system._converged = False
             if self.raise_on_opt_failure:
                 raise Exception(f"solver didnt converge: {answer}")
+            else:
+                self.warning(f"solver didnt converge: {answer}")
             output["success"] = False
     
         return output  
@@ -736,7 +754,6 @@ class ProblemExec:
         return self.slv_kw
 
 
-
     @property
     def dynamic_state(self):
         return self.ref_attrs.get('dynamics.state',{}).copy()
@@ -783,6 +800,11 @@ class ProblemExec:
         return self.ref_attrs.get('signal.signal',{}).copy()
 
     #formatted output
+    @property
+    def is_active(self):
+        """checks if the context has been entered and not exited"""
+        return self.entered and not self.exited
+    
     @property
     def solveable(self):
         """checks the system's references to determine if its solveabl"""
