@@ -185,7 +185,7 @@ class Time(ATTR_BASE):
 
         combos = kwargs.get("combos", "default")
         if isinstance(combos,str):
-            combos = ','.split(combos)
+            combos = combos.split(',')
         active = kwargs.get("active", True)
         const = {"type": kind, "value": value, "var": var, "active": active, "combos": combos, 'combo_var':cls.name}
         #print(const,cls.__dict__)

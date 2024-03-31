@@ -4,17 +4,20 @@ from engforge.problem_context import ProblemExec
 import itertools
 
 
+indep = '*x,*y,*z'
+indep_l = indep.split(',')
+
 class SolverRefSelection(unittest.TestCase):
 
     def setUp(self) -> None:
         self.sc = CubeSystem()
 
     def test_comps_solver_act(self):
-        inv = 'ineq_cost,ineq_length,min_len'
+        inv = 'ineq_cost,ineq_length,min_len'+','+indep
         acts = ['*costA','*lenA']
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:
-                extra = dict(combos=cmb,slv_vars='*x,*y,*z',activate=acts if act else None,only_active=act)
+                extra = dict(combos=cmb,slv_vars='*',activate=acts if act else None,only_active=act)
                 info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
@@ -30,13 +33,13 @@ class SolverRefSelection(unittest.TestCase):
                     self.assertEqual(set(info['solver.ineq']),ineq)
 
     def test_comps_solver_obj(self):
-        inv = 'obj_size,ineq_cost,ineq_length,min_len'
+        inv = 'obj_size,ineq_cost,ineq_length,min_len'+','+indep
         acts = ['*costA','*lenA']
         aacts = ['*costA','*lenA','*size']
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:
                 actv = acts if act else aacts
-                extra = dict(combos=cmb,slv_vars='*x,*y,*z',activate=actv,only_active=True)
+                extra = dict(combos=cmb,slv_vars='*',activate=actv,only_active=True)
                 info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
@@ -58,10 +61,10 @@ class SolverRefSelection(unittest.TestCase):
 
     def test_sys_solver(self):
         #test combos
-        inv = 'volume,height,min_len,total_*'
+        inv = 'volume,height,min_len,total_*'+','+indep
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:
-                extra = dict(combos=cmb,slv_vars='*x,*y,*z',activate=[],only_active=act)
+                extra = dict(combos=cmb,slv_vars=indep+',hght,obj,*sys*',activate=[],only_active=act)
                 info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
@@ -80,10 +83,10 @@ class SolverRefSelection(unittest.TestCase):
 
     def test_xyz_var_only(self):
         '''only xyz via vars'''
-        inv = '*x,*y,*z'
+        inv = indep
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:        
-                extra = dict(combos=[],slv_vars=cmb,only_active=act)
+                extra = dict(combos=None,slv_vars=cmb,only_active=act)
                 info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
@@ -99,7 +102,7 @@ class SolverRefSelection(unittest.TestCase):
         inv = 'x,y,z'
         for act in [True,False]:
             for cmb in [inv,inv.split(',')]:        
-                extra = dict(combos=cmb,slv_vars=[],only_active=act)
+                extra = dict(combos=None,slv_vars=indep,only_active=act)
                 info = self.sc.solver_vars(**extra)['attrs']
                 ans = {'x','y','z','comp.x','comp.y','comp.z'}
                 self.assertEqual(set(info['solver.var']),ans)
@@ -112,7 +115,7 @@ class SolverRefSelection(unittest.TestCase):
 
     def test_xyz_act_nocombo(self):
         '''activated aren't included because no combos are given'''
-        extra = dict(combos=[],slv_vars='*x,*y,*z',activate=['*costA','*lenA','*size'],only_active=True)
+        extra = dict(combos=None,slv_vars=indep,activate=['*costA','*lenA','*size'],only_active=True)
 
         info = self.sc.solver_vars(**extra)['attrs']
         ans = {'x','y','z','comp.x','comp.y','comp.z'}
@@ -134,14 +137,14 @@ class SingleCompSolverTest(unittest.TestCase):
         self.sc = CubeSystem()
 
     def test_exec_results(self):
-        extra = dict(combos=[],slv_vars='*x,*y,*z',activate=[],only_active=True)
+        extra = dict(combos=indep_l,slv_vars=indep,activate=[],only_active=True)
         with ProblemExec(self.sc,extra) as pb:
             o = self.sc.execute(**extra)
             self.assertDictEqual(o['Xstart'],o['Xans'])
 
     def test_run_results(self):
         """test that inputs stay the same when no objecives present"""
-        extra = dict(combos=[],slv_vars='*x,*y,*z',activate=[],only_active=True)
+        extra = dict(combos=indep,slv_vars=indep_l,activate=[],only_active=True)
 
         scx,scy,scz = self.sc.x,self.sc.y,self.sc.z
         sccx,sccy,sccz = self.sc.comp.x,self.sc.comp.y,self.sc.comp.z
@@ -166,7 +169,7 @@ class SingleCompSolverTest(unittest.TestCase):
             attempts = []
             for var in objs[ok]:
                 for con in cons[ck]:
-                    extra = dict(combos=[ok,ck,'min_len'],slv_vars='*x,*y,*z',activate=[var,con],only_active=True)
+                    extra = dict(combos=[ok,ck,'min_len'],slv_vars=indep,activate=[var,con],only_active=True)
                     o = self.sc.execute(**extra)
                     attempts.append(o)
             
@@ -181,7 +184,7 @@ class SingleCompSolverTest(unittest.TestCase):
             
     def test_system_execute(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
 
         H = self.sc.execute(**extra,weights={'hght':1,'obj':0})
         V = self.sc.execute(**extra,weights={'hght':0,'obj':1})
@@ -192,7 +195,7 @@ class SingleCompSolverTest(unittest.TestCase):
 
     def test_system_run(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
 
         H = self.sc.run(**extra,weights={'hght':1,'obj':0})
         V = self.sc.run(**extra,weights={'hght':0,'obj':1})
@@ -202,7 +205,7 @@ class SingleCompSolverTest(unittest.TestCase):
 
     def test_system_solver(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
 
         H = self.sc.solver(**extra,weights={'hght':1,'obj':0})
         V = self.sc.solver(**extra,weights={'hght':0,'obj':1})
@@ -212,7 +215,7 @@ class SingleCompSolverTest(unittest.TestCase):
 
     def test_system_eval(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars='*x,*y,*z',activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
 
         H = self.sc.eval(**extra,weights={'hght':1,'obj':0})
         V = self.sc.eval(**extra,weights={'hght':0,'obj':1})

@@ -128,11 +128,11 @@ class LoggingMixin(logging.Filter):
         self.add_fields(record)
         return True
 
-    def msg(self, *args):
+    def msg(self, *args,lvl=5):
         """Writes to log... this should be for raw data or something... least priorty"""
         if self.log_on:
             self.logger.log(
-                1, self.message_with_identiy(self.extract_message(args), "blue")
+                lvl, self.message_with_identiy(self.extract_message(args), "blue")
             )
 
     def debug(self, *args):

@@ -1,7 +1,8 @@
 import unittest
 from engforge.problem_context import *
 from engforge.system import System,forge
-from engforge.test.solver_testing_components import SpringMass
+from engforge.test.solver_testing_components import *
+from engforge.test.test_slider_crank import SliderCrank
 import random
 
 
@@ -18,6 +19,8 @@ class SimpleContext(System):
         return f'{self.one}_{self.two}'
     
 
+chk = lambda d,k: set(d.get(k)) if k in d else set()
+
 class TestSession(unittest.TestCase):
     """Test lifecycle of a problem and IO of the context"""
 
@@ -33,10 +36,112 @@ class TestSession(unittest.TestCase):
         sm = SpringMass(Fa=0,u=5)
         sm.run(dxdt=0)
         ssid = sm.last_context._session_id
-        sm.run(dxdt=0)
-        trid = sm.last_context._session_id
+        trsm,df = sm.simulate(dt=0.01, endtime=0.1,return_all=True)
+        trid = trsm.last_context._session_id
         self.assertNotEqual(ssid,trid,'Session ID should change after a run')
 
+    def test_slide_crank_empty(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'combos':'','slv_vars':'','dxdt':None})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set())
+        self.assertEqual(chk(atx,'solver.obj'),set())
+        self.assertEqual(chk(atx,'solver.ineq'),set())
+        self.assertEqual(chk(atx,'solver.eq'),set())
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(cons['constraints'],[])
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))      
+
+    def test_slide_crank_dflt(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'dxdt':None})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set())
+        self.assertEqual(chk(atx,'solver.obj'),set())
+        self.assertEqual(chk(atx,'solver.ineq'),set())
+        self.assertEqual(chk(atx,'solver.eq'),set())
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(cons['constraints'],[])
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))      
+
+    def test_slide_crank_dxdt_true(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'dxdt':True})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set())
+        self.assertEqual(chk(atx,'solver.obj'),set())
+        self.assertEqual(chk(atx,'solver.ineq'),set())
+        self.assertEqual(chk(atx,'solver.eq'),set())
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set(('omega','theta')))
+        self.assertEqual(chk(atx,'dynamics.state'),set(('omega','theta')))
+        self.assertEqual(chk(atx,'dynamics.input'),set(('Tg',)))
+
+        cons = pbx.constraints
+        self.assertEqual(cons['constraints'],[])
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var'])) 
+
+    def test_slide_crank_dxdt_zero(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'dxdt':0})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set())
+        self.assertEqual(chk(atx,'solver.obj'),set())
+        self.assertEqual(chk(atx,'solver.ineq'),set())
+        self.assertEqual(chk(atx,'solver.eq'),set())
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set(('omega','theta')))
+        self.assertEqual(chk(atx,'dynamics.state'),set(('omega','theta')))
+        self.assertEqual(chk(atx,'dynamics.input'),set(('Tg',)))
+
+        cons = pbx.constraints
+        self.assertEqual(cons['constraints'],[])
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var'])) 
+
+
+    def test_slide_crank_design(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'combos':'design','dxdt':None})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set(('Lo','Rc','Ro','x_offset','y_offset')))
+        self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv',)))
+        self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv')))
+        self.assertEqual(chk(atx,'solver.eq'),set(('gear_speed_slv','range_slv')))
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(len(cons['constraints']),7)
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))
+
+    def test_slide_crank_design_slv(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'combos':'design','slv_vars':'*slv','dxdt':None})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set())
+        self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv',)))
+        self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv')))
+        self.assertEqual(chk(atx,'solver.eq'),set(('gear_speed_slv','range_slv')))
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(len(cons['constraints']),5)
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))        
 
 
 

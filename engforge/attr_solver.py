@@ -214,8 +214,8 @@ class Solver(ATTR_BASE):
                 elif 'combo_var' not in const:
                     const['combo_var'] = name #update me
                 
-                if 'combo' not in const:
-                    const['combo'] = 'default'
+                if 'combos' not in const:
+                    const['combos'] = 'default'
                     
 
     # TODO: add normalize attribute to tune optimizations
@@ -395,7 +395,7 @@ class Solver(ATTR_BASE):
 
         combos = kwargs.get("combos", "default")
         if isinstance(combos,str):
-            combos = ','.split(combos)
+            combos = combos.split(',')
         active = kwargs.get("active", True)
         const = {"type": kind, "value": value, "var": var, "active": active, "combos": combos, 'combo_var':cls.name}
         #print(const,cls.__dict__)
