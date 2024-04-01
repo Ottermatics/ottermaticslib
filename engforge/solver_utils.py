@@ -404,28 +404,37 @@ def ext_str_list(extra_kw,key,default=None):
         out = default
     return out
 
-def filt_combo_vars(var,inst,extra_kw=None,combos_in=None):
+#filters return true for items they want to remove
+def filter_combos(var,inst,extra_kw=None,combos_in=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
     #not considered
     
-    if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
+    if log.log_level <= 2:
+        log.info(f'checking combos: {var} {inst} {extra_kw} {combos_in}')
+
+    #gather combos either given or not
+    if combos_in is None and not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
+    elif combos_in:
+        combos = combos_in
+    else:
+        combos = str_list_f(getattr(inst,'combos', 'default'))
     
+    #parse extra kwargs
     groups = ext_str_list(extra_kw,'combos','')
     if groups is None:
-        return True #filter no groups
+        return True #no group filter!
     
     igngrp = ext_str_list(extra_kw,'ign_combos',None)
     onlygrp = ext_str_list(extra_kw,'only_combos',None)
-
-    combos = str_list_f(getattr(inst,'combos', 'default'))
     
     if not combos:
         log.info(f'no combos for {var} {combos} {groups}')
         return None #no combos to filter to match, its permanent
     
+    #check values, and return on first match
     for var in combos:
         initial_match = [grp for grp in groups if arg_var_compare(var,grp)]
         if not any(initial_match):
@@ -444,22 +453,27 @@ def filt_combo_vars(var,inst,extra_kw=None,combos_in=None):
     
     return False    
     
-def filt_var_vars(var,inst,extra_kw=None):
+def filter_vals(var,inst,extra_kw=None):
+    #TODO: add_vars parsing here
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
     
+    if log.log_level <= 2:
+        log.info(f'checking combos: {var} {inst} {extra_kw}')
+
     #not considered
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
     groups = ext_str_list(extra_kw,'slv_vars','')
     if groups is None:
-        return True #filter no vars
+        return True #no var filter!
     
     igngrp = ext_str_list(extra_kw,'ign_vars',None)
     onlygrp = ext_str_list(extra_kw,'only_vars',None)
 
+    #check values, and filters
     initial_match = [grp for grp in groups if arg_var_compare(var,grp)]
     if not any(initial_match):
         if log.log_level < 3:

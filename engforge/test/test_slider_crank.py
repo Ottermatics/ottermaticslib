@@ -14,6 +14,7 @@ theta = np.concatenate((np.linspace(0,2*np.pi,120),np.array([0])))
 @forge(auto_attribs=True)
 class SliderCrank(System,CostModel):
 
+    success_thresh = 1000
     dynamic_state_vars:list = ['theta','omega']
     dynamic_input_vars:list = ['Tg']
 

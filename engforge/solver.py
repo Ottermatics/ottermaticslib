@@ -59,11 +59,11 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
             return False
 
     #Otherwise look at the combo filter, its its false return that
-    outc = filt_combo_vars(var_name,solver_inst, extra_kw,combos)
+    outc = filter_combos(var_name,solver_inst, extra_kw,combos)
     outp = False
     #if the combo filter didn't explicitly fail, check the var filter
     if attr_name in SLVR_SCOPE_PARM:
-        outp = filt_var_vars(var_name,solver_inst, extra_kw)
+        outp = filter_vals(var_name,solver_inst, extra_kw)
         outr = all((outp,outc)) #redundant per above
     else:
         outr = outc
@@ -131,20 +131,20 @@ class SolverMixin(SolveableMixin):
         """user callback for when run is beginning"""
         pass
 
-    def run(self, *args, **kwargs):
-        """the steady state run metsolverhod for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
+    def run(self, **kwargs):
+        """the steady state run the solver for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
 
         with ProblemExec(self,kwargs,level_name='run') as pbx:
-            return self._iterate_input_matrix(self._run, *args, **kwargs)
+            return self._iterate_input_matrix(self._run, **kwargs)
 
-    def _run(self, refs, icur, eval_kw=None, sys_kw=None, *args, **kwargs):
+    def _run(self, refs, icur, eval_kw=None, sys_kw=None, **kwargs):
         """the steady state run method for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
 
         # TODO: what to do with eval / sys kw
         # TODO: option to preserve state
         Ref.refset_input(refs, icur)
         self.debug(f"running with {icur}|{kwargs}")
-        self.run_method(eval_kw=eval_kw, sys_kw=sys_kw,*args, **kwargs)
+        self.run_method(eval_kw=eval_kw, sys_kw=sys_kw, **kwargs)
         self.debug(f"{icur} run time: {self._run_time}")
 
     def run_method(self, eval_kw=None, sys_kw=None, cb=None, **method_kw):
@@ -214,7 +214,8 @@ class SolverMixin(SolveableMixin):
             #TODO: move to problem context, and
             self.save_data(index=self.index)
 
-            #TODO: define exit behavior for the problem context
+            #exit to the level
+            #TODO: format output
             pbx.exit_to_level(level='eval',revert=False)
 
         if cb:
@@ -320,7 +321,7 @@ class SolverMixin(SolveableMixin):
 
 
 
-# # TODO: add basin hopping method in search_optimization
+# # TODO: add basin hopping method as a "search" call
 # output = {
 #     "Xstart": Xg,
 #     "vars": vars,

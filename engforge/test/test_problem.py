@@ -71,8 +71,8 @@ class TestSession(unittest.TestCase):
         self.assertEqual(chk(atx,'dynamics.input'),set())
 
         cons = pbx.constraints
-        self.assertEqual(cons['constraints'],[])
-        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))      
+        self.assertEqual(len(cons['constraints']),0)
+        self.assertEqual(len(cons['bounds']),0)      
 
     def test_slide_crank_dxdt_true(self):
         sm = SliderCrank(Tg=0)
@@ -106,7 +106,7 @@ class TestSession(unittest.TestCase):
 
         cons = pbx.constraints
         self.assertEqual(cons['constraints'],[])
-        self.assertEqual(len(cons['bounds']),len(atx['solver.var'])) 
+        self.assertEqual(len(cons['bounds']),2) 
 
 
     def test_slide_crank_design(self):
@@ -123,8 +123,8 @@ class TestSession(unittest.TestCase):
         self.assertEqual(chk(atx,'dynamics.input'),set())
 
         cons = pbx.constraints
-        self.assertEqual(len(cons['constraints']),7)
-        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))
+        self.assertEqual(len(cons['constraints']),5)
+        self.assertEqual(len(cons['bounds']),5)
 
     def test_slide_crank_design_slv(self):
         sm = SliderCrank(Tg=0)
@@ -141,7 +141,25 @@ class TestSession(unittest.TestCase):
 
         cons = pbx.constraints
         self.assertEqual(len(cons['constraints']),5)
+        self.assertEqual(len(cons['bounds']),2)
+
+    def test_slide_crank_design_slv(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'combos':'design', 'ign_combos':'max*' ,'slv_vars':'*slv','dxdt':None})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set())
+        self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv',)))
+        self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv')))
+        self.assertEqual(chk(atx,'solver.eq'),set(('gear_speed_slv','range_slv')))
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(len(cons['constraints']),5)
         self.assertEqual(len(cons['bounds']),len(atx['solver.var']))        
+
 
 
 

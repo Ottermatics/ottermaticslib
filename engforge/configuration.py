@@ -288,7 +288,7 @@ def signals_slots_handler(
                     f"{cls.__name__} overriding inherited attr: {o.name} as a system property overriding it"
                 )
             elif o.inherited and k in cls_dict:
-                log.warning(
+                log.debug(
                     f"{cls.__name__} overriding inherited attr: {o.name} as {cls_dict[k]} in cls"
                 )
                 #FIXME: should we deepcopy?
@@ -303,7 +303,7 @@ def signals_slots_handler(
             )
 
     # Enforce Property Changing
-    # FIXME: is this more reliable
+    # FIXME: is this more reliable?
     # real_out = []
     # for fld in out:
     #     if fld.type in (int,float,str):

@@ -51,6 +51,7 @@ These vars control the behavior of the ProblemExec when an error occurs or when 
 from engforge.logging import LoggingMixin
 from engforge.system_reference import Ref
 from engforge.solver_utils import *
+import weakref
 
 class ProbLog(LoggingMixin): pass
 log = ProbLog()
@@ -65,7 +66,7 @@ import uuid
 #The KW Defaults for Solver via kw_dict
 slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None)
 #KW Defaults for context from **opts
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = False,level_name='top',post_callback=None,success_thresh=10)
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10)
 
 #TODO: output options extend_dataframe=True,return_dataframe=True
 
@@ -102,12 +103,19 @@ class ProblemExitAtLevel(ProblemExit):
 class ProblemExec:
     """
     Represents the execution context for a problem in the system. The ProblemExec class provides a uniform set of options for managing the state of the system and its solvables, establishing the selection of combos or de/active attributes to Solvables. Once once created any further entracnces to ProblemExec will return the same instance until finally the last exit is called.
+
+    ## params:
+    -  _problem_id: uuid for subproblems, or True for top level, None means uninitalized
+
     """
     _class_cache = None #ProblemExec is assigned below
+
+    _problems = weakref.WeakValueDictionary()
 
     system: "System"
     _session: "ProblemExec"
     _session_id = None
+    problem_id = None 
     entered: bool = False
     exited: bool = False
 
@@ -124,8 +132,10 @@ class ProblemExec:
     revert_every: bool = True
     exit_on_failure: bool = True
     raise_on_opt_failure: bool = True
-
+    raise_on_unknown: bool = True
+    
     #exit & level definition
+
     post_callback: callable = None #callback that will be called on the system each time it is reverted, it should take args(system,current_problem_exec)
     level_name: str = None #target this context with the level name
     level_number: int = 0 #TODO: keep track of level on the global context
@@ -237,12 +247,16 @@ class ProblemExec:
                         
             #mirror the state of session (exactly)
             self.__dict__ = self._class_cache._session.__dict__.copy()
+            self._problem_id = uuid.uuid4()
+            self._problems[self._problem_id] = self #carry that weight
+
             if self.system is not system:
                 raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
 
             #modify things from the input
             if level_name is None:
-                self.level_name = 'ctx_'+str(int(uuid.uuid4()))[0:15]
+                #your new id
+                self.level_name = 'ctx_'+str(int(self._problem_id))[0:15]
             else:
                 self.level_name = level_name
 
@@ -260,6 +274,9 @@ class ProblemExec:
         else:
             #add the prob options to the context
             self.__dict__.update(opt_in)
+            self._problem_id = True #this is the top level
+            self._problems[self._problem_id] = self #carry that weight
+
             #supply the level name default as top if not set
             if level_name is None:
                 self.level_name = 'top'
@@ -291,6 +308,8 @@ class ProblemExec:
         self.system = system
         assert isinstance(self.system,SolveableInterface), 'only solveable interfaces are supported for execution context'
         self.system._last_context = self
+        if hasattr(self.system,'success_thresh') and isinstance(self.system.success_thresh,(int,float)):
+            self.success_thresh = self.system.success_thresh
 
         #Recache system references
         if isinstance(self.system, System):
@@ -316,11 +335,11 @@ class ProblemExec:
         self._post_update_refs = self.system.collect_post_update_refs()
         
         #Problem Variable Definitions
-        #self.solver_vars = self.sys_solver_variables()
-        self.Xref = self.problem_opt_vars
+        self.solver_vars = self.sys_solver_variables(as_flat=True,**self.slv_kw)
+        self.Xref = self.all_problem_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
-        self.constraints = self.sys_solver_constraints(self.Xref,cons)
+        self.constraints = self.sys_solver_constraints(cons)
 
         if log.log_level < 5:
             self.msg(f'established sys context: {self} {self.slv_kw}')  
@@ -562,7 +581,7 @@ class ProblemExec:
         elif answer.success:
             # out of threshold condition
             self.warning(
-                f"solver didnt fully solve equations! {answer.x} -> residual: {answer.fun}"
+                f"solver didnt meet threshold: {de} <? {thresh} ! {answer.x} -> residual: {answer.fun}"
             )
             self.system._converged = False
             output["success"] = False  # only false with threshold
@@ -578,18 +597,15 @@ class ProblemExec:
         return output 
 
     #Solver Parsing Methods
-    def sys_solver_variables(self,as_set=False,as_flat=False,**kw):
+    def sys_solver_variables(self,as_flat=False,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
         out = dict(variables=self.problem_opt_vars)
 
+        #do not consider dynamics with dxdt=None, otherwise consider them as solver variables
         if self._dxdt is not None:
             out.update(dynamics=self.dynamic_state,integration=self.integrator_vars)
 
-        if as_set==True:
-            vars = set.union(*(set(v) for k,v in out.items()))
-            return vars
-        
         if as_flat==True:
             flt = {}
             for k,v in out.items():
@@ -597,7 +613,7 @@ class ProblemExec:
             return flt
         
         return out
-
+    
     def sys_solver_objectives(self,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
@@ -607,10 +623,12 @@ class ProblemExec:
         objs = sys_refs.get('attrs',{}).get('solver.obj',{})
         return {k:v for k,v in objs.items()}
 
-    def sys_solver_constraints(self,Xrefs,add_con=None,combo_filter=True, *args, **kw):
+    def sys_solver_constraints(self,add_con=None,combo_filter=True, **kw):
         """formatted as arguments for the solver
         """
         from engforge.solver_utils import create_constraint
+
+        Xrefs = self.Xref
 
         system = self.system
         sys_refs = self.sys_refs
@@ -630,10 +648,11 @@ class ProblemExec:
         
 
         #The official definition of X var order
-        Xvars = list(Xrefs)
+        Nstates = len(Xrefs)
+        Xvars = list(Xrefs) #get names of solvers + dynamics
 
         # constraints lookup
-        bnd_list = [[None, None]] * len(Xvars)
+        bnd_list = [[None, None]] * Nstates
         con_list = []
         con_info = [] #names of constraints 
         constraints = {"constraints": con_list, "bounds": bnd_list,"info":con_info}
@@ -694,6 +713,9 @@ class ProblemExec:
                         in_activate = any([arg_var_compare(combo_var,v) for v in activated]) if activated else False
                         in_deactivate = any([arg_var_compare(combo_var,v) for v in deactivated]) if deactivated else False
 
+                        if log.log_level <= 5:
+                            self.debug(f'[{self.level_number}-{self.level_name}] filter combo: {ctype}=?{extra_kw}') 
+
                         #Check active or activated
                         if not active and not activated:
                             if log.log_level < 3:
@@ -711,7 +733,7 @@ class ProblemExec:
                             continue
 
                     if combos and combo_filter:
-                        filt = filt_combo_vars(combo_var,slv, extra_kw,combos)
+                        filt = filter_combos(combo_var,slv, extra_kw,combos)
                         if not filt:
                             if log.log_level < 5:
                                 self.debug(f'[{self.level_number}-{self.level_name}] filtering constraint={filt} {var} |{combos}')  
@@ -777,7 +799,7 @@ class ProblemExec:
                     con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
                     con_list.append(
                         create_constraint(
-                            system,Xrefs, 'ineq', cval, *args, **kw
+                            system,Xrefs, 'ineq', cval, **kw
                         )
                     )
 
@@ -791,7 +813,7 @@ class ProblemExec:
                     con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
                     con_list.append(
                         create_constraint(
-                            system,Xrefs, 'eq', cval, *args, **kw
+                            system,Xrefs, 'eq', cval, **kw
                         )
                     )
 
@@ -949,8 +971,8 @@ class ProblemExec:
     def all_problem_vars(self)->dict:
         """solver variables + dynamics states when dynamic_solve is True"""
         varx = self.ref_attrs.get('solver.var',{}).copy()
-        #Add the dynamic states
-        if self.dynamic_solve:
+        #Add the dynamic states to be optimized (ignore if integrating)
+        if self.dynamic_solve and not self._dxdt is True:
             varx.update(self.filter_vars(self.dynamic_state))
             varx.update(self.filter_vars(self.integrator_vars))
         return varx
@@ -959,10 +981,18 @@ class ProblemExec:
     def dynamic_solve(self)->bool:
         """indicates if the system is dynamic"""
         dxdt = self._dxdt
+
+        if dxdt is None or dxdt is False:
+            return False
+        
+        if dxdt is True:
+            return True
+        
         in_type = isinstance(dxdt,(dict,float,int))
         bool_type = (isinstance(dxdt,bool) and dxdt == True)
         if in_type or bool_type:
             return True
+        
         return False
 
     #Logging to class logger
@@ -1022,7 +1052,8 @@ class ProblemExec:
 
     @property
     def kwargs(self):
-        return self.slv_kw
+        """copy of slv_kw args"""
+        return self.slv_kw.copy()
 
 
     @property

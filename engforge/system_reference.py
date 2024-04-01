@@ -20,13 +20,13 @@ class RefLog(LoggingMixin):
 log = RefLog()
 
 
-def refset_input(refs, delta_dict,chk=True):
+def refset_input(refs, delta_dict,chk=True,fail=True):
     """change a set of refs with a dictionary of values. If chk is True k will be checked for membership in refs"""
     for k, v in delta_dict.items():
         memb =  k in refs
         if not chk or memb:
             refs[k].set_value(v)
-        elif chk and not memb:
+        elif fail and chk and not memb:
             raise KeyError(f"key {k} not in refs {refs.keys()}")
 
 
