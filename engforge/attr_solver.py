@@ -1,6 +1,6 @@
 """solver defines a SolverMixin for use by System.
 
-Additionally the SOLVER attribute is defined to add complex behavior to a system as well as add constraints and transient integration.
+Additionally the Solver attribute is defined to add complex behavior to a system as well as add constraints and transient integration.
 """
 
 import attrs
@@ -39,7 +39,7 @@ class SolverInstance(AttributeInstance):
     """A decoupled signal instance to perform operations on a system instance"""
 
     system: "System"
-    solver: "SOLVER"
+    solver: "Solver"
 
     # compiled info
     obj: "Ref"
@@ -52,7 +52,7 @@ class SolverInstance(AttributeInstance):
     _constraints: list
 
 
-    def __init__(self, solver: "SOLVER", system: "System",**kw) -> None:
+    def __init__(self, solver: "Solver", system: "System",**kw) -> None:
         """kwargs passed to compile"""
         self.class_attr = self.solver = solver
         self.system = system
@@ -190,7 +190,7 @@ class Solver(ATTR_BASE):
     normalize: ref_type
     allow_constraint_override: bool = True
 
-    attr_prefix = "SOLVER"
+    attr_prefix = "Solver"
     active: bool
     instance_class = SolverInstance
 
@@ -231,7 +231,7 @@ class Solver(ATTR_BASE):
         active = kwargs.get("active", True)
         combos = kwargs.get("combos", var)
 
-        new_name = f"SOLVER_var_{var}".replace(".", "_")
+        new_name = f"Solver_var_{var}".replace(".", "_")
         bkw = {"var": var, "value": None}
         constraints = [{"type": "min", **bkw}, {"type": "max", **bkw}]
         new_dict = dict(
@@ -262,7 +262,7 @@ class Solver(ATTR_BASE):
         kind = kwargs.get("kind", "min")
         assert kind in ("min", "max")
 
-        new_name = f"SOLVER_obj_{obj}_{kind}".replace(".", "_")
+        new_name = f"Solver_obj_{obj}_{kind}".replace(".", "_")
         bkw = {"var": obj, "value": None}
         new_dict = dict(
             name=new_name,
@@ -287,7 +287,7 @@ class Solver(ATTR_BASE):
         active = kwargs.get("active", True)
 
         # Create A New Signals Class
-        new_name = f"SOLVER_coneq_{lhs}_{rhs}".replace(".", "_")
+        new_name = f"Solver_coneq_{lhs}_{rhs}".replace(".", "_")
         new_dict = dict(
             name=new_name,
             active=active,
@@ -309,7 +309,7 @@ class Solver(ATTR_BASE):
         active = kwargs.get("active", True)
 
         # Create A New Signals Class
-        new_name = f"SOLVER_conineq_{lhs}_{rhs}".replace(".", "_")
+        new_name = f"Solver_conineq_{lhs}_{rhs}".replace(".", "_")
         new_dict = dict(
             name=new_name,
             active=active,
@@ -382,7 +382,7 @@ class Solver(ATTR_BASE):
         :param type: str, must be either min or max with var value comparison, or with a function additionally eq,ineq (same as max(0)) can be used
         :value: either a numeric (int,float), or a function, f(system)
         """
-        assert cls is not SOLVER, f"must set constraint on SOLVER subclass"
+        assert cls is not Solver, f"must set constraint on Solver subclass"
         # assert not cls.constraint_exists(type=kind,var=var), f"constraint already exists!"
         assert isinstance(value, (int, float)) or callable(
             value
@@ -436,4 +436,4 @@ class Solver(ATTR_BASE):
 
 
 # Support Previous SnakeCase
-SOLVER = Solver
+Solver = Solver

@@ -6,25 +6,25 @@ Component or other subsystems are added to a System class with `Slots`:
         slot_name = Slot.define(Component,ComponentSubclass,System)
     ```
 
-Component's data flow is established via `SIGNALS` that are defined:
+Component's data flow is established via `SignalS` that are defined:
     ```
     class CustomSystem(System):
-        signal_name = SIGNAL.define(source_attr_or_property, target_attr)
-        control_signal = SIGNAL.define(source_attr_or_property, target_attr,control_with='system.attr or slot.attr`)
+        signal_name = Signal.define(source_attr_or_property, target_attr)
+        control_signal = Signal.define(source_attr_or_property, target_attr,control_with='system.attr or slot.attr`)
     ```
     - source_attr: can reference a locally defined slot attribute (a la attr's fields) or any locally defined slot system property
     - target_attr: must be a locally defined slot attribute or system attribute.
 
 update description to include solver
 
-A system calculates its state upon calling `System.run()`. This executes `pre_execute()` first which will directly update any attributes based on their `SIGNAL` definition between `Slot` components. Once convergence is reached target_attr's are updated in `post_execute()` for cyclic SIGNALS.
+A system calculates its state upon calling `System.run()`. This executes `pre_execute()` first which will directly update any attributes based on their `Signal` definition between `Slot` components. Once convergence is reached target_attr's are updated in `post_execute()` for cyclic SignalS.
 
 If the system encounters a subsystem in its solver routine, the subsystem is evald() and its results used as static in that iteration,ie it isn't included in the system level dependents if cyclic references are found.
 
 
 The solver uses the root or cobla scipy optimizer results on quick references to internal component references. Upon solving the system
 
-SIGNALS can be limited with constrains via `min or max` values on `NumericProperty` which can be numeric values (int or float) or functions taking one argument of the component it is defined on. Additionally signals may take arguments of `min` or `max` which are numeric values or callbacks which take the system instance as an argument.
+SignalS can be limited with constrains via `min or max` values on `NumericProperty` which can be numeric values (int or float) or functions taking one argument of the component it is defined on. Additionally signals may take arguments of `min` or `max` which are numeric values or callbacks which take the system instance as an argument.
 """
 import attrs
 
@@ -52,7 +52,7 @@ log = SystemsLog()
 #NOTE: solver must come before solvable interface since it overrides certain methods
 @forge
 class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
-    """A system defines SlotS for Components, and data flow between them using SIGNALS
+    """A system defines SlotS for Components, and data flow between them using SignalS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
 
@@ -78,7 +78,9 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
 
     @system_property
     def run_id(self) -> int:
-        return self._run_id
+        if self.last_context is None: 
+            return None
+        return self.last_context.problem_id
 
     @classmethod
     def subclasses(cls, out=None):
@@ -103,8 +105,8 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
 
     @property
     def identity(self):
-        if self._run_id:
-            return f"{self.name}_{self._run_id}"
+        if self.run_id:
+            return f"{self.name}_{self.run_id}"
         else:
             return f"{self.name}"
 

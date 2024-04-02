@@ -5,7 +5,7 @@ from engforge.system import System
 from engforge.components import Component
 from engforge.attr_dynamics import Time
 from engforge.attr_solver import Solver
-from engforge.attr_signals import SIGNAL
+from engforge.attr_signals import Signal
 from engforge.attr_slots import Slot
 from engforge.properties import *
 from engforge.problem_context import ProblemExec
@@ -40,9 +40,9 @@ class MockSystem(System):
     x: float = attrs.field(default=0)
 
     # move system input to component
-    pre_sig = SIGNAL.define("comp.input", "input", mode="pre")
+    pre_sig = Signal.define("comp.input", "input", mode="pre")
     # move component output to system
-    post_sig = SIGNAL.define("output", "comp.output", mode="both")
+    post_sig = Signal.define("output", "comp.output", mode="both")
 
     Solver.constraint_equality("in_out_diff")
     Solver.constraint_equality("in2out2")

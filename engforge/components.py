@@ -29,7 +29,7 @@ class SolveableInterface(Configuration,TabulationMixin,SolveableMixin):
         """get the last context run, or the parent's"""
         if hasattr(self,"_last_context"):
             return self._last_context 
-        elif self.parent and (ctx:=self.parent.last_context):
+        elif hasattr(self,'parent') and self.parent and (ctx:=self.parent.last_context):
             return ctx
         return None
 

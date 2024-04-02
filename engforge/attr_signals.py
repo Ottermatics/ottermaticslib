@@ -15,12 +15,12 @@ class SignalInstance(AttributeInstance):
     """A decoupled signal instance to perform operations on a system instance"""
 
     system: "System"
-    signal: "SIGNAL"
+    signal: "Signal"
 
     # compiled info
     target: "Ref"
     source: "Ref"
-    class_attr: "SIGNAL"
+    class_attr: "Signal"
 
     def __init__(self, signal, system) -> None:
         self.class_attr = self.signal = signal
@@ -37,7 +37,7 @@ class SignalInstance(AttributeInstance):
         val = self.source.value()
         if self.system.log_level < 10:
             self.system.msg(
-                f"SIGNAL|applying {self.source}|{val} to {self.target}"
+                f"Signal|applying {self.source}|{val} to {self.target}"
             )
         self.target.set_value(val)
 
@@ -76,7 +76,7 @@ class Signal(ATTR_BASE):
         combos = kw.get("combos", 'default')
 
         # Create A New Signals Class
-        new_name = f"SIGNAL_{mode}_{source}_to_{target}".replace(".", "_")
+        new_name = f"Signal_{mode}_{source}_to_{target}".replace(".", "_")
         new_name = new_name + "_" + str(uuid.uuid4()).replace("-", "")[0:16]
         new_dict = dict(
             name=new_name,
@@ -87,7 +87,7 @@ class Signal(ATTR_BASE):
             combos=combos,
             default_options=cls.default_options.copy(),
         )
-        new_slot = type(new_name, (SIGNAL,), new_dict)
+        new_slot = type(new_name, (Signal,), new_dict)
         new_slot.default_options["default"] = new_slot.make_factory()
         new_slot.default_options["validator"] = new_slot.configure_instance
         new_sig = cls._setup_cls(new_name, new_dict)
@@ -113,4 +113,4 @@ class Signal(ATTR_BASE):
 
 
 # Support Previous API
-SIGNAL = Signal
+Signal = Signal

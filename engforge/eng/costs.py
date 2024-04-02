@@ -473,7 +473,7 @@ class Economics(Component):
         return lambda term: numpy.nansum([t(term) for t in term_funs])        
 
     #Gather & Set References (the magic!)
-    def internal_references(self,recache=True):
+    def internal_references(self,recache=True,numeric_only=False):
         """standard component references are """
         if not recache and hasattr(self,'__cache_refs'):
             return self.__cache_refs

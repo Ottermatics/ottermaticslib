@@ -31,7 +31,6 @@ import numpy as np
 import pandas
 import expiringdict
 import attr, attrs
-from scipy.integrate import solve_ivp
 
 
 # Index maps are used to translate between different indexes (local & global)
@@ -390,10 +389,27 @@ class DynamicsMixin(Configuration, SolveableMixin):
             O = O+self.dynamic_K
         return O
 
+    def set_time(self, t, system=True,subcomponents=True):
+        """sets the time of the system and context"""
+        
+        #set components
+        if subcomponents:
+            for cdyn_name, comp in self.comp_times.items():
+                comp.set_value(t)
+
+        elif system: #set system time only
+            self.time = t
+
+
+    @instance_cached #cache on solver due to changes of components
+    def comp_times(self) -> dict:
+        """returns a dictionary of time references to components which will be set to the current time"""
+        return {k: Ref(comp,'time',False,True) for k,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
+
     # optimized convience funcitons
     def nonlinear_step(self, t, dt, X, U=None, set_Y=True):
         """Optimal nonlinear steps"""
-        self.time = t
+        #self.time = t #important for simulation, moved to context.integrate
         self.update_dynamics(t, X, U)
         
         dXdt = self.rate_nonlinear(t, dt, X, U, update=False)
@@ -407,7 +423,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
     def linear_step(self, t, dt, X, U=None, set_Y=True):
         """Optimal nonlinear steps"""
-        self.time = t
+        #self.time = t #important for simulation, moved to context.integrate
         self.update_dynamics(t, X, U)
         dXdt = self.rate_linear(t, dt, X, U)
         out = self.linear_output(t, dt, X, U)
@@ -501,7 +517,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
         return hash(id(self))
 
 
-@forge(auto_attribs=True)
+@forge
 class GlobalDynamics(DynamicsMixin):
     """This object is inherited by configurations that collect other dynamicMixins and orchestrates their simulation, and steady state analysis
 
@@ -526,8 +542,9 @@ class GlobalDynamics(DynamicsMixin):
         endtime = tr_opts["endtime"]
 
         if isinstance(self, SolveableMixin):
-            sim = lambda *args, **kw: self.simulate(
-                dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw,  **kw
+            #adapt simulate to use the solver
+            sim = lambda Xo,*args, **kw: self.simulate(
+                dt, endtime,Xo, eval_kw=eval_kw, sys_kw=sys_kw,  **kw
             )
             self._iterate_input_matrix(
                 sim,
@@ -551,7 +568,7 @@ class GlobalDynamics(DynamicsMixin):
         eval_kw=None,
         sys_kw=None,
         min_kw=None,
-        run_solver=True,
+        run_solver=False,
         return_system=False,
         return_data=False,
         return_all=False,
@@ -561,179 +578,29 @@ class GlobalDynamics(DynamicsMixin):
         """runs a simulation over the course of time, and returns a dataframe of the results.
 
         A copy of this system is made, and the simulation is run on the copy, so as to not affect the state of the original system.
+
+        #TODO: 
         """
-        pbx,system = None,None
+        min_kw_dflt = {"method": "SLSQP"}
+        #'tol':1e-6,'options':{'maxiter':100}}
+        # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
+        if min_kw is None:
+            min_kw = min_kw_dflt.copy()
+        else:
+            min_kw_dflt.update(min_kw)
+        mkw = min_kw_dflt
+
+        #variables if failed
+        pbx,system = None,self
         try:
-            min_kw_dflt = {"method": "SLSQP"}
-            #'tol':1e-6,'options':{'maxiter':100}}
-            # min_kw_dflt = {'doset':True,'reset':False,'fail':True}
-            if min_kw is None:
-                min_kw = min_kw_dflt.copy()
-            else:
-                min_kw_dflt.update(min_kw)
-            mkw = min_kw_dflt
-
-            # Data Storage {time: data}
-            data = {}  # output storage
-            solver = expiringdict.ExpiringDict(100, 600)  # temp solver storage
-            Time = np.arange(0, endtime + dt, dt)
-
-            max_step_dt = kwargs.get("max_step", dt)
-
-            # Initial State
-            data = {}
-
-            #TODO: put copy system in problem context
-            system = self.copy_config_at_state()
-
-            #recursively initalize transient components
-            system.setup_global_dynamics()
 
             #Time Iteration Context
-            with ProblemExec(system,kwargs,level_name='sim',dxdt=True) as pbx:
-                
-                #Unpack Transient Problem
-                intl_refs = pbx.integrator_var_refs
-                refs = pbx.sys_refs
-
-                if self.log_level < 15:
-                    self.info(f'simulating {system},{pbx}| int:{intl_refs} | refs: {refs}' )            
-
-
-                if not intl_refs:
-                    raise Exception(f'no transient parameters found')            
-                
-                x_cur = X0 = {k: v.value(self,pbx) for k, v in intl_refs.items()}
-
-                if self.log_level < 10:
-                    self.debug(f'initial state {X0} {intl_refs}| {refs}')
-
-                if X0 is None:
-                    # get current
-                    X0 = x_cur
-                
-                #this will fail if X0 doesn't have solver vares
-                X0 = np.array([X0[p] for p in intl_refs])
-
-                #Gather data
-                Xss = refs['attrs'].get("solver.var",{})
-                Xpm = refs['attrs'].get('time.var',{})
-                Xdy = refs['attrs'].get('dynamics.state',{})
-
-                Yobj = refs['attrs'].get("solver.obj",{})
-                Yeq = refs['attrs'].get("solver.eq",{})
-                Yineq=refs['attrs'].get("solver.ineq",{})
-                Ydn = refs['attrs'].get("dynamics.output",{})
-
-                dXtmdt = refs['attrs'].get('time.rate',{})
-                dXdt = refs['attrs'].get("dynamics.rate",{})
-
-                #handle various cases of (obj,eq,ineq)
-                if not Yobj and Yeq:
-                    #handle case of Yineq == None: root solve
-                    self.info(f'making Yobj from Yeq: {Yeq}')
-                    Yobj = { k: v.copy(key = lambda sys,prob: (1+v.value(sys,prob)**2)) for k,v in Yeq.items() }
-
-                elif not Yobj:
-                    #minimize the product of all vars, so the smallest value is the best that satisfies all constraints
-                    self.info(f'making Yobj from X: {Xss}')
-                    def dflt(sys,prob)->float:
-                        out = 1
-                        for k,v in prob.problem_opt_vars.items():
-                            val = v.value(sys,prob)
-                            out = out*(1+val**2)**0.5
-                        return 1
-                    
-                    Yobj = {'synthetic': Ref(system, dflt)}
-                    #transfer!!!
-                    pbx.sys_refs['attrs']['solver.obj'] = Yobj.copy() 
-
-                #TODO: add simulation time to context
-                pbx.last_time = 0
-
-                #our anonymous integrator!
-                def sim_iter(t, x, *args):
-                    out = {p: np.nan for p in intl_refs}
-                    Xin = {p: x[i] for i, p in enumerate(intl_refs)}
-
-                    if self.log_level < 10:
-                        self.info(f'sim_iter {t} {x} {Xin}')
-
-                    system.time = t
-
-                    with ProblemExec(system,level_name='tr_slvr',Xnew=Xin) as pbx:
-
-                        # solver always gets a copy of x
-                        solver[t] = x #TODO: stateful capture
-                        
-                        # test for record time 
-                        #TODO: rates / events ect 
-                        #TODO: faster way to get last time vs max(data)  
-                        if not data or t > pbx.last_time + dt:
-                            data[t] = cs = pbx.get_ref_values()
-                            pbx.last_time = t
-                            if self.log_level < 10:
-                                self.info(f'record {t}| {Xin}')
-
-                        #ad hoc time integration
-                        for name, trdct in pbx.integrators.items():
-                            out[trdct.var] = trdct.current_rate
-
-                        # dynamics
-                        for compnm, compdict in pbx.dynamic_comps.items():
-                            comp = compdict#["comp"]
-                            if not comp.dynamic_state_vars and not comp.dynamic_input_vars:
-                                continue
-                            Xds = np.array([r.value() for r in comp.Xt_ref.values()])
-                            Uds = np.array([r.value() for r in comp.Ut_ref.values()])
-                            # time updated in step
-                            #system.info(f'comp {comp} {compnm} {Xds} {Uds}')
-                            dxdt = comp.step(t, dt, Xds, Uds, True)
-
-                            for i, (p, ref) in enumerate(comp.Xt_ref.items()):
-                                out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
-
-                        # solvers
-                        if run_solver and pbx.solveable:
-                            # TODO: add in any transient
-                            with ProblemExec(system,level_name='ss_slvr') as pbx:
-                                
-                                #TODO: handle various cases of (obj,eq,ineq) dynamically
-                                #normally obj is handled via min/max objective
-                                #in case of eq and inequal constraints, we need to adapt to the situation. For many eq's we can use the root solver, otherwise we can mutiply the normalize the equalities all together as multiply by something like normal of all inputs to provide a default objective of something like "find the smallest input satisfying constraints"
-
-
-                                ss_out = pbx.solve_min(Xss, Yobj, **mkw)
-                                if ss_out['ans'].success:
-                                    if self.log_level <= 9:
-                                        self.info(f'exiting solver {t} {ss_out["Xans"]} {ss_out["Xstart"]}')             
-                                    pbx.set_ref_values(ss_out['Xans'])
-                                    pbx.exit_to_level('ss_slvr',False)
-                                else:
-                                    self.warning(f'solver failed to converge {ss_out["ans"].message} {ss_out["Xans"]} {ss_out["X0"]}')
-                                    if pbx.raise_on_opt_failure:
-                                        pbx.exit_to_level('sim',pbx.fail_revert)
-                                    else:
-                                        pbx.exit_to_level('ss_slvr',pbx.fail_revert)
-
-                        #pbx.post_execute()
-                        V_dxdt =  np.array([out[p] for p in intl_refs])
-                        if self.log_level <= 10:
-                            self.info(f'exiting transient {t} {V_dxdt} {Xin} {cb}')
-                        pbx.exit_to_level('tr_slvr',False)
-
-                    if any( np.isnan(V_dxdt) ):
-                        self.warning(f'solver got infeasible: {V_dxdt}|{Xin}')
-                        pbx.exit_and_revert()
-                        #TODO: handle this better, seems to cause a warning
-                        raise ValueError(f'infeasible! nan result {V_dxdt} {out} {Xin} {cb}')
-
-                    return V_dxdt
-
-            
-                ans = solve_ivp(sim_iter, [0, endtime], X0, method="RK45", t_eval=Time, max_step=max_step_dt)
-
-                print(ans)
+            with ProblemExec(system,kwargs,level_name='sim',dxdt=True,copy_system=True,run_solver=run_solver,post_callback=cb) as pbx:
+                self._sim_ans = pbx.integrate(endtime=endtime,dt=dt,X0=X0,eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
+                data = pbx.data 
+                #TODO: ctx.save_data([system.save_data()])
+                #this will affect the context copy, not self
+                pbx.exit_to_level('sim',False) 
 
             # convert to list with time
             data = [{"time": k, **v} for k, v in data.items()]
@@ -753,3 +620,108 @@ class GlobalDynamics(DynamicsMixin):
             if debug_fail:
                 return system,pbx
             raise e
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#TODO: add simulation time to context
+# pbx.last_time = 0
+
+#                 #our anonymous integrator!
+#                 def sim_iter(t, x, *args):
+#                     out = {p: np.nan for p in intl_refs}
+#                     Xin = {p: x[i] for i, p in enumerate(intl_refs)}
+# 
+#                     if self.log_level < 10:
+#                         self.info(f'sim_iter {t} {x} {Xin}')
+# 
+#                     system.time = t
+# 
+#                     with ProblemExec(system,level_name='tr_slvr',Xnew=Xin) as pbx:
+# 
+#                         # solver always gets a copy of x
+#                         solver[t] = x #TODO: stateful capture
+#                         
+#                         # test for record time 
+#                         #TODO: rates / events ect 
+#                         #TODO: faster way to get last time vs max(data)  
+#                         if not data or t > pbx.last_time + dt:
+#                             data[t] = cs = pbx.get_ref_values()
+#                             pbx.last_time = t
+#                             if self.log_level < 10:
+#                                 self.info(f'record {t}| {Xin}')
+# 
+#                         #ad hoc time integration
+#                         for name, trdct in pbx.integrators.items():
+#                             out[trdct.var] = trdct.current_rate
+# 
+#                         # dynamics
+#                         for compnm, compdict in pbx.dynamic_comps.items():
+#                             comp = compdict#["comp"]
+#                             if not comp.dynamic_state_vars and not comp.dynamic_input_vars:
+#                                 continue
+#                             Xds = np.array([r.value() for r in comp.Xt_ref.values()])
+#                             Uds = np.array([r.value() for r in comp.Ut_ref.values()])
+#                             # time updated in step
+#                             #system.info(f'comp {comp} {compnm} {Xds} {Uds}')
+#                             dxdt = comp.step(t, dt, Xds, Uds, True)
+# 
+#                             for i, (p, ref) in enumerate(comp.Xt_ref.items()):
+#                                 out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
+# 
+#                         # solvers
+#                         if run_solver and pbx.solveable:
+#                             # TODO: add in any transient
+#                             with ProblemExec(system,level_name='ss_slvr') as pbx:
+#                                 
+#                                 #TODO: handle various cases of (obj,eq,ineq) dynamically
+#                                 #normally obj is handled via min/max objective
+#                                 #in case of eq and inequal constraints, we need to adapt to the situation. For many eq's we can use the root solver, otherwise we can mutiply the normalize the equalities all together as multiply by something like normal of all inputs to provide a default objective of something like "find the smallest input satisfying constraints"
+# 
+# 
+#                                 ss_out = pbx.solve_min(Xss, Yobj, **mkw)
+#                                 if ss_out['ans'].success:
+#                                     if self.log_level <= 9:
+#                                         self.info(f'exiting solver {t} {ss_out["Xans"]} {ss_out["Xstart"]}')             
+#                                     pbx.set_ref_values(ss_out['Xans'])
+#                                     pbx.exit_to_level('ss_slvr',False)
+#                                 else:
+#                                     self.warning(f'solver failed to converge {ss_out["ans"].message} {ss_out["Xans"]} {ss_out["X0"]}')
+#                                     if pbx.raise_on_opt_failure:
+#                                         pbx.exit_to_level('sim',pbx.fail_revert)
+#                                     else:
+#                                         pbx.exit_to_level('ss_slvr',pbx.fail_revert)
+# 
+#                         #pbx.post_execute()
+#                         V_dxdt =  np.array([out[p] for p in intl_refs])
+#                         if self.log_level <= 10:
+#                             self.info(f'exiting transient {t} {V_dxdt} {Xin} {cb}')
+#                         pbx.exit_to_level('tr_slvr',False)
+# 
+#                     if any( np.isnan(V_dxdt) ):
+#                         self.warning(f'solver got infeasible: {V_dxdt}|{Xin}')
+#                         pbx.exit_and_revert()
+#                         #TODO: handle this better, seems to cause a warning
+#                         raise ValueError(f'infeasible! nan result {V_dxdt} {out} {Xin} {cb}')
+# 
+#                     return V_dxdt

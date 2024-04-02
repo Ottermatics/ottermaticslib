@@ -289,16 +289,16 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             if isinstance(v, ComponentIter) and not v.wide
         }
 
-    def internal_references(self, recache=False) -> dict:
-        """get references to all internal attributes and values"""
-        if recache == False and hasattr(self, "_prv_internal_references"):
+    def internal_references(self, recache=False,numeric_only=False) -> dict:
+        """get references to all internal attributes and values, only saving when complete cache info is requested (vs numeric only)"""
+        if not numeric_only and (recache == False and hasattr(self, "_prv_internal_references")):
             return self._prv_internal_references
 
-        out = self._gather_references()
-        self._prv_internal_references = out
+        out = self._gather_references(numeric_only=numeric_only)
+        if not numeric_only: self._prv_internal_references = out
         return out
 
-    def _gather_references(self) -> dict:
+    def _gather_references(self,numeric_only=False) -> dict:
         out = {}
         out["attributes"] = at = {}
         out["properties"] = pr = {}
@@ -306,8 +306,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         for key in self.system_properties_classdef():
             pr[key] = Ref(self, key, True, False)
 
-        for key in self.input_fields():
-            at[key] = Ref(self, key, False, True)
+        if numeric_only:
+            for key in self.numeric_fields():
+                at[key] = Ref(self, key, False, True)
+        else:
+            for key in self.input_fields():
+                at[key] = Ref(self, key, False, True)
 
         return out
 
@@ -381,7 +385,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         from engforge.system import System
 
         self.debug(
-            f"running [SOLVER].{method} {self.identity} with input {kwargs}"
+            f"running [Solver].{method} {self.identity} with input {kwargs}"
         )
 
         # TODO: allow setting sub-component vars with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
@@ -412,11 +416,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             #     revert_x = Ref.refset_get(sys_refs)
 
             # prep references for keys
-            refs = {}
-            for k, v in _input.items():
-                refs[k] = self.locate_ref(k)
-            for k in sequence_keys:
-                refs[k] = self.locate_ref(k)
+            # refs = {}
+            # for k, v in _input.items():
+            #     refs[k] = self.locate_ref(k)
+            # for k in sequence_keys:
+            #     refs[k] = self.locate_ref(k)
 
             # Pre Run Callback
             self.pre_run_callback(eval_kw=eval_kw, sys_kw=sys_kw, **kwargs)
@@ -443,7 +447,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         # Run The Method with inputs provisioned
                         #TODO: wrap with ProblemExec 
                         out = method(
-                            refs, icur, eval_kw, sys_kw, cb=cb, **method_kw
+                            icur, eval_kw, sys_kw, cb=cb, **method_kw
                         )
 
                         if return_results:
@@ -633,18 +637,18 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return val
 
     # Reference Caching
-    def system_references(self, recache=False):
+    def system_references(self, recache=False,numeric_only=False):
         """gather a list of references to attributes and"""
-        if recache == False and hasattr(self, "_prv_system_references"):
+        if not numeric_only and (recache == False and hasattr(self, "_prv_system_references")):
             return self._prv_system_references
 
-        out = self.internal_references(recache)
+        out = self.internal_references(recache,numeric_only=numeric_only)
         tatr = out["attributes"]
         tprp = out["properties"]
 
         # component iternals
         for key, comp in self.comp_references.items():
-            sout = comp.internal_references(recache)
+            sout = comp.internal_references(recache,numeric_only=numeric_only)
             satr = sout["attributes"]
             sprp = sout["properties"]
 
@@ -655,7 +659,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for k, v in sprp.items():
                 tprp[f"{key}.{k}"] = v
 
-        self._prv_system_references = out
+        if numeric_only is False: self._prv_system_references = out
         return out
     
     def collect_comp_refs(self,conf:"Configuration"=None,**kw):

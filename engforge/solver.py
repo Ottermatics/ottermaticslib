@@ -1,6 +1,6 @@
 """solver defines a SolverMixin for use by System.
 
-Additionally the SOLVER attribute is defined to add complex behavior to a system as well as add constraints and transient integration.
+Additionally the Solver attribute is defined to add complex behavior to a system as well as add constraints and transient integration.
 
 ### A general Solver Run Will Look Like:
 0. run pre execute (signals=pre,both)
@@ -35,6 +35,7 @@ import inspect
 SOLVER_OPTIONS = ["minimize"]#"root", "global", 
 from engforge.solver_utils import *
 from engforge.problem_context import *
+from engforge.attr_solver import Solver,SolverInstance
 
 class SolverLog(LoggingMixin):
     pass
@@ -62,9 +63,12 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
     outc = filter_combos(var_name,solver_inst, extra_kw,combos)
     outp = False
     #if the combo filter didn't explicitly fail, check the var filter
-    if attr_name in SLVR_SCOPE_PARM:
+    if outc and attr_name in SLVR_SCOPE_PARM:
         outp = filter_vals(var_name,solver_inst, extra_kw)
-        outr = all((outp,outc)) #redundant per above
+        if extra_kw.get('both_match',True):
+            outr = all((outp,outc)) #redundant per above
+        else:
+            outr = any((outp,outc))
     else:
         outr = outc
     
@@ -116,11 +120,51 @@ class SolverMixin(SolveableMixin):
         return out    
     
     #Official Solver Interface
-    def solver_vars(self,check_dynamics=True,**kwargs):
-        """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations"""
+    def solver_vars(self,check_dynamics=True,addable=None,**kwargs):
+        """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations
+        
+        parses `add_vars` in kwargs to append to the collected solver vars
+        :param add_vars: can be a str, a list or a dictionary of variables: solver_instance kwargs. If a str or list the variable will be added with positive only constraints. If a dictionary is chosen, it can have keys as parameters, and itself have a subdictionary with keys: min / max, where each respective value is placed in the constraints list, which may be a callable(sys,prob) or numeric. If nothing is specified the default is min=0,max=None
+        """
         from engforge.solver import combo_filter
 
-        return self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs,check_dynamics=check_dynamics)
+        out = self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs,check_dynamics=check_dynamics)
+
+        base_const = {'min':0,'max':None}
+
+        #get add_vars and add to attributes
+        if addable and ( addvar:= kwargs.get('add_vars',[])):
+            matches = []
+            if addvar:
+
+                if isinstance(addvar,str):
+                    addvar = addvar.split(',')
+                
+                avars = list(addable['attributes'].keys())
+                for av in addvar:
+                    matches = set(fnmatch.filter(avars,av))
+                    if isinstance(addvar,dict) and isinstance(addvar[av],dict):
+                        const = base_const.copy()
+                        const.update(addvar[av])
+                    elif isinstance(addvar,dict):
+                        raise ValueError(f'dictionary must have a subdictionary for {av}')
+                    else:
+                        const = base_const.copy()
+
+                    for mtch in matches:
+
+                        if self.log_level < 5:
+                            self.msg(f'adding {mtch} to solver vars')
+
+                        ref = addable['attributes'][mtch].copy()
+                        mtch_type = Solver.declare_var(mtch)
+                        mtch_type.constraints[0]['value'] = const['min']
+                        mtch_type.constraints[1]['value'] = const['max']
+                        mtch_inst = SolverInstance(mtch_type,self)
+                        out['attrs']['solver.var'][mtch] = ref
+                        out['type']['solver'][mtch] = mtch_inst
+
+        return out
     
 
     def post_run_callback(self, **kwargs):
@@ -135,40 +179,8 @@ class SolverMixin(SolveableMixin):
         """the steady state run the solver for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
 
         with ProblemExec(self,kwargs,level_name='run') as pbx:
-            return self._iterate_input_matrix(self._run, **kwargs)
+            return self._iterate_input_matrix(self.eval, return_results=True,**kwargs)
 
-    def _run(self, refs, icur, eval_kw=None, sys_kw=None, **kwargs):
-        """the steady state run method for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
-
-        # TODO: what to do with eval / sys kw
-        # TODO: option to preserve state
-        Ref.refset_input(refs, icur)
-        self.debug(f"running with {icur}|{kwargs}")
-        self.run_method(eval_kw=eval_kw, sys_kw=sys_kw, **kwargs)
-        self.debug(f"{icur} run time: {self._run_time}")
-
-    def run_method(self, eval_kw=None, sys_kw=None, cb=None, **method_kw):
-        """runs the case as currently defined by the system. This is the method that is called by the solver matrix to run the system with the input vars. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
-        # set the values
-        from engforge.system import System
-
-        # Transeint
-        #TODO: move to problem context!!! add plug-play functionality
-        self._run_start = datetime.datetime.now()
-        if self._run_id is None:
-            self._run_id = int(uuid.uuid4())   
-
-        if isinstance(self, System):
-            self.system_references(recache=True)  
-            #recache is important for iterators
-            #TODO: only recache when iterators are present
-
-        #call solver in scope
-        self.eval(cb=cb, eval_kw=eval_kw, sys_kw=sys_kw, **method_kw)
-
-        #TODO: move to problem context
-        self._run_end = datetime.datetime.now()
-        self._run_time = self._run_end - self._run_start
 
     def run_internal_systems(self, sys_kw=None):
         """runs internal systems with potentially scoped kwargs"""
@@ -191,21 +203,27 @@ class SolverMixin(SolveableMixin):
                 if isinstance(comp, System):  # should always be true
                     self.info(f"solving {key} with {sys_kw_comp}")
                     comp.eval(**sys_kw_comp)
-
+ 
     # Single Point Flow
     def eval(
-        self, cb=None, eval_kw: dict = None, sys_kw: dict = None, **kw
+        self, Xo,eval_kw: dict = None, sys_kw: dict = None,cb=None, **kw
     ):
         """Evaluates the system with pre/post execute methodology
         :param kw: kwargs come from `sys_kw` input in run ect.
         :param cb: an optional callback taking the system as an argument of the form (self,eval_kw,sys_kw,**kw)
         """
 
+        # Transeint
+        from engforge.system import System
+        if isinstance(self, System):
+            #recache is important for iterators #TODO: only with iterable comps
+            self.system_references(recache=True)        
+
         if self.log_level < 20:
             self.debug(f"running with kw:{kw}")
         
         #execute with problem context and execute signals
-        with ProblemExec(self,kw,level_name='eval',eval_kw=eval_kw, sys_kw=sys_kw,post_callback=cb) as pbx:
+        with ProblemExec(self,kw,level_name='eval',eval_kw=eval_kw, sys_kw=sys_kw,post_callback=cb,Xnew=Xo) as pbx:
             #FIXME: change the eval_kw / sys_kw 
             #pbx.pre_execute(**kw)
             self.index += 1
@@ -320,62 +338,3 @@ class SolverMixin(SolveableMixin):
 
 
 
-
-# # TODO: add basin hopping method as a "search" call
-# output = {
-#     "Xstart": Xg,
-#     "vars": vars,
-#     "Xans": None,
-#     "dXdt": dXdt,
-#     "obj": obj,
-#     "add_obj": add_obj,
-#     "Yref": Yref,
-#     "update_methods": updts,
-# }
-# output['input_cons'] = constraints
-# 
-# # Solve / Minimize
-# #if solve_mode == "root" and not has_constraints and obj is None:
-#     #return self.solve_root(Xref, Yref, Xg, vars, output, **opts)
-# if solve_mode == "minimize" or has_constraints:
-#     # handle threahold for success depending on if objective provided
-#     if "thresh" not in opts:
-#         # default threshold
-#         opts["thresh"] = self.success_thresh if not obj else None
-#     elif obj:
-#         opts["thresh"] = None
-# 
-#     if obj:
-#         if add_obj:
-#             #normi = opts.pop("normalize", None)
-#             ffunc = lambda *args, **kw: secondary_obj(obj, *args, **kw)
-#             opts["ffunc"] = ffunc
-#         else:
-#             # TODO: define behavior
-#             pass
-#     sol = self.solve_min(Xref, Yref, Xg, vars, output, **opts)
-# 
-#     x_in = [sol['Xans'][p] for p in vars]
-#     cur = refset_get(Xref)
-#     refset_input(Xref, sol['Xans'])
-#     #print(con_list,constraints['constraints'])
-# 
-#     Ycon = {}
-#     for c,k in zip(constraints['constraints'],constraints['info']):
-#         cv = c['fun'](x_in,self,{})
-#         #print(c,k,cv)
-#         Ycon[k] = cv
-#     output['Ycon'] = Ycon
-#     output['Yobj'] = {k:v.value(self,output) for k,v in Yref.items()}
-#     refset_input(Xref, cur)
-# 
-#     return sol
-# 
-# else:
-#     self.warning(
-#         f"no solution attempted! for {solve_mode} with {obj} and const: {constraints}"
-#     )
-# 
-# 
-# 
-# 

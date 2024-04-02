@@ -454,7 +454,6 @@ def filter_combos(var,inst,extra_kw=None,combos_in=None):
     return False    
     
 def filter_vals(var,inst,extra_kw=None):
-    #TODO: add_vars parsing here
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
@@ -466,12 +465,21 @@ def filter_vals(var,inst,extra_kw=None):
     if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
         return True
     
+    #add_vars = ext_str_list(extra_kw,'add_vars',None)
     groups = ext_str_list(extra_kw,'slv_vars','')
     if groups is None:
         return True #no var filter!
     
     igngrp = ext_str_list(extra_kw,'ign_vars',None)
     onlygrp = ext_str_list(extra_kw,'only_vars',None)
+
+    #add vars overrides all other filters
+    #NOTE: add_vars is for variables that aren't defined already, slv_vars is for variables that are defined
+    # if add_vars:
+    #     if any([arg_var_compare(var,avar) for avar in add_vars]):
+    #         if log.log_level < 3:
+    #             log.msg(f'adding solver var')            
+    #         return True
 
     #check values, and filters
     initial_match = [grp for grp in groups if arg_var_compare(var,grp)]

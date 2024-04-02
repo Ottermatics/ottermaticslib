@@ -10,7 +10,7 @@ This isn't technically a singleton pattern, but it does provide a similar interf
 
     #Application code (arguments passed in kw)
     with ProblemExec(sys,combos='default',slv_vars'*',**kw) as pe:
-        pe.sys_refs #get the references and compiled problem
+        pe._sys_refs #get the references and compiled problem
         for i in range(10):
             pe.solve_min(pe.Xref,pe.Yref,**other_args)
             pe.set_checkpoint() #save the state of the system 
@@ -53,6 +53,14 @@ from engforge.system_reference import Ref
 from engforge.solver_utils import *
 import weakref
 
+from scipy.integrate import solve_ivp
+from collections import OrderedDict
+import numpy as np
+import pandas
+import expiringdict
+import attr, attrs
+import datetime
+
 class ProbLog(LoggingMixin): pass
 log = ProbLog()
 
@@ -61,15 +69,17 @@ import uuid
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 #TODO: define the dataframe / data storage feature
 
+min_kw_dflt = {"method": "SLSQP"}
 
 
 #The KW Defaults for Solver via kw_dict
-slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None)
+slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None,weights=None)
 #KW Defaults for context from **opts
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10)
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None,both_match=True)
+
+transfer_kw = ['system',]
 
 #TODO: output options extend_dataframe=True,return_dataframe=True
-
 
 
 #Special exception classes handled in exit
@@ -115,13 +125,30 @@ class ProblemExec:
     system: "System"
     _session: "ProblemExec"
     _session_id = None
+
+    #problem state / per level
     problem_id = None 
     entered: bool = False
     exited: bool = False
+    level_name: str = None #target this context with the level name
+    level_number: int = 0 #TODO: keep track of level on the global context    
 
-    #Store refs for later
+    #solution control (point to singleton via magic getattr)
+    _last_time: float = 0
+    _time: float = 0
+    _dt: float = 0    
     _update_refs: dict 
     _post_update_refs: dict
+    _sys_refs: dict
+    _slv_kw: dict
+    _minimizer_kw: dict = None
+    _data: list = None
+    _weights: dict
+    _x_start:dict = None
+    _dxdt = None #numeric/None/dict/(integrate=True)
+    _run_start = None
+    _run_end = None
+    _run_time = None
 
     #runtime and exit options
     success_thresh = 10
@@ -133,26 +160,23 @@ class ProblemExec:
     exit_on_failure: bool = True
     raise_on_opt_failure: bool = True
     raise_on_unknown: bool = True
-    
-    #exit & level definition
-
+    copy_system: bool = False
     post_callback: callable = None #callback that will be called on the system each time it is reverted, it should take args(system,current_problem_exec)
-    level_name: str = None #target this context with the level name
-    level_number: int = 0 #TODO: keep track of level on the global context
 
-    #solver references raw
-    sys_refs: dict
-    slv_kw: dict
 
-    #collections attrs expanded
-    attrs: dict
-    type: dict
-    comp: dict
+    def __getattr__(self, name):
+        '''This is a special method that is called when an attribute is not found in the usual places, like when interior contexts (anything not the root (_session_id=True)) are created that dont have the top level's attributes. some attributes will look to the parent session'''
 
-    #_sessions: dict = {} #TODO: support multiple systems
-    X_start:dict = None
-    X_end:dict = None
-    _dxdt = None #numeric/None/dict (True?)
+        self.info(f'lookup: {name}')
+
+        #subproblem lookup
+        if self._session_id != True and name.startswith('_') and 'session' not in name:
+            return getattr(self._class_cache._session,name)
+
+        #TODO: subproblem lookup here
+
+        # Default behaviour
+        return self.__getattribute__(name)
 
         
     def __init__(self,system,kw_dict=None,Xnew=None,ctx_fail_new=False,**opts):
@@ -187,21 +211,39 @@ class ProblemExec:
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
         """
+        self.data = {} #index:row_dict
+        # temp solver storage
+        self.solver_hist = expiringdict.ExpiringDict(100, 60)  
+
         if self.log_level < 15:
             if hasattr(ProblemExec,'_session'):
                 self.debug(f'subctx{self.level_number}|  keywords: {kw_dict} and misc: {opts}')
             else:
                 self.debug(f'context| keywords: {kw_dict} and misc: {opts}')
 
+        #special cases for parsing
         #parse the options to change behavior of the context
+        level_name = None
         if opts and 'level_name' in opts:
             level_name = opts.pop('level_name').lower()
-        elif kw_dict and 'level_name' in kw_dict:
+        if kw_dict and 'level_name' in kw_dict:
             level_name = kw_dict.pop('level_name').lower()
+
+        #solver min-args wrt defaults
+        min_kw = None
+        if opts and 'min_kw' in opts: 
+            min_kw = kw_dict.pop('min_kw')
+        if kw_dict and 'min_kw' in kw_dict:
+            min_kw = kw_dict.pop('min_kw')
+        mkw =min_kw_dflt.copy()
+        if min_kw is None:
+            min_kw = mkw
         else:
-            level_name = None
+            mkw.update(min_kw)
+        self._minimizer_kw = mkw
 
         #Merge kwdict(stateful) and opts (current level)
+        #solver vars should be static for a problem and subcontexts, however the default vars can change. Subproblems allow for the solver vars to be changed on its creation.
         opt_in,opt_out = {},{}
         if opts:
             #these go to the context instance optoins
@@ -211,6 +253,7 @@ class ProblemExec:
 
         if kw_dict is None:
             kw_dict = {}
+
         else:
             #these go to the context instance optoins
             kw_in = {k:v for k,v in kw_dict.items() if k in dflt_parse_kw}
@@ -218,6 +261,10 @@ class ProblemExec:
             kw_out = {k:v for k,v in kw_dict.items() if k not in opt_in}
             #these go to system establishment
             opt_out.update(kw_out)
+            #remove problem options from dict (otherwise passed along to system!)
+            for k in kw_in:
+                kw_dict.pop(k)
+
 
         #Define the handiling of rate integrals
         if 'dxdt' in opts:
@@ -238,7 +285,7 @@ class ProblemExec:
             else:
                 raise IllegalArgument(f'bad dxdt value {dxdt}')
                 
-        self._dxdt = dxdt                 
+        self._dxdt = dxdt              
             
         if hasattr(ProblemExec,'_session'):
             #TODO: update options for this instance
@@ -246,7 +293,8 @@ class ProblemExec:
             #error if the system is different (it shouldn't be!)
                         
             #mirror the state of session (exactly)
-            self.__dict__ = self._class_cache._session.__dict__.copy()
+            copy_vals = {k:v for k,v in self._class_cache._session.__dict__.items() if k in dflt_parse_kw or k in transfer_kw}
+            self.__dict__.update(copy_vals)
             self._problem_id = uuid.uuid4()
             self._problems[self._problem_id] = self #carry that weight
 
@@ -265,7 +313,7 @@ class ProblemExec:
             if log.log_level < 5:
                 self.msg(f'[{self.level_number}-{self.level_name}]setting execution context with {opt_in}| {opt_out}')
             
-            #each state request to be reverted, then we need to store the state of each execution context overriding the outer context X_start
+            #each state request to be reverted, then we need to store the state of each execution context overriding the outer context _x_start
             self.set_checkpoint()
 
         elif ctx_fail_new:
@@ -290,44 +338,56 @@ class ProblemExec:
             self.set_checkpoint()        
 
         if log.log_level < 10:
-            self.info(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {opts} | {self.slv_kw}')            
+            self.info(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {opts} | {self._slv_kw}')            
         elif log.log_level <= 3:
-            self.msg(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {self.slv_kw}')
+            self.msg(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {self._slv_kw}')
 
     def establish_system(self,system,kw_dict,**kwargs):
         """caches the system references, and parses the system arguments"""
-        from engforge.components import SolveableInterface
+        from engforge.solver import SolverMixin
         from engforge.system import System 
+    
+        if self.copy_system:
+            system = system.copy_config_at_state()
+        
+        if system.is_dynamic:
+            system.setup_global_dynamics()
 
         #pass args without creating singleton (yet)
         self._session_id = uuid.uuid4()
+        self._run_start = datetime.datetime.now()
         self.name = system.name + '-' + str(self._session_id)[:8]
+
         if log.log_level < 5:
             self.info(f'establish {system}| {kw_dict} {kwargs}')
 
         self.system = system
-        assert isinstance(self.system,SolveableInterface), 'only solveable interfaces are supported for execution context'
-        self.system._last_context = self
+        assert isinstance(self.system,SolverMixin), 'only solveable interfaces are supported for execution context'
+        self.system._last_context = self #set the last context to this one
+
         if hasattr(self.system,'success_thresh') and isinstance(self.system.success_thresh,(int,float)):
             self.success_thresh = self.system.success_thresh
 
         #Recache system references
-        if isinstance(self.system, System):
-            #get the fresh references!
-            self.system.system_references(recache=True)
+        self.all_refs = self.system.system_references(recache=True)
+        self.num_refs = self.system.system_references(numeric_only=True)
         
+
         #Extract solver vars and set them on this object, they will be distributed to any new further execution context's via monkey patch above
         in_kw = self.get_extra_kws(kwargs,slv_dflt_options,use_defaults=False)
-        self.slv_kw = self.get_extra_kws(kw_dict,slv_dflt_options,rmv=True)
-        self.slv_kw.update(in_kw) #update with input!
+        self._slv_kw = self.get_extra_kws(kw_dict,slv_dflt_options,rmv=True)
+        self._slv_kw.update(in_kw) #update with input!
+
+        #Get solver weights
+        self._weights = self._slv_kw.get('weights',None)
 
         check_dynamics = self._dxdt is not None and self._dxdt is not False
-        self.sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,**self.slv_kw)
+        self._sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,addable=self.num_refs,**self._slv_kw)
 
         #Grab inputs and set to system
         for k,v in dflt_parse_kw.items():
-            if k in self.slv_kw:
-                setattr(self,k,self.slv_kw[k])
+            if k in self._slv_kw:
+                setattr(self,k,self._slv_kw[k])
 
         #Get the update method refs
         self._update_refs = self.system.collect_update_refs()
@@ -335,18 +395,21 @@ class ProblemExec:
         self._post_update_refs = self.system.collect_post_update_refs()
         
         #Problem Variable Definitions
-        self.solver_vars = self.sys_solver_variables(as_flat=True,**self.slv_kw)
+        self.solver_vars = self.sys_solver_variables(as_flat=True,**self._slv_kw)
         self.Xref = self.all_problem_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
         self.constraints = self.sys_solver_constraints(cons)
 
         if log.log_level < 5:
-            self.msg(f'established sys context: {self} {self.slv_kw}')  
+            self.msg(f'established sys context: {self} {self._slv_kw}')  
 
     #Context Manager Interface
     def __enter__(self):
         #Set the new state
+        
+        if self.entered:
+            self.warning(f'context already entered!')
         
         self.activate_temp_state()
         
@@ -360,7 +423,7 @@ class ProblemExec:
                 self.warning(f'change of execution class!')
             #global level number
             self._class_cache.level_number += 1     
-            self.entered = True   
+            self.entered = True
             return self._class_cache._session
         
         #return New
@@ -368,8 +431,8 @@ class ProblemExec:
         self._class_cache.level_number = 0
 
         if self.log_level < 10:
-            refs = {k:v for k,v in self.sys_refs.get('attrs',{}).items() if v}
-            self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self.slv_kw}| {refs}')
+            refs = {k:v for k,v in self._sys_refs.get('attrs',{}).items() if v}
+            self.debug(f'[{self.level_number}-{self.level_name}] creating execution context for {self.system}| {self._slv_kw}| {refs}')
         self.entered = True
         return self
 
@@ -462,7 +525,7 @@ class ProblemExec:
 
         elif self.revert_every:
             if self.log_level <= 8:
-                self.debug(f'[{self.level_number}-{self.level_name}] to {self.X_start}')
+                self.debug(f'[{self.level_number}-{self.level_name}] to {self._x_start}')
             self.revert_to_start()
             
             #run execute 
@@ -489,17 +552,159 @@ class ProblemExec:
         return True #our problem will go on
     
     def clean_context(self):
-        if hasattr(ProblemExec,'_session') and self._class_cache._session is self:
-            #TODO: restore state from `X_start`
-            if self.log_level <= 10:
+        if hasattr(self._class_cache,'_session') and self._class_cache._session is self:
+            if self.log_level <= 8:
                 self.debug(f'[{self.level_number}-{self.level_name}] closing execution session')
             self._class_cache.level_number = 0
             del self._class_cache._session
         elif hasattr(self._class_cache,'_session'):
             #global level number
             self._class_cache.level_number -= 1  
-             
 
+        #finally mark we are done
+        if self._session_id == True:
+            self._run_end = datetime.datetime.now()
+            self._run_time = self._run_end - self._run_start
+            if self.log_level <= 10:
+                self.debug(f"EXIT[{self.system.identity}] run time: {self._run_time}",lvl=5)
+
+    def integrate(self,endtime,dt=0.001,max_step_dt=0.01,X0=None,**kw):
+        #Unpack Transient Problem
+        intl_refs = self.integrator_var_refs
+        refs = self._sys_refs
+        system = self.system
+
+        min_kw = self._minimizer_kw
+        if min_kw is None: min_kw = {}
+
+        if dt > max_step_dt:
+            self.warning(f'dt {dt} > max_step_dt {max_step_dt}!')
+            dt = max_step_dt
+
+        if self.log_level < 15:
+            self.info(f'simulating {system},{self}| int:{intl_refs} | refs: {refs}' )            
+
+        if not intl_refs:
+            raise Exception(f'no transient parameters found')            
+        
+        x_cur = {k: v.value(self,self) for k, v in intl_refs.items()}
+
+        if self.log_level < 10:
+            self.debug(f'initial state {X0} {intl_refs}| {refs}')
+
+        if X0 is None:
+            # get current
+            X0 = x_cur
+        #add any missing solver vars existing in the system
+        if set(X0) != set(x_cur):
+            X0 = x_cur.update(X0) 
+        
+        #this will fail if X0 doesn't have solver vars!
+        X0 = np.array([X0[p] for p in intl_refs])
+        Time = np.arange(self.system.time, endtime + dt, dt)
+
+        rate_kw = {'min_kw':min_kw,'dt':dt}
+
+        #run the simulation from the current state to the endtime
+        ans = solve_ivp(self.integral_rate, [self.system.time, endtime], X0, method="RK45", t_eval=Time, max_step=max_step_dt,args=(dt,),**kw)
+
+        print(ans) 
+
+        return ans
+
+    #set context time
+    def set_time(self,time,dt):
+        self._last_time = lt = self._time
+        self._time = time
+        dt_calc = time - lt
+        self._dt = dt if dt_calc <= 0 else dt_calc
+        self.system.set_time(time) #system times / subcomponents too
+
+    def integral_rate(self,t, x, dt, **kw):
+        """provides the dynamic rate of the system at time t, and state x"""
+        run_solver = kw.get('run_solver',False) #i would love this to be true, but there's just too much possible variation in application to make it so without some kind of control / continuity strategy. Dynamics are natural responses anyways
+
+
+
+        intl_refs = self.integrator_var_refs
+        refs = self._sys_refs
+        system = self.system
+
+        out = {p: np.nan for p in intl_refs}
+        Xin = {p: x[i] for i, p in enumerate(intl_refs)}
+
+        if self.log_level < 10:
+            self.info(f'sim_iter {t} {x} {Xin}')
+
+        system.time = t
+
+        #get the probelem variables
+        Xss = self.problem_opt_vars
+        Yobj = self.final_objective
+
+        with ProblemExec(system,level_name='tr_slvr',Xnew=Xin) as pbx:
+
+            # solver always gets a copy of x
+            #solver[t] = x #TODO: stateful capture
+            
+            # test for record time 
+            #TODO: rates / events ect & store data
+            #TODO: faster way to get last time vs max(data)  
+            # if not data or t > pbx.last_time + dt:
+            #     data[t] = cs = pbx.get_ref_values()
+            #     pbx.last_time = t
+            #     if self.log_level < 10:
+            #         self.info(f'record {t}| {Xin}')
+
+            #ad hoc time integration
+            for name, trdct in pbx.integrators.items():
+                out[trdct.var] = trdct.current_rate
+
+            # dynamics
+            for compnm, compdict in pbx.dynamic_comps.items():
+                comp = compdict#["comp"]
+                if not comp.dynamic_state_vars and not comp.dynamic_input_vars:
+                    continue
+                Xds = np.array([r.value() for r in comp.Xt_ref.values()])
+                Uds = np.array([r.value() for r in comp.Ut_ref.values()])
+                # time updated in step
+                #system.info(f'comp {comp} {compnm} {Xds} {Uds}')
+                dxdt = comp.step(t, dt, Xds, Uds, True)
+
+                for i, (p, ref) in enumerate(comp.Xt_ref.items()):
+                    out[(f"{compnm}." if compnm else "") + p] = dxdt[i]
+
+            # solvers
+            if run_solver and self.solveable:
+                # TODO: add in any transient
+                with ProblemExec(system,level_name='ss_slvr') as pbx:
+
+                    ss_out = pbx.solve_min(Xss, Yobj, **self._minimizer_kw)
+                    if ss_out['ans'].success:
+                        if self.log_level <= 9:
+                            self.info(f'exiting solver {t} {ss_out["Xans"]} {ss_out["Xstart"]}')             
+                        pbx.set_ref_values(ss_out['Xans'])
+                        pbx.exit_to_level('ss_slvr',False)
+                    else:
+                        self.warning(f'solver failed to converge {ss_out["ans"].message} {ss_out["Xans"]} {ss_out["X0"]}')
+                        if pbx.raise_on_opt_failure:
+                            pbx.exit_to_level('sim',pbx.fail_revert)
+                        else:
+                            pbx.exit_to_level('ss_slvr',pbx.fail_revert)
+
+            #pbx.post_execute()
+            V_dxdt =  np.array([out[p] for p in intl_refs])
+            if self.log_level <= 10:
+                self.info(f'exiting transient {t} {V_dxdt} {Xin}')
+            pbx.exit_to_level('tr_slvr',False)
+
+        if any( np.isnan(V_dxdt) ):
+            self.warning(f'solver got infeasible: {V_dxdt}|{Xin}')
+            pbx.exit_and_revert()
+            #TODO: handle this better, seems to cause a warning
+            raise ValueError(f'infeasible! nan result {V_dxdt} {out} {Xin}')
+
+        return V_dxdt
 
     def solve_min(
         self,Xref,Yref,output=None,**kw
@@ -544,6 +749,8 @@ class ProblemExec:
         if self.log_level < 10:
             self.debug(f"minimize {Xref} {Yref} {kw}")
         
+        if self._weights is not None:
+            kw['weights'] = self._weights
 
         self._ans = refmin_solve(self.system,self,Xref, Yref, **kw)
         output["ans"] = self._ans
@@ -617,11 +824,39 @@ class ProblemExec:
     def sys_solver_objectives(self,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
-        sys_refs = self.sys_refs
+        sys_refs = self._sys_refs
 
         #Convert result per kind of objective (min/max ect)
         objs = sys_refs.get('attrs',{}).get('solver.obj',{})
         return {k:v for k,v in objs.items()}
+    
+    @property
+    def final_objective(self):
+        """returns the final objective of the system"""
+        Yobj = self.problem_objs
+        Yeq = self.problem_eq
+        Xss = self.problem_opt_vars
+        if Yobj:
+            return Yobj #here is your application objective, sir
+        
+        #now make up an objective, if we have no constraints
+        elif not Yobj and Yeq:
+            #handle case of Yineq == None: root solve
+            self.warning(f'making Yobj from Yeq: {Yeq}')
+            Yobj = { k: v.copy(key = lambda sys,prob: (1+v.value(sys,prob)**2)) for k,v in Yeq.items() }
+
+        elif not Yobj:
+            #minimize the product of all vars, so the smallest value is the best that satisfies all constraints
+            self.info(f'making Yobj from X: {Xss}')
+            def dflt(sys,prob)->float:
+                out = 1
+                for k,v in prob.problem_opt_vars.items():
+                    val = v.value(sys,prob)
+                    out = out + (1+val**2)**0.5 #linear norm of positive values > 1 should be very large penalty 
+                return 1
+            
+            Yobj = {'smallness': Ref(self.system, dflt)}
+        return Yobj #our residual based objective
 
     def sys_solver_constraints(self,add_con=None,combo_filter=True, **kw):
         """formatted as arguments for the solver
@@ -631,7 +866,7 @@ class ProblemExec:
         Xrefs = self.Xref
 
         system = self.system
-        sys_refs = self.sys_refs
+        sys_refs = self._sys_refs
 
         extra_kw = self.kwargs
         
@@ -759,7 +994,7 @@ class ProblemExec:
                         varref = Xrefs[slvr]
                         #varref = slv.rate_ref
                         #Ref Case
-                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,*args,**kw)
+                        ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,rate_val,**kw)
                         #con_list.append(ccst)
                         con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
                         con_list.append(ccst) 
@@ -781,7 +1016,7 @@ class ProblemExec:
                         elif  kind in ('min','max') and slvr in Xvars:
                             varref = Xrefs[slvr]
                             #Ref Case
-                            ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,*args,**kw)
+                            ccst = ref_to_val_constraint(system,system.last_context,Xrefs,varref,kind,cval,**kw)
                             con_info.append(f'val_{ref.comp.classname}_{kind}_{slvr}')
                             con_list.append(ccst)
 
@@ -893,16 +1128,16 @@ class ProblemExec:
 
     def set_checkpoint(self):
         """sets the checkpoint"""
-        self.X_start = self.record_state
+        self._x_start = self.record_state
         if log.log_level <= 7:
-            self.debug(f'[{self.level_number}-{self.level_name}] set checkpoint: {list(self.X_start.values())}')
+            self.debug(f'[{self.level_number}-{self.level_name}] set checkpoint: {list(self._x_start.values())}')
 
     def revert_to_start(self):
         if log.log_level < 5:
-            xs = list(self.X_start.values())
+            xs = list(self._x_start.values())
             rs = list(self.record_state.values())
             self.debug(f'[{self.level_number}-{self.level_name}] reverting to start: {xs} -> {rs}')
-        Ref.refset_input(self.all_variables,self.X_start)
+        Ref.refset_input(self.all_variables,self._x_start)
 
     def activate_temp_state(self,new_state=None):
         if new_state:
@@ -1027,15 +1262,15 @@ class ProblemExec:
     #Safe Access Methods
     @property
     def ref_attrs(self):
-        return self.sys_refs.get('attrs',{}).copy()
+        return self._sys_refs.get('attrs',{}).copy()
 
     @property
     def attr_inst(self):
-        return self.sys_refs.get('type',{}).copy()
+        return self._sys_refs.get('type',{}).copy()
     
     @property
     def dynamic_comps(self):
-        return self.sys_refs.get('dynamic_comps',{}).copy()
+        return self._sys_refs.get('dynamic_comps',{}).copy()
     
     #Instances
     @property
@@ -1053,7 +1288,7 @@ class ProblemExec:
     @property
     def kwargs(self):
         """copy of slv_kw args"""
-        return self.slv_kw.copy()
+        return self._slv_kw.copy()
 
 
     @property

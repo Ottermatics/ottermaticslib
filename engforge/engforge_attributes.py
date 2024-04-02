@@ -205,30 +205,23 @@ class AttributedBaseMixin(LoggingMixin):
 
     @classmethod
     def input_fields(cls):
+        '''no attr base types, no tuples, no lists, no dicts'''
         ignore_types = (
-            Slot,
-            Signal,
-            Solver,
-            Time,
-            tuple,
-            list,
-            Plot,
-            Trace,
+            ATTR_BASE,
+            #tuple,
+            #list,
+            #dict,
         )
         return cls._get_init_attrs_data(ignore_types, exclude=True)
 
     @classmethod
     def numeric_fields(cls):
         ignore_types = (
-            Slot,
-            Signal,
-            Solver,
-            Time,
+            ATTR_BASE,
             str,
             tuple,
             list,
-            Plot,
-            Trace,
+            dict,
         )
         typ = cls._get_init_attrs_data(ignore_types, exclude=True)
         return {k: v for k, v in typ.items() if v.type in (int, float)}

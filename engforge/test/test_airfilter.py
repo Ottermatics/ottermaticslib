@@ -6,11 +6,13 @@ from engforge.system import System
 from engforge.components import Component
 from engforge.attr_dynamics import Time
 from engforge.attr_solver import Solver
-from engforge.attr_signals import SIGNAL
+from engforge.attr_signals import Signal
 from engforge.attr_slots import Slot
 from engforge.properties import *
 from engforge.attr_plotting import *
 from engforge.analysis import Analysis
+
+from engforge.test.solver_testing_components import *
 
 from scipy.optimize import curve_fit, least_squares
 import numpy as np
@@ -19,68 +21,6 @@ from matplotlib.pyplot import *
 import attrs
 
 
-@forge
-class Fan(Component):
-    n: float = attrs.field(default=1)
-    dp_design:float = attrs.field(default=100)
-    w_design:float = attrs.field(default=2)
-
-    @system_property
-    def dP_fan(self) -> float:
-        return self.dp_design * (self.n * self.w_design) ** 2.0
-
-
-@forge
-class Filter(Component):
-    w: float = attrs.field(default=0)
-    k_loss: float = attrs.field(default=50)
-
-    @system_property
-    def dP_filter(self) -> float:
-        return self.k_loss * self.w
-
-
-@forge
-class Airfilter(System):
-    throttle: float = attrs.field(default=1)
-    w: float = attrs.field(default=1)
-    k_parasitic: float = attrs.field(default=0.1)
-
-    fan: Fan = Slot.define(Fan, default_ok=True)
-    filt: Filter = Slot.define(Filter, default_ok=True)
-
-    set_fan_n = SIGNAL.define("fan.n", "throttle", mode="both")
-    set_filter_w = SIGNAL.define("filt.w", "w", mode="both")
-
-    var_w = Solver.declare_var('w',combos='w',active=True)
-    var_w.add_var_constraint(0.0, kind="min",combos=['min_len'])
-    flow_balance = Solver.constraint_equality('sum_dP')
-
-    flow_curve = Plot.define(
-        "throttle", "w", kind="lineplot", title="Flow Curve"
-    )
-
-    @system_property
-    def dP_parasitic(self) -> float:
-        return self.k_parasitic * self.w**2.0
-
-    @system_property
-    def sum_dP(self) -> float:
-        return self.fan.dP_fan - self.dP_parasitic - self.filt.dP_filter
-
-    @system_property
-    def dp_positive(self) -> float:
-        return self.dP_parasitic - self.filt.dP_filter
-
-
-@forge
-class AirFilterAnalysis(Analysis):
-    efficiency: float = attrs.field(default=0.9)
-    system = Slot.define(Airfilter, default_ok=True)
-
-    @system_property
-    def cadr(self) -> float:
-        return self.system.w * self.efficiency
 
 
 class TestFilterSystem(unittest.TestCase):

@@ -160,12 +160,39 @@ class TestSession(unittest.TestCase):
         self.assertEqual(len(cons['constraints']),5)
         self.assertEqual(len(cons['bounds']),len(atx['solver.var']))        
 
+    def test_slide_crank_add_var(self):
+        sc = SliderCrank()
+        out = sc.run(combos='design',slv_vars='*',revert_last=False,add_vars='*gear*')
+        self.assertEqual(out['gear_speed_slv'],0)    
 
 
 
 
     
 class TestContextExits(unittest.TestCase):
+
+    def test_context_singularity(self):
+        tst = SimpleContext()
+
+        with ProblemExec(tst) as pb1:
+            self.assertEqual(pb1,tst.last_context)
+            self.assertTrue(pb1.entered)
+            self.assertFalse(pb1.exited)                
+            with ProblemExec(tst,level_name='2') as pb2:
+                self.assertIs(pb1,pb2)
+                self.assertTrue(pb1.entered)
+                self.assertFalse(pb1.exited)                
+                with ProblemExec(tst) as pb3:
+                    self.assertIs(pb1,pb3)
+                    self.assertTrue(pb3.entered)
+                    self.assertFalse(pb3.exited)
+                    pb3.exit_to_level('top',revert = True)
+                    raise Exception('Wrong Level')
+                raise Exception('Wrong Level')
+            raise Exception('Wrong Level')
+        self.assertEqual(pb1,tst.last_context)
+        self.assertTrue(pb1.entered)
+        self.assertTrue(pb1.exited)      
 
     def test_exit_top(self):
         tst = SimpleContext()

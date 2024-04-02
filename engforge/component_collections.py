@@ -108,7 +108,7 @@ class ComponentIter(Component):
                 return self._item_refs[self._first_item_key]
             return self._item_refs[self.current_item]
 
-    @instance_cached
+    @instance_cached #TODO: implement this with args
     def comp_references(self):
         """Returns this components global references"""
         out = {}
@@ -123,7 +123,7 @@ class ComponentIter(Component):
 
         return out
 
-    def internal_references(self, recache=False):
+    def internal_references(self, recache=False,numeric_only=False):
         """lists the this_name.comp_key.<attr/prop key>: Ref format to override data_dict"""
 
         if (
@@ -155,11 +155,19 @@ class ComponentIter(Component):
                 prr[key] = rc
 
             # set attr refs
-            for key in item.input_fields():
-                k = f"{it_base_key}.{key}"
-                ri = Ref(item, key, False, True)
-                at[k] = ri
-                atr[key] = ri
+            if numeric_only:
+                for key in item.numeric_fields():
+                    k = f"{it_base_key}.{key}"
+                    ri = Ref(item, key, False, True)
+                    at[k] = ri
+                    atr[key] = ri
+
+            else:
+                for key in item.input_fields():
+                    k = f"{it_base_key}.{key}"
+                    ri = Ref(item, key, False, True)
+                    at[k] = ri
+                    atr[key] = ri
 
         # cache the references
         self._prv_internal_references = out
