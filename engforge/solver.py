@@ -58,12 +58,12 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
         if not outa:
             log.msg(f'filt not active: {var_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
             return False
-
+    both_match =  extra_kw.get('both_match',True)
     #Otherwise look at the combo filter, its its false return that
     outc = filter_combos(var_name,solver_inst, extra_kw,combos)
     outp = False
     #if the combo filter didn't explicitly fail, check the var filter
-    if outc and attr_name in SLVR_SCOPE_PARM:
+    if (outc and attr_name in SLVR_SCOPE_PARM) or not both_match:
         outp = filter_vals(var_name,solver_inst, extra_kw)
         if extra_kw.get('both_match',True):
             outr = all((outp,outc)) #redundant per above
@@ -79,6 +79,7 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
         log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
     elif fin:
         log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos}')
+
     return fin 
 
 # add to any SolvableMixin to allow solver use from its namespace
@@ -124,25 +125,27 @@ class SolverMixin(SolveableMixin):
         """applies the default combo filter, and your keyword arguments to the collect_solver_refs to test the ref / vars creations
         
         parses `add_vars` in kwargs to append to the collected solver vars
-        :param add_vars: can be a str, a list or a dictionary of variables: solver_instance kwargs. If a str or list the variable will be added with positive only constraints. If a dictionary is chosen, it can have keys as parameters, and itself have a subdictionary with keys: min / max, where each respective value is placed in the constraints list, which may be a callable(sys,prob) or numeric. If nothing is specified the default is min=0,max=None
+        :param add_vars: can be a str, a list or a dictionary of variables: solver_instance kwargs. If a str or list the variable will be added with positive only constraints. If a dictionary is chosen, it can have keys as parameters, and itself have a subdictionary with keys: min / max, where each respective value is placed in the constraints list, which may be a callable(sys,prob) or numeric. If nothing is specified the default is min=0,max=None, ie positive only.
         """
         from engforge.solver import combo_filter
 
         out = self.collect_solver_refs(check_atr_f=combo_filter,check_kw=kwargs,check_dynamics=check_dynamics)
 
-        base_const = {'min':0,'max':None}
+        base_const = {'min':0,'max':None} #positive only
 
         #get add_vars and add to attributes
         if addable and ( addvar:= kwargs.get('add_vars',[])):
             matches = []
             if addvar:
-
+                
+                #handle csv, listify string
                 if isinstance(addvar,str):
                     addvar = addvar.split(',')
-                
+                added = set()
                 avars = list(addable['attributes'].keys())
-                for av in addvar:
+                for av in addvar: #list/dict-keys
                     matches = set(fnmatch.filter(avars,av))
+                    #Lookup Constraints if input is a dictionary
                     if isinstance(addvar,dict) and isinstance(addvar[av],dict):
                         const = base_const.copy()
                         const.update(addvar[av])
@@ -151,16 +154,24 @@ class SolverMixin(SolveableMixin):
                     else:
                         const = base_const.copy()
 
+                    #for each match we add the variable
                     for mtch in matches:
+                        if mtch in added:
+                            continue #add only once
+                        else:
+                            added.add(mtch)
 
                         if self.log_level < 5:
                             self.msg(f'adding {mtch} to solver vars')
-
+                        #add constraint values and type/instance
                         ref = addable['attributes'][mtch].copy()
-                        mtch_type = Solver.declare_var(mtch)
+                        mtch_type = Solver.declare_var(mtch) #type
+                        #bounds
                         mtch_type.constraints[0]['value'] = const['min']
-                        mtch_type.constraints[1]['value'] = const['max']
+                        mtch_type.constraints[1]['value'] = const['max'] 
+                        #instance
                         mtch_inst = SolverInstance(mtch_type,self)
+                        #attach
                         out['attrs']['solver.var'][mtch] = ref
                         out['type']['solver'][mtch] = mtch_inst
 
@@ -206,7 +217,7 @@ class SolverMixin(SolveableMixin):
  
     # Single Point Flow
     def eval(
-        self, Xo,eval_kw: dict = None, sys_kw: dict = None,cb=None, **kw
+        self, Xo=None,eval_kw: dict = None, sys_kw: dict = None,cb=None, **kw
     ):
         """Evaluates the system with pre/post execute methodology
         :param kw: kwargs come from `sys_kw` input in run ect.

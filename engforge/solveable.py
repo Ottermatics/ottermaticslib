@@ -645,12 +645,19 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         out = self.internal_references(recache,numeric_only=numeric_only)
         tatr = out["attributes"]
         tprp = out["properties"]
+        comp_dict = {'':self}
+        out['components'] = comp_set_ref = {}
 
         # component iternals
         for key, comp in self.comp_references.items():
             sout = comp.internal_references(recache,numeric_only=numeric_only)
             satr = sout["attributes"]
             sprp = sout["properties"]
+            parent = '.'.join(key.split('.')[:-1])
+            comp_dict[key] = self
+            if parent and parent in comp_dict:
+                attr_name = key.split('.')[-1]
+                comp_set_ref[key] = Ref(comp_dict[parent],attr_name,False,True)
 
             # Fill in
             for k, v in satr.items():

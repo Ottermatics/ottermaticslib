@@ -87,6 +87,9 @@ class SolverInstance(AttributeInstance):
                 objfunc = Ref(self.system,fun)
             else:
                 objfunc = self.lhs
+            
+            if log.log_level <= 6:
+                self.system.debug(f"const defined: {objfunc}|{self.solver}")
 
             self.const_f = objfunc
 
@@ -106,25 +109,7 @@ class SolverInstance(AttributeInstance):
             self.obj = Ref(self.system,fun)
             #self.obj = self.system.locate_ref(fun)
             self.system.debug(f"solving with obj: {self.obj}")
-
-    @property
-    def indep_ref(self):
-        if self.solver.slvtype == "var":
-            return self.var
-        return None
-    
-    @property
-    def obj_key_in(self):
-        if self.solver.slvtype == "obj":
-            return self.solver.obj
-        return None
-    
-    @property
-    def constraint_refs(self):
-        if self.solver.slvtype in ["eq","ineq"]:
-            return self.const_f
-        return None
-
+            
     @property
     def constraints(self):
         if hasattr(self,'_constraints'):
@@ -168,7 +153,7 @@ class SolverInstance(AttributeInstance):
                 out['obj'] = self.obj
         elif self.solver.slvtype == "eq":
                 out['eq'] =  self.const_f
-        if self.solver.slvtype == "ineq":
+        elif self.solver.slvtype == "ineq":
                 out['ineq'] =  self.const_f
         
         return out
@@ -300,7 +285,7 @@ class Solver(ATTR_BASE):
         )
         return cls._setup_cls(new_name, new_dict)
 
-    eq_con = constraint_equality
+    con_eq = constraint_equality
 
     @classmethod
     def constraint_inequality(cls, lhs: ref_type, rhs: ref_type = 0, **kwargs):
@@ -420,19 +405,6 @@ class Solver(ATTR_BASE):
             if all([c[k] == v for k, v in kw.items()]):
                 return i
         return None
-
-    @classmethod
-    def cls_solveable(cls):
-        """returns True if the system has all the required references to solve the solver"""
-        if cls.slvtype == "var":
-            return cls.var
-        else:
-            return cls.lhs or cls.rhs
-
-    @classmethod
-    def sys_solveable(cls, system):
-        """returns True if the system has all the required references to solve the solver"""
-        raise NotImplementedError("#TODO")
 
 
 # Support Previous SnakeCase

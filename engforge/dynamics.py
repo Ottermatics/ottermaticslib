@@ -401,10 +401,10 @@ class DynamicsMixin(Configuration, SolveableMixin):
             self.time = t
 
 
-    @instance_cached #cache on solver due to changes of components
+    @instance_cached #TODO: cache on solver due to changes of components
     def comp_times(self) -> dict:
         """returns a dictionary of time references to components which will be set to the current time"""
-        return {k: Ref(comp,'time',False,True) for k,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
+        return {k: Ref(comp,'time',False,True) for k,l,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
 
     # optimized convience funcitons
     def nonlinear_step(self, t, dt, X, U=None, set_Y=True):

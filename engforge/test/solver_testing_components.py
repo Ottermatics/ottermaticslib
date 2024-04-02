@@ -174,7 +174,7 @@ class CubeSystem(System,SpaceMixin):
 
     sys_length = Solver.con_ineq('total_length','system_length',combos='total_length')
 
-    volfrac = Solver.eq_con('goal_vol_frac','vol_frac',combos='vol_frac_eq',active=False)
+    volfrac = Solver.con_eq('goal_vol_frac','vol_frac',combos='vol_frac_eq',active=False)
 
     obj = Solver.objective('total_volume',combos='volume',kind='max')
     hght = Solver.objective('total_height',combos='height',kind='max')
@@ -531,9 +531,8 @@ class SliderCrank(System,CostModel):
     
 
     #constraints
-    gear_speed_slv = Solver.eq_con('dx_goal',combos='speed_goal')
-    range_slv = Solver.eq_con('ds_goal',combos='range_goal')
-    
+    gear_speed_slv = Solver.con_eq('dx_goal',combos='speed_goal')
+    range_slv = Solver.con_eq('ds_goal',combos='range_goal')
     
 
     gear_pos_slv = Solver.con_ineq('final_gear_ratio',combos='design,gear')

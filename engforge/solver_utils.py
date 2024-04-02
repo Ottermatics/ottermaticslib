@@ -424,8 +424,9 @@ def filter_combos(var,inst,extra_kw=None,combos_in=None):
     
     #parse extra kwargs
     groups = ext_str_list(extra_kw,'combos','')
+    bm = extra_kw.get('both_match',True)
     if groups is None:
-        return True #no group filter!
+        return bm if bm is True else None
     
     igngrp = ext_str_list(extra_kw,'ign_combos',None)
     onlygrp = ext_str_list(extra_kw,'only_combos',None)

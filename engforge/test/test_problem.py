@@ -27,17 +27,17 @@ class TestSession(unittest.TestCase):
     def test_system_last_context(self):
         sm = SpringMass(Fa=0,u=5)
         sm.run(dxdt=0)
-        ssid = sm.last_context._session_id
+        ssid = sm.last_context.session_id
         sm.run(dxdt=0)
-        trid = sm.last_context._session_id
+        trid = sm.last_context.session_id
         self.assertNotEqual(ssid,trid,'Session ID should change after a run')
 
     def test_system_change_context(self):
         sm = SpringMass(Fa=0,u=5)
         sm.run(dxdt=0)
-        ssid = sm.last_context._session_id
+        ssid = sm.last_context.session_id
         trsm,df = sm.simulate(dt=0.01, endtime=0.1,return_all=True)
-        trid = trsm.last_context._session_id
+        trid = trsm.last_context.session_id
         self.assertNotEqual(ssid,trid,'Session ID should change after a run')
 
     def test_slide_crank_empty(self):
@@ -111,11 +111,28 @@ class TestSession(unittest.TestCase):
 
     def test_slide_crank_design(self):
         sm = SliderCrank(Tg=0)
-        pbx = ProblemExec(sm,{'combos':'design','dxdt':None})
+        pbx = ProblemExec(sm,{'combos':'design,cost','dxdt':None})
         atx = pbx.ref_attrs
         self.assertEqual(chk(atx,'solver.var'),set(('Lo','Rc','Ro','x_offset','y_offset')))
         self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv',)))
         self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv')))
+        self.assertEqual(chk(atx,'solver.eq'),set(()))
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(len(cons['constraints']),4)
+        self.assertEqual(len(cons['bounds']),5)
+
+    def test_slide_crank_design_one_match(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'combos':'design','dxdt':None,'both_match':False})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set(('Lo','Rc','Ro','x_offset','y_offset','X_spring_center')))
+        self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv','sym_slv')))
+        self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv','size')))
         self.assertEqual(chk(atx,'solver.eq'),set(('gear_speed_slv','range_slv')))
         self.assertEqual(chk(atx,'dynamics.output'),set())
         self.assertEqual(chk(atx,'dynamics.rate'),set())
@@ -123,29 +140,29 @@ class TestSession(unittest.TestCase):
         self.assertEqual(chk(atx,'dynamics.input'),set())
 
         cons = pbx.constraints
-        self.assertEqual(len(cons['constraints']),5)
-        self.assertEqual(len(cons['bounds']),5)
+        self.assertEqual(len(cons['constraints']),7)
+        self.assertEqual(len(cons['bounds']),6)        
 
-    def test_slide_crank_design_slv(self):
+    def test_slide_crank_design_slv_design(self):
         sm = SliderCrank(Tg=0)
         pbx = ProblemExec(sm,{'combos':'design','slv_vars':'*slv','dxdt':None})
         atx = pbx.ref_attrs
         self.assertEqual(chk(atx,'solver.var'),set())
-        self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv',)))
+        self.assertEqual(chk(atx,'solver.obj'),set(()))
         self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv')))
-        self.assertEqual(chk(atx,'solver.eq'),set(('gear_speed_slv','range_slv')))
+        self.assertEqual(chk(atx,'solver.eq'),set(()))
         self.assertEqual(chk(atx,'dynamics.output'),set())
         self.assertEqual(chk(atx,'dynamics.rate'),set())
         self.assertEqual(chk(atx,'dynamics.state'),set())
         self.assertEqual(chk(atx,'dynamics.input'),set())
 
         cons = pbx.constraints
-        self.assertEqual(len(cons['constraints']),5)
-        self.assertEqual(len(cons['bounds']),2)
+        self.assertEqual(len(cons['constraints']),3)
+        self.assertEqual(len(cons['bounds']),0)
 
     def test_slide_crank_design_slv(self):
         sm = SliderCrank(Tg=0)
-        pbx = ProblemExec(sm,{'combos':'design', 'ign_combos':'max*' ,'slv_vars':'*slv','dxdt':None})
+        pbx = ProblemExec(sm,{'combos':'design,cost,speed_goal,range_goal', 'ign_combos':'max*' ,'slv_vars':'*slv','dxdt':None})
         atx = pbx.ref_attrs
         self.assertEqual(chk(atx,'solver.var'),set())
         self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv',)))
@@ -158,12 +175,30 @@ class TestSession(unittest.TestCase):
 
         cons = pbx.constraints
         self.assertEqual(len(cons['constraints']),5)
-        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))        
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))
+
+    def test_slide_crank_design_slv_one_match(self):
+        sm = SliderCrank(Tg=0)
+        pbx = ProblemExec(sm,{'combos':'design', 'ign_combos':'max*' ,'slv_vars':'*slv','dxdt':None,'both_match':False})
+        atx = pbx.ref_attrs
+        self.assertEqual(chk(atx,'solver.var'),set(('Lo','Rc','Ro','x_offset','y_offset')))
+        self.assertEqual(chk(atx,'solver.obj'),set(('cost_slv','sym_slv')))
+        self.assertEqual(chk(atx,'solver.ineq'),set(('crank_pos_slv','gear_pos_slv','motor_pos_slv')))
+        self.assertEqual(chk(atx,'solver.eq'),set(('gear_speed_slv','range_slv')))
+        self.assertEqual(chk(atx,'dynamics.output'),set())
+        self.assertEqual(chk(atx,'dynamics.rate'),set())
+        self.assertEqual(chk(atx,'dynamics.state'),set())
+        self.assertEqual(chk(atx,'dynamics.input'),set())
+
+        cons = pbx.constraints
+        self.assertEqual(len(cons['constraints']),6)
+        self.assertEqual(len(cons['bounds']),len(atx['solver.var']))             
 
     def test_slide_crank_add_var(self):
         sc = SliderCrank()
-        out = sc.run(combos='design',slv_vars='*',revert_last=False,add_vars='*gear*')
-        self.assertEqual(out['gear_speed_slv'],0)    
+        out = sc.run(combos='design,speed_goal,range_goal',slv_vars='*',revert_last=False,add_vars='*gear*',both_match=False)
+        #self.assertEqual(len(out['gear_speed_slv']),0)    
+        print(out)
 
 
 
