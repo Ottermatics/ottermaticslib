@@ -62,7 +62,7 @@ class AttributeInstance:
     def active(self):
         return self.class_attr.active    
 
-
+#TODO: add a concept of queries of ATTR_BASE subclasses, where multiple types may be selected or filtered, with individual arguments.
 class ATTR_BASE(attrs.Attribute):
     """A base class that handles initalization in the attrs meta class scheme by ultimately createing an Instance"""
 

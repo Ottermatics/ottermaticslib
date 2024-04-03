@@ -89,6 +89,8 @@ class IntegratorInstance(AttributeInstance):
 
 
 #TODO: depriciate modes and update for dynamicmixin strategies
+#TODO: add Time.add_profile(parm, time:parameter_values, combos,active) to add a transient profile to be run on the system that is selectable by the user
+
 class Time(ATTR_BASE):
     """Transient is a base class for integrators over time"""
 
@@ -209,6 +211,7 @@ class Time(ATTR_BASE):
             if all([c[k] == v for k, v in kw.items()]):
                 return i
         return None
+
 
 
 # Support Previous API

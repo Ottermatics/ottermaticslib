@@ -50,13 +50,14 @@ These vars control the behavior of the ProblemExec when an error occurs or when 
 
 from engforge.logging import LoggingMixin
 from engforge.system_reference import Ref
+from engforge.dataframe import DataframeMixin,pandas
 from engforge.solver_utils import *
 import weakref
 
 from scipy.integrate import solve_ivp
 from collections import OrderedDict
 import numpy as np
-import pandas
+import pandas as pd
 import expiringdict
 import attr, attrs
 import datetime
@@ -77,14 +78,17 @@ min_kw_dflt = {"tol": 1e-10, "method": "SLSQP"}
 #these choices affect how solver-items are selected and added to the solver
 slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None,weights=None,both_match=True,obj=None)
 #KW Defaults for the context
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None)
-
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None,save_mode='all',save_data_on_exit=False)
 #can be found on session._<parm> or session.<parm>
 root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,x_start = None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None)
-
+save_modes = ['vars','nums','all']
 transfer_kw = ['system',]
 
-#TODO: output options extend_dataframe=True,return_dataframe=True
+root_possible = list(root_defined.keys()) + list('_'+k for k in root_defined.keys())
+
+#TODO: output options extend_dataframe=True,return_dataframe=True,condensed_dataframe=True,return_system=True,return_problem=True,return_df=True,return_data=True
+#TODO: connect save_data() output to _data table.
+#TODO: move dataframe mixin here, system should return a dataframe, and the problem should be able to save data to the dataframe, call this class Problem(). With default behavior it could seem like a normal dataframe is returned on problem.return(*state,exit,revert...)
 
 #Special exception classes handled in exit
 class IllegalArgument(Exception):
@@ -134,9 +138,7 @@ class ProblemExec:
     #problem state / per level
     problem_id = None 
     entered: bool = False
-    exited: bool = False
-    level_name: str = None #target this context with the level name
-    level_number: int = 0 #TODO: keep track of level on the global context    
+    exited: bool = False  
 
     #solution control (point to singleton/subproblem via magic getattr)
     _last_time: float = 0
@@ -153,11 +155,14 @@ class ProblemExec:
     _dxdt = None #numeric/None/dict/(integrate=True)
     _run_start = None
     _run_end = None
-    _run_time = None
+    _run_time = None    
     
 
-    #runtime and exit options
-    success_thresh = 10
+    #Interior Context Options
+    save_data_on_exit: bool = False
+    save_mode: str = 'all'
+    level_name: str = None #target this context with the level name
+    level_number: int = 0 #TODO: keep track of level on the global context  
     pre_exec: bool = True
     post_exec: bool = True
     fail_revert: bool = True
@@ -167,25 +172,41 @@ class ProblemExec:
     opt_fail: bool = True
     raise_on_unknown: bool = True
     copy_system: bool = False
-    post_callback: callable = None #callback that will be called on the system each time it is reverted, it should take args(system,current_problem_exec)
+    success_thresh = 1E6 #if system has `success_thresh` it will be assigned to the context
+    post_callback: callable = None#callback that will be called on the system each time it is reverted, it should take args(system,current_problem_exec)
+    
+    
 
 
     def __getattr__(self, name):
         '''This is a special method that is called when an attribute is not found in the usual places, like when interior contexts (anything not the root (session_id=True)) are created that dont have the top level's attributes. some attributes will look to the parent session'''
 
         #interior context lookup (when in active context, ie session exists)
-        if hasattr(self.class_cache,'session'):
+        if hasattr(self.class_cache,'session') and name in root_possible:
+            #revert to the parent session
             if self.session_id != True and name.startswith('_'):
                 return getattr(self.class_cache.session,name)
 
             elif name in root_defined:
                 return getattr(self.class_cache.session,'_'+name)
             
-        if name in root_defined:
+        if name in root_defined: #public interface
             return self.__getattribute__('_'+name)
 
         # Default behaviour
         return self.__getattribute__(name)
+    
+    def __setattr__(self, name: str, value) -> None:
+        """only allow setting data to parent for now (this is in reset which can trigger anywhere)"""
+        if hasattr(self.class_cache,'session') and name=='_data':
+            if self.session_id != True:
+                self.class_cache.session._data = value
+                return 
+            elif self.session_id == True:
+                self._data = value
+                return 
+
+        super().__setattr__(name, value)    
 
         
     def __init__(self,system,kw_dict=None,Xnew=None,ctx_fail_new=False,**opts):
@@ -220,7 +241,16 @@ class ProblemExec:
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
         """
-        self.data = {} #index:row_dict
+
+
+        if kw_dict is None:
+            #kw_dict is stateful so you can mix system & context args together, and ensure context args are removed. in the case this is unused, we'll create an empty dict to avoid errors
+            kw_dict = {}
+        
+        #storage optoins
+        if opts.pop('persist',False) or kw_dict.pop('persist',False) :
+            self.persist_contexts()
+
         # temp solver storage
         self.solver_hist = expiringdict.ExpiringDict(100, 60)  
 
@@ -244,11 +274,14 @@ class ProblemExec:
             min_kw = kw_dict.pop('min_kw')
         if kw_dict and 'min_kw' in kw_dict:
             min_kw = kw_dict.pop('min_kw')
+
+        
         mkw =min_kw_dflt.copy()
         if min_kw is None:
             min_kw = mkw
         else:
             mkw.update(min_kw)
+
         self._minimizer_kw = mkw
 
         #Merge kwdict(stateful) and opts (current level)
@@ -306,6 +339,7 @@ class ProblemExec:
             self.__dict__.update(copy_vals)
             self._problem_id = int(uuid.uuid4())
             self.problems_dict[self._problem_id] = self #carry that weight
+            self.session_id = int(uuid.uuid4())
 
             if self.system is not system:
                 raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
@@ -334,9 +368,7 @@ class ProblemExec:
             self._problem_id = True #this is the top level
             self.problems_dict[self._problem_id] = self #carry that weight
 
-            #Recache system references
-            self._num_refs = system.system_references(numeric_only=True)
-            self._all_refs = system.system_references(recache=True,check_config=False)
+            self.reset_data()
 
             #supply the level name default as top if not set
             if level_name is None:
@@ -345,8 +377,7 @@ class ProblemExec:
                 self.level_name = level_name
 
             self._temp_state = Xnew
-            self.establish_system(system,kw_dict=kw_dict,**opt_out)
-            
+            self.refresh(system,kw_dict=kw_dict,**opt_out)
             #Finally we record where we started!
             self.set_checkpoint()        
 
@@ -354,6 +385,22 @@ class ProblemExec:
             self.info(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {opts} | {self._slv_kw}')            
         elif log.log_level <= 3:
             self.msg(f'[{self.level_number}-{self.level_name}]new execution context for {system}| {self._slv_kw}')
+
+    def refresh(self,system=None,**kw_dict):
+        '''refresh the system and options for the context, and reset the data storage'''
+        #Recache system references
+        #TODO: refresh the system references
+        self._num_refs = system.system_references(numeric_only=True)
+        self._all_refs = system.system_references(recache=True,check_config=False)
+        self.establish_system(system,**kw_dict)
+
+    def reset_data(self):
+        '''reset the data storage'''
+        #the data storage!!
+        #TODO: add buffer type, or disk cache
+        self._data = {} #index:row_dict 
+        self._index = 0# works for time or index
+
 
     def establish_system(self,system,kw_dict,**kwargs):
         """caches the system references, and parses the system arguments"""
@@ -513,6 +560,27 @@ class ProblemExec:
         
     
     #Multi Context Exiting:
+    def persist_contexts(self):
+        """convert all contexts to a new storage format"""
+        self.info(f'persisting contexts!')
+        current_problems = self.problems_dict 
+        ProblemExec.problems_dict = {}
+        for k,v in current_problems.items():
+            self.problems_dict[k] = v #you will go on!
+
+    def discard_contexts(self):
+        """discard all contexts"""
+        current_problems = self.problems_dict 
+        ProblemExec.problems_dict = weakref.WeakValueDictionary()
+        for k,v in current_problems.items():
+            ProblemExec.problems_dict[k] = v #you will go on!             
+
+    def reset_contexts(self,fail_if_discardmode=True):
+        """reset all contexts to a new storage format"""
+        if isinstance(self.problems_dict,dict):
+            ProblemExec.problems_dict = {}
+        elif fail_if_discardmode:
+            raise IllegalArgument(f'cant reset contexts! {self.problems_dict} while not in persistance mode')       
 
     def exit_with_state(self):
         raise ProblemExit(revert=False)
@@ -562,14 +630,20 @@ class ProblemExec:
 
         return True #our problem will go on
     
-    def save_data(self,index=None,**data):
+    def save_data(self,index=None,**add_data):
         """save data to the context"""
+        #TODO: multi-index support
         if index is None and self._dxdt == True: #integration
             index = self._time
         elif index is None:
             index = self._index
-        #TODO: callbacks require (sys,prob)
-        self._data[index] = Ref.refset_get(self.all_data_ref)
+        out = self.output_state
+        if add_data: out.update(add_data)
+        self.data[index] = out
+        #if we are integrating, then we dont increment the index
+        if self._dxdt != True:
+            self._index += 1
+        #self.info(f'saving data at {index} |N={len(self.data)}')
     
     def clean_context(self):
         if hasattr(self.class_cache,'session') and self.class_cache.session is self:
@@ -587,6 +661,15 @@ class ProblemExec:
             self._run_time = self._run_end - self._run_start
             if self.log_level <= 10:
                 self.debug(f"EXIT[{self.system.identity}] run time: {self._run_time}",lvl=5)
+
+    #time context
+    def set_time(self,time,dt):
+        self._last_time = lt = self._time
+        self._time = time
+        dt_calc = time - lt
+        self._dt = dt if dt_calc <= 0 else dt_calc
+        self.system.set_time(time) #system times / subcomponents too
+        
 
     def integrate(self,endtime,dt=0.001,max_step_dt=0.01,X0=None,**kw):
         #Unpack Transient Problem
@@ -636,18 +719,10 @@ class ProblemExec:
 
         return ans
 
-    #set context time
-    def set_time(self,time,dt):
-        self._last_time = lt = self._time
-        self._time = time
-        dt_calc = time - lt
-        self._dt = dt if dt_calc <= 0 else dt_calc
-        self.system.set_time(time) #system times / subcomponents too
-
     def integral_rate(self,t, x, dt,Xss=None,Yobj=None, **kw):
         """provides the dynamic rate of the system at time t, and state x"""
         
-        run_solver = kw.get('run_solver',False) #i would love this to be true, but there's just too much possible variation in application to make it so without some kind of control / continuity strategy. Dynamics are natural responses anyways, so solver use should be an advanced case for now
+        run_solver = kw.get('run_solver',False) #i would love this to be=true, but there's just too much possible variation in application to make it so without some kind of control / continuity strategy. Dynamics are natural responses anyways, so solver use should be an advanced case for now (MPC/Filtering/ect later)
 
         intl_refs = self.integrator_var_refs
         refs = self._sys_refs
@@ -656,24 +731,17 @@ class ProblemExec:
         out = {p: np.nan for p in intl_refs}
         Xin = {p: x[i] for i, p in enumerate(intl_refs)}
 
+
+
         if self.log_level < 10:
             self.info(f'sim_iter {t} {x} {Xin}')
 
-        self.set_time(t,dt)
-
         with ProblemExec(system,level_name='tr_slvr',Xnew=Xin) as pbx:
-
-            # solver always gets a copy of x
-            #solver[t] = x #TODO: stateful capture
-            
             # test for record time 
-            #TODO: rates / events ect & store data
-            #TODO: faster way to get last time vs max(data)  
-            # if not data or t > pbx.last_time + dt:
-            #     data[t] = cs = pbx.get_ref_values()
-            #     pbx.last_time = t
-            #     if self.log_level < 10:
-            #         self.info(f'record {t}| {Xin}')
+            
+            self.set_time(t,dt)
+            #save data at the start
+            pbx.save_data()
 
             #ad hoc time integration
             for name, trdct in pbx.integrators.items():
@@ -1144,13 +1212,32 @@ class ProblemExec:
         """records the state of the system"""
         #refs = self.all_variable_refs
         refs = self.all_comps_and_vars
-        return Ref.refset_get(refs)     
+        return Ref.refset_get(refs,sys=self.system,prob=self)
+
+    @property
+    def output_state(self)->dict:
+        """records the state of the system"""
+
+        if 'nums' == self.save_mode:
+            refs = self.num_refs
+        elif 'all' == self.save_mode:
+            refs = self.all_system_references
+        elif 'vars' == self.save_mode:
+            refs = self.all_variable_refs
+
+        out = Ref.refset_get(refs,sys=self.system,prob=self)
+
+        if self._dxdt == True:
+            out['time'] = self._time
+
+        return out
+    
     
     def get_ref_values(self,refs=None):
         """returns the values of the refs"""
         if refs is None:
             refs = self.all_system_references
-        return Ref.refset_get(refs)
+        return Ref.refset_get(refs,sys=self.system,prob=self)
     
     def set_ref_values(self,values,refs=None):
         """returns the values of the refs"""
@@ -1362,6 +1449,14 @@ class ProblemExec:
             dc.update({intinst.var:intinst.var_ref})
         return dc    
     
+    #Dataframe support
+
+    @property
+    def dataframe(self)->pd.DataFrame:
+        """returns the dataframe of the system"""
+        return pd.DataFrame([kv[-1] for kv in sorted(self.data.items(),
+                                                   key=lambda kv:kv[0]) ])
+
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
     #Dynamics Interface
     def filter_vars(self,refs:list):
@@ -1435,9 +1530,21 @@ class ProblemExec:
         out.update(refs['properties'])
         return out
     
+    def __str__(self):
+        #TODO: expand this
+        return f'ProblemContext[{self.level_name:^12}][{str(self.session_id)[0:8]}-{str(self._problem_id)[0:8]}][{self.system.identity}]'
+    
+
 
     
 #subclass before altering please!
 ProblemExec.class_cache = ProblemExec
+
+class Problem(ProblemExec,DataframeMixin):
+    #TODO: implement checks to ensure that problem is defined as the top level context to be returned to
+    #TODO: also define return options for data/system/dataframe and indexing
+    pass
+    
+
 
 

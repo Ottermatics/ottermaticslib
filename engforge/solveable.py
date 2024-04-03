@@ -716,7 +716,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             #Get attributes & attribute instances
             atrs = conf.collect_inst_attributes()
             rawattr = conf.collect_inst_attributes(handle_inst=False)
-            key = f'{key}.' if key else ''
+            key = f'{key}.' if key else '' #you need a dot if there's a key
             comp_dict[key] = conf
             #Gather attribute heirarchy and make key.var the dictionary entry
             for atype,aval in atrs.items():

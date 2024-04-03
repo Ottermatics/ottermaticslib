@@ -195,6 +195,7 @@ class SolverMixin(SolveableMixin):
             kwargs['opt_fail'] = False
 
         with ProblemExec(self,kwargs,level_name='run') as pbx:
+            #problem context removes slv/args from kwargs
             return self._iterate_input_matrix(self.eval, return_results=True,**kwargs)
 
 
@@ -244,14 +245,8 @@ class SolverMixin(SolveableMixin):
         
         #execute with problem context and execute signals
         with ProblemExec(self,kw,level_name='eval',eval_kw=eval_kw, sys_kw=sys_kw,post_callback=cb,Xnew=Xo) as pbx:
-            #FIXME: change the eval_kw / sys_kw 
-            self.index += 1
             out = self.execute(**kw)
-
-            #TODO: move to problem context, and
-            #pbx.save_data()
-            self.save_data(index=self.index)
-
+            pbx.save_data()
             pbx.exit_to_level(level='eval',revert=False)
 
         if self.log_level >= 20:
