@@ -343,15 +343,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for ck, comp in components.items():
                 comp.reset()
 
-    # @instance_cached 
-    @property
-    def comp_references(self):
+    def comp_references(self,**kw):
         """A cached set of recursive references to any slot component
-        #TODO: work on caching, concern with iterators 
         #FIXME: by instance recache on iterative component change or other signals
         """
         out = {}
-        for key, lvl, comp in self.go_through_configurations(parent_level=1):
+        for key, lvl, comp in self.go_through_configurations(parent_level=1,**kw):
             if not isinstance(comp, SolveableMixin):
                 continue
             out[key] = comp
@@ -637,9 +634,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return val
 
     # Reference Caching
-    def system_references(self, recache=False,numeric_only=False):
+    def system_references(self, recache=False,numeric_only=False,**kw):
         """gather a list of references to attributes and"""
-        if not numeric_only and (recache == False and hasattr(self, "_prv_system_references")):
+        if not numeric_only and not kw and (recache == False and hasattr(self, "_prv_system_references")):
             return self._prv_system_references
 
         out = self.internal_references(recache,numeric_only=numeric_only)
@@ -649,13 +646,20 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         out['components'] = comp_set_ref = {}
 
         # component iternals
-        for key, comp in self.comp_references.items():
+        for key, comp in self.comp_references(**kw).items():
             sout = comp.internal_references(recache,numeric_only=numeric_only)
             satr = sout["attributes"]
             sprp = sout["properties"]
-            parent = '.'.join(key.split('.')[:-1])
-            comp_dict[key] = self
-            if parent and parent in comp_dict:
+            
+            #find the parent component
+            key_segs = key.split('.')
+            if len(key_segs) == 1:
+                parent = ''
+            else:
+                parent = '.'.join(key_segs[:-1])
+
+            comp_dict[key] = comp
+            if parent in comp_dict:
                 attr_name = key.split('.')[-1]
                 comp_set_ref[key] = Ref(comp_dict[parent],attr_name,False,True)
 
@@ -666,7 +670,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for k, v in sprp.items():
                 tprp[f"{key}.{k}"] = v
 
-        if numeric_only is False: self._prv_system_references = out
+        if not numeric_only and not kw : self._prv_system_references = out
         return out
     
     def collect_comp_refs(self,conf:"Configuration"=None,**kw):

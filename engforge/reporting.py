@@ -153,7 +153,7 @@ class CSVReporter(TableReporter, DiskReporterMixin):
         self.info(f"saving analysis to: {af}")
         analysis.dataframe.to_csv(af)
 
-        for ckey, comp in system.comp_references.items():
+        for ckey, comp in system.comp_references().items():
             af = os.path.join(self.report_root, f"{ckey}_{comp.name}.csv")
             self.ensure_path(af)
             self.info(f"saving {ckey} to: {af}")

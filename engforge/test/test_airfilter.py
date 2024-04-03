@@ -28,7 +28,7 @@ class TestFilterSystem(unittest.TestCase):
         self.af = Airfilter()
 
     def test_plot(self):
-        self.af.run(throttle=np.linspace(0, 1, 10))
+        self.af.run(throttle=np.linspace(0, 1, 10),combos='*',slv_vars='*')
         fig = self.af.flow_curve()
         self.assertIsNotNone(fig)
 
@@ -38,7 +38,7 @@ class TestAnalysis(unittest.TestCase):
         self.af = AirFilterAnalysis()
 
     def test_plot(self):
-        self.af.run(throttle=np.linspace(0, 1, 10))
+        self.af.run(throttle=np.linspace(0, 1, 10),combos='*',slv_vars='*')
         fig = self.af.system.flow_curve()
         ofig = self.af._stored_plots["airfilteranalysis.airfilter.flow_curve"]
         print(fig)

@@ -115,7 +115,7 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
         """looks at internal components as well as flag for anything chagned."""
         if self._anything_changed_:
             return True
-        elif any([c.anything_changed for k, c in self.comp_references.items()]):
+        elif any([c.anything_changed for k, c in self.comp_references().items()]):
             return True
         return False
 

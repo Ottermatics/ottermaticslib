@@ -36,7 +36,7 @@ class TestDynamics(unittest.TestCase):
         dt = 0.001
         #FIXME: input on simulate not working 
 
-        df = sm.simulate(dt=dt, endtime=10,run_solver=False)
+        df = sm.simulate(dt=dt, endtime=10,combos='*')
         #TODO: add passing flag to context
         #self.assertTrue(sm.solved)
         #self.assertTrue(sm.converged)
@@ -70,7 +70,7 @@ class TestDynamics(unittest.TestCase):
         sm.run(dxdt=0)
 
         dfss =sm.dataframe
-        df = sm.simulate(dt=0.001, endtime=10,run_solver=False)
+        trsm,df = sm.simulate(dt=0.001, endtime=10,combos='*',return_all=True)
 
         self.assertAlmostEqual(df.iloc[-1].x,dfss.iloc[0].x, delta=0.01)
 
@@ -84,7 +84,7 @@ class TestDynamics(unittest.TestCase):
         sm.x = dfss.iloc[0].x #no residual input
         
         
-        df = sm.simulate(dt=0.001, endtime=10,run_solver=False)
+        trsm,df = sm.simulate(dt=0.001, endtime=10,run_solver=False,combos='*',return_all=True)
 
         X = df.x
         T = df.time

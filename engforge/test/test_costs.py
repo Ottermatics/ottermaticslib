@@ -120,8 +120,6 @@ class TestEconomicsAccounting(unittest.TestCase):
         EconRecursive.reset_cls_costs()
 
     def test_econ_defaults(self):
-        #FIXME: missing norm cost of -10
-        
         Comp1.default_cost('norm',Norm(cost_per_item=10))
         Comp2.default_cost('comp1',Comp1(cost_per_item=5))
         EconRecursive.default_cost('comp2',Comp2(cost_per_item=3))
@@ -140,8 +138,6 @@ class TestEconomicsAccounting(unittest.TestCase):
 
 
     def test_recursive_null(self,ANS=75):
-        #FIXME: missing norm cost of +8
-
         Comp1.default_cost('norm',5) 
         Comp2.default_cost('comp1',10)
         EconRecursive.default_cost('comp1',3)
@@ -160,8 +156,6 @@ class TestEconomicsAccounting(unittest.TestCase):
         self.assertEqual(7,d['econ.comp2.cost.item_cost'])
 
     def test_recursive_comp2(self,ANS=80):
-        #FIXME: missing norm cost of -5
-
         Comp1.default_cost('norm',5)
         Comp2.default_cost('comp1',10)
         EconRecursive.default_cost('comp1',Comp1(cost_per_item=3))

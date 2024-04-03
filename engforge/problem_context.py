@@ -23,7 +23,7 @@ This isn't technically a singleton pattern, but it does provide a similar interf
 ...
 
 # Combos Selection
-By default no arguments run will select all active items from all combos. The `combos` argument can be used to select a specific set of combos, a outer select. From this set, the `ign_combos` and `only_combos` arguments can be used to ignore or select specific combos based on exclusion or inclusion respectively.
+By default no arguments run will select all active items with combo="default". The `combos` argument can be used to select a specific set of combos, a outer select. From this set, the `ign_combos` and `only_combos` arguments can be used to ignore or select specific combos based on exclusion or inclusion respectively.
 
 # Parameter Name Selection
 The `slv_vars` argument can be used to select a specific set of solvables. From this set, the `ign_vars` and `only_vars` arguments can be used to ignore or select specific solvables based on exclusion or inclusion respectively. The `add_vars` argument can be used to add a specific set of solvables to the solver.
@@ -69,18 +69,22 @@ import uuid
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 #TODO: define the dataframe / data storage feature
 
-min_kw_dflt = {"method": "SLSQP"}
+min_kw_dflt = {"tol": 1e-10, "method": "SLSQP"}
 
 
 #The KW Defaults for Solver via kw_dict
-slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None,weights=None,both_match=True)
-#KW Defaults for context from **opts
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,raise_on_opt_failure = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None)
+# IMPORTANT:!!! these group parameter names by behavior, they are as important as the following class, add/remove variables with caution
+#these choices affect how solver-items are selected and added to the solver
+slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None,weights=None,both_match=True,obj=None)
+#KW Defaults for the context
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None)
+
+#can be found on session._<parm> or session.<parm>
+root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,x_start = None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None)
 
 transfer_kw = ['system',]
 
 #TODO: output options extend_dataframe=True,return_dataframe=True
-
 
 #Special exception classes handled in exit
 class IllegalArgument(Exception):
@@ -150,6 +154,7 @@ class ProblemExec:
     _run_start = None
     _run_end = None
     _run_time = None
+    
 
     #runtime and exit options
     success_thresh = 10
@@ -159,7 +164,7 @@ class ProblemExec:
     revert_last: bool = True
     revert_every: bool = True
     exit_on_failure: bool = True
-    raise_on_opt_failure: bool = True
+    opt_fail: bool = True
     raise_on_unknown: bool = True
     copy_system: bool = False
     post_callback: callable = None #callback that will be called on the system each time it is reverted, it should take args(system,current_problem_exec)
@@ -168,11 +173,16 @@ class ProblemExec:
     def __getattr__(self, name):
         '''This is a special method that is called when an attribute is not found in the usual places, like when interior contexts (anything not the root (session_id=True)) are created that dont have the top level's attributes. some attributes will look to the parent session'''
 
-        #interior context lookup
-        if self.session_id != True and name.startswith('_'):
-            return getattr(self.class_cache.session,name)
+        #interior context lookup (when in active context, ie session exists)
+        if hasattr(self.class_cache,'session'):
+            if self.session_id != True and name.startswith('_'):
+                return getattr(self.class_cache.session,name)
 
-        #TODO: subproblem lookup here
+            elif name in root_defined:
+                return getattr(self.class_cache.session,'_'+name)
+            
+        if name in root_defined:
+            return self.__getattribute__('_'+name)
 
         # Default behaviour
         return self.__getattribute__(name)
@@ -324,6 +334,10 @@ class ProblemExec:
             self._problem_id = True #this is the top level
             self.problems_dict[self._problem_id] = self #carry that weight
 
+            #Recache system references
+            self._num_refs = system.system_references(numeric_only=True)
+            self._all_refs = system.system_references(recache=True,check_config=False)
+
             #supply the level name default as top if not set
             if level_name is None:
                 self.level_name = 'top'
@@ -366,10 +380,6 @@ class ProblemExec:
 
         if hasattr(self.system,'success_thresh') and isinstance(self.system.success_thresh,(int,float)):
             self.success_thresh = self.system.success_thresh
-
-        #Recache system references
-        self.all_refs = self.system.system_references(recache=True)
-        self.num_refs = self.system.system_references(numeric_only=True)
         
 
         #Extract solver vars and set them on this object, they will be distributed to any new further execution context's via monkey patch above
@@ -381,7 +391,7 @@ class ProblemExec:
         self._weights = self._slv_kw.get('weights',None)
 
         check_dynamics = self._dxdt is not None and self._dxdt is not False
-        self._sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,addable=self.num_refs,**self._slv_kw)
+        self._sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,addable=self._num_refs,**self._slv_kw)
 
         #Grab inputs and set to system
         for k,v in dflt_parse_kw.items():
@@ -474,17 +484,17 @@ class ProblemExec:
                 #always exit with level_name='top' at outer context
                 if not ext and self.class_cache.session is self and exc_value.level=='top':
                     if self.log_level <= 11:
-                        self.debug(f'[{self.level_number}-{self.level_name}] exit at top')                
+                        self.debug(f'[{self.level_number}-{self.level_name}] exit at top')
+
                     ext = True
 
                 elif self.class_cache.session is self and not ext:
                     #never ever leave the top level without deleting the session
                     self.class_cache.level_number = 0
                     del self.class_cache.session 
-                    self.exited = True
+                    self.exited = True 
                     raise KeyError(f'cant exit to level! {exc_value.level} not found!!')
             
-            #TODO: expand this per options
             else:
                 if self.log_level <= 18:
                     self.info(f'[{self.level_number}-{self.level_name}] problem exit revert={exc_value.revert}')
@@ -500,8 +510,10 @@ class ProblemExec:
 
         self.exited = True
         return ext
+        
     
     #Multi Context Exiting:
+
     def exit_with_state(self):
         raise ProblemExit(revert=False)
     
@@ -615,7 +627,7 @@ class ProblemExec:
 
         #get the probelem variables
         Xss = self.problem_opt_vars
-        Yobj = self.final_objective
+        Yobj = self.final_objectives
 
         #run the simulation from the current state to the endtime
         ans = solve_ivp(self.integral_rate, [self.system.time, endtime], X0, method="RK45", t_eval=Time, max_step=max_step_dt,args=(dt,Xss,Yobj),**kw)
@@ -634,7 +646,8 @@ class ProblemExec:
 
     def integral_rate(self,t, x, dt,Xss=None,Yobj=None, **kw):
         """provides the dynamic rate of the system at time t, and state x"""
-        run_solver = kw.get('run_solver',False) #i would love this to be true, but there's just too much possible variation in application to make it so without some kind of control / continuity strategy. Dynamics are natural responses anyways
+        
+        run_solver = kw.get('run_solver',False) #i would love this to be true, but there's just too much possible variation in application to make it so without some kind of control / continuity strategy. Dynamics are natural responses anyways, so solver use should be an advanced case for now
 
         intl_refs = self.integrator_var_refs
         refs = self._sys_refs
@@ -693,7 +706,7 @@ class ProblemExec:
                         pbx.exit_to_level('ss_slvr',False)
                     else:
                         self.warning(f'solver failed to converge {ss_out["ans"].message} {ss_out["Xans"]} {ss_out["X0"]}')
-                        if pbx.raise_on_opt_failure:
+                        if pbx.opt_fail:
                             pbx.exit_to_level('sim',pbx.fail_revert)
                         else:
                             pbx.exit_to_level('ss_slvr',pbx.fail_revert)
@@ -713,7 +726,7 @@ class ProblemExec:
         return V_dxdt
 
     def solve_min(
-        self,Xref,Yref,output=None,**kw
+        self,Xref=None,Yref=None,output=None,**kw
     ):
         """
         Solve the minimization problem using the given vars and constraints. And sets the system state to the solution depending on input of the following:
@@ -725,10 +738,17 @@ class ProblemExec:
         :param fail: Flag indicating whether to raise an exception if the solver doesn't converge. (default: True)
         :param kw: Additional keyword arguments.
         :return: The output dictionary containing the results.
-        """
+        """ 
+
+        if Xref is None:
+            Xref = self.Xref
+
+        if Yref is None:
+            Yref = self.final_objectives
 
         thresh = kw.pop("thresh", self.success_thresh)
 
+        #TODO: options for solver detail in response
         dflt = {
                 "Xstart": Ref.refset_get(Xref,sys=self.system,prob=self),
                 "Ystart": Ref.refset_get(Yref,sys=self.system,prob=self),
@@ -737,6 +757,9 @@ class ProblemExec:
                 "Xans":None,
                 "Yobj":None,
                 "Ycon":None,
+                "ans": None,
+                "weights":self._weights,
+                "constraints":self.constraints,
             }
 
         if output:
@@ -744,8 +767,12 @@ class ProblemExec:
             output = dflt
         else:
             output = dflt
-            
 
+        if len(Xref) == 0:
+            self.debug(f'no variables found for solver: {kw}')
+            #None for `ans` will not trigger optimization failure        
+            return output
+        
         #override constraints input
         kw.update(self.constraints)
 
@@ -801,7 +828,7 @@ class ProblemExec:
 
         else:
             self.system._converged = False
-            if self.raise_on_opt_failure:
+            if self.opt_fail:
                 raise Exception(f"solver didnt converge: {answer}")
             else:
                 self.warning(f"solver didnt converge: {answer}")
@@ -837,7 +864,7 @@ class ProblemExec:
         return {k:v for k,v in objs.items()}
     
     @property
-    def final_objective(self):
+    def final_objectives(self)->dict:
         """returns the final objective of the system"""
         Yobj = self.problem_objs
         Yeq = self.problem_eq
@@ -848,12 +875,12 @@ class ProblemExec:
         #now make up an objective, if we have no constraints
         elif not Yobj and Yeq:
             #handle case of Yineq == None: root solve
-            self.warning(f'making Yobj from Yeq: {Yeq}')
+            self.debug(f'making Yobj from Yeq: {Yeq}')
             Yobj = { k: v.copy(key = lambda sys,prob: (1+v.value(sys,prob)**2)) for k,v in Yeq.items() }
 
         elif not Yobj:
             #minimize the product of all vars, so the smallest value is the best that satisfies all constraints
-            self.info(f'making Yobj from X: {Xss}')
+            self.debug(f'making Yobj from X: {Xss}')
             def dflt(sys,prob)->float:
                 out = 1
                 for k,v in prob.problem_opt_vars.items():
@@ -1116,7 +1143,7 @@ class ProblemExec:
     def record_state(self)->dict:
         """records the state of the system"""
         #refs = self.all_variable_refs
-        refs = self.all_variables
+        refs = self.all_comps_and_vars
         return Ref.refset_get(refs)     
     
     def get_ref_values(self,refs=None):
@@ -1129,7 +1156,7 @@ class ProblemExec:
         """returns the values of the refs"""
         #TODO: add checks for the refs
         if refs is None:
-            refs = self.all_variables        
+            refs = self.all_comps_and_vars        
         return Ref.refset_input(refs,values)    
 
     def set_checkpoint(self):
@@ -1143,14 +1170,14 @@ class ProblemExec:
             xs = list(self._x_start.values())
             rs = list(self.record_state.values())
             self.debug(f'[{self.level_number}-{self.level_name}] reverting to start: {xs} -> {rs}')
-        Ref.refset_input(self.all_variables,self._x_start)
+        Ref.refset_input(self.all_comps_and_vars,self._x_start)
 
     def activate_temp_state(self,new_state=None):
         if new_state:
-            Ref.refset_input(self.all_variables,new_state)
+            Ref.refset_input(self.all_comps_and_vars,new_state)
         elif self._temp_state:
             self.debug(f'[{self.level_number}-{self.level_name}] activating temp state: {self._temp_state}')
-            Ref.refset_input(self.all_variables,self._temp_state)
+            Ref.refset_input(self.all_comps_and_vars,self._temp_state)
 
     #System Events
     def apply_pre_signals(self):
@@ -1193,48 +1220,7 @@ class ProblemExec:
         self.post_update_system(*args,**kwargs)
 
     
-    #Dynamics Interface
-    def filter_vars(self,refs:list):
-        '''selects only settable refs'''
-        return {v.key:v for k,v in refs.items() if v.allow_set}
-    
-    def filter_prop(self,refs:list):
-        '''selects only settable refs'''
-        return {k:v for k,v in refs.items() if not v.allow_set}        
 
-    #X solver variable refs
-    @property
-    def problem_opt_vars(self)->dict:
-        """solver variables"""
-        return self.ref_attrs.get('solver.var',{}).copy()
-    
-    @property
-    def all_problem_vars(self)->dict:
-        """solver variables + dynamics states when dynamic_solve is True"""
-        varx = self.ref_attrs.get('solver.var',{}).copy()
-        #Add the dynamic states to be optimized (ignore if integrating)
-        if self.dynamic_solve and not self._dxdt is True:
-            varx.update(self.filter_vars(self.dynamic_state))
-            varx.update(self.filter_vars(self.integrator_vars))
-        return varx
-
-    @property
-    def dynamic_solve(self)->bool:
-        """indicates if the system is dynamic"""
-        dxdt = self._dxdt
-
-        if dxdt is None or dxdt is False:
-            return False
-        
-        if dxdt is True:
-            return True
-        
-        in_type = isinstance(dxdt,(dict,float,int))
-        bool_type = (isinstance(dxdt,bool) and dxdt == True)
-        if in_type or bool_type:
-            return True
-        
-        return False
 
     #Logging to class logger
     @property
@@ -1377,6 +1363,49 @@ class ProblemExec:
         return dc    
     
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
+    #Dynamics Interface
+    def filter_vars(self,refs:list):
+        '''selects only settable refs'''
+        return {v.key:v for k,v in refs.items() if v.allow_set}
+    
+    def filter_prop(self,refs:list):
+        '''selects only settable refs'''
+        return {k:v for k,v in refs.items() if not v.allow_set}        
+
+    #X solver variable refs
+    @property
+    def problem_opt_vars(self)->dict:
+        """solver variables"""
+        return self.ref_attrs.get('solver.var',{}).copy()
+    
+    @property
+    def all_problem_vars(self)->dict:
+        """solver variables + dynamics states when dynamic_solve is True"""
+        varx = self.ref_attrs.get('solver.var',{}).copy()
+        #Add the dynamic states to be optimized (ignore if integrating)
+        if self.dynamic_solve and not self._dxdt is True:
+            varx.update(self.filter_vars(self.dynamic_state))
+            varx.update(self.filter_vars(self.integrator_vars))
+        return varx
+
+    @property
+    def dynamic_solve(self)->bool:
+        """indicates if the system is dynamic"""
+        dxdt = self._dxdt
+
+        if dxdt is None or dxdt is False:
+            return False
+        
+        if dxdt is True:
+            return True
+        
+        in_type = isinstance(dxdt,(dict,float,int))
+        bool_type = (isinstance(dxdt,bool) and dxdt == True)
+        if in_type or bool_type:
+            return True
+        
+        return False
+
     @property
     def all_variable_refs(self)->dict:
         ing = self.integrator_vars
@@ -1386,22 +1415,26 @@ class ProblemExec:
     
     @property
     def all_variables(self)->dict:
+        """returns all variables in the system"""
+        return self.all_refs['attributes']
+
+    @property
+    def all_comps_and_vars(self)->dict:
         #TODO: ensure system refes are fresh per system runtime events
-        attrs =  self.system.system_references(False)['attributes']
-        comps = self.system.system_references(False)['components']
-        #attrs.update(comps)
+        refs = self.all_refs
+        attrs = refs['attributes'].copy()
+        comps = refs['components'].copy()
+        attrs.update(comps)
         return attrs
     
     @property
     def all_system_references(self)->dict:
-        refs = self.system.system_references(False)
+        refs = self.all_refs
         out = {}
         out.update(refs['attributes'])
         out.update(refs['properties'])
         return out
     
-
- 
 
     
 #subclass before altering please!

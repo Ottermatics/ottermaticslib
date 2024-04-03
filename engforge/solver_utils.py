@@ -55,7 +55,7 @@ def f_lin_min(system,prob, Xref, Yref,weights=None, *args, **kw):
             slv_info = base_dict
 
         #with revert_X(system,Xref,Xnext=Xnext):
-        #Enter existing problem context
+        #this will run all signals and updates selected in outer context
         with ProblemExec(system,{},Xnew=Xnext,ctx_fail_new=True) as exc:
             grp = (yvar, weights)
             vals,pos,neg = [],[],[]
@@ -301,7 +301,6 @@ def refmin_solve(
     Yref: dict,
     Xo=None,
     weights: np.array = None,
-    reset=True,
     ffunc=f_lin_min,
     **kw,
 ):
@@ -313,7 +312,6 @@ def refmin_solve(
     :param weights: a dictionary of values to weights the x values by, list also ok as long as same length and order as Xref
     :param reset: if the solution fails, reset the x values to their original state, if true will reset the x values to their original state on failure overiding doset.
     :param doset: if the solution is successful, set the x values to the solution by default, otherwise follows reset, if not successful reset is checked first, then doset
-    #TODO: add 
     """
     vars = list(Xref.keys())  # static x_basis
     
@@ -331,8 +329,8 @@ def refmin_solve(
 
     # TODO: IO for jacobean and state estimations (complex as function definition, requires learning)
     system.debug(f'minimize! {Fc.__name__,Xo,vars,kw}')
-    kw.pop('prob',None)
-    kw.pop('info',None)
+    #kw.pop('prob',None)
+    kw.pop('info',None) #info added from context constraints
     ans = sciopt.minimize(Fc, Xo, **kw)
     return ans
     #return process_ans(ans,vars,Xref,x_pre,doset,reset,fail,ret_ans)

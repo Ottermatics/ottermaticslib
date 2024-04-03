@@ -189,7 +189,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
         return self.format_label(attr_prop)
 
     def format_label(self, label):
-        return label.replace("_", " ").replace("-", " ").title()
+        return label.replace(".", "_").replace("-", "_").title()
 
     @instance_cached
     def attr_labels(self) -> list:

@@ -169,7 +169,7 @@ class SingleCompSolverTest(unittest.TestCase):
             attempts = []
             for var in objs[ok]:
                 for con in cons[ck]:
-                    extra = dict(combos=[ok,ck,'min_len'],slv_vars=indep,activate=[var,con],only_active=True)
+                    extra = dict(combos=[ok,ck,'min_len'],slv_vars=indep,activate=[var,con],only_active=True,both_match=False)
                     o = self.sc.execute(**extra)
                     attempts.append(o)
             
@@ -184,7 +184,7 @@ class SingleCompSolverTest(unittest.TestCase):
             
     def test_system_execute(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True,both_match=False)
 
         H = self.sc.execute(**extra,weights={'hght':1,'obj':0})
         V = self.sc.execute(**extra,weights={'hght':0,'obj':1})
@@ -195,17 +195,17 @@ class SingleCompSolverTest(unittest.TestCase):
 
     def test_system_run(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True,both_match=False)
 
-        H = self.sc.run(**extra,weights={'hght':1,'obj':0})
-        V = self.sc.run(**extra,weights={'hght':0,'obj':1})
+        H = self.sc.run(**extra,weights={'hght':1,'obj':0})['output'][0]
+        V = self.sc.run(**extra,weights={'hght':0,'obj':1})['output'][0]
 
         self.assertGreater(H['Yobj']['hght'],V['Yobj']['hght'])
         self.assertGreater(V['Yobj']['obj'],H['Yobj']['obj'])
 
     def test_system_solver(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True,both_match=False)
 
         H = self.sc.solver(**extra,weights={'hght':1,'obj':0})
         V = self.sc.solver(**extra,weights={'hght':0,'obj':1})
@@ -215,7 +215,7 @@ class SingleCompSolverTest(unittest.TestCase):
 
     def test_system_eval(self):
         """check the system solver methods work as expected (objectives are optimized)"""
-        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True)
+        extra = dict(combos='volume,height,min_len,total_*',slv_vars=indep,activate=[],only_active=True,both_match=False)
 
         H = self.sc.eval(**extra,weights={'hght':1,'obj':0})
         V = self.sc.eval(**extra,weights={'hght':0,'obj':1})

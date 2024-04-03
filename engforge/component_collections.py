@@ -108,8 +108,7 @@ class ComponentIter(Component):
                 return self._item_refs[self._first_item_key]
             return self._item_refs[self.current_item]
 
-    @instance_cached #TODO: implement this with args
-    def comp_references(self):
+    def comp_references(self,**kw):
         """Returns this components global references"""
         out = {}
         out["attributes"] = at = {}
@@ -135,7 +134,7 @@ class ComponentIter(Component):
 
         keeprefcopy = lambda d: {k: {**c} for k, c in d.items()}
 
-        out = keeprefcopy(self.comp_references)
+        out = keeprefcopy(self.comp_references())
         at = out["attributes"]  # = at = {}
         pr = out["properties"]  # = pr = {}
         _item_refs = {}
@@ -143,7 +142,7 @@ class ComponentIter(Component):
         for itkey, item in self._item_gen():
             it_base_key = self._item_key(itkey, item)
 
-            _item_refs[itkey] = ir = keeprefcopy(self.comp_references)
+            _item_refs[itkey] = ir = keeprefcopy(self.comp_references())
             atr = ir["attributes"]  # = atr = {}
             prr = ir["properties"]  # = prr = {}
 

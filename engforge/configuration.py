@@ -93,7 +93,7 @@ def meta(title, desc=None, **kwargs):
     :param title: a title that gets formatted for column headers
     :param desc: a description of the property"""
     out = {
-        "label": title.replace("_", " ").replace("-", " ").title(),
+        "label": title.replace(".", "_").replace("-", "_").title(),
         "desc": None,
         **kwargs,
     }

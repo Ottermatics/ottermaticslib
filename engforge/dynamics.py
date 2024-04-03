@@ -597,6 +597,7 @@ class GlobalDynamics(DynamicsMixin):
             #Time Iteration Context
             with ProblemExec(system,kwargs,level_name='sim',dxdt=True,copy_system=True,run_solver=run_solver,post_callback=cb) as pbx:
                 self._sim_ans = pbx.integrate(endtime=endtime,dt=dt,X0=X0,eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
+                system = pbx.system
                 data = pbx.data 
                 #TODO: ctx.save_data([system.save_data()])
                 #this will affect the context copy, not self
@@ -707,7 +708,7 @@ class GlobalDynamics(DynamicsMixin):
 #                                     pbx.exit_to_level('ss_slvr',False)
 #                                 else:
 #                                     self.warning(f'solver failed to converge {ss_out["ans"].message} {ss_out["Xans"]} {ss_out["X0"]}')
-#                                     if pbx.raise_on_opt_failure:
+#                                     if pbx.opt_fail:
 #                                         pbx.exit_to_level('sim',pbx.fail_revert)
 #                                     else:
 #                                         pbx.exit_to_level('ss_slvr',pbx.fail_revert)

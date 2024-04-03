@@ -36,7 +36,7 @@ SOLVER_OPTIONS = ["minimize"]#"root", "global",
 from engforge.solver_utils import *
 from engforge.problem_context import *
 from engforge.attr_solver import Solver,SolverInstance
-
+import sys
 class SolverLog(LoggingMixin):
     pass
 
@@ -141,7 +141,9 @@ class SolverMixin(SolveableMixin):
                 #handle csv, listify string
                 if isinstance(addvar,str):
                     addvar = addvar.split(',')
-                added = set()
+                
+                #handle dictionary                    
+                added = set(())
                 avars = list(addable['attributes'].keys())
                 for av in addvar: #list/dict-keys
                     matches = set(fnmatch.filter(avars,av))
@@ -189,6 +191,9 @@ class SolverMixin(SolveableMixin):
     def run(self, **kwargs):
         """the steady state run the solver for the system. It will run the system with the input vars and return the system with the results. Dynamics systems will be run so they are in a steady state nearest their initial position."""
 
+        if 'opt_fail' not in kwargs:
+            kwargs['opt_fail'] = False
+
         with ProblemExec(self,kwargs,level_name='run') as pbx:
             return self._iterate_input_matrix(self.eval, return_results=True,**kwargs)
 
@@ -226,29 +231,31 @@ class SolverMixin(SolveableMixin):
 
         # Transeint
         from engforge.system import System
-        if isinstance(self, System):
+        if kw.pop('refresh_references',True) and isinstance(self, System):
             #recache is important for iterators #TODO: only with iterable comps
-            self.system_references(recache=True)        
+            self.system_references(recache=True)    
 
-        if self.log_level < 20:
-            self.debug(f"running with kw:{kw}")
+        #default behavior of system is to accept non-optimal results but describe the behavior anyways
+        if 'opt_fail' not in kw:
+            kw['opt_fail'] = False
+
+        
+        self.debug(f"running with kw:{kw}")
         
         #execute with problem context and execute signals
         with ProblemExec(self,kw,level_name='eval',eval_kw=eval_kw, sys_kw=sys_kw,post_callback=cb,Xnew=Xo) as pbx:
             #FIXME: change the eval_kw / sys_kw 
-            #pbx.pre_execute(**kw)
             self.index += 1
             out = self.execute(**kw)
-            #pbx.post_execute( **kw)
+
             #TODO: move to problem context, and
+            #pbx.save_data()
             self.save_data(index=self.index)
 
-            #exit to the level
-            #TODO: format output
             pbx.exit_to_level(level='eval',revert=False)
 
-        if cb:
-            cb(self, eval_kw, sys_kw, **kw)
+        if self.log_level >= 20:
+            sys.stdout.write('.')
 
         return out
 
@@ -259,9 +266,8 @@ class SolverMixin(SolveableMixin):
 
         :returns: the result of this function is returned from solver()
         """
-        #TODO: pass to execution context!!!!
         # steady state
-        dflt = dict(obj=None, cons=True, X0=None, dXdt=0)
+        dflt = dict()#obj=None, cons=True, X0=None, dXdt=0)
         dflt.update(kw)
         return self.solver(**dflt)
 
@@ -269,7 +275,7 @@ class SolverMixin(SolveableMixin):
 
     # TODO: code options for transient integration
     def solver(
-            self, obj=None, cons=True, X0: dict = None, dXdt: dict = None, **kw
+            self, **kw
         ):
             """
             runs the system solver using the current system state and modifying it. This is the default solver for the system, and it is recommended to add additional options or methods via the execute method.
@@ -295,46 +301,49 @@ class SolverMixin(SolveableMixin):
             :param deactivate: default None, a list of solver vars to deactivate (if not activated above)
             """
 
-            output = {
-                "obj": obj,
-                "add_obj": True,
-            }
-
-            #Minimizer Args (#TODO: move to problem context!!!)
-            opts = {"tol": 1e-6, "method": "SLSQP"}
             #to your liking sir
+            opts = {} #TODO: add defaults
             opts.update(kw) #your custom args!
                    
             #use problem execution context
             self.debug(f'starting solver: {opts}')
+            
             with ProblemExec(self,opts,level_name='sys_slvr') as pbx:
-                #print(pbx.level_name,pbx.level_number)
-                Xref = pbx.Xref
-                if len(Xref) == 0:
-                    self.debug(f'no variables found for solver: {opts}')
-                    return
-                
-                #TODO: swap between vars depending on dxdt=True
-                Yref = pbx.Yref
-
-                opts.update(**pbx.constraints)
-                output['pbx'] = pbx
                 
                 #Use Solver Context to Solve
-                out = pbx.solve_min(Xref,Yref,output=output, **opts)
-                if out['ans'].success:
+                out = pbx.solve_min(**opts)
+                has_ans = 'ans' in out
+                #depending on the solver success, failure or no solution, we can exit the solver
+                if has_ans and out['ans'] and out['ans'].success:
+                    #this is where you want to be! <<<
                     pbx.set_ref_values(out['Xans'])
                     pbx.exit_to_level('sys_slvr',False)
+
+                elif has_ans and out['ans'] is None:
+                    #deterministic input based case for updates / signals
+                    self.debug(f'exiting solver with no solution {out}')
+                    pbx.exit_with_state() 
+
                 else:
-                    #TODO: handle failure options
-                    if pbx.raise_on_opt_failure:
-                        raise ValueError(f"Solver failed to converge: {out['ans']}")
+                    #handle failure options
+                    if pbx.opt_fail:
+
+                        #if log.log_level < 15:
+                        pbx.warning(f'Optimization Failed: {pbx.sys_refs} | {pbx.constraints}')
+
+                        #if log.log_level < 5:
+                        pbx.debug(f'{pbx.__dict__}')
+
+                        ve = f"Solver failed to converge: {out['ans']}"
+                        raise ValueError(ve)
                     
                     if pbx.fail_revert:
                         pbx.exit_and_revert()
                     else:
                         pbx.exit_with_state()  
-
+                #close context
+            
+            #return output
             return out
 
 

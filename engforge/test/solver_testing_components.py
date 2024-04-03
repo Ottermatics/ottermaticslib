@@ -148,9 +148,6 @@ class CubeComp(Component,SpaceMixin):
     volume_goal: float = attrs.field(default=100)
 
 
-
-
-
     
 
 @forge(auto_attribs=True)
@@ -424,9 +421,10 @@ class Airfilter(System):
     set_fan_n = Signal.define("fan.n", "throttle", mode="both")
     set_filter_w = Signal.define("filt.w", "w", mode="both")
 
-    var_w = Solver.declare_var('w',combos='w',active=True)
-    var_w.add_var_constraint(0.0, kind="min",combos=['min_len'])
-    flow_balance = Solver.constraint_equality('sum_dP')
+    var_w = Solver.declare_var('w')
+    var_w.add_var_constraint(0.0, kind="min")
+    pressure_balance = Solver.constraint_equality('sum_dP')
+    #flow_balance = Solver.objective('w',combos='flow_balance',kind='max')
 
     flow_curve = Plot.define(
         "throttle", "w", kind="lineplot", title="Flow Curve"
@@ -510,7 +508,7 @@ class SliderCrank(System,CostModel):
     ro_slv.add_var_constraint(0,'min')
 
     rg_slv = Solver.declare_var('Rg',combos='design')
-    rg_slv.add_var_constraint(0.02,'min')
+    rg_slv.add_var_constraint(0.0125,'min')
 
     rg_slv = Solver.declare_var('Lo',combos='design')
     rg_slv.add_var_constraint(lambda s,p: s.Rc*s.Lo_factor,'min',combos='design')    
@@ -539,8 +537,6 @@ class SliderCrank(System,CostModel):
     crank_pos_slv = Solver.con_ineq('crank_gear_ratio',combos='design,gear')
     motor_pos_slv = Solver.con_ineq('motor_gear_ratio',combos='design,gear')
     size = Solver.con_ineq(lambda sys,prob: sys.max_size,'overall_length',combos='max_size')
-
-
 
     #Dynamics
     nonlinear: bool = True #sinusoidal-isms
