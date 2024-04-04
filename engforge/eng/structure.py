@@ -23,6 +23,7 @@ from engforge.logging import log, LoggingMixin
 from engforge.eng.costs import CostModel,cost_property
 from engforge.attr_slots import Slot
 from engforge.eng.prediction import PredictionMixin
+from engforge.problem_context import ProblemExec
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
@@ -307,44 +308,47 @@ class Structure(System,CostModel,PredictionMixin):
         for combo in iteration_combos:
             if combos is not None and combo not in combos:
                 continue
-            #reset cached failures
-            self.current_failure_summary = None
-            self._current_combo_failure_analysis = None            
-            
-            #run the analysis
-            self.index += 1
-            combo_possible = self.struct_pre_execute(combo) #can change combo
-            if combo_possible:
-                self.current_combo = combo_possible
-            else:
-                self.current_combo = combo
-            combo = self.current_combo
-            
-            self.info(f"running load combo : {combo} with solver {self.solve_method}")
+            with ProblemExec(self, {}) as px:
+                #reset cached failures
+                self.current_failure_summary = None
+                self._current_combo_failure_analysis = None            
+                
+                #run the analysis
+                #self.index += 1
+                combo_possible = self.struct_pre_execute(combo) #can change combo
+                if combo_possible:
+                    self.current_combo = combo_possible
+                else:
+                    self.current_combo = combo
+                combo = self.current_combo
+                
+                self.info(f"running load combo : {combo} with solver {self.solve_method}")
 
-            if 'check_statics' not in kwargs:
-                kwargs['check_statics'] = self.check_statics
+                if 'check_statics' not in kwargs:
+                    kwargs['check_statics'] = self.check_statics
 
-            if self.solve_method == 'linear':
-                self.analyze_linear(load_combos=[combo], *args, **kwargs)
-            elif self.solve_method == 'normal':  
-                self.analyze(load_combos=[combo], *args, **kwargs)
-            elif self.solve_method == 'pdelta':
-                self.analyze_PDelta(load_combos=[combo], *args, **kwargs)
+                if self.solve_method == 'linear':
+                    self.analyze_linear(load_combos=[combo], *args, **kwargs)
+                elif self.solve_method == 'normal':  
+                    self.analyze(load_combos=[combo], *args, **kwargs)
+                elif self.solve_method == 'pdelta':
+                    self.analyze_PDelta(load_combos=[combo], *args, **kwargs)
 
-            self._any_solved = True #Flag system properties to save
-            self.struct_post_execute(combo)
-            
-            #backup data saver.
-            self.current_failures() #cache failures
-            self._anything_changed = True #change costs
-            if save:
-                self.save_data(index=self.index, force=True)
+                self._any_solved = True #Flag system properties to save
+                self.struct_post_execute(combo)
+                
+                #backup data saver.
+                self.current_failures() #cache failures
+                self._anything_changed = True #change costs
 
-            #record results for prediction
-            if record and self.prediction:
-                res = self._prediction_record
-                if res: self.record_result(res)
+                if save:
+                    #self.save_data(index=self.index, force=True)
+                    px.save_data()
+
+                #record results for prediction
+                if record and self.prediction:
+                    res = self._prediction_record
+                    if res: self.record_result(res)
 
     #Solver Mechanics
     def struct_root_failure(self,x,fail_parm,base_kw,mult=1,target=1,sols=None,save=False,*args,**kw):

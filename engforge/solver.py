@@ -85,20 +85,17 @@ def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
 # add to any SolvableMixin to allow solver use from its namespace
 class SolverMixin(SolveableMixin):
     """A base class inherited by solveable items providing the ability to solve itself"""
-    #TODO: move to problem context
-    _run_id: str = None
-    _solved = None
-    _trans_opts = None
-    _converged = False
 
-    #TODO: implement equality solver as root
-    solver_option = "minimize" #or root 
+    #TODO: implement constraint equality solver as root
     
-
     # Configuration Information
     @property
     def solved(self):
-        return self._solved
+        if self.last_context is None: 
+            return False        
+        elif self.last_context.data:
+            return True
+        return False
     
     # Replaces Tabulation Method
     @solver_cached

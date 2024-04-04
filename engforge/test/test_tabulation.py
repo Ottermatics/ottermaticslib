@@ -5,7 +5,9 @@ import tempfile
 from engforge.configuration import forge
 from engforge.tabulation import system_property
 from engforge.components import Component
+from engforge.system import System
 from engforge.component_collections import ComponentIterator, ComponentDict
+from engforge.problem_context import ProblemExec
 import attr
 import os
 import numpy
@@ -16,7 +18,7 @@ import random
 
 
 @forge
-class TestConfig(Component):
+class TestConfig(System):
     attrs_prop: float = attr.ib(1.0)
     attrs_str: str = attr.ib("hey now")
 
@@ -50,18 +52,6 @@ class Test(unittest.TestCase):
         for fil in contents_local:
             if self.test_file_name in fil:
                 rfil = os.path.join(self.test_dir, fil)
-                # print('removing '+rfil)
-                # os.remove(rfil)
-        #self.test_config.reset_table()
-
-    def test_attrs_labels(self):
-        # Default
-        self.assertEqual(
-            self.test_config.attr_labels, ["name",'parent','time',"attrs_prop", "attrs_str"]
-        )
-
-    def test_attrs_vals(self):
-        self.assertEqual(self.test_config.attr_row, ["testconfig", 0.0, 1.0, "hey now"])
 
     def test_property_labels(self):
         ans = set(["four", "test_two", "test_one", "three"])
@@ -90,41 +80,45 @@ class Test(unittest.TestCase):
     def test_assemble_data_always_save(self):
         # print(f"testing data assembly {self.test_config.always_save_data}")
         # Run before test_table_to...
+        self.assertFalse(self.test_config.dataframe.shape[0])
+        with ProblemExec(self.test_config,{}) as px:
+            px.save_data()
 
-        self.assertFalse(self.test_config.TABLE)
-        self.test_config.save_data()
+            self.assertTrue(px.dataframe.shape[0])
+            self.assertTrue(1 == px.dataframe.shape[0])
 
-        self.assertTrue(self.test_config.TABLE)
-        self.assertTrue(1 in self.test_config.TABLE)
-
-        # Stochastic Props so this will work without input change.
-        self.test_config.save_data()
-        self.assertFalse(2 in self.test_config.TABLE)
+            # Stochastic Props so this will work without input change.
+            px.save_data()
+            self.assertTrue(2 == px.dataframe.shape[0])
 
     def test_assemble_data_on_input(self):
         # change this to check behavior to adjust stochastic behavior
         # print(f"testing data assembly {self.test_config.always_save_data}")
         # Run before test_table_to...
+        self.assertFalse(self.test_config.dataframe.shape[0])
+        self.test_config.always_save_data = False
+        
+        with ProblemExec(self.test_config,{}) as px:
+            px.save_data()
 
-        self.assertFalse(self.test_config.TABLE)
-        self.test_config.save_data()
+            #print(px.dataframe,len(px.dataframe))
+            self.assertTrue(px.dataframe.shape[0])
+            self.assertTrue(1 == px.dataframe.shape[0])
 
-        self.assertTrue(self.test_config.TABLE)
-        self.assertTrue(1 in self.test_config.TABLE)
+            # No Update So This Wont Save
+            px.save_data()
+            self.assertFalse(2 == px.dataframe.shape[0])
 
-        # No Update So This Wont Save
-        self.test_config.save_data()
-        self.assertFalse(2 in self.test_config.TABLE)
-
-        # Change Something
-        cur_val = self.test_config.attrs_prop
-        new_val = 6 + cur_val
-        self.test_config.info(
-            f"setting attrs prop on in {cur_val } => {new_val}"
-        )
-        self.test_config.attrs_prop = new_val
-        self.test_config.save_data()
-        self.assertTrue(2 in self.test_config.TABLE)
+            # Change Something
+            cur_val = self.test_config.attrs_prop
+            new_val = 6 + cur_val
+            self.test_config.info(
+                f"setting attrs prop on in {cur_val } => {new_val}"
+            )
+            
+            self.test_config.attrs_prop = new_val
+            px.save_data()
+            self.assertTrue(2 == px.dataframe.shape[0])
 
     def file_in_format(self, fileextension, path=True):
         fille = "{}.{}".format(self.test_file_name, fileextension)
@@ -137,17 +131,12 @@ class Test(unittest.TestCase):
     def test_dataframe(self, iter=5):
         attr_in = {}
         for i in range(iter):
-            cur_val = self.test_config.attrs_prop
-            attr_in[i] = val = cur_val + i**2.0
-            self.test_config.info(f"setting attrs prop df {cur_val } => {val}")
-            self.test_config.attrs_prop = val
-            self.test_config.save_data()
-
-        # print(df)
-        # print(self.test_config.attr_raw_keys)
-        # print(self.test_config.attr_row)
-        # print(self.test_config.internal_references)
-        # print(self.test_config.TABLE)
+            with ProblemExec(self.test_config,{}) as px:
+                cur_val = self.test_config.attrs_prop
+                attr_in[i] = val = cur_val + i**2.0
+                self.test_config.info(f"setting attrs prop df {cur_val } => {val}")
+                self.test_config.attrs_prop = val
+                px.save_data()
 
         df = self.test_config.dataframe
 
@@ -186,7 +175,7 @@ class Test(unittest.TestCase):
 
 
 @forge
-class Static(Component):
+class Static(System):
     attrs_prop: float = attr.ib(1.0)
     attrs_str: str = attr.ib("hey now")
 
@@ -205,13 +194,15 @@ class TestStatic(unittest.TestCase):
 
     def test_static(self, num=10):
         for i in range(num):
-            self.test_config.save_data()
+             with ProblemExec(self.test_config,{}) as px:
+                px.save_data()
 
         self.assertEqual(len(self.test_config.dataframe), 1)
 
     def test_input(self, num=10):
         for i in range(num):
-            self.test_config.attrs_prop = i + self.test_config.attrs_prop
-            self.test_config.save_data()
+            with ProblemExec(self.test_config,{}) as px:
+                self.test_config.attrs_prop = i + self.test_config.attrs_prop
+                px.save_data()
 
         self.assertEqual(len(self.test_config.dataframe), num)

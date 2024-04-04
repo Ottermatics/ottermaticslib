@@ -114,7 +114,7 @@ class TestComposition(unittest.TestCase):
 
     def test_input_and_run(self):
         self.system.run(**{"comp.aux": 5, "comp.comp.aux": 6})
-        self.assertEqual(len(self.system.TABLE), 1, f"wrong run config")
+        self.assertEqual(len(self.system.dataframe), 1, f"wrong run config")
         self.assertEqual(set(self.system.dataframe["comp_aux"]), set([5]))
         self.assertEqual(set(self.system.dataframe["comp_comp_aux"]), set([6]))
 

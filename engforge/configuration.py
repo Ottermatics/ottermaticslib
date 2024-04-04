@@ -83,7 +83,7 @@ def forge(cls=None, **kwargs):
         def f(cls, *args):
             return forge(cls, **kwargs)
         
-        f.__name__ ==  "forge"
+        f.__name__ ==  "forge_wrapper"
 
         return f
 
@@ -110,21 +110,23 @@ def property_changed(instance, variable, value):
 
     if instance._anything_changed:
         # Bypass Check since we've already flagged for an update
+        if log.log_level <= 2:
+            log.debug(f"already property changed {instance}{variable.name} {value}")
         return value
 
     if log.log_level <= 6:
-        log.msg(f"checking property changed {instance}{variable.name} {value}")
+        log.debug(f"checking property changed {instance}{variable.name} {value}")
 
     #Check if should be updated
     cur = getattr(instance, variable.name)
     attrs = attr.fields(instance.__class__)
     if variable in attrs and value != cur:
         if log.log_level < 5:
-            instance.debug(f"changing variables: {variable.name} {value}")
+            log.debug(f"changing variables: {variable.name} {value}")
         instance._anything_changed = True
 
     elif log.log_level < 4 and variable in attrs:
-        instance.warning(
+        log.warning(
             f"didnt change variables {variable.name}| {value} == {cur}"
         )
     return value

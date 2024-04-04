@@ -41,6 +41,9 @@ def valid_mtx(arr):
     elif arr.size == 0:
         return 0
     return True
+
+##TODO: compile problems using index_map
+#TODO: move to problem module
 class INDEX_MAP:
     oppo = {str: int, int: str}
 

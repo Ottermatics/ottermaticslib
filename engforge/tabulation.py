@@ -24,12 +24,13 @@ import os
 import collections
 import uuid
 
-
 class TableLog(LoggingMixin):
     pass
-
-
 log = TableLog()
+
+SKIP_REF = ["run_id", "converged", "name", "index",'converged']
+
+
 
 
 class TabulationMixin(SolveableMixin, DataframeMixin):
@@ -47,54 +48,6 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     _anything_changed: bool
     _always_save_data = False
 
-    # Data Tabulation - Intelligent Lookups
-    #TODO: 
-    def save_data(
-        self,
-        index=None,
-        saved=None,
-        force=False,
-        subforce=False,
-        save_internal=False,
-    ):
-        """We'll save data for this object and any other internal configuration if
-        anything changed or if the table is empty This should result in at least one row of data,
-        or minimal number of rows to track changes
-        This should capture all changes but save data"""
-
-        if log.log_level <= 10:
-            log.debug(
-                f"check save for {self}|{index}|save: {self.anything_changed or force}"
-            )
-
-        if saved is None:
-            saved = set()
-
-        if self.anything_changed or not self.TABLE or force:
-            if index is not None:
-                # only set this after we check if anything changed
-                self.index = index
-            else:
-                # normal increiment
-                self.index += 1
-            self.TABLE[self.index] = self.data_dict
-            self.debug("saving data {}".format(self.index))
-            saved.add(self)
-
-        #gather sub items as well!
-        if save_internal or subforce:
-            for config in self.internal_components().values():
-                if config is None:
-                    continue
-                if config not in saved:
-                    self.debug(f"saving {config.identity}")
-                    config.save_data(index, saved=saved, force=subforce,save_internal=save_internal)
-                else:
-                    self.debug(f"skipping saved config {config.identity}")
-
-        # reset value
-        self._anything_changed = False
-
     @property
     def anything_changed(self):
         """use the on_setattr method to determine if anything changed,
@@ -110,34 +63,6 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
             return True
         return False
 
-    # def reset_table(self):
-    #     """Resets the table, and attrs label stores"""
-    #     self.index = 0
-    #     self._table = None
-    #     cls = self.__class__
-    #     if hasattr(cls, "_{cls.__name__}_system_properties"):
-    #         return setattr(cls, "_{cls.__name__}_system_properties", None)
-
-#     @property
-#     def TABLE(self):
-#         """this should seem significant"""
-#         if self._table is None:
-#             self._table = {}
-#         return self._table
-# 
-#     @property
-#     def table(self):
-#         """alias for TABLE"""
-#         return self.TABLE
-
-    # @solver_cached
-    # def dataframe(self):
-    #     """The table compiled into a dataframe"""
-    #     data = [self.TABLE[v] for v in sorted(self.TABLE)]
-    #     df = pandas.DataFrame(data=data, copy=True)
-    #     self.format_columns(df)
-    #     return df
-
     @property
     def last_context(self):
         """Returns the last context"""
@@ -145,7 +70,9 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
 
     @solver_cached
     def dataframe(self):
-        return self.last_context.dataframe
+        if hasattr(self,'last_context') and hasattr(self.last_context, "dataframe"):
+            return self.last_context.dataframe
+        return pandas.DataFrame([])
 
     @property
     def plotable_variables(self):
@@ -186,56 +113,9 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
         return out
 
     @instance_cached
-    def skip_attr(self) -> list:
-        base = list((self.internal_configurations()).keys())
-        if self._skip_table_vars is None:
-            return base
-        return self._skip_table_vars + base
-
-    def format_label_attr(self, k, attr_prop):
-        if attr_prop.metadata and "label" in attr_prop.metadata:
-            return self.format_label(attr_prop.metadata["label"])
-        return self.format_label(attr_prop)
-
-    def format_label(self, label):
-        return label.replace(".", "_").replace("-", "_").title()
-
-    @instance_cached
-    def attr_labels(self) -> list:
-        """Returns formated attr label if the value is numeric"""
-        attr_labels = list(
-            [
-                k.lower()
-                for k, v in attr.fields_dict(self.__class__).items()
-                if k not in self.skip_attr
-            ]
-        )
-        return attr_labels
-
-    @solver_cached
-    def attr_row(self) -> list:
-        """Returns formated attr data if the value is numeric"""
-        return list(
-            [
-                getattr(self, k)
-                for k in self.attr_raw_keys
-                if k not in self.skip_attr
-            ]
-        )
-
-    @instance_cached
     def attr_raw_keys(self) -> list:
         good = set(self.table_fields())
         return [k for k in attr.fields_dict(self.__class__).keys() if k in good]
-
-    # @solver_cached
-    # def attr_dict(self) -> list:
-    #     """Returns formated attr data if the value is numeric"""
-    #     return {
-    #         k.lower(): getattr(self, k)
-    #         for k in self.attr_raw_keys
-    #         if hasattr(self, k) and k not in self.skip_attr
-    #     }
 
     def set_attr(self, **kwargs):
         assert set(kwargs).issubset(set(self.attr_raw_keys))
@@ -350,6 +230,8 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
                 # and "engforge" not in mrv.__module__
             ):
                 for k, obj in mrv.__dict__.items():
+                    if k in SKIP_REF:
+                        continue
                     if k not in __system_properties and isinstance(
                         obj, system_property
                     ):  # Precedent
@@ -381,3 +263,52 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
         """returns an instance unique id based on id(self)"""
         idd = id(self)
         return f"{self.classname}.{idd}"
+
+
+
+
+#     def save_data(
+#         self,
+#         index=None,
+#         saved=None,
+#         force=False,
+#         subforce=False,
+#         save_internal=False,
+#     ):
+#         """We'll save data for this object and any other internal configuration if
+#         anything changed or if the table is empty This should result in at least one row of data,
+#         or minimal number of rows to track changes
+#         This should capture all changes but save data"""
+# 
+#         if log.log_level <= 10:
+#             log.debug(
+#                 f"check save for {self}|{index}|save: {self.anything_changed or force}"
+#             )
+# 
+#         if saved is None:
+#             saved = set()
+# 
+#         if self.anything_changed or not self.TABLE or force:
+#             if index is not None:
+#                 # only set this after we check if anything changed
+#                 self.index = index
+#             else:
+#                 # normal increiment
+#                 self.index += 1
+#             self.TABLE[self.index] = self.data_dict
+#             self.debug("saving data {}".format(self.index))
+#             saved.add(self)
+# 
+#         #gather sub items as well!
+#         if save_internal or subforce:
+#             for config in self.internal_components().values():
+#                 if config is None:
+#                     continue
+#                 if config not in saved:
+#                     self.debug(f"saving {config.identity}")
+#                     config.save_data(index, saved=saved, force=subforce,save_internal=save_internal)
+#                 else:
+#                     self.debug(f"skipping saved config {config.identity}")
+# 
+#         # reset value
+#         self._anything_changed = False

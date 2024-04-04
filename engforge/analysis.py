@@ -61,13 +61,14 @@ class Analysis(Configuration, TabulationMixin, PlottingMixin, DataframeMixin):
     @property
     def uploaded(self):
         return self._uploaded
+    
 
     def run(self, *args, **kwargs):
         """Analysis.run() passes inputs to the assigned system and saves data via the system.run(cb=callback), once complete `Analysis.post_process()` is run also being passed input arguments, then plots & reports are made"""
         self.info(
             f"running analysis {self.identity} with input {args} {kwargs}"
         )
-        cb = lambda *args, **kw: self.save_data(force=True, subforce=True)
+        cb = lambda *args, **kw: self.system.last_context.save_data(force=True)
         out = self.system.run(*args, **kwargs, cb=cb)
         self.post_process(*args, **kwargs)
 

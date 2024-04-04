@@ -74,7 +74,7 @@ class TestWide(unittest.TestCase):
         self.system = WideSystem(cdict=dc, citer=lc)
 
     def test_keys(self):
-        self.assertFalse(bool(self.system.table))
+        self.assertFalse(bool(self.system.dataframe))
 
         dat = self.system.data_dict
 
@@ -109,8 +109,8 @@ class TestWide(unittest.TestCase):
         # save the data to table
         self.system.run()
 
-        self.assertTrue(len(self.system.table) == 1)
-        self.assertTrue(should_keys.issubset(set(self.system.table[1].keys())))
+        self.assertTrue(len(self.system.dataframe) == 1)
+        self.assertTrue(should_keys.issubset(set(self.system.dataframe[1].keys())))
         self.assertTrue(dataframe_keys.issubset(set(self.system.dataframe.keys())))
 
 
@@ -129,7 +129,7 @@ class TestNarrow(unittest.TestCase):
         self.system = NarrowSystem(cdict=dc, citer=lc)
 
     def test_keys(self):
-        self.assertFalse(bool(self.system.table))
+        self.assertFalse(len(self.system.dataframe)>0)
 
         dat = self.system.data_dict
 
@@ -164,8 +164,8 @@ class TestNarrow(unittest.TestCase):
         # save the data to table
         self.system.run()
 
-        self.assertTrue(len(self.system.table) == 5 ** len(comps))
-        self.assertTrue(should_keys.issubset(set(self.system.table[1].keys())))
+        self.assertTrue(len(self.system.dataframe) == 5 ** len(comps))
+        self.assertTrue(should_keys.issubset(set(self.system.dataframe[1].keys())))
         self.assertTrue(dataframe_keys.issubset(set(self.system.dataframe.keys())))
 
         # test item existence

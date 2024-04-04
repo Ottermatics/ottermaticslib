@@ -28,7 +28,6 @@ class SolvableLog(LoggingMixin):
     pass
 
 
-SKIP_REF = ["run_id", "converged", "name", "index"]
 
 log = SolvableLog()
 
@@ -55,6 +54,7 @@ def _cost_update(comp):
     return updt
 
 dflt_dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{},'dynamic_comps':{}}
+skipa_attr_names = ("index","parent","dynamic_input_vars","dynamic_state_vars","dynamic_output_vars")
 
     
 class SolveableMixin(AttributedBaseMixin):  #'Configuration'
@@ -658,6 +658,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             else:
                 parent = '.'.join(key_segs[:-1])
 
+            #parent refs for assigning a component
             comp_dict[key] = comp
             if parent in comp_dict:
                 attr_name = key.split('.')[-1]
@@ -665,6 +666,8 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
             # Fill in
             for k, v in satr.items():
+                if k in skipa_attr_names:
+                    continue
                 tatr[f"{key}.{k}"] = v
 
             for k, v in sprp.items():
@@ -913,6 +916,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         :return: A dictionary of system property references.
         :rtype: dict
         """
+        from engforge.tabulation import SKIP_REF
         refs = {}
         for ckey, lvl, comp in self.go_through_configurations(**kw):
             if comp is None:
@@ -969,6 +973,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         :return: A dictionary of system property references.
         :rtype: dict
         """
+        from engforge.tabulation import SKIP_REF
         refs = {}
         for ckey, lvl, comp in self.go_through_configurations(**kw):
             if not isinstance(comp, SolveableMixin):

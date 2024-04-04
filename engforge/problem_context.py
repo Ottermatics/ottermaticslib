@@ -80,8 +80,8 @@ slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_ob
 #KW Defaults for the context
 dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None,save_mode='all',x_start = None,save_data_on_exit=False)
 #can be found on session._<parm> or session.<parm>
-root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None)
-save_modes = ['vars','nums','all']
+root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None,converged=None)
+save_modes = ['vars','nums','all','prob']
 transfer_kw = ['system',]
 
 root_possible = list(root_defined.keys()) + list('_'+k for k in root_defined.keys())
@@ -155,7 +155,8 @@ class ProblemExec:
     _dxdt = None #numeric/None/dict/(integrate=True)
     _run_start = None
     _run_end = None
-    _run_time = None    
+    _run_time = None
+    _converged = None
     
 
     #Interior Context Options
@@ -512,7 +513,9 @@ class ProblemExec:
             #a context custom callback
             self.post_callback()
 
-        # TODO: save state to dataframe
+        #save state to dataframe
+        if self.save_data_on_exit:
+            self.save_data()
 
         #Exit Scenerio (boolean return important for context manager exit handling in heirarchy)
         if isinstance(exc_value,ProblemExit):     
@@ -638,20 +641,28 @@ class ProblemExec:
 
         return True #our problem will go on
     
-    def save_data(self,index=None,**add_data):
+    def save_data(self,index=None,force=False,**add_data):
         """save data to the context"""
         #TODO: multi-index support
-        if index is None and self._dxdt == True: #integration
-            index = self._time
-        elif index is None:
-            index = self._index
-        out = self.output_state
-        if add_data: out.update(add_data)
-        self.data[index] = out
-        #if we are integrating, then we dont increment the index
-        if self._dxdt != True:
-            self._index += 1
-        #self.info(f'saving data at {index} |N={len(self.data)}')
+        #save data if there isn't any or if nothing has changed
+        if self.system.anything_changed or not self.data or force:
+            if index is None and self._dxdt == True: #integration
+                index = self._time
+            elif index is None:
+                index = self._index
+            out = self.output_state
+            if add_data: out.update(add_data)
+            self.data[index] = out
+            #if we are integrating, then we dont increment the index
+            if self._dxdt != True:
+                self._index += 1
+            
+            #reset the data for changed items
+            self.system.mark_all_comps_changed(False)
+
+        else:
+            self.warning(f'no data saved, nothing changed')
+
     
     def clean_context(self):
         if hasattr(self.class_cache,'session') and self.class_cache.session is self:
@@ -738,8 +749,6 @@ class ProblemExec:
         out = {p: np.nan for p in intl_refs}
         Xin = {p: x[i] for i, p in enumerate(intl_refs)}
 
-
-
         if self.log_level < 10:
             self.info(f'sim_iter {t} {x} {Xin}')
 
@@ -749,6 +758,7 @@ class ProblemExec:
             self.set_time(t,dt)
             
             #save data at the start
+            print(f'saving data!')
             pbx.save_data() #TODO: chec_enable/ rate_check
 
             #ad hoc time integration
@@ -1241,6 +1251,10 @@ class ProblemExec:
             refs = self.all_system_references
         elif 'vars' == self.save_mode:
             refs = self.all_variable_refs
+        elif 'prob' == self.save_mode:
+            raise NotImplementedError(f'problem save mode not implemented')
+        else:
+            raise KeyError(f'unknown save mode {self.save_mode}, not in {save_modes}')
 
         out = Ref.refset_get(refs,sys=self.system,prob=self)
 
@@ -1282,8 +1296,8 @@ class ProblemExec:
         elif self.temp_state:
             self.debug(f'activating temp state: {self.temp_state}')
             Ref.refset_input(self.all_comps_and_vars,self.temp_state)
-        else:
-            self.warning(f'unable to set state: {new_state}')
+        elif self.log_level < 9:
+            self.debug(f'no state to set: {new_state}')
 
     #System Events
     def apply_pre_signals(self):
