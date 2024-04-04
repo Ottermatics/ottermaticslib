@@ -595,16 +595,17 @@ class GlobalDynamics(DynamicsMixin):
         try:
 
             #Time Iteration Context
+            data = []
             with ProblemExec(system,kwargs,level_name='sim',dxdt=True,copy_system=True,run_solver=run_solver,post_callback=cb) as pbx:
                 self._sim_ans = pbx.integrate(endtime=endtime,dt=dt,X0=X0,eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
-                system = pbx.system
-                data = pbx.data
+                system = pbx.system #hello copy
+
+                data = [{"time": k, **v} for k, v in  pbx.data.items()]
+
                 #this will affect the context copy, not self
                 pbx.exit_to_level('sim',False) 
 
             # convert to list with time
-            data = [{"time": k, **v} for k, v in data.items()]
-
             df = pandas.DataFrame(data)
             self.format_columns(df)
 

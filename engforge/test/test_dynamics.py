@@ -69,7 +69,7 @@ class TestDynamics(unittest.TestCase):
         sm = SpringMass(Fa=0,u=5)
         sm.run(dxdt=0)
 
-        dfss =sm.dataframe
+        dfss =sm.last_context.dataframe
         trsm,df = sm.simulate(dt=0.001, endtime=10,combos='*',return_all=True)
 
         self.assertAlmostEqual(df.iloc[-1].x,dfss.iloc[0].x, delta=0.01)

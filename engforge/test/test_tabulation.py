@@ -52,7 +52,7 @@ class Test(unittest.TestCase):
                 rfil = os.path.join(self.test_dir, fil)
                 # print('removing '+rfil)
                 # os.remove(rfil)
-        self.test_config.reset_table()
+        #self.test_config.reset_table()
 
     def test_attrs_labels(self):
         # Default
@@ -207,11 +207,11 @@ class TestStatic(unittest.TestCase):
         for i in range(num):
             self.test_config.save_data()
 
-        self.assertEqual(len(self.test_config.TABLE), 1)
+        self.assertEqual(len(self.test_config.dataframe), 1)
 
     def test_input(self, num=10):
         for i in range(num):
             self.test_config.attrs_prop = i + self.test_config.attrs_prop
             self.test_config.save_data()
 
-        self.assertEqual(len(self.test_config.TABLE), num)
+        self.assertEqual(len(self.test_config.dataframe), num)

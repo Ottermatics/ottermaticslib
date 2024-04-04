@@ -36,14 +36,14 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
-    index = 0  # Not an attr on purpose, we want pandas to provide the index
+    #index = 0  # Not an attr on purpose, we want pandas to provide the index
 
     # override per class:
     _skip_table_vars: list = None
     _skip_plot_vars: list
 
     # Cached and private
-    _table: dict = None
+    #_table: dict = None
     _anything_changed: bool
     _always_save_data = False
 
@@ -110,33 +110,42 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
             return True
         return False
 
-    def reset_table(self):
-        """Resets the table, and attrs label stores"""
-        self.index = 0
-        self._table = None
-        cls = self.__class__
-        if hasattr(cls, "_{cls.__name__}_system_properties"):
-            return setattr(cls, "_{cls.__name__}_system_properties", None)
+    # def reset_table(self):
+    #     """Resets the table, and attrs label stores"""
+    #     self.index = 0
+    #     self._table = None
+    #     cls = self.__class__
+    #     if hasattr(cls, "_{cls.__name__}_system_properties"):
+    #         return setattr(cls, "_{cls.__name__}_system_properties", None)
+
+#     @property
+#     def TABLE(self):
+#         """this should seem significant"""
+#         if self._table is None:
+#             self._table = {}
+#         return self._table
+# 
+#     @property
+#     def table(self):
+#         """alias for TABLE"""
+#         return self.TABLE
+
+    # @solver_cached
+    # def dataframe(self):
+    #     """The table compiled into a dataframe"""
+    #     data = [self.TABLE[v] for v in sorted(self.TABLE)]
+    #     df = pandas.DataFrame(data=data, copy=True)
+    #     self.format_columns(df)
+    #     return df
 
     @property
-    def TABLE(self):
-        """this should seem significant"""
-        if self._table is None:
-            self._table = {}
-        return self._table
-
-    @property
-    def table(self):
-        """alias for TABLE"""
-        return self.TABLE
+    def last_context(self):
+        """Returns the last context"""
+        raise NotImplemented('this should be implemented in the solvable class')
 
     @solver_cached
     def dataframe(self):
-        """The table compiled into a dataframe"""
-        data = [self.TABLE[v] for v in sorted(self.TABLE)]
-        df = pandas.DataFrame(data=data, copy=True)
-        self.format_columns(df)
-        return df
+        return self.last_context.dataframe
 
     @property
     def plotable_variables(self):
