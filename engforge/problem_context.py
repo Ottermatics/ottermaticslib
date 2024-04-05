@@ -98,23 +98,26 @@ class IllegalArgument(Exception):
 class ProblemExit(Exception):
     """an exception to exit the problem context, without error"""
     revert:bool
-    def __init__(self,revert:bool=None):
+    prob:"ProblemExec"
+    def __init__(self,prob:"ProblemExec",revert:bool=None):
         self.revert = revert
+        self.prob = prob
 
     def __str__(self) -> str:
-        return f'ProblemExit[revert={self.revert}]'        
+        return f'ProblemExit[{self.prob}|rvt={self.revert}]'        
 
 class ProblemExitAtLevel(ProblemExit):
     """an exception to exit the problem context, without error"""
     level: str
-    def __init__(self,level:str,revert=None):
+    def __init__(self,prob:"ProblemExec",level:str,revert=None):
         assert level is not None, 'level must be defined'
         assert isinstance(level,str), 'level must be a string'
+        self.prob = prob
         self.level = level.lower()
         self.revert = revert
 
     def __str__(self) -> str:
-        return f'ProblemExit[level={self.level},revert={self.revert}]'
+        return f'ProblemExit[{self.prob}|lvl={self.level}|rvt={self.revert}]'
 
 
 
@@ -257,7 +260,7 @@ class ProblemExec:
         self.solver_hist = expiringdict.ExpiringDict(100, 60)  
 
         if self.log_level < 15:
-            if hasattr(ProblemExec,'session'):
+            if hasattr(self.class_cache,'session'):
                 self.debug(f'subctx{self.level_number}|  keywords: {kw_dict} and misc: {opts}')
             else:
                 self.debug(f'context| keywords: {kw_dict} and misc: {opts}')
@@ -331,11 +334,7 @@ class ProblemExec:
                 
         self._dxdt = dxdt              
             
-        if hasattr(ProblemExec,'session'):
-            #TODO: update options for this instance
-            #TODO: record option to revert every change (or just on last change)
-            #error if the system is different (it shouldn't be!)
-                        
+        if hasattr(self.class_cache,'session'):                        
             #mirror the state of session (exactly)
             copy_vals = {k:v for k,v in self.class_cache.session.__dict__.items() if k in dflt_parse_kw or k in transfer_kw}
             self.__dict__.update(copy_vals)
@@ -343,6 +342,8 @@ class ProblemExec:
             self.problems_dict[self._problem_id] = self #carry that weight
             self.session_id = int(uuid.uuid4())
 
+            self.class_cache.session._prob_levels = {}
+            #error if the system is different (it shouldn't be!)
             if self.system is not system:
                 raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
 
@@ -369,6 +370,7 @@ class ProblemExec:
             self.__dict__.update(opt_in)
             self._problem_id = True #this is the top level
             self.problems_dict[self._problem_id] = self #carry that weight
+            self._prob_levels = {}
 
             self.reset_data()
 
@@ -417,8 +419,7 @@ class ProblemExec:
         #place me here after system has been modified
         self.system = system
         #cache as much as possible before running the problem (stitch in time saves 9 or whatever)
-        self._num_refs = self.system.system_references(numeric_only=True)
-        self._all_refs = self.system.system_references(recache=True,check_config=False)
+
 
         #pass args without creating singleton (yet)
         self.session_id = int(uuid.uuid4())
@@ -434,40 +435,54 @@ class ProblemExec:
 
         if hasattr(self.system,'success_thresh') and isinstance(self.system.success_thresh,(int,float)):
             self.success_thresh = self.system.success_thresh
-
-
-        
-
         #Extract solver vars and set them on this object, they will be distributed to any new further execution context's via monkey patch above
         in_kw = self.get_extra_kws(kwargs,slv_dflt_options,use_defaults=False)
         self._slv_kw = self.get_extra_kws(kw_dict,slv_dflt_options,rmv=True)
         self._slv_kw.update(in_kw) #update with input!
 
+        self.refresh_references()
+
         #Get solver weights
         self._weights = self._slv_kw.get('weights',None)
-
-        check_dynamics = self._dxdt is not None and self._dxdt is not False
-        self._sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,addable=self._num_refs,**self._slv_kw)
 
         #Grab inputs and set to system
         for k,v in dflt_parse_kw.items():
             if k in self._slv_kw:
                 setattr(self,k,self._slv_kw[k])
 
+
+
+        if log.log_level < 5:
+            self.msg(f'established sys context: {self} {self._slv_kw}')  
+
+    def refresh_references(self):
+        """refresh the system references"""
+        if self.log_level < 5:
+            self.warning(f'refreshing system references')
+        check_dynamics = self.check_dynamics
+        self._num_refs = self.system.system_references(numeric_only=True)
+        self._sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,addable=self._num_refs,**self._slv_kw)                 
+
         #Get the update method refs
         self._update_refs = self.system.collect_update_refs()
         #TODO: find subsystems that are not-subsolvers and execute them
         self._post_update_refs = self.system.collect_post_update_refs()
+
+        #initial establishment costs / ect
+        self.pre_execute()
+
+        #final ref's after update
+        self._all_refs = self.system.system_references(recache=True,check_config=False) #after updates
         
         #Problem Variable Definitions
-        self.solver_vars = self.sys_solver_variables(as_flat=True,**self._slv_kw)
         self.Xref = self.all_problem_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
-        self.constraints = self.sys_solver_constraints(cons)
+        self.constraints = self.sys_solver_constraints(cons) 
 
-        if log.log_level < 5:
-            self.msg(f'established sys context: {self} {self._slv_kw}')  
+    @property
+    def check_dynamics(self):
+        return self._dxdt is not None and self._dxdt is not False
 
     #Context Manager Interface
     def __enter__(self):
@@ -477,18 +492,21 @@ class ProblemExec:
             self.warning(f'context already entered!')
         
         self.activate_temp_state()
-        
+        self.entered = True
+
         if self.pre_exec:
             self.pre_execute()
 
         #Check for existing session        
-        if hasattr(ProblemExec,'session'):
+        if hasattr(self.class_cache,'session'):
             self.msg(f'entering existing execution context')
             if not isinstance(self,self.class_cache):
                 self.warning(f'change of execution class!')
             #global level number
+
             self.class_cache.level_number += 1     
-            self.entered = True
+            self.class_cache.session._prob_levels[self.level_name] = self
+            
             return self.class_cache.session
         
         #return New
@@ -498,11 +516,14 @@ class ProblemExec:
         if self.log_level < 10:
             refs = {k:v for k,v in self._sys_refs.get('attrs',{}).items() if v}
             self.debug(f'creating execution context for {self.system}| {self._slv_kw}| {refs}')
-        self.entered = True
+        
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        #define exit action, to handle the error here return True. Otherwise error propigates up to top level      
+        #define exit action, to handle the error here return True. Otherwise error propigates up to top level
+        self.exited = True
+        if self.log_level < 10:
+            self.debug(f'exit action {exc_type} {exc_value}')
 
         #Last opprotunity to update the system  at tsate
         if self.post_exec:
@@ -518,7 +539,9 @@ class ProblemExec:
             self.save_data()
 
         #Exit Scenerio (boolean return important for context manager exit handling in heirarchy)
-        if isinstance(exc_value,ProblemExit):     
+        if isinstance(exc_value,ProblemExit):
+            if self.log_level < 7:
+                self.debug(f'exit action {exc_type}| {exc_value.__dict__}')
             
             #first things first
             if exc_value.revert:
@@ -550,25 +573,35 @@ class ProblemExec:
                     #never ever leave the top level without deleting the session
                     self.class_cache.level_number = 0
                     del self.class_cache.session 
-                    self.exited = True 
                     raise KeyError(f'cant exit to level! {exc_value.level} not found!!')
             
             else:
                 if self.log_level <= 18:
                     self.info(f'problem exit revert={exc_value.revert}')
 
-                ext = True
-
+                ext = True #basic exit is one level up
+            
+            self.clean_context()
+            return ext
+        
+        #default exit scenerios
         elif exc_type is not None:
             ext = self.error_action(exc_value)
         else:
             ext = self.exit_action()
 
         self.clean_context()
-
-        self.exited = True
+        
         return ext
         
+    def debug_levels(self):
+        """debug the levels of the context"""
+        if hasattr(self.class_cache,'session'):
+            for k,v in self.class_cache.session._prob_levels.items():
+                self.info(f'level: {k} | {v} | {v.x_start}')
+
+        else:
+            raise IllegalArgument(f'no session available')
     
     #Multi Context Exiting:
     def persist_contexts(self):
@@ -594,19 +627,20 @@ class ProblemExec:
             raise IllegalArgument(f'cant reset contexts! {self.problems_dict} while not in persistance mode')       
 
     def exit_with_state(self):
-        raise ProblemExit(revert=False)
+        raise ProblemExit(self,revert=False)
     
     def exit_and_revert(self):
-        raise ProblemExit(revert=True)
+        raise ProblemExit(self,revert=True)
 
     def exit_to_level(self,level:str,revert=False):
-        raise ProblemExitAtLevel(level=level,revert=revert)
+        raise ProblemExitAtLevel(self,level=level,revert=revert)
 
     def exit_action(self):
         """handles the exit action wrt system"""
-        if self.revert_last and (self.class_cache.session is self or self.level_name == 'top'):
+        EOL =(self.class_cache.session is self or self.level_name == 'top')
+        if self.revert_last and EOL:
             if self.log_level <= 8:
-                self.debug(f' reverting to start')
+                self.debug(f'revert last!')
             self.revert_to_start()
             
             #run execute
@@ -641,10 +675,14 @@ class ProblemExec:
 
         return True #our problem will go on
     
+
     def save_data(self,index=None,force=False,**add_data):
         """save data to the context"""
-        #TODO: multi-index support
-        #save data if there isn't any or if nothing has changed
+
+        if not self.exited and self.post_exec:
+            #a context custom callback
+            self.post_execute()
+
         if self.system.anything_changed or not self.data or force:
             if index is None and self._dxdt == True: #integration
                 index = self._time
@@ -658,8 +696,8 @@ class ProblemExec:
                 self._index += 1
             
             #reset the data for changed items
-            self.system.mark_all_comps_changed(False)
-
+            self.system._anything_changed = False
+            self.debug(f'data saved = {index}')
         else:
             self.warning(f'no data saved, nothing changed')
 
@@ -758,8 +796,7 @@ class ProblemExec:
             self.set_time(t,dt)
             
             #save data at the start
-            print(f'saving data!')
-            pbx.save_data() #TODO: chec_enable/ rate_check
+            pbx.save_data() #TODO: check_enable/ rate_check
 
             #ad hoc time integration
             for name, trdct in pbx.integrators.items():
@@ -803,7 +840,6 @@ class ProblemExec:
                         else:
                             pbx.exit_to_level('ss_slvr',pbx.fail_revert)
 
-            #pbx.post_execute()
             V_dxdt =  np.array([out[p] for p in intl_refs])
             if self.log_level <= 10:
                 self.info(f'exiting transient {t} {V_dxdt} {Xin}')
@@ -1298,18 +1334,32 @@ class ProblemExec:
             Ref.refset_input(self.all_comps_and_vars,self.temp_state)
         elif self.log_level < 9:
             self.debug(f'no state to set: {new_state}')
+        
+        #be smarter about this
+        if self.system.anything_changed:
+            self.refresh_references()
 
     #System Events
     def apply_pre_signals(self):
         """applies all pre signals"""
+        msg_lvl = self.log_level <= 2
+        if self.log_level < 5:
+            self.msg(f"applying pre signals",lvl=6)
         for signame, sig in self.signals.items():
             if sig.mode == "pre" or sig.mode == "both":
+                if msg_lvl:
+                    self.msg(f"applying post signals: {signame}",lvl=3)                
                 sig.apply()
 
     def apply_post_signals(self):
         """applies all post signals"""
+        msg_lvl = self.log_level <= 2
+        if self.log_level < 5:
+            self.msg(f"applying post signals",lvl=6)        
         for signame, sig in self.signals.items():
             if sig.mode == "post" or sig.mode == "both":
+                if msg_lvl:
+                    self.msg(f"applying post signals: {signame}",lvl=3)
                 sig.apply()
 
     def update_system(self,*args,**kwargs):
@@ -1351,25 +1401,25 @@ class ProblemExec:
     def log_level(self):
         return log.log_level
 
-    def msg(self,msg):
+    def msg(self,msg,*a,**kw):
         if log.log_level < 5:
-            log.msg(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}')
+            log.msg(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}',*a,**kw)
 
-    def debug(self,msg):
+    def debug(self,msg,*a,**kw):
         if log.log_level <= 15:
-            log.debug(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}')
+            log.debug(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}',*a,**kw)
 
-    def warning(self,msg):
-        log.warning(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}')
+    def warning(self,msg,*a,**kw):
+        log.warning(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}',*a,**kw)
 
-    def info(self,msg):
-        log.info(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}')
+    def info(self,msg,*a,**kw):
+        log.info(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}',*a,**kw)
 
-    def error(self,error,msg):
-        log.error(error,f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}')        
+    def error(self,error,msg,*a,**kw):
+        log.error(error,f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}',*a,**kw)        
 
-    def critical(self,msg):
-        log.critical(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}')
+    def critical(self,msg,*a,**kw):
+        log.critical(f'{self.identity}|[{self.level_number}-{self.level_name}]  {msg}',*a,**kw)
 
     #Safe Access Methods
     @property
@@ -1487,8 +1537,10 @@ class ProblemExec:
     @property
     def dataframe(self)->pd.DataFrame:
         """returns the dataframe of the system"""
-        return pd.DataFrame([kv[-1] for kv in sorted(self.data.items(),
+        res = pd.DataFrame([kv[-1] for kv in sorted(self.data.items(),
                                                    key=lambda kv:kv[0]) ])
+        self.system.format_columns(res)
+        return res
 
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
     #Dynamics Interface

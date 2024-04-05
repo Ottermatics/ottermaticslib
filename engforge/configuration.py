@@ -1,7 +1,7 @@
 import attr, attrs
 
 from engforge.engforge_attributes import AttributedBaseMixin
-from engforge.logging import LoggingMixin, log
+from engforge.logging import LoggingMixin, log, change_all_log_levels
 from engforge.properties import *
 from engforge.env_var import EnvVariable
 import randomname
@@ -18,6 +18,8 @@ log = ConfigLog()
 conv_nms = lambda v: v.split(',') if isinstance(v,str) else v
 NAME_ADJ = EnvVariable('FORGE_NAME_ADJ',default=('geometry','size','algorithms','complexity','colors','materials'),type_conv=conv_nms)
 NAME_NOUN = EnvVariable('FORGE_NAME_NOUN',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
+FORGE_DEBUG = EnvVariable('FORGE_LOG_LEVEL',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=int)
+
 def name_generator(instance):
     """a name generator for the instance"""
     base = str(instance.__class__.__name__).lower()+'-'
@@ -71,6 +73,8 @@ def forge(cls=None, **kwargs):
             **dflts,
             **kwargs,
         )
+        if FORGE_DEBUG.in_env:
+            change_all_log_levels(inst=acls,new_log_level=FORGE_DEBUG.secret)        
         # must be here since can't inspect till after fields corrected
         acls.pre_compile()  # custom class compiler
         acls.validate_class()

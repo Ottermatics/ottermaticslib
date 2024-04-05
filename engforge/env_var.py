@@ -219,3 +219,4 @@ HOSTNAME = EnvVariable(
 SLACK_WEBHOOK = EnvVariable(
     "FORGE_SLACK_LOG_WEBHOOK", default=None, obscure=False, dontovrride=True
 )
+

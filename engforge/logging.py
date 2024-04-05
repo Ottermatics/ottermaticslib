@@ -17,13 +17,11 @@ BASIC_LOG_FMT = "[%(name)-24s]%(message)s"
 global LOG_LEVEL
 LOG_LEVEL = logging.INFO
 
-
-def change_all_log_levels(inst,new_log_level: int, check_function=None):
+def change_all_log_levels(inst=None,new_log_level: int=20, check_function=None):
     """Changes All Log Levels With pyee broadcast before reactor is running
     :param new_log_level: int - changes unit level log level (10-msg,20-debug,30-info,40-warning,50-error,60-crit)
     :param check_function: callable -> bool - (optional) if provided if check_function(unit) is true then the new_log_level is applied
     """
-    print(f"changing log levels to {new_log_level}...")
     if isinstance(new_log_level, float):
         new_log_level = int(new_log_level)  # Float Case Is Handled
 
@@ -35,12 +33,13 @@ def change_all_log_levels(inst,new_log_level: int, check_function=None):
 
     global LOG_LEVEL
     LOG_LEVEL = new_log_level
-
-    log.info(f"Changing All Logging Units To Level {new_log_level}")
+    
+    if LoggingMixin.log_level != new_log_level:
+        print(f"changing log levels to {new_log_level}...")
+        log.info(f"Changing All Logging Units To Level {new_log_level}")
     log_change_emitter.emit("change_level", new_log_level, check_function)
     LoggingMixin.log_level = new_log_level
-    inst.log_level = new_log_level
-
+    if inst: inst.log_level = new_log_level
 
 class LoggingMixin(logging.Filter):
     """Class to include easy formatting in subclasses"""

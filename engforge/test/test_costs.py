@@ -278,7 +278,7 @@ class TestFanSystemDataFrame(unittest.TestCase):
         fs.run(**{'econ.term_length': [1, 10, 20, 50], 'fan.V': [1, 5, 10], 'fan.area': [1, 5, 10]}, base=[None, MetalBase()])
 
         # Get the dataframe
-        df_complete = fs.dataframe
+        df_complete = fs.last_context.dataframe
 
         dfc = df_complete
         match = (dfc['fan_blade_cost']+dfc['motor_motor_cost']==dfc['econ_lifecycle_category_capex']).all()

@@ -87,10 +87,13 @@ class TestComposition(unittest.TestCase):
         self.system.post_sig.signal.mode = "post"  # usually its both
 
         # Pre Signals Test
+        outsys = self.system.output
+        outcomp = self.system.comp.output        
         sysstart = self.system.input
         compstart = self.system.comp.input
         self.assertNotEqual(sysstart, compstart)  # no signals transfering input
 
+        log.warning(f'test signals: {sysstart} {compstart}| {outsys} {outcomp}')
         with ProblemExec(self.system,{},post_exec=True,pre_exec=True) as pbx:
             sysend = self.system.input
             compend = self.system.comp.input
@@ -101,6 +104,7 @@ class TestComposition(unittest.TestCase):
             sysstart = self.system.output
             compstart = self.system.comp.output
             self.assertNotEqual(sysstart, compstart)  # they aren't aligned
+            log.info(f'pre-vert: {sysstart} {compstart}')
             
             #preserve changes
             pbx.exit_with_state()
@@ -108,6 +112,9 @@ class TestComposition(unittest.TestCase):
         #now post signals should be applied
         sysend = self.system.output
         compend = self.system.comp.output
+
+        log.info(f'final: {sysstart} {compstart}')
+
         self.assertEqual(sysend, compend)  # signals should work
         self.assertEqual(compstart, compend)  # output should change
         self.assertNotEqual(sysstart, sysend)  # output should change

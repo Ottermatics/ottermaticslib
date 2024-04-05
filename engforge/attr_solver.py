@@ -212,9 +212,11 @@ class Solver(ATTR_BASE):
         :param combos: The combinations of the solver variable.
         :return: The setup class for the solver variable.
         """
+        assert ',' not in var, f"var cannot have commas: {var}"
+
         # Create A New Signals Class
         active = kwargs.get("active", True)
-        combos = kwargs.get("combos", var)
+        combos = kwargs.get("combos", f'default,{var}') #default + var_name
 
         new_name = f"Solver_var_{var}".replace(".", "_")
         bkw = {"var": var, "value": None}

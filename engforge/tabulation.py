@@ -257,6 +257,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
             ]
         ):
             log.info(f"setting always save on {cls.__name__}")
+            cls._always_save_data = True
 
     @property
     def system_id(self) -> str:

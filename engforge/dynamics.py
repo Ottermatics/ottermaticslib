@@ -609,8 +609,9 @@ class GlobalDynamics(DynamicsMixin):
                 pbx.exit_to_level('sim',False) 
 
             # convert to list with time
-            df = pandas.DataFrame(data)
-            self.format_columns(df)
+            #df = pandas.DataFrame(data)
+            #self.format_columns(df)
+            df = pbx.dataframe
 
             #TODO: move to context
             if return_all:

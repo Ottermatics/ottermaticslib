@@ -124,7 +124,7 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
     @_anything_changed.setter
     def _anything_changed(self, inpt):
         """allows default functionality with new property system"""
-        self._anything_changed_ = inpt
+        self.mark_all_comps_changed(inpt)
 
     def mark_all_comps_changed(self,inpt:bool):
         """mark all components as changed, useful for forcing a re-run of the system, or for marking data as saved"""

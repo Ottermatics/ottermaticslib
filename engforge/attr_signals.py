@@ -30,14 +30,14 @@ class SignalInstance(AttributeInstance):
     def compile(self, **kwargs):
         self.source = self.system.locate_ref(self.signal.source)
         self.target = self.system.locate_ref(self.signal.target)
-        self.system.debug(f"SIGNAL|setting {self.target} with {self.source}")
+        self.system.debug(f"SIGNAL| setting {self.target} with {self.source}")
 
     def apply(self):
         """sets `target` from `source`"""
         val = self.source.value()
         if self.system.log_level < 10:
             self.system.msg(
-                f"Signal|applying {self.source}|{val} to {self.target}"
+                f"Signal| applying {self.source}|{val} to {self.target}"
             )
         self.target.set_value(val)
 
