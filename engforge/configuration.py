@@ -191,26 +191,26 @@ def signals_slots_handler(
 
     # Index
     # assert 'index' not in field_names, f'`index` is a reserved attribute'
-    if sys:
-        if "index" not in field_names:
-            index = attrs.Attribute(
-                name="index",
-                default=0,
-                validator=None,
-                repr=True,
-                cmp=None,
-                hash=None,
-                init=False,
-                metadata=None,
-                type=int,
-                converter=None,
-                kw_only=True,
-                eq=None,
-                order=None,
-                on_setattr=None,
-                inherited=False,
-            )
-            out.append(index)
+    #if sys:
+        # if "index" not in field_names:
+        #     index = attrs.Attribute(
+        #         name="index",
+        #         default=0,
+        #         validator=None,
+        #         repr=True,
+        #         cmp=None,
+        #         hash=None,
+        #         init=False,
+        #         metadata=None,
+        #         type=int,
+        #         converter=None,
+        #         kw_only=True,
+        #         eq=None,
+        #         order=None,
+        #         on_setattr=None,
+        #         inherited=False,
+        #     )
+        #     out.append(index)
 
         # Add Time Parm
         # TODO: remove after formulated in testing

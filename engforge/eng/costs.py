@@ -415,10 +415,11 @@ class Economics(Component):
     def update(self,parent:parent_types):
         
         if self.log_level < 5 :
-            self.msg(f'updating costs: {parent}')
+            self.msg(f'updating costs: {parent}',lvl=5)
         
         self.parent = parent
 
+        #this is kinda expensive to do every time, but we need to do it to get the costs
         self._gather_cost_references(parent)
         self._calc_output = self.calculate_production(parent,0)
         self._costs = self.calculate_costs(parent)
@@ -473,10 +474,11 @@ class Economics(Component):
         return lambda term: numpy.nansum([t(term) for t in term_funs])        
 
     #Gather & Set References (the magic!)
+    #TODO: update internal_references in problem in costs
     def internal_references(self,recache=True,numeric_only=False):
         """standard component references are """
-        if not recache and hasattr(self,'__cache_refs'):
-            return self.__cache_refs
+        #if not recache and hasattr(self,'__cache_refs'):
+        #    return self.__cache_refs
         
         d = self._gather_references()
         self._create_term_eval_functions()

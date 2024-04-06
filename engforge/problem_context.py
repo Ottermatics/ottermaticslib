@@ -80,7 +80,7 @@ slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_ob
 #KW Defaults for the context
 dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None,save_mode='all',x_start = None,save_data_on_exit=False)
 #can be found on session._<parm> or session.<parm>
-root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None,converged=None)
+root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None,converged=None,comp_changed=False)
 save_modes = ['vars','nums','all','prob']
 transfer_kw = ['system',]
 
@@ -120,13 +120,14 @@ class ProblemExitAtLevel(ProblemExit):
         return f'ProblemExit[{self.prob}|lvl={self.level}|rvt={self.revert}]'
 
 
-
+#TODO: determine when components are updated, and refresh the system references accordingly.
+#TODO: Map attributes/properties by component key and then autofix refs! (this is a big one), no refresh required. Min work
 class ProblemExec:
     """
     Represents the execution context for a problem in the system. The ProblemExec class provides a uniform set of options for managing the state of the system and its solvables, establishing the selection of combos or de/active attributes to Solvables. Once once created any further entracnces to ProblemExec will return the same instance until finally the last exit is called.
 
     ## params:
-    -  _problem_id: uuid for subproblems, or True for top level, None means uninitalized
+    -  _problem_id: uuid for subproblems, or True for top level, None means uninitialized
 
     """
     class_cache = None #ProblemExec is assigned below
@@ -230,6 +231,7 @@ class ProblemExec:
         :param kw_dict: A keyword argument dictionary to be parsed for solver options, and removed from the outer context. Changes are made to this dictionary, so they are removed automatically from the outer context, and thus no longer passed to interior vars.
         :param dxdt: The dynamics integration method. Default is None meaning that dynamic vars are not considered for minimization unless otherwise specified. Steady State can be specified by dxdt=0 all dynamic vars are considered as solver variables, with the constraint that their rate of change is zero. If a dictionary is passed then the dynamic vars are considered as solver variables, with the constraint that their rate of change is equal to the value in the dictionary, and all other unspecified rates are zero (steady).
 
+        #### Solver Selection Options
         :param combos: The selection of combos. Default is '*' (select all).
         :param  ign_combos: The combos to be ignored.
         :param  only_combos: The combos to be selected.
@@ -245,6 +247,8 @@ class ProblemExec:
         :param  revert_last: Whether to revert the last change. Default is True.
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
+        #### Context Options
+        :param refresh: Whether to refresh the system references. Default is False, if there is an active session context. New contexts will always refresh the system references.
         """
 
 
@@ -286,6 +290,11 @@ class ProblemExec:
             min_kw = mkw
         else:
             mkw.update(min_kw)
+
+        if "refresh" in opts or "refresh" in kw_dict:
+            refresh = kw_dict.pop("refresh",opts.get("refresh",False))
+        else:
+            refresh = False
 
         self._minimizer_kw = mkw
 
@@ -346,6 +355,9 @@ class ProblemExec:
             #error if the system is different (it shouldn't be!)
             if self.system is not system:
                 raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
+            
+            if refresh:
+                self.class_cache.session.refresh_references()
 
             #modify things from the input
             if level_name is None:
@@ -472,13 +484,18 @@ class ProblemExec:
         self.pre_execute()
 
         #final ref's after update
+        self.min_refresh()
+
+    def min_refresh(self):
+        self.warning(f'refresh')
+        #final ref's after update
         self._all_refs = self.system.system_references(recache=True,check_config=False) #after updates
-        
+
         #Problem Variable Definitions
         self.Xref = self.all_problem_vars
         self.Yref = self.sys_solver_objectives()
         cons = {} #TODO: parse additional constraints
-        self.constraints = self.sys_solver_constraints(cons) 
+        self.constraints = self.sys_solver_constraints(cons)          
 
     @property
     def check_dynamics(self):
@@ -496,6 +513,8 @@ class ProblemExec:
 
         if self.pre_exec:
             self.pre_execute()
+       
+        self.min_refresh()
 
         #Check for existing session        
         if hasattr(self.class_cache,'session'):
@@ -690,6 +709,7 @@ class ProblemExec:
                 index = self._index
             out = self.output_state
             if add_data: out.update(add_data)
+            out['index'] = index
             self.data[index] = out
             #if we are integrating, then we dont increment the index
             if self._dxdt != True:
@@ -698,7 +718,7 @@ class ProblemExec:
             #reset the data for changed items
             self.system._anything_changed = False
             self.debug(f'data saved = {index}')
-        else:
+        elif self.log_level < 15:
             self.warning(f'no data saved, nothing changed')
 
     
@@ -790,7 +810,7 @@ class ProblemExec:
         if self.log_level < 10:
             self.info(f'sim_iter {t} {x} {Xin}')
 
-        with ProblemExec(system,level_name='tr_slvr',Xnew=Xin) as pbx:
+        with ProblemExec(system,level_name='tr_slvr',Xnew=Xin,revert_last=False,revert_every=False) as pbx:
             # test for record time 
             
             self.set_time(t,dt)
@@ -825,7 +845,7 @@ class ProblemExec:
             #solvers
             if self.run_solver  and Xss and Yobj and self.solveable:
                 # TODO: add in any transient
-                with ProblemExec(system,level_name='ss_slvr') as pbx:
+                with ProblemExec(system,level_name='ss_slvr',revert_last=False,revert_every=False) as pbx:
 
                     ss_out = pbx.solve_min(Xss, Yobj, **self._minimizer_kw)
                     if ss_out['ans'].success:
@@ -1335,9 +1355,6 @@ class ProblemExec:
         elif self.log_level < 9:
             self.debug(f'no state to set: {new_state}')
         
-        #be smarter about this
-        if self.system.anything_changed:
-            self.refresh_references()
 
     #System Events
     def apply_pre_signals(self):

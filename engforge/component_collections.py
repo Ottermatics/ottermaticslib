@@ -98,6 +98,7 @@ class ComponentIter(Component):
         """override this to customize data access to self.data or other container name"""
         return itkey
 
+    #TODO: way to update internal references in problem, do on update()?
     @property
     def _internal_references(self) -> dict:
         """considers wide format to return active references"""

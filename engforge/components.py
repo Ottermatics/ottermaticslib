@@ -28,8 +28,15 @@ class SolveableInterface(Configuration,TabulationMixin,SolveableMixin):
     def last_context(self):
         """get the last context run, or the parent's"""
         if hasattr(self,"_last_context"):
-            return self._last_context 
+            #cleanup parent context
+            if hasattr(self,'_parent_context') and not self.parent.last_context:
+                del self._last_context
+                del self._parent_context
+            else:
+                return self._last_context 
         elif hasattr(self,'parent') and self.parent and (ctx:=self.parent.last_context):
+            self._last_context = ctx
+            self._parent_context = True
             return ctx
         return None
 

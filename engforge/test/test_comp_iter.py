@@ -74,7 +74,7 @@ class TestWide(unittest.TestCase):
         self.system = WideSystem(cdict=dc, citer=lc)
 
     def test_keys(self):
-        self.assertFalse(bool(self.system.dataframe))
+        self.assertFalse(len(self.system.dataframe))
 
         dat = self.system.data_dict
 
@@ -100,17 +100,20 @@ class TestWide(unittest.TestCase):
         for ck, vlist in comps.items():
             for v in vlist:
                 for p in props:
-                    tkn = f"{ck}.{v}.{p}"
+                    tkn = f"{ck}_{v}_{p}"
                     should_keys.add(tkn)
                     dataframe_keys.add(tkn.replace('.','_'))
 
-        self.assertTrue(should_keys.issubset(set(self.system.data_dict.keys())))
+        sys_key = set(self.system.data_dict.keys())
+        mtch =should_keys.issubset(sys_key)
+        self.system.info(f'keys: {should_keys} vs {sys_key}')
+        self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
 
         # save the data to table
         self.system.run()
 
         self.assertTrue(len(self.system.dataframe) == 1)
-        self.assertTrue(should_keys.issubset(set(self.system.dataframe[1].keys())))
+        self.assertTrue(should_keys.issubset(set(self.system.dataframe.iloc[0].keys())))
         self.assertTrue(dataframe_keys.issubset(set(self.system.dataframe.keys())))
 
 
@@ -155,17 +158,19 @@ class TestNarrow(unittest.TestCase):
         for ck, vlist in comps.items():
             # for v in vlist:
             for p in props:
-                tkn = f"{ck}.{p}"
+                tkn = f"{ck}_{p}"
                 should_keys.add(tkn)
                 dataframe_keys.add(tkn.replace('.', '_'))
-
-        self.assertTrue(should_keys.issubset(set(self.system.data_dict.keys())))
+        sys_key = set(self.system.data_dict.keys())
+        mtch =should_keys.issubset(sys_key)
+        self.system.info(f'keys: {should_keys} vs {sys_key}')
+        self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
 
         # save the data to table
         self.system.run()
 
         self.assertTrue(len(self.system.dataframe) == 5 ** len(comps))
-        self.assertTrue(should_keys.issubset(set(self.system.dataframe[1].keys())))
+        self.assertTrue(should_keys.issubset(set(self.system.dataframe.iloc[0].keys())))
         self.assertTrue(dataframe_keys.issubset(set(self.system.dataframe.keys())))
 
         # test item existence
