@@ -35,22 +35,43 @@ log = SolvableLog()
 def _update_func(comp,eval_kw):
     def updt(*args,**kw):
         eval_kw.update(kw)
+        if log.log_level <= 5:
+            log.msg(f'update| {comp.name} ',lvl=5)
         return comp.update(comp.parent, *args, **eval_kw)
     if log.log_level <= 5:
         log.msg(f'create method| {comp.name}| {eval_kw}')
+    updt.__name__ = f'{comp.name}_update'
     return updt
 
 def _post_update_func(comp,eval_kw):
     def updt(*args,**kw):
         eval_kw.update(kw)
-        return comp.update(comp.parent, *args, **eval_kw)
+        return comp.post_update(comp.parent, *args, **eval_kw)
     if log.log_level <= 5:
         log.msg(f'create post method| {comp.name}| {eval_kw}')
+    updt.__name__ = f'{comp.name}_post_update'
     return updt
 
 def _cost_update(comp):
-    def updt(*args,**kw):
-        return comp.update_dflt_costs()
+    from engforge.eng.costs import Economics,CostModel    
+    
+    if isinstance(comp,Economics):
+        def updt(*args,**kw):
+            if log.log_level <= 10:
+                log.warning(f'update economics {comp.name} | {comp.term_length} ')
+            comp.system_properties_classdef(True)
+            comp.update(comp.parent, *args, **kw)
+        log.warning(f'economics update cb {comp.name} | {comp.term_length} ')
+        updt.__name__ = f'{comp.name}_econ_update'
+    else:
+        def updt(*args,**kw):
+            if log.log_level <= 7:
+                log.msg(f'update costs {comp.name} ',lvl=5)
+            comp.system_properties_classdef(True)
+            return comp.update_dflt_costs()
+        log.warning(f'cost update cb {comp.name} ')
+        updt.__name__ = f'{comp.name}_cost_update'
+        
     return updt
 
 dflt_dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{},'dynamic_comps':{}}
@@ -75,6 +96,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     _prv_system_references: dict
 
     # Update Flow
+    #TODO: pass the problem vs the parent component, then locate this component in the problem and update any references
     def update(self, parent, *args, **kwargs):
         """Kwargs comes from eval_kw in solver"""
         if log.log_level <= 5:
@@ -85,74 +107,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         if log.log_level <= 5:
             log.debug(f"void post-updating {self.__class__.__name__}.{self}")
 
-    def update_internal(self, eval_kw=None, ignore=None, *args, **kw):
-        """update internal elements with input arguments"""
-        # Solve Each Internal System
-        from engforge.components import Component
-        from engforge.component_collections import ComponentIter
-
-        # Ignore
-        if ignore is None:
-            ignore = set()
-        elif self in ignore:
-            return
-
-        self.update(self.parent, *args, **kw)
-        self.debug(f"updating internal {self.__class__.__name__}.{self}")
-        for key, comp in self.internal_configurations(False).items():
-            if ignore is not None and comp in ignore:
-                continue
-
-            # provide add eval_kw
-            if eval_kw and key in eval_kw:
-                eval_kw_comp = eval_kw[key]
-            else:
-                eval_kw_comp = {}
-
-            # comp update cycle
-            self.debug(f"updating {key} {comp.__class__.__name__}.{comp}")
-            if isinstance(comp, ComponentIter):
-                comp.update(self, **eval_kw_comp)
-            elif isinstance(comp, (SolveableMixin, Component)):
-                comp.update(self, **eval_kw_comp)
-                comp.update_internal(eval_kw=eval_kw_comp, ignore=ignore)
-        ignore.add(self)  # add self to ignore list
-
-    def post_update_internal(self, eval_kw=None, ignore=None, *args, **kw):
-        """Post update all internal components"""
-        # Post Update Self
-        from engforge.components import Component
-        from engforge.component_collections import ComponentIter
-
-        # Ignore
-        if ignore is None:
-            ignore = set()
-        elif self in ignore:
-            return
-
-        self.post_update(self.parent, *args, **kw)
-        self.debug(f"post updating internal {self.__class__.__name__}.{self}")
-        for key, comp in self.internal_configurations(False).items():
-            if ignore is not None and comp in ignore:
-                continue
-
-            # provide add eval_kw
-            if eval_kw and key in eval_kw:
-                eval_kw_comp = eval_kw[key]
-            else:
-                eval_kw_comp = {}
-
-            self.debug(f"post updating {key} {comp.__class__.__name__}.{comp}")
-            if isinstance(comp, ComponentIter):
-                comp.post_update(self, **eval_kw_comp)
-            elif isinstance(comp, (SolveableMixin, Component)):
-                comp.post_update(self, **eval_kw_comp)
-                comp.post_update_internal(eval_kw=eval_kw_comp, ignore=ignore)
-        ignore.add(self)
-
     def collect_update_refs(self,eval_kw=None,ignore=None):
         """checks all methods and creates ref's to execute them later"""
-        from engforge.eng.costs import CostModel
+        from engforge.eng.costs import CostModel,Economics
 
         updt_refs = {}
         from engforge.components import Component
@@ -179,13 +136,16 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             ekw = eval_kw_comp
 
             #Add if its a unique update method (not the passthrough)
-            if comp.__class__.update != SolveableMixin.update:
+            if isinstance(comp,(CostModel,Economics)):
+                ref = Ref(comp,_cost_update(comp))
+                updt_refs[key+'._cost_model_'] =  ref            
+            
+            elif comp.__class__.update != SolveableMixin.update:
                 ref = Ref(comp,_update_func(comp,ekw))
                 updt_refs[key] =  ref
+            
+            #Cost Models
 
-            if isinstance(comp,CostModel):
-                ref = Ref(comp,_cost_update(comp))
-                updt_refs[key+'._cost_model_'] =  ref
 
         ignore.add(self)
         return updt_refs
@@ -228,6 +188,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     # internals caching
     # instance attributes
 
+    #TODO: move all system / property & identification to the problem_context or new system_identificaiton class (problem/base)
     @instance_cached
     def signals(self):
         """this is just a record of signals from this solvable. dont use this to get the signals, use high level signals strategy #TODO: add signals strategy"""
@@ -380,13 +341,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
         """
         from engforge.system import System
+        from engforge.problem_context import ProblemExec
 
         self.debug(
             f"running [Solver].{method} {self.identity} with input {kwargs}"
         )
-
-        # TODO: allow setting sub-component vars with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
-
+        assert hasattr(ProblemExec.class_cache,'session'), 'must be active context!'
         # create iterable null for sequence
         if sequence is None or not sequence:
             sequence = [{}]
@@ -442,7 +402,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             icur.update(**seq)
 
                         # Run The Method with inputs provisioned
-                        #TODO: wrap with ProblemExec 
                         out = method(
                             icur, eval_kw, sys_kw, cb=cb, **method_kw
                         )
@@ -949,62 +908,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         refs[(f"{ckey}." if ckey else "") + p] = Ref(
                             comp, p, False, True
                         )
-
-        return refs
-
-    def get_system_property_refs(
-        self,
-        strings=False,
-        numeric=True,
-        misc=False,
-        all=False,
-        boolean=False,
-        **kw,
-    ):
-        """
-        Get the references to system properties based on the specified criteria.
-
-        :param strings: Include system properties of string type.
-        :param numeric: Include system properties of numeric type (float, int).
-        :param misc: Include system properties of miscellaneous type.
-        :param all: Include all system properties regardless of type.
-        :param boolean: Include system properties of boolean type.
-        :param kw: Additional keyword arguments passed to recursive config loop
-        :return: A dictionary of system property references.
-        :rtype: dict
-        """
-        from engforge.tabulation import SKIP_REF
-        refs = {}
-        for ckey, lvl, comp in self.go_through_configurations(**kw):
-            if not isinstance(comp, SolveableMixin):
-                continue
-            for p, atr in comp.system_properties_classdef().items():
-                if p in SKIP_REF and not all:
-                    continue
-                ty = atr.return_type
-                if all:
-                    refs[(f"{ckey}." if ckey else "") + p] = Ref(
-                        comp, p, True, False
-                    )
-                    continue
-                if issubclass(ty, bool):
-                    if not boolean:
-                        continue  # prevent catch at int type
-                    refs[(f"{ckey}." if ckey else "") + p] = Ref(
-                        comp, p, True, False
-                    )
-                elif issubclass(ty, (float, int)) and numeric:
-                    refs[(f"{ckey}." if ckey else "") + p] = Ref(
-                        comp, p, True, False
-                    )
-                elif issubclass(ty, str) and strings:
-                    refs[(f"{ckey}." if ckey else "") + p] = Ref(
-                        comp, p, True, False
-                    )
-                elif misc:
-                    refs[(f"{ckey}." if ckey else "") + p] = Ref(
-                        comp, p, True, False
-                    )
 
         return refs
 

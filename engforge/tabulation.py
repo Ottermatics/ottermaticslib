@@ -200,7 +200,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
 
     @classmethod
     def system_properties_classdef(cls, recache=False):
-        """Combine other classes table properties into this one, in the case of subclassed system_properties"""
+        """Combine other parent-classes table properties into this one, in the case of subclassed system_properties"""
         from engforge.tabulation import TabulationMixin
 
         # Use a cache for deep recursion

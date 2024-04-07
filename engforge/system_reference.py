@@ -20,7 +20,7 @@ class RefLog(LoggingMixin):
 log = RefLog()
 
 
-def refset_input(refs, delta_dict,chk=True,fail=True):
+def refset_input(refs, delta_dict,chk=True,fail=True,warn=True):
     """change a set of refs with a dictionary of values. If chk is True k will be checked for membership in refs"""
     for k, v in delta_dict.items():
         memb =  k in refs
@@ -28,6 +28,8 @@ def refset_input(refs, delta_dict,chk=True,fail=True):
             refs[k].set_value(v)
         elif fail and chk and not memb:
             raise KeyError(f"key {k} not in refs {refs.keys()}")
+        elif warn and chk and not memb:
+            log.warning(f"key {k} not in refs {refs.keys()}")
 
 
 def refset_get(refs,*args,**kw):
@@ -211,7 +213,7 @@ class Ref:
 
     def setup_calls(self):
         """caches anonymous functions for value and logging speedup"""
-        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level < 2:
+        if self.comp and isinstance(self.comp,LoggingMixin) and self.comp.log_level <= 2:
             self._log_func = lambda val: self.comp.msg(f"REF[get] {str(self):<50} -> {val}")
         else:
             self._log_func = None

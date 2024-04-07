@@ -98,7 +98,7 @@ class TestCategoriesAndTerms(unittest.TestCase):
         er = EconRecursive(comp1=tc,comp2=c2)        
         inkw = {'econ.term_length':[0,5,10,15],'econ.fixed_output':1}
         #inkw = {}
-        er.run(revert_last=False,**inkw)
+        er.run(revert_last=False,revert_every=False,**inkw)
 
         df = er.dataframe
         tc = (df['econ_summary_total_cost'] == np.array([161., 220., 305., 390.])).all()

@@ -1,0 +1,1003 @@
+[forgelog                ][97mStarting engforge Enviornment[0m
+[configlog               ][97mConfiguring System: System[0m
+GPU solver not available: PYNITE_GPU environment variable not set to `True`
+[configlog               ][97mConfiguring System: CubeSystem[0m
+[configlog               ][97mConfiguring System: DynamicSystem[0m
+[configlog               ][97mConfiguring System: SpringMass[0m
+[plotlog                 ][97madding PLOT|relplot.lineplot(throttle,w,hue=None,c:[None],r:[None],{}[0m
+[configlog               ][97mConfiguring System: Airfilter[0m
+[configlog               ][33mWARN: AirFilterAnalysis skipping inherited attr: system as a custom type overriding it[0m
+[configlog               ][97mConfiguring System: SliderCrank[0m
+[configlog               ][97mConfiguring System: EconDefault[0m
+[configlog               ][97mConfiguring System: EconRecursive[0m
+[configlog               ][97mConfiguring System: FanSystem[0m
+[costlog                 ][33mWARN: assigning cost to non CostModel based slot base[0m
+[configlog               ][97mConfiguring System: WideSystem[0m
+[configlog               ][97mConfiguring System: NarrowSystem[0m
+[configlog               ][97mConfiguring System: MockSystem[0m
+[configlog               ][97mConfiguring System: PipeSystem[0m
+[configlog               ][97mConfiguring System: SimpleContext[0m
+[envvariable             ][97mloading section from /tmp/shapely_sections[0m
+[configlog               ][33mWARN: ShapelySection.mesh_extent_decimation has no type[0m
+[configlog               ][97mConfiguring System: Structure[0m
+[configlog               ][97mConfiguring System: TestConfig[0m
+[configlog               ][97mConfiguring System: Static[0m
+[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fe9fcf9e8f0>[0m
+[airfilteranalysis-bipart][97mrunning analysis airfilteranalysis-bipartite-incircle with input () {'throttle': array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
+       0.55555556, 0.66666667, 0.77777778, 0.88888889, 1.        ]), 'combos': '*', 'slv_vars': '*'}[0m
+..........[plotlog                 ][97mPlotting airfilteranalysis[0m
+[plotlog                 ][97mairfilteranalysis-bipartite-incircle system plotting system | <engforge.test.solver_testing_components.Airfilter object at 0x7fe9fcf9e8f0>[0m
+[plotlog                 ][97mPlotting airfilteranalysis.airfilter[0m
+[plotlog                 ][97mairfilter-humongous-edge plotting airfilteranalysis.airfilter.flow_curve | <engforge.attr_plotting.PlotInstance object at 0x7fe9fcf9fd90>[0m
+[plotlog                 ][97mplotting airfilter-humongous-edge| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+[airfilteranalysis-bipart][97mreport results[0m
+[airfilteranalysis-bipart][97mshowing plots 1[0m
+[airfilteranalysis-bipart][97mshowing airfilteranalysis.airfilter.flow_curve[0m
+/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/analysis.py:103: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  fig.show()
+[plotlog                 ][97mplotting airfilter-humongous-edge| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.(<Figure size 500x500 with 1 Axes>, <seaborn.axisgrid.FacetGrid object at 0x7fe9fccd6710>)
+Figure(500x500)
+[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7feabcfabca0>[0m
+..........[plotlog                 ][97mplotting airfilter-visible-median| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7feabce20280>[0m
+[airfilteranalysis-tomato][97mrunning analysis airfilteranalysis-tomato-cone with input () {'throttle': array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
+       0.55555556, 0.66666667, 0.77777778, 0.88888889, 1.        ]), 'combos': '*', 'slv_vars': '*'}[0m
+..........[plotlog                 ][97mPlotting airfilteranalysis[0m
+[plotlog                 ][97mairfilteranalysis-tomato-cone system plotting system | <engforge.test.solver_testing_components.Airfilter object at 0x7feabce20280>[0m
+[plotlog                 ][97mPlotting airfilteranalysis.airfilter[0m
+[plotlog                 ][97mairfilter-stable-radian plotting airfilteranalysis.airfilter.flow_curve | <engforge.attr_plotting.PlotInstance object at 0x7fe9faa5f2b0>[0m
+[plotlog                 ][97mplotting airfilter-stable-radian| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+[airfilteranalysis-tomato][97mreport results[0m
+[airfilteranalysis-tomato][97mshowing plots 1[0m
+[airfilteranalysis-tomato][97mshowing airfilteranalysis.airfilter.flow_curve[0m
+/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/analysis.py:103: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  fig.show()
+[plotlog                 ][97mplotting airfilter-stable-radian| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.(<Figure size 500x500 with 1 Axes>, <seaborn.axisgrid.FacetGrid object at 0x7fe9fa99db70>)
+Figure(500x500)
+[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7feabcdc7d90>[0m
+..........[plotlog                 ][97mplotting airfilter-equidistant-argument| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.[narrowsystem-linear-rank][97mkeys: {'cdict_name', 'citer_test_one', 'citer_test_two', 'citer_attrs_str', 'citer_test_four', 'citer_name', 'cdict_attrs_str', 'cdict_test_two', 'cdict_test_three', 'cdict_attrs_prop', 'citer_attrs_prop', 'cdict_test_one', 'citer_test_three', 'cdict_test_four'} vs {'dynamic_state_vars', 'citer.name', 'cdict.attrs_prop', 'time', 'name', 'cdict.test_four', 'dynamic_input_vars', 'citer.component_type', 'citer.attrs_prop', 'cdict.test_one', 'cdict.test_three', 'citer.test_four', 'citer.time', 'cdict.name', 'citer.test_one', 'cdict.test_two', 'cdict.current_item', 'dynamic_output_vars', 'citer.attrs_str', 'cdict.attrs_str', 'cdict.time', 'citer.current_item', 'citer.test_three', 'cdict.component_type', 'citer.test_two'}[0m
+F[widesystem-equidistant-e][97mkeys: {'citer_1_test_three', 'cdict_heyheyheyheyhey_test_two', 'cdict_heyhey_test_four', 'citer_1_test_one', 'citer_3_attrs_prop', 'cdict_heyheyheyheyhey_test_three', 'cdict_hey_test_two', 'citer_2_test_four', 'citer_4_test_four', 'citer_4_attrs_str', 'cdict_hey_name', 'cdict_heyheyhey_attrs_prop', 'citer_1_attrs_str', 'cdict_heyheyheyheyhey_attrs_str', 'citer_2_name', 'cdict_hey_test_three', 'citer_2_test_three', 'citer_2_test_one', 'cdict_heyhey_test_one', 'cdict_hey_test_four', 'cdict_heyheyheyhey_attrs_str', 'cdict_heyhey_test_three', 'cdict_heyheyheyhey_test_four', 'cdict_heyheyheyheyhey_name', 'citer_0_test_two', 'cdict_heyheyhey_test_two', 'cdict_heyheyheyhey_test_three', 'cdict_heyheyhey_test_one', 'citer_4_test_three', 'cdict_heyhey_attrs_str', 'cdict_heyhey_name', 'cdict_heyheyhey_attrs_str', 'citer_1_test_two', 'citer_4_test_two', 'citer_0_test_one', 'cdict_heyheyheyhey_attrs_prop', 'citer_3_name', 'cdict_heyheyheyheyhey_test_one', 'citer_0_name', 'citer_3_test_three', 'citer_4_attrs_prop', 'citer_1_test_four', 'cdict_heyheyheyhey_test_two', 'citer_2_attrs_prop', 'citer_4_test_one', 'cdict_hey_attrs_str', 'cdict_heyheyheyhey_test_one', 'citer_3_test_four', 'cdict_heyheyheyheyhey_attrs_prop', 'cdict_hey_attrs_prop', 'cdict_heyheyheyheyhey_test_four', 'cdict_heyhey_attrs_prop', 'citer_0_test_three', 'cdict_heyheyhey_test_three', 'citer_2_test_two', 'citer_4_name', 'citer_0_attrs_str', 'cdict_heyheyhey_test_four', 'cdict_heyheyheyhey_name', 'citer_3_test_one', 'cdict_hey_test_one', 'cdict_heyhey_test_two', 'citer_1_name', 'cdict_heyheyhey_name', 'citer_1_attrs_prop', 'citer_0_attrs_prop', 'citer_3_test_two', 'citer_2_attrs_str', 'citer_3_attrs_str', 'citer_0_test_four'} vs {'cdict.heyheyheyhey.time', 'dynamic_state_vars', 'cdict.heyhey.time', 'cdict.heyheyhey.test_four', 'citer.1.test_three', 'citer.3.test_two', 'citer.1.name', 'citer.1.attrs_str', 'cdict.heyheyheyheyhey.test_four', 'citer.component_type', 'citer.1.time', 'citer.2.test_two', 'citer.1.test_two', 'citer.2.test_one', 'citer.3.time', 'dynamic_output_vars', 'citer.0.attrs_prop', 'cdict.heyheyhey.attrs_prop', 'cdict.heyheyheyhey.test_two', 'citer.4.attrs_str', 'citer.2.name', 'cdict.heyheyhey.test_two', 'citer.0.test_four', 'cdict.heyheyheyhey.test_three', 'citer.name', 'citer.0.name', 'cdict.heyhey.name', 'name', 'cdict.heyheyheyhey.test_four', 'citer.0.test_two', 'cdict.heyhey.test_four', 'citer.0.time', 'cdict.heyheyhey.attrs_str', 'cdict.heyheyheyhey.name', 'citer.2.time', 'cdict.heyhey.test_two', 'cdict.heyheyheyhey.attrs_prop', 'citer.3.attrs_str', 'citer.3.name', 'cdict.heyheyheyheyhey.test_three', 'cdict.heyheyheyhey.attrs_str', 'cdict.heyheyheyheyhey.name', 'citer.3.test_four', 'citer.4.name', 'cdict.heyhey.attrs_str', 'time', 'citer.1.test_four', 'citer.2.test_four', 'cdict.hey.time', 'dynamic_input_vars', 'citer.time', 'cdict.heyheyhey.name', 'citer.2.attrs_str', 'citer.0.test_three', 'citer.4.test_two', 'cdict.hey.test_two', 'cdict.hey.attrs_str', 'cdict.heyheyheyheyhey.test_one', 'cdict.heyheyheyheyhey.test_two', 'cdict.heyheyheyheyhey.attrs_str', 'citer.3.test_one', 'cdict.heyheyheyheyhey.attrs_prop', 'citer.2.attrs_prop', 'cdict.heyhey.attrs_prop', 'cdict.hey.test_three', 'cdict.heyheyheyhey.test_one', 'cdict.heyhey.test_one', 'cdict.heyheyheyheyhey.time', 'citer.1.attrs_prop', 'cdict.heyheyhey.test_one', 'cdict.hey.test_four', 'cdict.name', 'cdict.heyheyhey.test_three', 'cdict.heyhey.test_three', 'citer.4.test_one', 'citer.3.test_three', 'cdict.heyheyhey.time', 'citer.2.test_three', 'cdict.current_item', 'cdict.hey.name', 'citer.4.time', 'citer.1.test_one', 'cdict.hey.test_one', 'citer.0.test_one', 'citer.0.attrs_str', 'cdict.time', 'citer.4.attrs_prop', 'citer.current_item', 'citer.4.test_three', 'citer.4.test_four', 'cdict.hey.attrs_prop', 'cdict.component_type', 'citer.3.attrs_prop'}[0m
+F..[propertylog             ][33mWARN: test signals: 5 0| 0 0[0m
+[propertylog             ][97mpre-vert: 0 25[0m
+[propertylog             ][97mfinal: 0 25[0m
+..[solvablelog             ][33mWARN: economics update cb economics-broad-lepton | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extended-bias [0m
+[solvablelog             ][33mWARN: cost update cb comp2-magenta-cube [0m
+[solvablelog             ][33mWARN: economics update cb economics-broad-lepton | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extended-bias [0m
+[solvablelog             ][33mWARN: cost update cb comp2-magenta-cube [0m
+[solvablelog             ][33mWARN: economics update cb economics-broad-lepton | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extended-bias [0m
+[solvablelog             ][33mWARN: cost update cb comp2-magenta-cube [0m
+[solvablelog             ][33mWARN: economics update cb economics-broad-lepton | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extended-bias [0m
+[solvablelog             ][33mWARN: cost update cb comp2-magenta-cube [0m
+..[solvablelog             ][33mWARN: economics update cb economics-small-variance | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+[solvablelog             ][33mWARN: economics update cb economics-small-variance | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+[solvablelog             ][33mWARN: economics update cb economics-small-variance | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+[solvablelog             ][33mWARN: economics update cb economics-small-variance | 0 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+.[solvablelog             ][33mWARN: economics update cb economics-small-variance | 5 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+[solvablelog             ][33mWARN: economics update cb economics-small-variance | 5 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+.[solvablelog             ][33mWARN: economics update cb economics-small-variance | 10 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+[solvablelog             ][33mWARN: economics update cb economics-small-variance | 10 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+.[solvablelog             ][33mWARN: economics update cb economics-small-variance | 15 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+[solvablelog             ][33mWARN: economics update cb economics-small-variance | 15 [0m
+[solvablelog             ][33mWARN: cost update cb termcosts-extremal-opacity [0m
+[solvablelog             ][33mWARN: cost update cb comp2-leather-mixture [0m
+..........[costlog                 ][33mWARN: assigning cost to non CostModel based slot comp[0m
+[solvablelog             ][33mWARN: economics update cb economics-recursive-representative | 0 [0m
+[solvablelog             ][33mWARN: economics update cb economics-recursive-representative | 0 [0m
+[solvablelog             ][33mWARN: economics update cb economics-recursive-representative | 0 [0m
+[solvablelog             ][33mWARN: economics update cb economics-recursive-representative | 0 [0m
+..[solvablelog             ][33mWARN: economics update cb economics-red-register | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp2-maroon-cone [0m
+[solvablelog             ][33mWARN: economics update cb economics-red-register | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp2-maroon-cone [0m
+[solvablelog             ][33mWARN: economics update cb economics-red-register | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp2-maroon-cone [0m
+[solvablelog             ][33mWARN: economics update cb economics-red-register | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp2-maroon-cone [0m
+..[solvablelog             ][33mWARN: economics update cb economics-composite-mole | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-offline-name [0m
+[solvablelog             ][33mWARN: cost update cb comp2-cyclic-style [0m
+[solvablelog             ][33mWARN: economics update cb economics-composite-mole | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-offline-name [0m
+[solvablelog             ][33mWARN: cost update cb comp2-cyclic-style [0m
+[solvablelog             ][33mWARN: economics update cb economics-composite-mole | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-offline-name [0m
+[solvablelog             ][33mWARN: cost update cb comp2-cyclic-style [0m
+[solvablelog             ][33mWARN: economics update cb economics-composite-mole | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-offline-name [0m
+[solvablelog             ][33mWARN: cost update cb comp2-cyclic-style [0m
+..[solvablelog             ][33mWARN: economics update cb economics-hidden-type | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-weighted-guide [0m
+[solvablelog             ][33mWARN: cost update cb comp2-orange-blur [0m
+[solvablelog             ][33mWARN: economics update cb economics-hidden-type | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-weighted-guide [0m
+[solvablelog             ][33mWARN: cost update cb comp2-orange-blur [0m
+[solvablelog             ][33mWARN: economics update cb economics-hidden-type | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-weighted-guide [0m
+[solvablelog             ][33mWARN: cost update cb comp2-orange-blur [0m
+[solvablelog             ][33mWARN: economics update cb economics-hidden-type | 0 [0m
+[solvablelog             ][33mWARN: cost update cb comp1-weighted-guide [0m
+[solvablelog             ][33mWARN: cost update cb comp2-orange-blur [0m
+..[solvablelog             ][33mWARN: economics update cb economics-free-instance | 0 [0m
+[solvablelog             ][33mWARN: economics update cb economics-free-instance | 0 [0m
+[solvablelog             ][33mWARN: economics update cb economics-free-instance | 0 [0m
+[solvablelog             ][33mWARN: economics update cb economics-free-instance | 0 [0m
+..[solvablelog             ][33mWARN: cost update cb metalbase-orthogonal-writer [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 0 [0m
+[solvablelog             ][33mWARN: cost update cb metalbase-orthogonal-writer [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 0 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 1 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 10 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 20 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+[solvablelog             ][33mWARN: cost update cb fan-exact-singularity [0m
+[solvablelog             ][33mWARN: cost update cb motor-augmenting-base [0m
+[solvablelog             ][33mWARN: economics update cb sysecon-stone-dust | 50 [0m
+.[reflog                  ][33mWARN: key base.name not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[reflog                  ][33mWARN: key base.time not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[reflog                  ][33mWARN: key base.cost_per_item not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'time', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.time', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.time', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.time', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
+./home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
+  warn("The following arguments have no effect for a chosen solver: {}."
+./home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
+  warn("The following arguments have no effect for a chosen solver: {}."
+./home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
+  warn("The following arguments have no effect for a chosen solver: {}."
+./home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
+  warn("The following arguments have no effect for a chosen solver: {}."
+.............  message: The solver successfully reached the end of the integration interval.
+  success: True
+   status: 0
+        t: [ 0.000e+00  1.000e-03 ...  9.999e+00  1.000e+01]
+        y: [[ 0.000e+00  1.515e-02 ... -5.212e-12 -5.407e-12]
+            [ 0.000e+00  7.582e-06 ...  3.038e-01  3.038e-01]]
+      sol: None
+ t_events: None
+ y_events: None
+     nfev: 6014
+     njev: 0
+      nlu: 0
+.  message: The solver successfully reached the end of the integration interval.
+  success: True
+   status: 0
+        t: [ 0.000e+00  1.000e-03 ...  9.999e+00  1.000e+01]
+        y: [[ 0.000e+00 -8.333e-10 ... -8.691e-02 -8.698e-02]
+            [ 5.038e-01  5.038e-01 ...  4.464e-01  4.463e-01]]
+      sol: None
+ t_events: None
+ y_events: None
+     nfev: 6014
+     njev: 0
+      nlu: 0
+  message: The solver successfully reached the end of the integration interval.
+  success: True
+   status: 0
+        t: [ 0.000e+00  1.000e-03 ...  9.999e+00  1.000e+01]
+        y: [[ 0.000e+00  1.519e-02 ...  2.148e+00  2.148e+00]
+            [ 0.000e+00  7.595e-06 ...  3.092e-01  3.113e-01]]
+      sol: None
+ t_events: None
+ y_events: None
+     nfev: 6014
+     njev: 0
+      nlu: 0
+  message: The solver successfully reached the end of the integration interval.
+  success: True
+   status: 0
+        t: [ 0.000e+00  1.000e-02 ...  9.990e+00  1.000e+01]
+        y: [[ 0.000e+00  0.000e+00 ...  0.000e+00  0.000e+00]
+            [ 0.000e+00 -5.000e-04 ... -4.995e-01 -5.000e-01]]
+      sol: None
+ t_events: None
+ y_events: None
+     nfev: 6014
+     njev: 0
+      nlu: 0
+[configlog               ][33mWARN: SimpleHeatExchanger.Thi has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.mdot_h has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.Cp_h has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.Tci has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.mdot_c has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.Cp_c has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.efficiency has no type[0m
+[configlog               ][33mWARN: SimpleHeatExchanger.name has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.pressure_ratio has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.Tin has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.mdot has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.Cp has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.gamma has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.efficiency has no type[0m
+[configlog               ][33mWARN: SimpleCompressor.name has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.Pout has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.Pin has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.Tin has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.mdot has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.Cp has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.gamma has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.efficiency has no type[0m
+[configlog               ][33mWARN: SimpleTurbine.name has no type[0m
+[configlog               ][33mWARN: SimplePump.MFin has no type[0m
+[configlog               ][33mWARN: SimplePump.pressure_ratio has no type[0m
+[configlog               ][33mWARN: SimplePump.Tin has no type[0m
+[configlog               ][33mWARN: SimplePump.Pin has no type[0m
+[configlog               ][33mWARN: SimplePump.efficiency has no type[0m
+[configlog               ][33mWARN: SimplePump.fluid has no type[0m
+[configlog               ][33mWARN: SimplePump.name has no type[0m
+../home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
+  warn("The following arguments have no effect for a chosen solver: {}."
+F.         186474 function calls (185792 primitive calls) in 0.044 seconds
+
+   Ordered by: internal time
+   List reduced from 690 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     2318    0.015    0.000    0.027    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:72(_get_init_attrs_data)
+    97047    0.005    0.000    0.006    0.000 {built-in method builtins.isinstance}
+     2323    0.002    0.000    0.002    0.000 /home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/attr/_make.py:1969(<dictcomp>)
+    46590    0.002    0.000    0.002    0.000 {built-in method builtins.issubclass}
+     2323    0.001    0.000    0.004    0.000 /home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/attr/_make.py:1949(fields_dict)
+      511    0.001    0.000    0.002    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:175(set)
+     2230    0.001    0.000    0.027    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:369(<lambda>)
+     2233    0.001    0.000    0.026    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:172(slots_attributes)
+      511    0.000    0.000    0.000    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:214(setup_calls)
+       71    0.000    0.000    0.027    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:375(<dictcomp>)
+
+
+  message: The solver successfully reached the end of the integration interval.
+  success: True
+   status: 0
+        t: [ 0.000e+00  1.000e-03 ...  9.999e+00  1.000e+01]
+        y: [[ 0.000e+00  2.519e-02 ...  9.114e-01  9.114e-01]
+            [ 0.000e+00  1.259e-05 ...  1.295e-01  1.305e-01]]
+      sol: None
+ t_events: None
+ y_events: None
+     nfev: 6014
+     njev: 0
+      nlu: 0
+         81930236 function calls (81779767 primitive calls) in 16.760 seconds
+
+   Ordered by: internal time
+   List reduced from 650 to 10 due to restriction <10>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  1125006    7.323    0.000   12.784    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:72(_get_init_attrs_data)
+ 45483375    2.410    0.000    2.411    0.000 {built-in method builtins.isinstance}
+  1125016    1.110    0.000    1.110    0.000 /home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/attr/_make.py:1969(<dictcomp>)
+ 22502260    1.098    0.000    1.098    0.000 {built-in method builtins.issubclass}
+  1125016    0.601    0.000    1.848    0.000 /home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/attr/_make.py:1949(fields_dict)
+  1118936    0.313    0.000   13.269    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:369(<lambda>)
+  1118936    0.298    0.000   12.956    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:172(slots_attributes)
+   138428    0.249    0.000    0.517    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:175(set)
+    36097    0.194    0.000   13.463    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:375(<dictcomp>)
+   258619    0.126    0.000    0.404    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:250(value)
+
+
+[flowinput-orange-liason ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f510ba30>[0m
+[pipenode-visible-assista][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f510ba30>[0m
+[flowinput-orange-liason ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f510bca0>[0m
+[pipenode-commutative-deg][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f510bca0>[0m
+[pipenode-visible-assista][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f750caf0>[0m
+[pipenode-silver-transfor][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f750caf0>[0m
+[pipenode-commutative-deg][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f4d6e260>[0m
+[pipenode-silver-transfor][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f4d6e260>[0m
+[pipenode-silver-transfor][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f4d6db40>[0m
+[flowinput-convoluted-mar][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f4d6db40>[0m
+[pipenode-n2z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490e590>[0m
+[pipenode-visible-assista][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490e590>[0m
+[pipenode-commutative-deg][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490fd30>[0m
+[pipenode-n3z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490fd30>[0m
+[pipenode-silver-transfor][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490e080>[0m
+[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490e080>[0m
+[pipenode-visible-assista][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490e170>[0m
+[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490e170>[0m
+[flowinput-extended-pound][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490cf10>[0m
+[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f490cf10>[0m
+[pipenode-n3z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f5582e60>[0m
+[pipenode-n2z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fe9f5582e60>[0m
+[pipelog                 ][97madding flowinput.140643008460832[0m
+[pipelog                 ][97madding pipe.140642815621680[0m
+[pipelog                 ][97madding pipenode.140643008461216[0m
+[pipelog                 ][97madding pipe.140642815621680[0m
+[pipelog                 ][97madding pipe.140642853374704[0m
+[pipelog                 ][97madding pipenode.140642812138096[0m
+[pipelog                 ][97madding pipe.140642853374704[0m
+[pipelog                 ][97madding pipe.140642811830880[0m
+[pipelog                 ][97madding pipenode.140643008452480[0m
+[pipelog                 ][97madding pipe.140642815622304[0m
+[pipelog                 ][97madding pipe.140642811830880[0m
+[pipelog                 ][97madding pipe.140642807250224[0m
+[pipelog                 ][97madding pipenode.140642824512816[0m
+[pipelog                 ][97madding pipe.140642807250224[0m
+[pipelog                 ][97madding pipe.140642820304480[0m
+[pipelog                 ][97madding pipenode.140642812143568[0m
+[pipelog                 ][97madding pipe.140642807244176[0m
+[pipelog                 ][97madding pipe.140642820304480[0m
+[pipelog                 ][97madding pipe.140642811829056[0m
+[pipelog                 ][97madding flowinput.140642812136608[0m
+[pipelog                 ][97madding pipe.140642811829056[0m
+[pipelog                 ][97madding pipe.140642807242880[0m
+[pipelog                 ][97madding pipenode.140642824514688[0m
+[pipelog                 ][97madding pipe.140642807242880[0m
+[pipelog                 ][97madding pipe.140642807243120[0m
+[pipelog                 ][97madding pipe.140642807238416[0m
+[pipelog                 ][97madding flowinput.140642824508160[0m
+[pipelog                 ][97madding pipe.140642807238416[0m
+[pipesystem-short-enginee][97mfound cycle: ['flowinput.140643008460832', 'pipenode.140643008461216', 'pipenode.140642812143568', 'pipenode.140642824512816', 'pipenode.140643008452480'][0m
+[pipesystem-short-enginee][97mfound cycle: ['pipenode.140642812138096', 'pipenode.140643008461216', 'pipenode.140642812143568', 'pipenode.140642824512816', 'pipenode.140643008452480'][0m
+[pipesystem-short-enginee][97mfound cycle: ['pipenode.140642812138096', 'pipenode.140642824514688', 'pipenode.140643008461216'][0m
+[pipelog                 ][97madding flowinput.140643008460832[0m
+[pipelog                 ][97madding pipe.140642815621680[0m
+[pipelog                 ][97madding pipenode.140643008461216[0m
+[pipelog                 ][97madding pipe.140642815621680[0m
+[pipelog                 ][97madding pipe.140642853374704[0m
+[pipelog                 ][97madding pipenode.140642812138096[0m
+[pipelog                 ][97madding pipe.140642853374704[0m
+[pipelog                 ][97madding pipe.140642811830880[0m
+[pipelog                 ][97madding pipenode.140643008452480[0m
+[pipelog                 ][97madding pipe.140642815622304[0m
+[pipelog                 ][97madding pipe.140642811830880[0m
+[pipelog                 ][97madding pipe.140642807250224[0m
+[pipelog                 ][97madding pipenode.140642824512816[0m
+[pipelog                 ][97madding pipe.140642807250224[0m
+[pipelog                 ][97madding pipe.140642820304480[0m
+[pipelog                 ][97madding pipenode.140642812143568[0m
+[pipelog                 ][97madding pipe.140642807244176[0m
+[pipelog                 ][97madding pipe.140642820304480[0m
+[pipelog                 ][97madding pipe.140642811829056[0m
+[pipelog                 ][97madding flowinput.140642812136608[0m
+[pipelog                 ][97madding pipe.140642811829056[0m
+[pipelog                 ][97madding pipe.140642807242880[0m
+[pipelog                 ][97madding pipenode.140642824514688[0m
+[pipelog                 ][97madding pipe.140642807242880[0m
+[pipelog                 ][97madding pipe.140642807243120[0m
+[pipelog                 ][97madding pipe.140642807238416[0m
+[pipelog                 ][97madding flowinput.140642824508160[0m
+[pipelog                 ][97madding pipe.140642807238416[0m
+[pipesystem-short-enginee][97mfound cycle: ['flowinput.140643008460832', 'pipenode.140643008461216', 'pipenode.140642812143568', 'pipenode.140642824512816', 'pipenode.140643008452480'][0m
+[pipesystem-short-enginee][97mfound cycle: ['pipenode.140642812138096', 'pipenode.140643008461216', 'pipenode.140642812143568', 'pipenode.140642824512816', 'pipenode.140643008452480'][0m
+[pipesystem-short-enginee][97mfound cycle: ['pipenode.140642812138096', 'pipenode.140642824514688', 'pipenode.140643008461216'][0m
+................../home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
+  warn("The following arguments have no effect for a chosen solver: {}."
+.../home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/optimize/_optimize.py:404: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
+  warnings.warn("Values in x were outside bounds during a "
+..............{'output': {0: {'Xstart': {'Rc': 0.25, 'Ro': 0.33, 'Lo': 0.3, 'y_offset': 0, 'x_offset': 0, 'X_spring_center': 0, 'gear_thickness': 0.0127, 'main_gear_speed_min': 2.0943933333333336, 'main_gear_speed_max': 12.56636}, 'Ystart': {'cost_slv': 100.6987015536568, 'sym_slv': 0.24998547725644396}, 'Xans': {'Rc': 0.12498459338569347, 'Ro': 0.28433133970000174, 'Lo': 0.30001323349520465, 'y_offset': 0.005110978330743903, 'x_offset': 0.0, 'X_spring_center': 0.0, 'gear_thickness': 1.5354692528951374e-10, 'main_gear_speed_min': 2.0943933333333336, 'main_gear_speed_max': 16.573568727851246}, 'success': True, 'Yobj': {'cost_slv': 9.063928481810376e-07, 'sym_slv': 0.06249999999999997}, 'Ycon': {'val_slidercrank_min_Lo': 0.050031548264479114, 'eq_slidercrank.gear_pos_slv_ineq_REF[56ccc0][callable.REF[56cbc0][slidercrank.final_gear_ratio]_0_ineq]': 4.166153112856449, 'eq_slidercrank.crank_pos_slv_ineq_REF[56ee40][callable.REF[56dbc0][slidercrank.crank_gear_ratio]_0_ineq]': 0.43957375053191405, 'eq_slidercrank.motor_pos_slv_ineq_REF[56fcc0][callable.REF[56c440][slidercrank.motor_gear_ratio]_0_ineq]': 9.477711323333391, 'eq_slidercrank.size_ineq_REF[56e640][callable.REF[56edc0][callable.<lambda>]_REF[56fbc0][slidercrank.overall_length]_ineq]': 0.05001757973340837, 'eq_slidercrank.gear_speed_slv_eq_REF[56c640][callable.REF[56ed40][slidercrank.dx_goal]_0_eq]': -5.551115123125783e-17, 'eq_slidercrank.range_slv_eq_REF[56f040][callable.REF[56dcc0][slidercrank.ds_goal]_0_eq]': -7.105427357601002e-15}, 'ans':  message: Optimization terminated successfully
+ success: True
+  status: 0
+     fun: 0.06250090639284815
+       x: [ 1.250e-01  2.843e-01  3.000e-01  5.111e-03  0.000e+00
+            0.000e+00  1.535e-10  2.094e+00  1.657e+01]
+     nit: 5
+     jac: [ 1.000e+00  3.877e-05 -1.240e-04  5.503e-03  0.000e+00
+            0.000e+00  5.903e+03  0.000e+00  0.000e+00]
+    nfev: 52
+    njev: 5, 'weights': None, 'constraints': {'constraints': [{'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a8a60>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a8d30>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a8f70>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a91b0>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a93f0>}, {'type': 'eq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a9750>}, {'type': 'eq', 'fun': <function objectify.<locals>.<lambda> at 0x7fe9f49a9b40>}], 'bounds': [[None, None], [None, None], [None, None], [None, None], [None, None], [None, None], [0, None], [0, None], [0, None]], 'info': ['val_slidercrank_min_Lo', 'eq_slidercrank.gear_pos_slv_ineq_REF[56ccc0][callable.REF[56cbc0][slidercrank.final_gear_ratio]_0_ineq]', 'eq_slidercrank.crank_pos_slv_ineq_REF[56ee40][callable.REF[56dbc0][slidercrank.crank_gear_ratio]_0_ineq]', 'eq_slidercrank.motor_pos_slv_ineq_REF[56fcc0][callable.REF[56c440][slidercrank.motor_gear_ratio]_0_ineq]', 'eq_slidercrank.size_ineq_REF[56e640][callable.REF[56edc0][callable.<lambda>]_REF[56fbc0][slidercrank.overall_length]_ineq]', 'eq_slidercrank.gear_speed_slv_eq_REF[56c640][callable.REF[56ed40][slidercrank.dx_goal]_0_eq]', 'eq_slidercrank.range_slv_eq_REF[56f040][callable.REF[56dcc0][slidercrank.ds_goal]_0_eq]']}}}, 'input_sets': {0: {}}}
+.  message: The solver successfully reached the end of the integration interval.
+  success: True
+   status: 0
+        t: [ 0.000e+00  1.000e-02  2.000e-02  3.000e-02  4.000e-02
+             5.000e-02  6.000e-02  7.000e-02  8.000e-02  9.000e-02
+             1.000e-01]
+        y: [[ 0.000e+00  1.480e-01 ...  1.028e+00  1.099e+00]
+            [ 0.000e+00  7.467e-04 ...  5.152e-02  6.217e-02]]
+      sol: None
+ t_events: None
+ y_events: None
+     nfev: 74
+     njev: 0
+      nlu: 0
+........[shapelysection-shapely s][33mWARN: overriding material Material(name='default', elastic_modulus=1, poissons_ratio=0, yield_strength=1, density=1, color='w') with ANSI_4130(name='steel 4130', elastic_modulus=205000000000.0, poissons_ratio=0.28, yield_strength=460000000.0, density=7872.0, color=(0.231674, 0.318106, 0.544834, 1.0))[0m
+[shapelysection-shapely s][97mcalculating shape bounds![0m
+[shapelysection-shapely s][97mcalculating shape bounds![0m
+[cantilever_beam         ][97mrunning with combos: None | () | {} [0m
+[cantilever_beam         ][97mrunning load combo : gravity with solver linear[0m
++----------------+
+| Statics Check: |
++----------------+
+
++------------------+--------+--------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
+| Load Combination | Sum FX | Sum RX | Sum FY | Sum RY | Sum FZ | Sum RZ | Sum MX | Sum RMX | Sum MY | Sum RMY |  Sum MZ  | Sum RMZ |
++------------------+--------+--------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
+|     gravity      | 3e+03  | -3e+03 |   0    |   0    |   0    |   0    |   0    |    0    |   0    |    0    | -1.5e+04 | 1.5e+04 |
++------------------+--------+--------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
+
+[cantilever_beam         ][97mdetermining failures for gravity[0m
+[cantilever_beam         ][97mchecking mesh failure gravity[0m
+[cantilever_beam         ][97mdetermine combo gravity failures...[0m
+[cantilever_beam         ][97mchecking mesh failure gravity[0m
+[cantilever_beam         ][97mno estimated failures found[0m
+.[beam-mem                ][97mevaluating stresses for gravity @ 0.0 w {}[0m
+[beam-mem                ][97mevaluating stresses for gravity @ 0.5 w {}[0m
+[beam-mem                ][97mevaluating stresses for gravity @ 1.0 w {}[0m
+[beam-mem                ][97mevaluating stresses for gravity @ 0.0 w {}[0m
+[beam-mem                ][97mevaluating stresses for gravity @ 0.5 w {}[0m
+[beam-mem                ][97mevaluating stresses for gravity @ 1.0 w {}[0m
+.[shapelysection-shapely s][33mWARN: overriding material Material(name='default', elastic_modulus=1, poissons_ratio=0, yield_strength=1, density=1, color='w') with ANSI_4130(name='steel 4130', elastic_modulus=205000000000.0, poissons_ratio=0.28, yield_strength=460000000.0, density=7872.0, color=(0.12478, 0.640461, 0.527068, 1.0))[0m
+[shapelysection-shapely s][97mcalculating shape bounds![0m
+[shapelysection-shapely s][97mcalculating shape bounds![0m
+[truss                   ][97mrunning with combos: None | () | {} [0m
+[truss                   ][97mrunning load combo : gravity with solver linear[0m
++----------------+
+| Statics Check: |
++----------------+
+
++------------------+--------+----------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
+| Load Combination | Sum FX |  Sum RX  | Sum FY | Sum RY | Sum FZ | Sum RZ | Sum MX | Sum RMX | Sum MY | Sum RMY |  Sum MZ  | Sum RMZ |
++------------------+--------+----------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
+|     gravity      |   0    | 5.68e-13 | -3e+03 | 3e+03  |   0    |   0    |   0    |    0    |   0    |    0    | -1.2e+05 | 1.2e+05 |
++------------------+--------+----------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
+
+[truss                   ][97mdetermining failures for gravity[0m
+[truss                   ][97mchecking mesh failure gravity[0m
+[truss                   ][97mdetermine combo gravity failures...[0m
+[truss                   ][97mchecking mesh failure gravity[0m
+[truss                   ][97mno estimated failures found[0m
+..[testconfig              ][97mtesting data assembly False[0m
+.[testconfig              ][97mtesting data assembly False[0m
+[testconfig              ][97msetting attrs prop on in 1.0 => 7.0[0m
+.[testconfig              ][97msetting attrs prop df 1.0 => 1.0[0m
+[testconfig              ][97msetting attrs prop df 1.0 => 2.0[0m
+[testconfig              ][97msetting attrs prop df 2.0 => 6.0[0m
+[testconfig              ][97msetting attrs prop df 6.0 => 15.0[0m
+[testconfig              ][97msetting attrs prop df 15.0 => 31.0[0m
+.......
+======================================================================
+FAIL: test_keys (engforge.test.test_comp_iter.TestNarrow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_comp_iter.py", line 167, in test_keys
+    self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
+AssertionError: False is not true : missing keys: {'cdict_name', 'citer_test_two', 'citer_test_one', 'citer_attrs_str', 'citer_test_four', 'citer_name', 'cdict_attrs_str', 'cdict_test_two', 'cdict_test_three', 'cdict_attrs_prop', 'citer_attrs_prop', 'cdict_test_one', 'citer_test_three', 'cdict_test_four'}
+
+======================================================================
+FAIL: test_keys (engforge.test.test_comp_iter.TestWide)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_comp_iter.py", line 110, in test_keys
+    self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
+AssertionError: False is not true : missing keys: {'citer_1_test_three', 'cdict_heyheyheyheyhey_test_two', 'cdict_heyhey_test_four', 'citer_3_attrs_prop', 'citer_1_test_one', 'cdict_heyheyheyheyhey_test_three', 'cdict_hey_test_two', 'citer_2_test_four', 'citer_4_test_four', 'citer_4_attrs_str', 'cdict_hey_name', 'cdict_heyheyhey_attrs_prop', 'citer_1_attrs_str', 'cdict_heyheyheyheyhey_attrs_str', 'citer_2_name', 'cdict_hey_test_three', 'citer_2_test_three', 'citer_2_test_one', 'cdict_heyhey_test_one', 'cdict_hey_test_four', 'cdict_heyheyheyhey_attrs_str', 'cdict_heyhey_test_three', 'cdict_heyheyheyhey_test_four', 'cdict_heyheyheyheyhey_name', 'citer_0_test_two', 'cdict_heyheyhey_test_two', 'cdict_heyheyheyhey_test_three', 'cdict_heyheyhey_test_one', 'citer_4_test_three', 'cdict_heyhey_attrs_str', 'cdict_heyhey_name', 'cdict_heyheyhey_attrs_str', 'citer_1_test_two', 'citer_4_test_two', 'citer_0_test_one', 'cdict_heyheyheyhey_attrs_prop', 'citer_3_name', 'cdict_heyheyheyheyhey_test_one', 'citer_0_name', 'citer_3_test_three', 'citer_4_attrs_prop', 'citer_1_test_four', 'cdict_heyheyheyhey_test_two', 'citer_2_attrs_prop', 'citer_4_test_one', 'cdict_hey_attrs_str', 'cdict_heyheyheyhey_test_one', 'citer_3_test_four', 'cdict_heyheyheyheyhey_attrs_prop', 'cdict_hey_attrs_prop', 'cdict_heyheyheyheyhey_test_four', 'cdict_heyhey_attrs_prop', 'citer_0_test_three', 'cdict_heyheyhey_test_three', 'citer_2_test_two', 'citer_4_name', 'citer_0_attrs_str', 'cdict_heyheyhey_test_four', 'cdict_heyheyheyhey_name', 'citer_3_test_one', 'cdict_hey_test_one', 'cdict_heyhey_test_two', 'citer_1_name', 'cdict_heyheyhey_name', 'citer_1_attrs_prop', 'citer_0_attrs_prop', 'citer_3_test_two', 'citer_2_attrs_str', 'citer_3_attrs_str', 'citer_0_test_four'}
+
+======================================================================
+FAIL: test_transient (engforge.test.test_performance.TestPerformance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_performance.py", line 52, in test_transient
+    self.assertLessEqual((end-start),endtime)
+AssertionError: 16.763750553131104 not less than or equal to 10
+
+----------------------------------------------------------------------
+Ran 88 tests in 146.422s
+
+FAILED (failures=3)
+         name  time dynamic_input_vars  ... test_three test_four  index
+0  testconfig   0.0                 []  ...          2  0.583732      0
+1  testconfig   0.0                 []  ...          2  0.929759      1
+2  testconfig   0.0                 []  ...          2  0.595577      2
+3  testconfig   0.0                 []  ...          2  0.188471      3
+4  testconfig   0.0                 []  ...          2  0.623735      4
+
+[5 rows x 12 columns]

@@ -55,7 +55,7 @@ COST_TERM_MODES = {'initial': lambda inst,term: True if term < 1 else False,
                    'always': lambda inst,term: True}
 
 category_type = typing.Union[str,list]
-COST_CATEGORIES = set(('uncategorized',))
+COST_CATEGORIES = set(('misc',))
 
 
 
@@ -106,7 +106,7 @@ class cost_property(system_property):
             for cc in self.cost_categories:
                 self.__class__._all_categories.add(cc)
         else:
-            self.cost_categories = ['uncategorized']
+            self.cost_categories = ['misc']
 
     def apply_at_term(self,inst,term):
         if term < 0:
@@ -147,7 +147,6 @@ class CostModel(Configuration,TabulationMixin):
         
         This should be called from Component.update() if default costs are used
         """
-
         if self._slot_costs:
             current_comps = self.internal_components()
             for k,v in self._slot_costs.items():
@@ -362,7 +361,7 @@ class CostModel(Configuration,TabulationMixin):
 cost_type = typing.Union[float,int,CostModel,dict]
 def eval_slot_cost(slot_item:cost_type,saved:set=None):
     sub_tot = 0
-    #log.debug(f'evaluating slot: {slot_item}')
+    log.debug(f'evaluating slot: {slot_item}')
     if isinstance(slot_item,(float,int)):
         sub_tot += numpy.nansum([slot_item,0])
     elif isinstance(slot_item,CostModel):
@@ -384,11 +383,10 @@ def gend(deect:dict):
 
 
 
-
-
-
     
 parent_types = typing.Union[Component,'System']
+
+#TODO: automatically apply economics at problem level if cost_model present, no need for parent econ lookups
 @forge
 class Economics(Component): 
     """Economics is a component that summarizes costs and reports the economics of a system and its components in a recursive format"""
@@ -414,8 +412,8 @@ class Economics(Component):
 
     def update(self,parent:parent_types):
         
-        if self.log_level < 5 :
-            self.msg(f'updating costs: {parent}',lvl=5)
+        if self.log_level <= 5 :
+            self.msg(f'econ updating costs: {parent}',lvl=5)
         
         self.parent = parent
 
@@ -435,7 +433,6 @@ class Economics(Component):
 
     def calculate_costs(self,parent)->float:
         """recursively accounts for costs in the parent, its children recursively."""
-
         return self.sum_cost_references()
     
     #Reference Utilitly Functions   
@@ -474,12 +471,9 @@ class Economics(Component):
         return lambda term: numpy.nansum([t(term) for t in term_funs])        
 
     #Gather & Set References (the magic!)
-    #TODO: update internal_references in problem in costs
+    #TODO: update internal_references callback to problem
     def internal_references(self,recache=True,numeric_only=False):
         """standard component references are """
-        #if not recache and hasattr(self,'__cache_refs'):
-        #    return self.__cache_refs
-        
         d = self._gather_references()
         self._create_term_eval_functions()
         #Gather all internal economic variables and report costs
@@ -501,8 +495,6 @@ class Economics(Component):
 
         for k,v in lc_out.items():
             props[k] = Ref(lc_out,k,False,False)
-
-        self.__cache_refs = d        
     
         return d
 
@@ -532,8 +524,7 @@ class Economics(Component):
         LC = lc.levalized_cost.sum()
         LO = lc.levalized_output.sum()
         summary['levalized_cost'] =  LC / LO if LO != 0 else numpy.nan
-        summary['levalized_output'] = LO / LC if LC != 0 else numpy.nan
-        
+        summary['levalized_output'] = LO / LC if LC != 0 else numpy.nan 
 
         out2 = dict(gend(out))
         self._term_output = out2
@@ -675,7 +666,7 @@ class Economics(Component):
         _key = bse+'item_cost'
         CST = self._cost_references
         if self.log_level < 5:
-            self.msg(f'extracting costs from {bse}|{conf.identity}')
+            self.msg(f'extracting costs from {bse}|{conf.identity}',lvl=5)
 
         #cost properties of conf item
         for cost_nm,cost_prop in conf.class_cost_properties().items():
@@ -689,13 +680,13 @@ class Economics(Component):
                     self._cost_categories['category.'+cc].append(ref)
                     self._comp_categories[bse+'category.'+cc].append(ref)
             else:
-                #we'll reference it as uncategorized
-                cc = 'uncategorized'
+                #we'll reference it as misc
+                cc = 'misc'
                 self._cost_categories['category.'+cc].append(ref)
                 self._comp_categories[bse+'category.'+cc].append(ref)
 
         comps_act = conf.internal_components()
-        if self.log_level < 10: self.msg(f'{conf.identity if conf else conf} active components: {comps_act}')
+        if self.log_level < 10: self.msg(f'{conf.identity if conf else conf} active components: {comps_act}',lvl=5)
         #add slot costs with current items (skip class defaults)
         for slot_name, slot_value in conf._slot_costs.items():
             #Skip items that are internal components
@@ -722,7 +713,7 @@ class Economics(Component):
         for compnm,comp in conf.internal_configurations(False,none_ok=True).items():
             if comp is None:
                 if self.log_level < 5: 
-                    self.msg(f'{conf} looking up base class costs for {compnm}')
+                    self.msg(f'{conf} looking up base class costs for {compnm}',lvl=5)
                 comp_cls = conf.slots_attributes()[compnm].type.accepted
                 for cc in comp_cls:
                     if issubclass(cc,CostModel):

@@ -109,6 +109,8 @@ def property_changed(instance, variable, value):
     """a callback for when a property changes, this will set the _anything_changed flag to True, and change value when appropriate"""
     from engforge.tabulation import TabulationMixin
 
+    #TODO: determine when, in an active problem if components change, and update refs accordingly!
+
     if not isinstance(instance, (TabulationMixin)):
         return value
 
@@ -425,6 +427,11 @@ class Configuration(AttributedBaseMixin):
         #Finally change references!
         if isinstance(new_sys, SolveableInterface):
             new_sys.system_references(recache=True)
+
+        #update the parents
+        if hasattr(self,'parent'):
+            if self.parent in changed:
+                new_sys.parent = changed[self.parent]
 
         return new_sys
 

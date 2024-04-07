@@ -82,7 +82,7 @@ dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on
 #can be found on session._<parm> or session.<parm>
 root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None,converged=None,comp_changed=False)
 save_modes = ['vars','nums','all','prob']
-transfer_kw = ['system',]
+transfer_kw = ['system']
 
 root_possible = list(root_defined.keys()) + list('_'+k for k in root_defined.keys())
 
@@ -202,17 +202,17 @@ class ProblemExec:
         # Default behaviour
         return self.__getattribute__(name)
     
-    def __setattr__(self, name: str, value) -> None:
-        """only allow setting data to parent for now (this is in reset which can trigger anywhere)"""
-        if hasattr(self.class_cache,'session') and name=='_data':
-            if self.session_id != True:
-                self.class_cache.session._data = value
-                return 
-            elif self.session_id == True:
-                self._data = value
-                return 
-
-        super().__setattr__(name, value)    
+#     def __setattr__(self, name: str, value) -> None:
+#         """only allow setting data to parent for now (this is in reset which can trigger anywhere)"""
+#         if hasattr(self.class_cache,'session') and name=='_data':
+#             if self.session_id != True:
+#                 self.class_cache.session._data = value
+#                 return 
+#             elif self.session_id == True:
+#                 self._data = value
+#                 return 
+# 
+#         super().__setattr__(name, value)    
 
         
     def __init__(self,system,kw_dict=None,Xnew=None,ctx_fail_new=False,**opts):
@@ -351,7 +351,7 @@ class ProblemExec:
             self.problems_dict[self._problem_id] = self #carry that weight
             self.session_id = int(uuid.uuid4())
 
-            self.class_cache.session._prob_levels = {}
+            self.class_cache.session._prob_levels[self.level_name] = self
             #error if the system is different (it shouldn't be!)
             if self.system is not system:
                 raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
@@ -393,7 +393,7 @@ class ProblemExec:
                 self.level_name = level_name
 
             self.temp_state = Xnew
-            self.refresh(system,kw_dict=kw_dict,**opt_out)
+            self.establish_system(system,kw_dict=kw_dict,**opt_out)
             #Finally we record where we started!
             self.set_checkpoint()        
 
@@ -401,12 +401,6 @@ class ProblemExec:
             self.info(f'new execution context for {system}| {opts} | {self._slv_kw}')            
         elif log.log_level <= 3:
             self.msg(f'new execution context for {system}| {self._slv_kw}')
-
-    def refresh(self,system=None,**kw_dict):
-        '''refresh the system and options for the context, and reset the data storage'''
-        #Recache system references
-        #TODO: refresh the system references   
-        self.establish_system(system,**kw_dict)
 
 
     def reset_data(self):
@@ -462,40 +456,71 @@ class ProblemExec:
             if k in self._slv_kw:
                 setattr(self,k,self._slv_kw[k])
 
-
-
         if log.log_level < 5:
             self.msg(f'established sys context: {self} {self._slv_kw}')  
 
-    def refresh_references(self):
+    @property
+    def sesh(self):
+        """caches the property for the session"""
+        if hasattr(self,'inst_sesh'):
+            return self.inst_sesh
+        sesh = self.get_sesh()
+        return sesh
+
+    def get_sesh(self,sesh=None):
+        """get the session"""
+        out = sesh
+        if not sesh:
+            if hasattr(self.class_cache,'session'):
+                out = self.class_cache.session
+            elif self._problem_id == True:
+                out = self
+        if out: 
+            self.inst_sesh = out
+        return out
+
+    #Update Methods
+    def refresh_references(self,sesh=None):
         """refresh the system references"""
+        sesh = self.sesh
+
         if self.log_level < 5:
             self.warning(f'refreshing system references')
-        check_dynamics = self.check_dynamics
-        self._num_refs = self.system.system_references(numeric_only=True)
-        self._sys_refs = self.system.solver_vars(check_dynamics=check_dynamics,addable=self._num_refs,**self._slv_kw)                 
+        check_dynamics = sesh.check_dynamics
+        sesh._num_refs = sesh.system.system_references(numeric_only=True)
+        sesh._sys_refs = sesh.system.solver_vars(check_dynamics=check_dynamics,addable=sesh._num_refs,**sesh._slv_kw)
 
+        sesh.update_methods(sesh=sesh)
+        sesh.min_refresh(sesh=sesh)
+                
+
+    def update_methods(self,sesh=None):
         #Get the update method refs
-        self._update_refs = self.system.collect_update_refs()
+        sesh = self.sesh
+
+        sesh._update_refs = sesh.system.collect_update_refs()
         #TODO: find subsystems that are not-subsolvers and execute them
-        self._post_update_refs = self.system.collect_post_update_refs()
+        sesh._post_update_refs = sesh.system.collect_post_update_refs()
 
         #initial establishment costs / ect
-        self.pre_execute()
+        if sesh.pre_exec:
+            sesh.pre_execute()
+
+    def min_refresh(self,sesh=None):
+        sesh = self.sesh
+
+        if self.log_level < 5:
+            self.info(f'min refresh')
 
         #final ref's after update
-        self.min_refresh()
-
-    def min_refresh(self):
-        self.warning(f'refresh')
-        #final ref's after update
-        self._all_refs = self.system.system_references(recache=True,check_config=False) #after updates
+        sesh._all_refs = sesh.system.system_references(recache=True,check_config=False) #after updates
 
         #Problem Variable Definitions
-        self.Xref = self.all_problem_vars
-        self.Yref = self.sys_solver_objectives()
+        sesh.Xref = sesh.all_problem_vars
+        sesh.Yref = sesh.sys_solver_objectives()
+        
         cons = {} #TODO: parse additional constraints
-        self.constraints = self.sys_solver_constraints(cons)          
+        sesh.constraints = sesh.sys_solver_constraints(cons)          
 
     @property
     def check_dynamics(self):
@@ -506,18 +531,24 @@ class ProblemExec:
         #Set the new state
         
         if self.entered:
+            #TODO: enable env-var STRICT MODE to fail on things like this
             self.warning(f'context already entered!')
         
+        #Important managed updates / refs from Xnew input
         self.activate_temp_state()
         self.entered = True
 
-        if self.pre_exec:
-            self.pre_execute()
-       
-        self.min_refresh()
+        #TODO: create a component-slot ref-update graph, and update the system references accordingly.
+        #TODO: map the signals to the system references, and update the system references accordingly.
+        #TODO: 
+        #transients wont update components/ methods dynamically (or shouldn't) so we can just update the system references once and be done with it for other cases, but that is not necessary unless a component changes or a component has in general a unique reference update system (economics / component-iterators)
+        sesh = self.sesh
+        if not self._dxdt is True:
+            sesh.update_methods(sesh=sesh)
+            sesh.min_refresh(sesh=sesh)
 
         #Check for existing session        
-        if hasattr(self.class_cache,'session'):
+        if sesh not in [None,self]:
             self.msg(f'entering existing execution context')
             if not isinstance(self,self.class_cache):
                 self.warning(f'change of execution class!')
@@ -533,7 +564,7 @@ class ProblemExec:
         self.class_cache.level_number = 0
 
         if self.log_level < 10:
-            refs = {k:v for k,v in self._sys_refs.get('attrs',{}).items() if v}
+            refs = {k:v for k,v in self.sesh._sys_refs.get('attrs',{}).items() if v}
             self.debug(f'creating execution context for {self.system}| {self._slv_kw}| {refs}')
         
         return self
@@ -557,6 +588,10 @@ class ProblemExec:
         if self.save_data_on_exit:
             self.save_data()
 
+        #sesh = self.sesh #this should be here
+        #if self.level_name in sesh._prob_levels:
+        #    sesh._prob_levels.pop(self.level_name)
+
         #Exit Scenerio (boolean return important for context manager exit handling in heirarchy)
         if isinstance(exc_value,ProblemExit):
             if self.log_level < 7:
@@ -567,11 +602,12 @@ class ProblemExec:
                 self.revert_to_start()
                 if self.pre_exec:
                     self.pre_execute()         
-
+            lvl_match = False
             #Decide our exit conditon (if we should exit)
             if isinstance(exc_value,ProblemExitAtLevel):
                 #should we stop?
-                if exc_value.level == self.level_name:
+                lvl_match = exc_value.level == self.level_name
+                if lvl_match:
                     if self.log_level <= 11:
                         self.debug(f'exit at level {exc_value}')
                     ext = True                     
@@ -586,7 +622,7 @@ class ProblemExec:
                     if self.log_level <= 11:
                         self.debug(f'exit at top')
 
-                    ext = True
+                    ext = True #top override
 
                 elif self.class_cache.session is self and not ext:
                     #never ever leave the top level without deleting the session
@@ -601,6 +637,7 @@ class ProblemExec:
                 ext = True #basic exit is one level up
             
             self.clean_context()
+
             return ext
         
         #default exit scenerios
@@ -610,7 +647,7 @@ class ProblemExec:
             ext = self.exit_action()
 
         self.clean_context()
-        
+
         return ext
         
     def debug_levels(self):
@@ -660,6 +697,7 @@ class ProblemExec:
         if self.revert_last and EOL:
             if self.log_level <= 8:
                 self.debug(f'revert last!')
+                self.debug(f'revert to{self.x_start}')
             self.revert_to_start()
             
             #run execute
@@ -668,7 +706,7 @@ class ProblemExec:
 
         elif self.revert_every:
             if self.log_level <= 8:
-                self.debug(f'to {self.x_start}')
+                self.debug(f'revert to{self.x_start}')
             self.revert_to_start()
             
             #run execute 
@@ -750,12 +788,13 @@ class ProblemExec:
 
     def integrate(self,endtime,dt=0.001,max_step_dt=0.01,X0=None,**kw):
         #Unpack Transient Problem
-        intl_refs = self.integrator_var_refs #order forms problem basis
-        self.prv_ingtegral_refs = intl_refs #for rate function
-        refs = self._sys_refs
-        system = self.system
+        sesh = self.sesh
+        intl_refs = sesh.integrator_var_refs #order forms problem basis
+        sesh.prv_ingtegral_refs = intl_refs #for rate function
+        refs = sesh._sys_refs
+        system = sesh.system
 
-        min_kw = self._minimizer_kw
+        min_kw = sesh._minimizer_kw
         if min_kw is None: min_kw = {}
 
         if dt > max_step_dt:
@@ -763,12 +802,12 @@ class ProblemExec:
             dt = max_step_dt
 
         if self.log_level < 15:
-            self.info(f'simulating {system},{self}| int:{intl_refs} | refs: {refs}' )            
+            self.info(f'simulating {system},{sesh}| int:{intl_refs} | refs: {refs}' )            
 
         if not intl_refs:
             raise Exception(f'no transient parameters found')            
         
-        x_cur = {k: v.value(self.system,self) for k, v in intl_refs.items()}
+        x_cur = {k: v.value(sesh.system,sesh) for k, v in intl_refs.items()}
 
         if self.log_level < 10:
             self.debug(f'initial state {X0} {intl_refs}| {refs}')
@@ -782,27 +821,27 @@ class ProblemExec:
         
         #this will fail if X0 doesn't have solver vars!
         X0 = np.array([X0[p] for p in intl_refs])
-        Time = np.arange(self.system.time, endtime + dt, dt)
+        Time = np.arange(sesh.system.time, endtime + dt, dt)
 
         rate_kw = {'min_kw':min_kw,'dt':dt}
 
         #get the probelem variables
-        Xss = self.problem_opt_vars
-        Yobj = self.final_objectives
+        Xss = sesh.problem_opt_vars
+        Yobj = sesh.final_objectives
 
         #run the simulation from the current state to the endtime
-        ans = solve_ivp(self.integral_rate, [self.system.time, endtime], X0, method="RK45", t_eval=Time, max_step=max_step_dt,args=(dt,Xss,Yobj),**kw)
+        ans = solve_ivp(sesh.integral_rate, [sesh.system.time, endtime], X0, method="RK45", t_eval=Time, max_step=max_step_dt,args=(dt,Xss,Yobj),**kw)
 
-        print(ans) 
+        print(ans)
 
         return ans
 
     def integral_rate(self,t, x, dt,Xss=None,Yobj=None, **kw):
         """provides the dynamic rate of the system at time t, and state x"""
-        
-        intl_refs = self.prv_ingtegral_refs #created in self.integral()
-        refs = self._sys_refs
-        system = self.system
+        sesh = self.sesh
+        intl_refs = sesh.prv_ingtegral_refs #cached in self.integral()
+        refs = sesh._sys_refs
+        system = sesh.system
 
         out = {p: np.nan for p in intl_refs}
         Xin = {p: x[i] for i, p in enumerate(intl_refs)}
@@ -890,27 +929,27 @@ class ProblemExec:
         :param kw: Additional keyword arguments.
         :return: The output dictionary containing the results.
         """ 
-
+        sesh = self.sesh
         if Xref is None:
-            Xref = self.Xref
+            Xref = sesh.Xref
 
         if Yref is None:
-            Yref = self.final_objectives
+            Yref = sesh.final_objectives
 
-        thresh = kw.pop("thresh", self.success_thresh)
+        thresh = kw.pop("thresh", sesh.success_thresh)
 
         #TODO: options for solver detail in response
         dflt = {
-                "Xstart": Ref.refset_get(Xref,sys=self.system,prob=self),
-                "Ystart": Ref.refset_get(Yref,sys=self.system,prob=self),
+                "Xstart": Ref.refset_get(Xref,sys=sesh.system,prob=sesh),
+                "Ystart": Ref.refset_get(Yref,sys=sesh.system,prob=sesh),
                 "Xans": None,
                 "success": None,
                 "Xans":None,
                 "Yobj":None,
                 "Ycon":None,
                 "ans": None,
-                "weights":self._weights,
-                "constraints":self.constraints,
+                "weights":sesh._weights,
+                "constraints":sesh.constraints,
             }
 
         if output:
@@ -925,27 +964,29 @@ class ProblemExec:
             return output
         
         #override constraints input
-        kw.update(self.constraints)
+        kw.update(sesh.constraints)
 
         if len(kw['bounds']) != len(Xref):
-            raise ValueError(f"bounds {len(self.constraints['bounds'])} != Xref {len(Xref)}")
+            raise ValueError(f"bounds {len(sesh.constraints['bounds'])} != Xref {len(Xref)}")
 
         if self.log_level < 10:
             self.debug(f"minimize {Xref} {Yref} {kw}")
         
-        if self._weights is not None:
-            kw['weights'] = self._weights
+        if sesh._weights is not None:
+            kw['weights'] = sesh._weights
 
-        self._ans = refmin_solve(self.system,self,Xref, Yref, **kw)
-        output["ans"] = self._ans
+        sesh._ans = refmin_solve(sesh.system,self,Xref, Yref, **kw)
+        output["ans"] = sesh._ans
 
-        self.handle_solution(self._ans,Xref,Yref,output)
+        sesh.handle_solution(sesh._ans,Xref,Yref,output)
 
         return output
 
     def handle_solution(self,answer,Xref,Yref,output):
         #TODO: move exit condition handiling somewhere else, reduce cross over from process_ans
-        thresh = self.success_thresh
+        sesh = self.sesh
+        
+        thresh = sesh.success_thresh
         vars = list(Xref)
 
         #Output Results
@@ -953,20 +994,20 @@ class ProblemExec:
         output["Xans"] = Xa
         Ref.refset_input(Xref,Xa)
 
-        Yout = {p: Yref[p].value(self.system,self) for p in Yref}
+        Yout = {p: Yref[p].value(sesh.system,self) for p in Yref}
         output["Yobj"] = Yout
 
         Ycon = {}
-        if self.constraints['constraints']:
+        if sesh.constraints['constraints']:
             x_in = answer.x
-            for c,k in zip(self.constraints['constraints'],self.constraints['info']):
+            for c,k in zip(sesh.constraints['constraints'],sesh.constraints['info']):
                 cv = c['fun'](x_in,self,{})
                 Ycon[k] = cv
         output['Ycon'] = Ycon   
 
         de = answer.fun
         if answer.success and de < thresh if thresh else True:
-            self.system._converged = True #TODO: put in context
+            sesh.system._converged = True #TODO: put in context
             output["success"] = True
 
         elif answer.success:
@@ -974,11 +1015,11 @@ class ProblemExec:
             self.warning(
                 f"solver didnt meet threshold: {de} <? {thresh} ! {answer.x} -> residual: {answer.fun}"
             )
-            self.system._converged = False
+            sesh.system._converged = False
             output["success"] = False  # only false with threshold
 
         else:
-            self.system._converged = False
+            sesh.system._converged = False
             if self.opt_fail:
                 raise Exception(f"solver didnt converge: {answer}")
             else:
@@ -988,27 +1029,11 @@ class ProblemExec:
         return output 
 
     #Solver Parsing Methods
-    def sys_solver_variables(self,as_flat=False,**kw):
-        """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
-        """
-        out = dict(variables=self.problem_opt_vars)
-
-        #do not consider dynamics with dxdt=None, otherwise consider them as solver variables
-        if self._dxdt is not None:
-            out.update(dynamics=self.dynamic_state,integration=self.integrator_vars)
-
-        if as_flat==True:
-            flt = {}
-            for k,v in out.items():
-                flt.update(v)
-            return flt
-        
-        return out
     
     def sys_solver_objectives(self,**kw):
         """gathers variables from solver vars, and attempts to locate any input_vars to add as well. use exclude_vars to eliminate a variable from  the solver
         """
-        sys_refs = self._sys_refs
+        sys_refs = self.sesh._sys_refs
 
         #Convert result per kind of objective (min/max ect)
         objs = sys_refs.get('attrs',{}).get('solver.obj',{})
@@ -1017,9 +1042,10 @@ class ProblemExec:
     @property
     def final_objectives(self)->dict:
         """returns the final objective of the system"""
-        Yobj = self.problem_objs
-        Yeq = self.problem_eq
-        Xss = self.problem_opt_vars
+        sesh = self.sesh
+        Yobj = sesh.problem_objs
+        Yeq = sesh.problem_eq
+        Xss = sesh.problem_opt_vars
         if Yobj:
             return Yobj #here is your application objective, sir
         
@@ -1039,18 +1065,18 @@ class ProblemExec:
                     out = out + (1+val**2)**0.5 #linear norm of positive values > 1 should be very large penalty 
                 return 1
             
-            Yobj = {'smallness': Ref(self.system, dflt)}
+            Yobj = {'smallness': Ref(sesh.system, dflt)}
         return Yobj #our residual based objective
 
     def sys_solver_constraints(self,add_con=None,combo_filter=True, **kw):
         """formatted as arguments for the solver
         """
         from engforge.solver_utils import create_constraint
+        sesh = self.sesh
+        Xrefs = sesh.Xref
 
-        Xrefs = self.Xref
-
-        system = self.system
-        sys_refs = self._sys_refs
+        system = sesh.system
+        sys_refs = sesh._sys_refs
 
         extra_kw = self.kwargs
         
@@ -1098,7 +1124,7 @@ class ProblemExec:
         # Add Constraints
         ex_arg = {"con_args": (),**kw}
         #Variable limit (function -> ineq, numeric -> bounds)
-        for slvr, ref in self.problem_opt_vars.items():
+        for slvr, ref in sesh.problem_opt_vars.items():
             assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
             if slvr in slv_inst:
                 slv = slv_inst[slvr]
@@ -1166,9 +1192,9 @@ class ProblemExec:
                     
                     #lookup rates
                     rate_val = None
-                    if self._dxdt is not None:
-                        if isinstance(self._dxdt,dict) and not slv_var:
-                            rate_val = self._dxdt.get(slvr,0)
+                    if sesh._dxdt is not None:
+                        if isinstance(sesh._dxdt,dict) and not slv_var:
+                            rate_val = sesh._dxdt.get(slvr,0)
                         elif not slv_var:
                             rate_val = 0
 
@@ -1292,27 +1318,28 @@ class ProblemExec:
     #State Interfaces
     @property
     def record_state(self)->dict:
-        """records the state of the system"""
+        """records the state of the system using session"""
         #refs = self.all_variable_refs
-        refs = self.all_comps_and_vars
-        return Ref.refset_get(refs,sys=self.system,prob=self)
+        sesh = self.sesh
+        refs = sesh.all_comps_and_vars
+        return Ref.refset_get(refs,sys=sesh.system,prob=self)
 
     @property
     def output_state(self)->dict:
         """records the state of the system"""
-
-        if 'nums' == self.save_mode:
-            refs = self.num_refs
-        elif 'all' == self.save_mode:
-            refs = self.all_system_references
-        elif 'vars' == self.save_mode:
+        sesh = self.sesh
+        if 'nums' == sesh.save_mode:
+            refs = sesh.num_refs
+        elif 'all' == sesh.save_mode:
+            refs = sesh.all_system_references
+        elif 'vars' == sesh.save_mode:
             refs = self.all_variable_refs
-        elif 'prob' == self.save_mode:
+        elif 'prob' == sesh.save_mode:
             raise NotImplementedError(f'problem save mode not implemented')
         else:
             raise KeyError(f'unknown save mode {self.save_mode}, not in {save_modes}')
 
-        out = Ref.refset_get(refs,sys=self.system,prob=self)
+        out = Ref.refset_get(refs,sys=sesh.system,prob=self)
 
         if self._dxdt == True:
             out['time'] = self._time
@@ -1322,15 +1349,17 @@ class ProblemExec:
     
     def get_ref_values(self,refs=None):
         """returns the values of the refs"""
+        sesh = self.sesh
         if refs is None:
-            refs = self.all_system_references
+            refs = sesh.all_system_references
         return Ref.refset_get(refs,sys=self.system,prob=self)
     
     def set_ref_values(self,values,refs=None):
         """returns the values of the refs"""
         #TODO: add checks for the refs
+        sesh = self.sesh
         if refs is None:
-            refs = self.all_comps_and_vars        
+            refs = sesh.all_comps_and_vars        
         return Ref.refset_input(refs,values)    
 
     def set_checkpoint(self):
@@ -1340,18 +1369,23 @@ class ProblemExec:
             self.debug(f'set checkpoint: {list(self.x_start.values())}')
 
     def revert_to_start(self):
+        sesh = self.sesh
         if log.log_level < 5:
             xs = list(self.x_start.values())
             rs = list(self.record_state.values())
             self.debug(f'reverting to start: {xs} -> {rs}')
-        Ref.refset_input(self.all_comps_and_vars,self.x_start)
+        #TODO: STRICT MODE Fail for refset_input
+        Ref.refset_input(sesh.all_comps_and_vars,self.x_start,fail=False)
 
     def activate_temp_state(self,new_state=None):
+        #TODO: determine when components change, and update refs accordingly!
+        sesh = self.sesh
+        #TODO: STRICT MODE Fail for refset_input
         if new_state:
-            Ref.refset_input(self.all_comps_and_vars,new_state)
+            Ref.refset_input(sesh.all_comps_and_vars,new_state,fail=False)
         elif self.temp_state:
             self.debug(f'activating temp state: {self.temp_state}')
-            Ref.refset_input(self.all_comps_and_vars,self.temp_state)
+            Ref.refset_input(sesh.all_comps_and_vars,self.temp_state,fail=False)
         elif self.log_level < 9:
             self.debug(f'no state to set: {new_state}')
         
@@ -1362,7 +1396,7 @@ class ProblemExec:
         msg_lvl = self.log_level <= 2
         if self.log_level < 5:
             self.msg(f"applying pre signals",lvl=6)
-        for signame, sig in self.signals.items():
+        for signame, sig in self.sesh.signals.items():
             if sig.mode == "pre" or sig.mode == "both":
                 if msg_lvl:
                     self.msg(f"applying post signals: {signame}",lvl=3)                
@@ -1373,7 +1407,7 @@ class ProblemExec:
         msg_lvl = self.log_level <= 2
         if self.log_level < 5:
             self.msg(f"applying post signals",lvl=6)        
-        for signame, sig in self.signals.items():
+        for signame, sig in self.sesh.signals.items():
             if sig.mode == "post" or sig.mode == "both":
                 if msg_lvl:
                     self.msg(f"applying post signals: {signame}",lvl=3)
@@ -1381,13 +1415,13 @@ class ProblemExec:
 
     def update_system(self,*args,**kwargs):
         """updates the system"""
-        for ukey,uref in self._update_refs.items():
+        for ukey,uref in self.sesh._update_refs.items():
             self.debug(f'context updating {ukey}')
             uref.value(*args,**kwargs)
 
     def post_update_system(self,*args,**kwargs):
         """updates the system"""
-        for ukey,uref in self._post_update_refs.items():
+        for ukey,uref in  self.sesh._post_update_refs.items():
             self.debug(f'context post updating {ukey}')
             uref.value(*args,**kwargs)
 
@@ -1395,16 +1429,18 @@ class ProblemExec:
         """Updates the pre/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
         if log.log_level < 5:
             self.msg(f"pre execute")
-        self.apply_pre_signals()
-        self.update_system(*args,**kwargs)
+        sesh = self.sesh
+        sesh.apply_pre_signals()
+        sesh.update_system(*args,**kwargs)
 
 
     def post_execute(self,*args,**kwargs):
         """Updates the post/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
         if log.log_level < 5:
             self.msg(f"post execute")
-        self.apply_post_signals()
-        self.post_update_system(*args,**kwargs)
+        sesh = self.sesh
+        sesh.apply_post_signals()
+        sesh.post_update_system(*args,**kwargs)
 
     
 
@@ -1441,15 +1477,15 @@ class ProblemExec:
     #Safe Access Methods
     @property
     def ref_attrs(self):
-        return self._sys_refs.get('attrs',{}).copy()
+        return self.sesh._sys_refs.get('attrs',{}).copy()
 
     @property
     def attr_inst(self):
-        return self._sys_refs.get('type',{}).copy()
+        return self.sesh._sys_refs.get('type',{}).copy()
     
     @property
     def dynamic_comps(self):
-        return self._sys_refs.get('dynamic_comps',{}).copy()
+        return self.sesh._sys_refs.get('dynamic_comps',{}).copy()
     
     #Instances
     @property
@@ -1467,7 +1503,7 @@ class ProblemExec:
     @property
     def kwargs(self):
         """copy of slv_kw args"""
-        return self._slv_kw.copy()
+        return self.sesh._slv_kw.copy()
 
 
     @property
@@ -1524,7 +1560,7 @@ class ProblemExec:
     @property
     def solveable(self):
         """checks the system's references to determine if its solveabl"""
-        if self.problem_opt_vars:
+        if self.sesh.problem_opt_vars:
             #TODO: expand this
             return True
         return False
@@ -1580,15 +1616,17 @@ class ProblemExec:
         """solver variables + dynamics states when dynamic_solve is True"""
         varx = self.ref_attrs.get('solver.var',{}).copy()
         #Add the dynamic states to be optimized (ignore if integrating)
-        if self.dynamic_solve and not self._dxdt is True:
-            varx.update(self.filter_vars(self.dynamic_state))
-            varx.update(self.filter_vars(self.integrator_vars))
+        sesh = self.sesh
+        if sesh.dynamic_solve and not sesh._dxdt is True:
+            varx.update(self.filter_vars(sesh.dynamic_state))
+            varx.update(self.filter_vars(sesh.integrator_vars))
         return varx
 
     @property
     def dynamic_solve(self)->bool:
         """indicates if the system is dynamic"""
-        dxdt = self._dxdt
+        sesh = self.sesh
+        dxdt = sesh._dxdt
 
         if dxdt is None or dxdt is False:
             return False
@@ -1605,6 +1643,7 @@ class ProblemExec:
 
     @property
     def all_variable_refs(self)->dict:
+        sesh = self.sesh
         ing = self.integrator_vars
         stt = self.dynamic_state
         vars = self.problem_opt_vars
@@ -1618,7 +1657,8 @@ class ProblemExec:
     @property
     def all_comps_and_vars(self)->dict:
         #TODO: ensure system refes are fresh per system runtime events
-        refs = self.all_refs
+        sesh = self.sesh
+        refs = sesh.all_refs
         attrs = refs['attributes'].copy()
         comps = refs['components'].copy()
         attrs.update(comps)
@@ -1626,7 +1666,8 @@ class ProblemExec:
     
     @property
     def all_system_references(self)->dict:
-        refs = self.all_refs
+        sesh = self.sesh
+        refs = sesh.all_refs
         out = {}
         out.update(refs['attributes'])
         out.update(refs['properties'])
@@ -1637,6 +1678,8 @@ class ProblemExec:
         return f'ProblemContext[{self.level_name:^12}][{str(self.session_id)[0:8]}-{str(self._problem_id)[0:8]}][{self.system.identity}]'
     
 
+#TODO: move all system_reference concept inside problem context, remove from system/tabulation ect.
+#TODO: use prob.register(comp,key='') to add components to the problem context, mapping subcomponents to the problem context
 
     
 #subclass before altering please!
@@ -1646,7 +1689,14 @@ class Problem(ProblemExec,DataframeMixin):
     #TODO: implement checks to ensure that problem is defined as the top level context to be returned to
     #TODO: also define return options for data/system/dataframe and indexing
     pass
+
+    @property
+    def level_name(self):
+        return 'top' #fixed top output, garuntees exit to here.
     
+    @level_name.setter
+    def level_name(self,value):
+        raise AttributeError(f'cannot set level_name of top level problem context')
 
 
 
