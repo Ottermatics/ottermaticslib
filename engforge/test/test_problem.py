@@ -206,6 +206,27 @@ class TestSession(unittest.TestCase):
     
 class TestContextExits(unittest.TestCase):
 
+
+    def tearDown(self) -> None:
+        self.assertFalse(hasattr(ProblemExec.class_cache,'session'),msg='not cleaned!')
+
+    def test_error_exit(self):
+        tst = SimpleContext()
+        class TestError(Exception):
+            pass
+
+        with self.assertRaises(TestError): #we should get an error
+            with ProblemExec(tst) as pb1:
+                tst.set_rand()
+                with ProblemExec(tst,level_name='2') as pb2:
+                    tst.set_rand() 
+                    with ProblemExec(tst) as pb3:
+                        tst.set_rand()
+                        raise TestError('pocket-sand') #TODO: INSERT KING OF THE HILL REFERENCE
+        self.assertFalse(hasattr(ProblemExec.class_cache,'session'))  
+    
+    
+
     def test_context_singularity(self):
         tst = SimpleContext()
 
@@ -227,7 +248,7 @@ class TestContextExits(unittest.TestCase):
             raise Exception('Wrong Level')
         self.assertEqual(pb1,tst.last_context)
         self.assertTrue(pb1.entered)
-        self.assertTrue(pb1.exited)      
+        self.assertTrue(pb1.exited) 
 
     def test_exit_top(self):
         tst = SimpleContext()

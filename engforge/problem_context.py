@@ -82,7 +82,7 @@ dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on
 #can be found on session._<parm> or session.<parm>
 root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None,converged=None,comp_changed=False)
 save_modes = ['vars','nums','all','prob']
-transfer_kw = ['system']
+transfer_kw = ['system','_dxdt']
 
 root_possible = list(root_defined.keys()) + list('_'+k for k in root_defined.keys())
 
@@ -152,15 +152,15 @@ class ProblemExec:
     _post_update_refs: dict
     _sys_refs: dict
     _slv_kw: dict
-    _minimizer_kw: dict = None
-    _data: list = None
+    _minimizer_kw: dict
+    _data: list 
     _weights: dict
-    x_start:dict = None
-    _dxdt = None #numeric/None/dict/(integrate=True)
-    _run_start = None
-    _run_end = None
-    _run_time = None
-    _converged = None
+    x_start:dict
+    _dxdt:float
+    _run_start:float
+    _run_end:float
+    _run_time:float
+    _converged:bool
     
 
     #Interior Context Options
@@ -191,28 +191,19 @@ class ProblemExec:
         if hasattr(self.class_cache,'session') and name in root_possible:
             #revert to the parent session
             if self.session_id != True and name.startswith('_'):
+                #self.info(f'get parent private {name}')
                 return getattr(self.class_cache.session,name)
 
             elif name in root_defined:
+                #self.info(f'get parent public {name}')
                 return getattr(self.class_cache.session,'_'+name)
             
         if name in root_defined: #public interface
+            #self.info(f'get root fallback {name}')
             return self.__getattribute__('_'+name)
 
         # Default behaviour
         return self.__getattribute__(name)
-    
-#     def __setattr__(self, name: str, value) -> None:
-#         """only allow setting data to parent for now (this is in reset which can trigger anywhere)"""
-#         if hasattr(self.class_cache,'session') and name=='_data':
-#             if self.session_id != True:
-#                 self.class_cache.session._data = value
-#                 return 
-#             elif self.session_id == True:
-#                 self._data = value
-#                 return 
-# 
-#         super().__setattr__(name, value)    
 
         
     def __init__(self,system,kw_dict=None,Xnew=None,ctx_fail_new=False,**opts):
@@ -316,9 +307,9 @@ class ProblemExec:
 
 
         #Define the handiling of rate integrals
-        if 'dxdt' in opts:
+        if 'dxdt' in opts and opts['dxdt'] is not None:
             dxdt = opts.pop('dxdt')
-        if 'dxdt' in kw_dict:
+        if 'dxdt' in kw_dict and kw_dict['dxdt'] is not None:
             dxdt = kw_dict.pop('dxdt')
         else:
             dxdt = None  #by default dont consider dynamics
@@ -424,7 +415,6 @@ class ProblemExec:
         if log.log_level < 5:
             self.info(f'establish {system}| {kw_dict} {kwargs}')
 
-        
         assert isinstance(self.system,SolverMixin), 'only solveable interfaces are supported for execution context'
         self.system._last_context = self #set the last context to this one
 
@@ -502,7 +492,9 @@ class ProblemExec:
             self.info(f'min refresh')
 
         #final ref's after update
-        sesh._all_refs = sesh.system.system_references(recache=True,check_config=False) #after updates
+        #after updates
+        sesh._all_refs = sesh.system.system_references(recache=True,check_config=False,ignore_none_comp=False)
+        
 
         #Problem Variable Definitions
         sesh.Xref = sesh.all_problem_vars
@@ -513,7 +505,8 @@ class ProblemExec:
 
     @property
     def check_dynamics(self):
-        return self._dxdt is not None and self._dxdt is not False
+        sesh = self.sesh
+        return sesh._dxdt is not None and sesh._dxdt is not False
 
     #Context Manager Interface
     def __enter__(self):
@@ -616,6 +609,7 @@ class ProblemExec:
                 elif self.class_cache.session is self and not ext:
                     #never ever leave the top level without deleting the session
                     self.class_cache.level_number = 0
+                    self.problems_dict.pop(self._problem_id,None)
                     del self.class_cache.session 
                     raise KeyError(f'cant exit to level! {exc_value.level} not found!!')
             
@@ -626,7 +620,7 @@ class ProblemExec:
                 ext = True #basic exit is one level up
             
             self.clean_context()
-
+            self.problems_dict.pop(self._problem_id,None)
             return ext
         
         #default exit scenerios
@@ -636,7 +630,7 @@ class ProblemExec:
             ext = self.exit_action()
 
         self.clean_context()
-
+        self.problems_dict.pop(self._problem_id,None)
         return ext
         
     def debug_levels(self):
@@ -730,15 +724,17 @@ class ProblemExec:
             #a context custom callback
                 sesh.post_execute()
 
-        if sesh.system.anything_changed or not sesh.data or force:
+        if force or not sesh.data or sesh.system.anything_changed:
+            out = sesh.output_state
             if index is None and sesh._dxdt == True: #integration
                 index = sesh._time
             elif index is None:
                 index = sesh._index
-            out = sesh.output_state
+
             if add_data: out.update(add_data)
+            if sesh._dxdt==True: out['time'] = sesh._time
             out['index'] = index
-            sesh.data[index] = out
+            sesh._data[index] = out
             #if we are integrating, then we dont increment the index
             if sesh._dxdt != True:
                 sesh._index += 1
@@ -746,6 +742,7 @@ class ProblemExec:
             #reset the data for changed items
             sesh.system._anything_changed = False
             self.debug(f'data saved = {index}')
+
         elif self.log_level < 15:
             self.warning(f'no data saved, nothing changed')
 
@@ -773,7 +770,7 @@ class ProblemExec:
         self._time = time
         dt_calc = time - lt
         self._dt = dt if dt_calc <= 0 else dt_calc
-        self.system.set_time(time) #system times / subcomponents too
+        #self.system.set_time(time) #system times / subcomponents too
         
 
     def integrate(self,endtime,dt=0.001,max_step_dt=0.01,X0=None,**kw):
@@ -839,7 +836,7 @@ class ProblemExec:
         if self.log_level < 10:
             self.info(f'sim_iter {t} {x} {Xin}')
 
-        with ProblemExec(system,level_name='tr_slvr',Xnew=Xin,revert_last=False,revert_every=False) as pbx:
+        with ProblemExec(system,level_name='tr_slvr',Xnew=Xin,revert_last=False,revert_every=False,dxdt=True) as pbx:
             # test for record time 
             
             self.set_time(t,dt)
@@ -874,7 +871,7 @@ class ProblemExec:
             #solvers
             if self.run_solver  and Xss and Yobj and self.solveable:
                 # TODO: add in any transient
-                with ProblemExec(system,level_name='ss_slvr',revert_last=False,revert_every=False) as pbx:
+                with ProblemExec(system,level_name='ss_slvr',revert_last=False,revert_every=False,dxdt=True) as pbx:
 
                     ss_out = pbx.solve_min(Xss, Yobj, **self._minimizer_kw)
                     if ss_out['ans'].success:
@@ -949,7 +946,7 @@ class ProblemExec:
             output = dflt
 
         if len(Xref) == 0:
-            self.debug(f'no variables found for solver: {kw}')
+            self.info(f'no variables found for solver: {kw}')
             #None for `ans` will not trigger optimization failure        
             return output
         
@@ -1327,12 +1324,12 @@ class ProblemExec:
         elif 'prob' == sesh.save_mode:
             raise NotImplementedError(f'problem save mode not implemented')
         else:
-            raise KeyError(f'unknown save mode {self.save_mode}, not in {save_modes}')
+            raise KeyError(f'unknown save mode {sesh.save_mode}, not in {save_modes}')
 
         out = Ref.refset_get(refs,sys=sesh.system,prob=self)
 
-        if self._dxdt == True:
-            out['time'] = self._time
+        if sesh._dxdt == True:
+            out['time'] = sesh._time
 
         return out
     
@@ -1580,7 +1577,8 @@ class ProblemExec:
     @property
     def dataframe(self)->pd.DataFrame:
         """returns the dataframe of the system"""
-        res = pd.DataFrame([kv[-1] for kv in sorted(self.data.items(),
+        sesh = self.sesh
+        res = pd.DataFrame([kv[-1] for kv in sorted(sesh.data.items(),
                                                    key=lambda kv:kv[0]) ])
         self.system.format_columns(res)
         return res

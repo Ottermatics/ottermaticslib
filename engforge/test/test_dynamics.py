@@ -34,7 +34,6 @@ class TestDynamics(unittest.TestCase):
         self.w_ans = np.sqrt(sm.k / sm.m)
 
         dt = 0.001
-        #FIXME: input on simulate not working 
 
         df = sm.simulate(dt=dt, endtime=10,combos='*')
         #TODO: add passing flag to context

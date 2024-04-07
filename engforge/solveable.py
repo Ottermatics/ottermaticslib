@@ -57,11 +57,12 @@ def _cost_update(comp):
     
     if isinstance(comp,Economics):
         def updt(*args,**kw):
-            if log.log_level <= 10:
-                log.warning(f'update economics {comp.name} | {comp.term_length} ')
+            if log.log_level <= 8:
+                log.debug(f'update economics {comp.name} | {comp.term_length} ')
             comp.system_properties_classdef(True)
             comp.update(comp.parent, *args, **kw)
-        log.warning(f'economics update cb {comp.name} | {comp.term_length} ')
+        if log.log_level <= 8:
+            log.debug(f'economics update cb {comp.name} | {comp.term_length} ')
         updt.__name__ = f'{comp.name}_econ_update'
     else:
         def updt(*args,**kw):
@@ -69,7 +70,8 @@ def _cost_update(comp):
                 log.msg(f'update costs {comp.name} ',lvl=5)
             comp.system_properties_classdef(True)
             return comp.update_dflt_costs()
-        log.warning(f'cost update cb {comp.name} ')
+        if log.log_level <= 7:
+            log.debug(f'cost update cb {comp.name} ')
         updt.__name__ = f'{comp.name}_cost_update'
         
     return updt
@@ -304,13 +306,13 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for ck, comp in components.items():
                 comp.reset()
 
-    def comp_references(self,**kw):
+    def comp_references(self,ignore_none_comp=True,**kw):
         """A cached set of recursive references to any slot component
         #FIXME: by instance recache on iterative component change or other signals
         """
         out = {}
         for key, lvl, comp in self.go_through_configurations(parent_level=1,**kw):
-            if not isinstance(comp, SolveableMixin):
+            if ignore_none_comp and not isinstance(comp, SolveableMixin):
                 continue
             out[key] = comp
         return out

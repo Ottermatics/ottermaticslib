@@ -501,7 +501,8 @@ class Configuration(AttributedBaseMixin):
                 self.error(e, f"error in __pre_init__ {e}")
 
         # Assign Parents, ensure single componsition
-        # TODO: allow multi-parent, w/wo keeping state, state swap on update()?
+        #TODO: allow multi-parent, w/wo keeping state, state swap on update()?
+        #TODO: replace parent concept with problem context
         for compnm, comp in self.internal_configurations(False).items():
             if isinstance(comp, Component):
                 # TODO: allow multiple parents

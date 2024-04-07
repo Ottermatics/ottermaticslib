@@ -109,7 +109,7 @@ class INDEX_MAP:
 class DynamicsMixin(Configuration, SolveableMixin):
     """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the Time integrating attributes, and will raise an error if a conflict is detected #TODO."""
 
-    time: float = attrs.field(default=0.0)
+    #time: float = attrs.field(default=0.0)
 
     dynamic_state_vars: list = []#attrs.field(factory=list)
     dynamic_input_vars: list =  []#attrs.field(factory=list)
@@ -154,10 +154,16 @@ class DynamicsMixin(Configuration, SolveableMixin):
             assert p in fields, f"output var {p} not in attr: {fields}"
         for p in self.dynamic_input_vars:
             assert p in fields, f"input var {p} not in attr: {fields}"
-        
-    def reset_sim(self):
-        """reset the system to the initial state"""
-        self.time = 0.0
+
+    @property
+    def time(self):
+        #convience function 
+        ctx = getattr(self,'last_context',None)
+        if ctx:
+            time = getattr(ctx,'_time',0)
+        else:
+            time = 0
+        return time
 
     @instance_cached
     def is_dynamic(self):
@@ -394,20 +400,20 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
     def set_time(self, t, system=True,subcomponents=True):
         """sets the time of the system and context"""
-        
+        pass        
         #set components
-        if subcomponents:
-            for cdyn_name, comp in self.comp_times.items():
-                comp.set_value(t)
+        #if subcomponents:
+        #    for cdyn_name, comp in self.comp_times.items():
+        #        comp.set_value(t)
 
-        elif system: #set system time only
-            self.time = t
+        # if system: #set system time only
+        #     self.time = t
 
 
-    @instance_cached #TODO: cache on solver due to changes of components
-    def comp_times(self) -> dict:
+    #@instance_cached #TODO: cache on solver due to changes of components
+    #def comp_times(self) -> dict:
         """returns a dictionary of time references to components which will be set to the current time"""
-        return {k: Ref(comp,'time',False,True) for k,l,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
+        # return {k: Ref(comp,'time',False,True) for k,l,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
 
     # optimized convience funcitons
     def nonlinear_step(self, t, dt, X, U=None, set_Y=True):
@@ -479,11 +485,18 @@ class DynamicsMixin(Configuration, SolveableMixin):
         uses current state of X and U to determine the dXdt
         """
         # TODO: gather timestep
-        lt = getattr(self, "_last_cache_time", 0)
-        dt = max(self.time - lt, 0)
-        self.info(f"cache dXdt {self.time} {lt} {dt}")
-        step = self.step(self.time, dt, self.state, self.input)
-        self._last_cache_time = self.time
+        ctx = getattr(self,'last_context',None)
+        
+        if ctx:
+            time = getattr(ctx,'_time',0)
+            lt = getattr(ctx, "_last_time", 0)
+        else:
+            time = 0
+            lt = 0
+
+        dt = max(time - lt, 0)
+        self.info(f"cache dXdt {time} {lt} {dt}")
+        step = self.step(time, dt, self.state, self.input)
         return step
 
     def ref_dXdt(self, name: str):
@@ -593,6 +606,9 @@ class GlobalDynamics(DynamicsMixin):
             min_kw_dflt.update(min_kw)
         mkw = min_kw_dflt
 
+        #force transient
+        kwargs['dxdt'] = True
+
         #variables if failed
         pbx,system = None,self
         try:
@@ -603,7 +619,7 @@ class GlobalDynamics(DynamicsMixin):
                 self._sim_ans = pbx.integrate(endtime=endtime,dt=dt,X0=X0,eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
                 system = pbx.system #hello copy
 
-                data = [{"time": k, **v} for k, v in  pbx.data.items()]
+                #data = [{"time": k, **v} for k, v in  pbx.data.items()]
 
                 #this will affect the context copy, not self
                 pbx.exit_to_level('sim',False) 

@@ -111,6 +111,37 @@ class Analysis(Configuration, TabulationMixin, PlottingMixin, DataframeMixin):
         # TODO: join with analysis dataframe
         return self.system.dataframe
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     # Plotting & Report Methods:
 
 
