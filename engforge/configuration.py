@@ -362,15 +362,16 @@ class Configuration(AttributedBaseMixin):
         additionally this skip any configuration that start with an underscore (private variable)
         """
         from engforge.configuration import Configuration
+        slots = self.slots_attributes()
 
         if check_config:
             chk = lambda k, v: isinstance(v, Configuration)
         else:
-            chk = lambda k, v: k in self.slots_attributes() and (none_ok or v is not None)
+            chk = lambda k, v: k in slots and (none_ok or v is not None)
 
         obj = self.__dict__
         if not use_dict:  # slots
-            obj = {k: obj.get(k, None) for k in self.slots_attributes()}
+            obj = {k: obj.get(k, None) for k in slots}
 
         return {
             k: v for k, v in obj.items() if chk(k, v) and not k.startswith("_")

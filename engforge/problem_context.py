@@ -247,8 +247,6 @@ class ProblemExec:
         :param  revert_last: Whether to revert the last change. Default is True.
         :param  revert_every: Whether to revert every change. Default is True.
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
-        #### Context Options
-        :param refresh: Whether to refresh the system references. Default is False, if there is an active session context. New contexts will always refresh the system references.
         """
 
 
@@ -290,11 +288,6 @@ class ProblemExec:
             min_kw = mkw
         else:
             mkw.update(min_kw)
-
-        if "refresh" in opts or "refresh" in kw_dict:
-            refresh = kw_dict.pop("refresh",opts.get("refresh",False))
-        else:
-            refresh = False
 
         self._minimizer_kw = mkw
 
@@ -340,8 +333,6 @@ class ProblemExec:
                 pass
             else:
                 raise IllegalArgument(f'bad dxdt value {dxdt}')
-                
-        self._dxdt = dxdt              
             
         if hasattr(self.class_cache,'session'):                        
             #mirror the state of session (exactly)
@@ -355,9 +346,6 @@ class ProblemExec:
             #error if the system is different (it shouldn't be!)
             if self.system is not system:
                 raise IllegalArgument(f'somethings wrong! change of comp! {self.system} -> {system}')
-            
-            if refresh:
-                self.class_cache.session.refresh_references()
 
             #modify things from the input
             if level_name is None:
@@ -383,7 +371,8 @@ class ProblemExec:
             self._problem_id = True #this is the top level
             self.problems_dict[self._problem_id] = self #carry that weight
             self._prob_levels = {}
-
+            
+            self._dxdt = dxdt
             self.reset_data()
 
             #supply the level name default as top if not set
@@ -496,7 +485,7 @@ class ProblemExec:
 
     def update_methods(self,sesh=None):
         #Get the update method refs
-        sesh = self.sesh
+        sesh = sesh if sesh is not None else self.sesh
 
         sesh._update_refs = sesh.system.collect_update_refs()
         #TODO: find subsystems that are not-subsolvers and execute them
@@ -507,7 +496,7 @@ class ProblemExec:
             sesh.pre_execute()
 
     def min_refresh(self,sesh=None):
-        sesh = self.sesh
+        sesh = sesh if sesh is not None else  self.sesh
 
         if self.log_level < 5:
             self.info(f'min refresh')
@@ -543,7 +532,7 @@ class ProblemExec:
         #TODO: 
         #transients wont update components/ methods dynamically (or shouldn't) so we can just update the system references once and be done with it for other cases, but that is not necessary unless a component changes or a component has in general a unique reference update system (economics / component-iterators)
         sesh = self.sesh
-        if not self._dxdt is True:
+        if not sesh._dxdt is True:
             sesh.update_methods(sesh=sesh)
             sesh.min_refresh(sesh=sesh)
 
@@ -735,26 +724,27 @@ class ProblemExec:
 
     def save_data(self,index=None,force=False,**add_data):
         """save data to the context"""
-
+        
+        sesh = self.sesh
         if not self.exited and self.post_exec:
             #a context custom callback
-            self.post_execute()
+                sesh.post_execute()
 
-        if self.system.anything_changed or not self.data or force:
-            if index is None and self._dxdt == True: #integration
-                index = self._time
+        if sesh.system.anything_changed or not sesh.data or force:
+            if index is None and sesh._dxdt == True: #integration
+                index = sesh._time
             elif index is None:
-                index = self._index
-            out = self.output_state
+                index = sesh._index
+            out = sesh.output_state
             if add_data: out.update(add_data)
             out['index'] = index
-            self.data[index] = out
+            sesh.data[index] = out
             #if we are integrating, then we dont increment the index
-            if self._dxdt != True:
-                self._index += 1
+            if sesh._dxdt != True:
+                sesh._index += 1
             
             #reset the data for changed items
-            self.system._anything_changed = False
+            sesh.system._anything_changed = False
             self.debug(f'data saved = {index}')
         elif self.log_level < 15:
             self.warning(f'no data saved, nothing changed')
