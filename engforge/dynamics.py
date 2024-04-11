@@ -496,7 +496,8 @@ class DynamicsMixin(Configuration, SolveableMixin):
             lt = 0
 
         dt = max(time - lt, 0)
-        self.info(f"cache dXdt {time} {lt} {dt}")
+        if self.log_level <= 4:
+            self.debug(f"cache dXdt {time} {lt} {dt}")
         step = self.step(time, dt, self.dynamic_state, self.dynamic_input)
         return step
 
@@ -505,8 +506,9 @@ class DynamicsMixin(Configuration, SolveableMixin):
         vars = self.dynamic_state_vars
         assert name in vars, f"name {name} not in state vars"
         inx = vars.index(name)
-        accss = lambda comp: comp.cache_dXdt[inx]
-        return Ref(self, name, accss)
+        accss = lambda sys,prob: self.cache_dXdt[inx]
+        accss.__name__ = f"ref_dXdt_{name}"
+        return Ref(self, accss)
     
 
     def determine_nearest_stationary_state(

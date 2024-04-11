@@ -243,7 +243,6 @@ class SolverMixin(SolveableMixin):
         #execute with problem context and execute signals
         with ProblemExec(self,kw,level_name='eval',eval_kw=eval_kw, sys_kw=sys_kw,post_callback=cb,Xnew=Xo) as pbx:
             out = self.execute(**kw)
-            pbx.save_data()
             pbx.exit_to_level(level='eval',revert=False)
 
         if self.log_level >= 20:
@@ -267,7 +266,7 @@ class SolverMixin(SolveableMixin):
 
     # TODO: code options for transient integration
     def solver(
-            self, **kw
+            self, enter_refresh=True,save_on_exit=True,**kw
         ):
             """
             runs the system solver using the current system state and modifying it. This is the default solver for the system, and it is recommended to add additional options or methods via the execute method.
@@ -300,7 +299,7 @@ class SolverMixin(SolveableMixin):
             #use problem execution context
             self.debug(f'starting solver: {opts}')
             
-            with ProblemExec(self,opts,level_name='sys_slvr') as pbx:
+            with ProblemExec(self,opts,level_name='sys_slvr',enter_refresh=enter_refresh,save_on_exit=save_on_exit) as pbx:
                 
                 #Use Solver Context to Solve
                 out = pbx.solve_min(**opts)

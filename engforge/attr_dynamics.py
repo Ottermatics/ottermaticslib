@@ -126,7 +126,7 @@ class Time(ATTR_BASE):
             rate=rate,
             active=active,
             constraints=[], #TODO: parse kwargs for limits
-            combos=cls.process_combos(combos)
+            combos=cls.process_combos(combos,add_combos=f'time,{var}')
         )
         return cls._setup_cls(new_name, new_dict)
 

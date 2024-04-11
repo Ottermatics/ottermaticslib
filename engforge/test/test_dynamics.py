@@ -35,7 +35,7 @@ class TestDynamics(unittest.TestCase):
 
         dt = 0.001
 
-        df = sm.simulate(dt=dt, endtime=10,combos='*')
+        df = sm.simulate(dt=dt, endtime=10)
         #TODO: add passing flag to context
         #self.assertTrue(sm.solved)
         #self.assertTrue(sm.converged)
@@ -66,10 +66,10 @@ class TestDynamics(unittest.TestCase):
     def test_damping(self):
         """test that the ss answer is equal to the result with damping"""
         sm = SpringMass(Fa=0,u=5)
-        sm.run(dxdt=0)
+        sm.run(dxdt=0,combos='time') #time captures integral via combos
 
         dfss =sm.last_context.dataframe
-        trsm,df = sm.simulate(dt=0.001, endtime=10,combos='*',return_all=True)
+        trsm,df = sm.simulate(dt=0.001, endtime=10,return_all=True)
 
         self.assertAlmostEqual(df.iloc[-1].x,dfss.iloc[0].x, delta=0.01)
 
@@ -78,7 +78,7 @@ class TestDynamics(unittest.TestCase):
         sm = SpringMass(Fa=10,u=0,wo_f=1)
         sm.wo_f = w_ans = np.sqrt(sm.k / sm.m) * 0.1 #very different frequency
 
-        sm.run(dxdt=0)
+        sm.run(dxdt=0,combos='time')
         dfss =sm.dataframe
         sm.x = dfss.iloc[0].x #no residual input
         

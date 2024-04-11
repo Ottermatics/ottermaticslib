@@ -598,6 +598,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return val
 
     # Reference Caching
+    #TODO: move to problem context
     def system_references(self, recache=False,numeric_only=False,**kw):
         """gather a list of references to attributes and"""
         if not numeric_only and not kw and (recache == False and hasattr(self, "_prv_system_references")):
@@ -773,10 +774,11 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         
         #Dynamic Variables Add, following the skipped items
         if check_dynamics:
-            dyn_refs = self.collect_dynamic_refs(confobj)
+            dyn_refs = self.collect_dynamic_refs(confobj).copy()
             #house keeping to organize special returns 
-            #TODO: generalize this with a function to update the attr dict serach result
-            out['dynamic_comps'] = dyn_refs.pop('dynamic_comps',{})
+            
+            #TODO: generalize this with a function to update the attr dict serach result when changing components
+            out['dynamic_comps'] = dyn_comp = dyn_refs.pop('dynamic_comps',{})
             
 
             if check_atr_f or any([v for v in skipped.values()]):
@@ -785,17 +787,26 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                 for pre,refs in dyn_refs.items():
                     
                     if pre not in attr_dict:
-                        attr_dict[pre] = {}
+                        attr_dict[pre] =  {}
 
                     for var,ref in refs.items():
                         
-                        is_ref = isinstance(ref,Ref) and ref.allow_set
+                        key_segs = var.split('.')
+                        key = '' if len(key_segs) == 1 else '.'.join(key_segs[:-1])
+                        scoped_name = f'{var}'
+                        conf = dyn_comp.get(key)                        
+
+                        is_ref = isinstance(ref,Ref) 
                         if not is_ref:
-                            conf.info(f'bad refs skip {pre,ref,val_type,skipd}')
+                            conf.info(f'not ref {ref}')
+                            continue
+
+                        if is_ref and not ref.allow_set:
+                            #adding settables
                             attr_dict[pre].update(**{var:ref})
                             continue
 
-                        scoped_name = f'{key}{var}'
+
                         val_setskip = ( is_ref and ref.key in skipd)
                         val_type = None
                         

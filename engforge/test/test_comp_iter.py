@@ -110,7 +110,7 @@ class TestWide(unittest.TestCase):
         self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
 
         # save the data to table
-        self.system.run(revert_last=False,revert_every=False,save_data_on_exit=True)
+        self.system.run(revert_last=False,revert_every=False,save_on_exit=True)
 
         df = self.system.last_context.dataframe
         self.assertTrue(len(df) == 1,msg=f"len: {len(df)}|\n{str(df)}")

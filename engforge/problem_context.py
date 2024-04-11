@@ -70,7 +70,7 @@ import uuid
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 #TODO: define the dataframe / data storage feature
 
-min_opt = {'finite_diff_rel_step': 0.1, 'xtol': 0.1, 'eps': 0.1}
+min_opt = {'finite_diff_rel_step': 0.1}
 min_kw_dflt = {"tol":1e-10, "method": "SLSQP",'jac':'3-point', 'options':min_opt}
 
 
@@ -78,8 +78,8 @@ min_kw_dflt = {"tol":1e-10, "method": "SLSQP",'jac':'3-point', 'options':min_opt
 # IMPORTANT:!!! these group parameter names by behavior, they are as important as the following class, add/remove variables with caution
 #these choices affect how solver-items are selected and added to the solver
 slv_dflt_options = dict(combos='default',ign_combos=None,only_combos=None,add_obj=True,slv_vars='*',add_vars=None,ign_vars=None,only_vars=None,only_active=True,activate=None,deactivate=None,dxdt=None,weights=None,both_match=True,obj=None)
-#KW Defaults for the context
-dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None,save_mode='all',x_start = None,save_data_on_exit=False)
+#KW Defaults for the local context (what saves state for contexts / reverts ect)
+dflt_parse_kw = dict(fail_revert=True,revert_last=True,revert_every=True,exit_on_failure=True, pre_exec=True,post_exec=True,opt_fail = True,level_name='top',post_callback=None,success_thresh=10,copy_system=False,run_solver=False,min_kw=None,save_mode='all',x_start = None,save_on_exit=False,enter_refresh=False)
 #can be found on session._<parm> or session.<parm>
 root_defined = dict( last_time = 0,time = 0,dt = 0,update_refs=None,post_update_refs=None,sys_refs=None,slv_kw=None,minimizer_kw=None,data = None,weights=None,dxdt = None,run_start = None,run_end = None,run_time = None,all_refs=None,num_refs=None,converged=None,comp_changed=False)
 save_modes = ['vars','nums','all','prob']
@@ -165,7 +165,8 @@ class ProblemExec:
     
 
     #Interior Context Options
-    save_data_on_exit: bool = False
+    enter_refresh: bool = False
+    save_on_exit: bool = False
     save_mode: str = 'all'
     level_name: str = None #target this context with the level name
     level_number: int = 0 #TODO: keep track of level on the global context  
@@ -528,7 +529,7 @@ class ProblemExec:
         #TODO: 
         #transients wont update components/ methods dynamically (or shouldn't) so we can just update the system references once and be done with it for other cases, but that is not necessary unless a component changes or a component has in general a unique reference update system (economics / component-iterators)
         sesh = self.sesh
-        if not sesh._dxdt is True:
+        if not sesh._dxdt is True and self.enter_refresh:
             sesh.update_methods(sesh=sesh)
             sesh.min_refresh(sesh=sesh)
 
@@ -570,7 +571,7 @@ class ProblemExec:
             self.post_callback()
 
         #save state to dataframe
-        if self.save_data_on_exit:
+        if self.save_on_exit:
             self.save_data()
 
         #sesh = self.sesh #this should be here
@@ -1044,9 +1045,9 @@ class ProblemExec:
         if Yobj:
             return Yobj #here is your application objective, sir
         
-        #now make up an objective, if we have no constraints
+        #now make up an objective
         elif not Yobj and Yeq:
-            #handle case of Yineq == None: root solve
+            #TODO: handle case of Yineq == None with root solver
             self.debug(f'making Yobj from Yeq: {Yeq}')
             Yobj = { k: v.copy(key = lambda sys,prob: (1+v.value(sys,prob)**2)) for k,v in Yeq.items() }
 
@@ -1114,12 +1115,13 @@ class ProblemExec:
             constraints = {} #youre free!
             return constraints
         
-        
-
         # Add Constraints
         ex_arg = {"con_args": (),**kw}
+        
         #Variable limit (function -> ineq, numeric -> bounds)
+        #TODO: dynamic limits
         for slvr, ref in sesh.problem_opt_vars.items():
+            #TODO: solution to this is to combine the independent variables into one, but allow multiple dependent objectives for constraints/objectives
             assert not all((slvr in slv_inst,slvr in trv_inst)), f'solver and integrator share parameter {slvr} '
             if slvr in slv_inst:
                 slv = slv_inst[slvr]
@@ -1185,7 +1187,7 @@ class ProblemExec:
                     #get the index of the variable
                     x_inx = Xvars.index(slvr)        
                     
-                    #lookup rates
+                    #lookup rates for overlapping dynamic variables
                     rate_val = None
                     if sesh._dxdt is not None:
                         if isinstance(sesh._dxdt,dict) and not slv_var:
@@ -1195,6 +1197,7 @@ class ProblemExec:
 
                     #add the dynamic parameters when configured
                     if not slv_var and rate_val is not None:
+                        print(f'adding dynamic constraint {slvr} {rate_val}')
                         #if kind in ('min','max') and slvr in Xvars:
                         varref = Xrefs[slvr]
                         #varref = slv.rate_ref
@@ -1204,7 +1207,8 @@ class ProblemExec:
                         con_info.append(f'dxdt_{varref.comp.classname}.{slvr}_{kind}_{cval}')
                         con_list.append(ccst) 
 
-                    elif slv_var:                       
+                    # elif slv_var:                       
+                    elif slv_var:
                         #establish simple bounds w/ solver  
                         if ( 
                             kind in ("min", "max")
@@ -1229,7 +1233,7 @@ class ProblemExec:
                             self.warning(f"bad constraint: {cval} {kind} {slv_var}|{slvr}")
 
         # Add Constraints
-        for slvr, ref in sys_refs.get('solver.ineq',{}).items():
+        for slvr, ref in self.problem_ineq.items():
             slv = slv_inst[slvr]
             slv_constraints = slv.constraints
             for ctype in slv_constraints:
@@ -1243,19 +1247,30 @@ class ProblemExec:
                         )
                     )
 
-        for slvr, ref in sys_refs.get('solver.eq',{}).items():
-            slv = slv_inst[slvr]
-            slv_constraints = slv.constraints
-            for ctype in slv_constraints:
-                cval = ctype['value']
-                kind = ctype['type']                    
-                if cval is not None:
-                    con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
-                    con_list.append(
-                        create_constraint(
-                            system,Xrefs, 'eq', cval, **kw
+        for slvr, ref in self.problem_eq.items():
+            if slvr in slv_inst:
+                slv = slv_inst[slvr]
+                slv_constraints = slv.constraints
+                for ctype in slv_constraints:
+                    cval = ctype['value']
+                    kind = ctype['type']                    
+                    if cval is not None:
+                        con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
+                        con_list.append(
+                            create_constraint(
+                                system,Xrefs, 'eq', cval, **kw
+                            )
                         )
+            else:
+                #This must be a dynamic rate, #TODO add check 
+                self.debug(f'no solver instance for {slvr} ')
+                con_info.append(f'eq_{ref.comp.classname}.{slvr}_rate')
+                con_list.append(
+                    create_constraint(
+                        system,Xrefs, 'eq', ref, **kw
                     )
+                )
+                
 
 
         return constraints 
@@ -1528,7 +1543,48 @@ class ProblemExec:
 
     @property
     def problem_eq(self):
-        return self.ref_attrs.get('solver.eq',{}).copy()
+        base_eq = self.ref_attrs.get('solver.eq',{}).copy()
+        if self._dxdt in [True,None] or self._dxdt is False:
+            return base_eq #wysiwyg
+        base_eq.update(self.dynamic_rate_eq)
+        
+        if len(base_eq) > len(self.Xref):
+            self.warning(f'problem_eq has more variables than Xref {base_eq} {self.Xref}')
+            #TODO: in this case combine the rate_eq to prevent this error
+
+        return base_eq
+        
+
+    @property
+    def dynamic_rate_eq(self):
+        #Add Dynamics Rate Equalities
+        base_eq = {}
+        if self._dxdt in [True,None] or self._dxdt is False: #zero case
+            return base_eq
+        
+        Xrefs = self.Xref
+        system = self.system
+        #henceforth, the rate shall be equal to somethign!
+        base_eq.update(self.dynamic_rate)
+        base_eq.update(self.filter_vars(self.integrator_rates))
+        out = {}
+        #TODO: handle callable case
+        if self._dxdt is not None and (isinstance(self._dxdt,dict) or abs(self._dxdt) > 0):
+            #add in the dynamic rate constraints
+            for var,varref in base_eq.items():
+                if (isinstance(self._dxdt,dict) and var in self._dxdt):
+                    rate_val = self._dxdt.get(var,0) #zero default rate
+                elif isinstance(self._dxdt,(int,float)):
+                    rate_val = self._dxdt
+                    con_ref = ref_to_val_constraint(system,system.last_context,Xrefs,varref,'min',rate_val,return_ref=True)
+                    out[var] = con_ref
+                else:
+                    out[var] = varref #zip rate
+        else:
+            #thou shalt be zero (no ref modifications)
+            out = base_eq
+
+        return out      
     
     @property
     def problem_ineq(self):
@@ -1592,14 +1648,18 @@ class ProblemExec:
         return res
 
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
+    def get_parent_key(self,key):
+        """returns the parent key of the key"""
+        if not key:
+            return ''
+        elif '.' in key:
+            return '.'.join(key.split('.')[:-1])+'.'
+        return ''
+        
     #Dynamics Interface
     def filter_vars(self,refs:list):
         '''selects only settable refs'''
-        return {v.key:v for k,v in refs.items() if v.allow_set}
-    
-    def filter_prop(self,refs:list):
-        '''selects only settable refs'''
-        return {k:v for k,v in refs.items() if not v.allow_set}        
+        return {f'{self.get_parent_key(k)}{v.key}':v for k,v in refs.items() if v.allow_set}   
 
     #X solver variable refs
     @property
@@ -1614,7 +1674,7 @@ class ProblemExec:
         #Add the dynamic states to be optimized (ignore if integrating)
         sesh = self.sesh
         if sesh.dynamic_solve and not sesh._dxdt is True:
-            varx.update(self.filter_vars(sesh.dynamic_state))
+            varx.update(sesh.dynamic_state)
             varx.update(self.filter_vars(sesh.integrator_vars))
         return varx
 
@@ -1649,6 +1709,16 @@ class ProblemExec:
     def all_variables(self)->dict:
         """returns all variables in the system"""
         return self.all_refs['attributes']
+    
+    @property
+    def all_comps(self)->dict:
+        """returns all variables in the system"""
+        return self.all_refs['components']
+    
+    @property
+    def all_components(self)->dict:
+        """returns all variables in the system"""
+        return self.all_refs['components']
 
     @property
     def all_comps_and_vars(self)->dict:

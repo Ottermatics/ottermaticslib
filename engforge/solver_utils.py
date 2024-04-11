@@ -165,7 +165,7 @@ def secondary_obj(
 
     return f
 
-def ref_to_val_constraint(system,ctx,Xrefs,var_ref,kind,val,*args,**kwargs):
+def ref_to_val_constraint(system,ctx,Xrefs,var_ref,kind,val,contype='ineq',return_ref=False,*args,**kwargs):
     """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
     """
     info = ctx
@@ -197,8 +197,11 @@ def ref_to_val_constraint(system,ctx,Xrefs,var_ref,kind,val,*args,**kwargs):
     else:
         raise ValueError(f"bad constraint value: {val}")
     
+    if return_ref:
+        return ref
+    
     #Make Objective
-    return create_constraint(system,Xrefs,'ineq',ref,*args,**kwargs)
+    return create_constraint(system,Xrefs,contype,ref,*args,**kwargs)
 
 def create_constraint(
     system,Xref, contype: str, ref, con_args=None,*args, **kwargs
@@ -222,25 +225,25 @@ def create_constraint(
         cons['args'] = con_args
     return cons
 
-def misc_to_ref(system,val,*args,**kwargs):
-    """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
-    """
-    if isinstance(val,Ref):
-        #fun = lambda *a,**kw:val.value()
-        ref = Ref(val.comp,val)
-    #Function Case
-    elif callable(val):
-        fun = lambda system,info: val(system,info)
-        fun.__name__ = val.__name__
-        ref = Ref(None,fun) #comp shouldn't matter
-    elif isinstance(val,(int,float)):
-        fun = lambda system,info: val
-        fun.__name__ = f'const_{str(val)}'
-        ref = Ref(None,fun) #comp shouldn't matter
-    else:
-        raise ValueError(f"bad constraint value: {val}")
-    
-    return ref
+# def misc_to_ref(system,val,*args,**kwargs):
+#     """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
+#     """
+#     if isinstance(val,Ref):
+#         #fun = lambda *a,**kw:val.value()
+#         ref = Ref(val.comp,val)
+#     #Function Case
+#     elif callable(val):
+#         fun = lambda system,info: val(system,info)
+#         fun.__name__ = val.__name__
+#         ref = Ref(None,fun) #comp shouldn't matter
+#     elif isinstance(val,(int,float)):
+#         fun = lambda system,info: val
+#         fun.__name__ = f'const_{str(val)}'
+#         ref = Ref(None,fun) #comp shouldn't matter
+#     else:
+#         raise ValueError(f"bad constraint value: {val}")
+#     
+#     return ref
 
 
 # Reference Jacobean Calculation

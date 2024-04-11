@@ -18,7 +18,7 @@ log = PerfTest()
 def eval_steady_state(dxdt=0):
     """test that the ss answer is equal to the result with damping"""
     sm = SpringMass()
-    sm.run(dxdt=dxdt)
+    sm.run(dxdt=dxdt,combos='time')
     df = sm.dataframe
 
 def eval_transient(endtime=10,dt=0.001,run_solver=False):

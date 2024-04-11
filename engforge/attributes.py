@@ -81,15 +81,25 @@ class ATTR_BASE(attrs.Attribute):
 
     #Activation & Combo Selection Functionality
     @classmethod
-    def process_combos(cls, combos):
+    def process_combos(cls, combos,default=None,add_combos=None):
         if isinstance(combos, str):
             if '*' in combos:
                 raise KeyError("wildcard (*) not allowed in combos!")
-            return combos.split(",")
+            out = combos.split(",") 
         elif isinstance(combos, list):
             if any(['*' in c for c in combos]):
                 raise KeyError("wildcard (*) not allowed in combos!")            
-            return combos     
+            out = combos     
+        
+        if add_combos is not None:
+            out += cls.process_combos(add_combos,default=default)
+
+
+        if out:
+            return out
+        if default:
+            return default
+        return ['default']
 
     #Initialization
     @classmethod

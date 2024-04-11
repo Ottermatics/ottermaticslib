@@ -26,15 +26,15 @@ class TestSession(unittest.TestCase):
 
     def test_system_last_context(self):
         sm = SpringMass(Fa=0,u=5)
-        sm.run(dxdt=0)
+        sm.run(dxdt=0,combos='time')
         ssid = sm.last_context.session_id
-        sm.run(dxdt=0)
+        sm.run(dxdt=0,combos='time')
         trid = sm.last_context.session_id
         self.assertNotEqual(ssid,trid,'Session ID should change after a run')
 
     def test_system_change_context(self):
         sm = SpringMass(Fa=0,u=5)
-        sm.run(dxdt=0)
+        sm.run(dxdt=0,combos='time')
         ssid = sm.last_context.session_id
         trsm,df = sm.simulate(dt=0.01, endtime=0.1,return_all=True)
         trid = trsm.last_context.session_id
@@ -105,7 +105,7 @@ class TestSession(unittest.TestCase):
         self.assertEqual(chk(atx,'dynamics.input'),set(('Tg',)))
 
         cons = pbx.constraints
-        self.assertEqual(cons['constraints'],[])
+        self.assertEqual(len(cons['constraints']),2)
         self.assertEqual(len(cons['bounds']),2) 
 
 

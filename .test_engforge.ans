@@ -22,226 +22,550 @@ GPU solver not available: PYNITE_GPU environment variable not set to `True`
 [configlog               ][97mConfiguring System: Structure[0m
 [configlog               ][97mConfiguring System: TestConfig[0m
 [configlog               ][97mConfiguring System: Static[0m
-[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fd56e1c6e60>[0m
-[airfilteranalysis-ragged][97mrunning analysis airfilteranalysis-ragged-planner with input () {'throttle': array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
+[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fcc47235870>[0m
+[airfilteranalysis-acute-][97mrunning analysis airfilteranalysis-acute-cluster with input () {'throttle': array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
        0.55555556, 0.66666667, 0.77777778, 0.88888889, 1.        ]), 'combos': '*', 'slv_vars': '*'}[0m
-..........[plotlog                 ][97mPlotting airfilteranalysis[0m
-[plotlog                 ][97mairfilteranalysis-ragged-planner system plotting system | <engforge.test.solver_testing_components.Airfilter object at 0x7fd56e1c6e60>[0m
+[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2509.211443989711
+       x: [ 9.058e-01]
+     nit: 100
+     jac: [ 1.815e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2038.955219369025
+       x: [ 9.055e-01]
+     nit: 100
+     jac: [ 1.635e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 920.8247367302266
+       x: [ 9.039e-01]
+     nit: 100
+     jac: [ 1.097e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 32.72919601705776
+       x: [ 8.793e-01]
+     nit: 100
+     jac: [ 1.981e+00]
+    nfev: 1190
+    njev: 100[0m
+..[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 537522.6565087916
+       x: [ 7.046e+00]
+     nit: 100
+     jac: [ 2.066e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 460722.3432419153
+       x: [ 6.994e+00]
+     nit: 100
+     jac: [ 1.899e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 377569.695457429
+       x: [ 6.922e+00]
+     nit: 100
+     jac: [ 1.701e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 291871.57744860544
+       x: [ 6.819e+00]
+     nit: 100
+     jac: [ 1.473e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|50733|[2-run]  solver didnt converge:  message: Positive directional derivative for linesearch
+ success: False
+  status: 8
+     fun: 203989.21016708433
+       x: [ 0.000e+00]
+     nit: 6
+     jac: [ 0.000e+00]
+    nfev: 4
+    njev: 2[0m
+.[plotlog                 ][97mPlotting airfilteranalysis[0m
+[plotlog                 ][97mairfilteranalysis-acute-cluster system plotting system | <engforge.test.solver_testing_components.Airfilter object at 0x7fcc47235870>[0m
 [plotlog                 ][97mPlotting airfilteranalysis.airfilter[0m
-[plotlog                 ][97mairfilter-azure-grid plotting airfilteranalysis.airfilter.flow_curve | <engforge.attr_plotting.PlotInstance object at 0x7fd56e1c4730>[0m
-[plotlog                 ][97mplotting airfilter-azure-grid| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
-[airfilteranalysis-ragged][97mreport results[0m
-[airfilteranalysis-ragged][97mshowing plots 1[0m
-[airfilteranalysis-ragged][97mshowing airfilteranalysis.airfilter.flow_curve[0m
+[plotlog                 ][97mairfilter-hard-cylinder plotting airfilteranalysis.airfilter.flow_curve | <engforge.attr_plotting.PlotInstance object at 0x7fcc47236f50>[0m
+[plotlog                 ][97mplotting airfilter-hard-cylinder| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+[airfilteranalysis-acute-][97mreport results[0m
+[airfilteranalysis-acute-][97mshowing plots 1[0m
+[airfilteranalysis-acute-][97mshowing airfilteranalysis.airfilter.flow_curve[0m
 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/analysis.py:103: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
   fig.show()
-[plotlog                 ][97mplotting airfilter-azure-grid| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
-.(<Figure size 500x500 with 1 Axes>, <seaborn.axisgrid.FacetGrid object at 0x7fd56dc8c610>)
+[plotlog                 ][97mplotting airfilter-hard-cylinder| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.(<Figure size 500x500 with 1 Axes>, <seaborn.axisgrid.FacetGrid object at 0x7fcc46339030>)
 Figure(500x500)
-[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fd62dd8c070>[0m
-..........[plotlog                 ][97mplotting airfilter-intricate-function| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
-.[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fd5cfd36e00>[0m
-[airfilteranalysis-plasti][97mrunning analysis airfilteranalysis-plastic-anode with input () {'throttle': array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
+[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fcd0721bcd0>[0m
+[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2509.211443989711
+       x: [ 9.058e-01]
+     nit: 100
+     jac: [ 1.815e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2038.955219369025
+       x: [ 9.055e-01]
+     nit: 100
+     jac: [ 1.635e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 920.8247367302266
+       x: [ 9.039e-01]
+     nit: 100
+     jac: [ 1.097e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 32.72919601705776
+       x: [ 8.793e-01]
+     nit: 100
+     jac: [ 1.981e+00]
+    nfev: 1190
+    njev: 100[0m
+..[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 537522.6565087916
+       x: [ 7.046e+00]
+     nit: 100
+     jac: [ 2.066e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 460722.3432419153
+       x: [ 6.994e+00]
+     nit: 100
+     jac: [ 1.899e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 377569.695457429
+       x: [ 6.922e+00]
+     nit: 100
+     jac: [ 1.701e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 291871.57744860544
+       x: [ 6.819e+00]
+     nit: 100
+     jac: [ 1.473e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|26723|[2-run]  solver didnt converge:  message: Positive directional derivative for linesearch
+ success: False
+  status: 8
+     fun: 203989.21016708433
+       x: [ 0.000e+00]
+     nit: 6
+     jac: [ 0.000e+00]
+    nfev: 4
+    njev: 2[0m
+.[plotlog                 ][97mplotting airfilter-local-anion| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fccad0c7f70>[0m
+[airfilteranalysis-linear][97mrunning analysis airfilteranalysis-linear-quasar with input () {'throttle': array([0.        , 0.11111111, 0.22222222, 0.33333333, 0.44444444,
        0.55555556, 0.66666667, 0.77777778, 0.88888889, 1.        ]), 'combos': '*', 'slv_vars': '*'}[0m
-..........[plotlog                 ][97mPlotting airfilteranalysis[0m
-[plotlog                 ][97mairfilteranalysis-plastic-anode system plotting system | <engforge.test.solver_testing_components.Airfilter object at 0x7fd5cfd36e00>[0m
+[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2509.211443989711
+       x: [ 9.058e-01]
+     nit: 100
+     jac: [ 1.815e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2038.955219369025
+       x: [ 9.055e-01]
+     nit: 100
+     jac: [ 1.635e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 920.8247367302266
+       x: [ 9.039e-01]
+     nit: 100
+     jac: [ 1.097e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 32.72919601705776
+       x: [ 8.793e-01]
+     nit: 100
+     jac: [ 1.981e+00]
+    nfev: 1190
+    njev: 100[0m
+..[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 537522.6565087916
+       x: [ 7.046e+00]
+     nit: 100
+     jac: [ 2.066e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 460722.3432419153
+       x: [ 6.994e+00]
+     nit: 100
+     jac: [ 1.899e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 377569.695457429
+       x: [ 6.922e+00]
+     nit: 100
+     jac: [ 1.701e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 291871.57744860544
+       x: [ 6.819e+00]
+     nit: 100
+     jac: [ 1.473e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|22976|[2-run]  solver didnt converge:  message: Positive directional derivative for linesearch
+ success: False
+  status: 8
+     fun: 203989.21016708433
+       x: [ 0.000e+00]
+     nit: 6
+     jac: [ 0.000e+00]
+    nfev: 4
+    njev: 2[0m
+.[plotlog                 ][97mPlotting airfilteranalysis[0m
+[plotlog                 ][97mairfilteranalysis-linear-quasar system plotting system | <engforge.test.solver_testing_components.Airfilter object at 0x7fccad0c7f70>[0m
 [plotlog                 ][97mPlotting airfilteranalysis.airfilter[0m
-[plotlog                 ][97mairfilter-blocking-function plotting airfilteranalysis.airfilter.flow_curve | <engforge.attr_plotting.PlotInstance object at 0x7fd56b907be0>[0m
-[plotlog                 ][97mplotting airfilter-blocking-function| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
-[airfilteranalysis-plasti][97mreport results[0m
-[airfilteranalysis-plasti][97mshowing plots 1[0m
-[airfilteranalysis-plasti][97mshowing airfilteranalysis.airfilter.flow_curve[0m
+[plotlog                 ][97mairfilter-brute-force-neutron plotting airfilteranalysis.airfilter.flow_curve | <engforge.attr_plotting.PlotInstance object at 0x7fcc432ab970>[0m
+[plotlog                 ][97mplotting airfilter-brute-force-neutron| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+[airfilteranalysis-linear][97mreport results[0m
+[airfilteranalysis-linear][97mshowing plots 1[0m
+[airfilteranalysis-linear][97mshowing airfilteranalysis.airfilter.flow_curve[0m
 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/analysis.py:103: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
   fig.show()
-[plotlog                 ][97mplotting airfilter-blocking-function| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
-.(<Figure size 500x500 with 1 Axes>, <seaborn.axisgrid.FacetGrid object at 0x7fd56b8a7ac0>)
+[plotlog                 ][97mplotting airfilter-brute-force-neutron| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.(<Figure size 500x500 with 1 Axes>, <seaborn.axisgrid.FacetGrid object at 0x7fcc425d3f10>)
 Figure(500x500)
-[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fd5cfd19780>[0m
-..........[plotlog                 ][97mplotting airfilter-parallel-register| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
-.[narrowsystem-asymptotic-][97mkeys: {'cdict.attrs_prop', 'cdict.test_three', 'citer.test_two', 'cdict.test_one', 'citer.test_four', 'cdict.test_four', 'cdict.name', 'cdict.test_two', 'citer.test_one', 'cdict.attrs_str', 'citer.test_three', 'citer.name', 'citer.attrs_prop', 'citer.attrs_str'} vs {'cdict.test_one', 'dynamic_state_vars', 'cdict.test_four', 'cdict.name', 'cdict.test_two', 'citer.test_three', 'citer.component_type', 'cdict.attrs_prop', 'dynamic_input_vars', 'citer.current_item', 'citer.test_four', 'citer.attrs_str', 'dynamic_output_vars', 'citer.name', 'citer.test_one', 'cdict.test_three', 'citer.test_two', 'cdict.attrs_str', 'cdict.current_item', 'cdict.component_type', 'citer.attrs_prop', 'name'}[0m
-[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|18360|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|29788|[2-run]  no variables found for solver: {}[0m
+[plotlog                 ][97mvalidating: <engforge.test.solver_testing_components.Airfilter object at 0x7fcd0747bc40>[0m
+[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2509.211443989711
+       x: [ 9.058e-01]
+     nit: 100
+     jac: [ 1.815e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 2038.955219369025
+       x: [ 9.055e-01]
+     nit: 100
+     jac: [ 1.635e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 920.8247367302266
+       x: [ 9.039e-01]
+     nit: 100
+     jac: [ 1.097e+01]
+    nfev: 1190
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 32.72919601705776
+       x: [ 8.793e-01]
+     nit: 100
+     jac: [ 1.981e+00]
+    nfev: 1190
+    njev: 100[0m
+..[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 537522.6565087916
+       x: [ 7.046e+00]
+     nit: 100
+     jac: [ 2.066e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 460722.3432419153
+       x: [ 6.994e+00]
+     nit: 100
+     jac: [ 1.899e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 377569.695457429
+       x: [ 6.922e+00]
+     nit: 100
+     jac: [ 1.701e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Iteration limit reached
+ success: False
+  status: 9
+     fun: 291871.57744860544
+       x: [ 6.819e+00]
+     nit: 100
+     jac: [ 1.473e+03]
+    nfev: 1181
+    njev: 100[0m
+.[problog                 ][33mWARN: PROB|run|16940|[2-run]  solver didnt converge:  message: Positive directional derivative for linesearch
+ success: False
+  status: 8
+     fun: 203989.21016708433
+       x: [ 0.000e+00]
+     nit: 6
+     jac: [ 0.000e+00]
+    nfev: 4
+    njev: 2[0m
+.[plotlog                 ][97mplotting airfilter-unsorted-radiator| relplot.lineplot with {'x': 'throttle', 'y': 'w', 'kind': 'line'}[0m
+.[narrowsystem-nondetermin][97mkeys: {'cdict.test_four', 'cdict.attrs_prop', 'citer.test_four', 'citer.test_two', 'citer.name', 'cdict.test_three', 'cdict.test_one', 'citer.test_three', 'cdict.attrs_str', 'citer.test_one', 'citer.attrs_str', 'cdict.test_two', 'citer.attrs_prop', 'cdict.name'} vs {'citer.test_two', 'name', 'cdict.name', 'cdict.attrs_prop', 'citer.test_four', 'dynamic_output_vars', 'cdict.test_three', 'cdict.current_item', 'cdict.attrs_str', 'cdict.test_four', 'cdict.test_two', 'citer.attrs_prop', 'cdict.component_type', 'citer.name', 'citer.test_three', 'citer.test_one', 'citer.component_type', 'citer.attrs_str', 'dynamic_state_vars', 'citer.current_item', 'cdict.test_one', 'dynamic_input_vars'}[0m
+[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|33299|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|49070|[2-run]  no variables found for solver: {}[0m
 ....[propertylog             ][33mWARN: test signals: 5 0| 0 0[0m
 [propertylog             ][97mpre-vert: 0 25[0m
 [propertylog             ][97mfinal: 0 25[0m
-..[problog                 ][97mPROB|run|10976|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|23904|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|23904|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|23904|[2-run]  no variables found for solver: {}[0m
-.[problog                 ][97mPROB|run|23904|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|28755|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|13463|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|13463|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|13463|[2-run]  no variables found for solver: {}[0m
+.[problog                 ][97mPROB|run|13463|[2-run]  no variables found for solver: {}[0m
 ..........[costlog                 ][33mWARN: assigning cost to non CostModel based slot comp[0m
-[problog                 ][97mPROB|run|69906|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|16155|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|19040|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|28563|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|41917|[2-run]  no variables found for solver: {}[0m
-..[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|24636|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|27889|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|31249|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|58470|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|24721|[2-run]  no variables found for solver: {}[0m
+..[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
-[problog                 ][97mPROB|run|27691|[2-run]  no variables found for solver: {}[0m
+[problog                 ][97mPROB|run|19371|[2-run]  no variables found for solver: {}[0m
 .[reflog                  ][33mWARN: key base.name not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
 [reflog                  ][33mWARN: key base.cost_per_item not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
 [reflog                  ][33mWARN: key base not in refs dict_keys(['name', 'dynamic_input_vars', 'dynamic_state_vars', 'dynamic_output_vars', 'cost_per_item', 'fan.name', 'fan.cost_per_item', 'fan.blade_cost_com', 'fan.area', 'fan.V', 'motor.name', 'motor.cost_per_item', 'motor.spc_motor_cost', 'econ.name', 'econ.term_length', 'econ.discount_rate', 'econ.fixed_output', 'econ.output_type', 'econ.terms_per_year', 'fan', 'motor', 'econ'])[0m
@@ -253,7 +577,7 @@ Figure(500x500)
   warn("The following arguments have no effect for a chosen solver: {}."
 ./home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
   warn("The following arguments have no effect for a chosen solver: {}."
-.............  message: The solver successfully reached the end of the integration interval.
+..............  message: The solver successfully reached the end of the integration interval.
   success: True
    status: 0
         t: [ 0.000e+00  1.000e-03 ...  9.999e+00  1.000e+01]
@@ -303,7 +627,7 @@ Figure(500x500)
      nfev: 6008
      njev: 0
       nlu: 0
-[configlog               ][33mWARN: SimpleHeatExchanger.Thi has no type[0m
+.[configlog               ][33mWARN: SimpleHeatExchanger.Thi has no type[0m
 [configlog               ][33mWARN: SimpleHeatExchanger.mdot_h has no type[0m
 [configlog               ][33mWARN: SimpleHeatExchanger.Cp_h has no type[0m
 [configlog               ][33mWARN: SimpleHeatExchanger.Tci has no type[0m
@@ -335,22 +659,22 @@ Figure(500x500)
 [configlog               ][33mWARN: SimplePump.name has no type[0m
 ../home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/integrate/_ivp/common.py:39: UserWarning: The following arguments have no effect for a chosen solver: `eval_kw`, `sys_kw`.
   warn("The following arguments have no effect for a chosen solver: {}."
-..         40855 function calls (40139 primitive calls) in 0.018 seconds
+..         26579 function calls (25972 primitive calls) in 0.012 seconds
 
    Ordered by: internal time
    List reduced from 691 to 10 due to restriction <10>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-      159    0.001    0.000    0.003    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:72(_get_init_attrs_data)
-      489    0.001    0.000    0.002    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:142(set)
-    10394    0.001    0.000    0.001    0.000 {built-in method builtins.isinstance}
-      159    0.001    0.000    0.001    0.000 {method 'items' of 'mappingproxy' objects}
-      489    0.000    0.000    0.000    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:181(setup_calls)
+       87    0.001    0.000    0.001    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:72(_get_init_attrs_data)
+     6302    0.000    0.000    0.001    0.000 {built-in method builtins.isinstance}
+  664/652    0.000    0.000    0.001    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:217(value)
         2    0.000    0.000    0.000    0.000 /home/olly/miniconda3/envs/nept/lib/python3.10/logging/__init__.py:1403(_clear_cache)
     128/3    0.000    0.000    0.000    0.000 {built-in method _abc._abc_subclasscheck}
-       71    0.000    0.000    0.000    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:376(<dictcomp>)
-  610/584    0.000    0.000    0.001    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:217(value)
-      541    0.000    0.000    0.000    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:604(classname)
+       21    0.000    0.000    0.003    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/problem_context.py:211(__init__)
+        6    0.000    0.000    0.000    0.000 /home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/randomname/util.py:248(<listcomp>)
+       94    0.000    0.000    0.000    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:142(set)
+       52    0.000    0.000    0.000    0.000 {pandas._libs.lib.maybe_convert_objects}
+       24    0.000    0.000    0.000    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:35(refset_get)
 
 
   message: The solver successfully reached the end of the integration interval.
@@ -365,123 +689,123 @@ Figure(500x500)
      nfev: 6014
      njev: 0
       nlu: 0
-         4587756 function calls (4389177 primitive calls) in 2.174 seconds
+         4587822 function calls (4389243 primitive calls) in 2.178 seconds
 
    Ordered by: internal time
-   List reduced from 649 to 10 due to restriction <10>
+   List reduced from 650 to 10 due to restriction <10>
 
    ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-    18107    0.142    0.000    0.255    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:72(_get_init_attrs_data)
-   240576    0.113    0.000    0.400    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:217(value)
-    12029    0.106    0.000    0.424    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:35(refset_get)
-     6014    0.084    0.000    1.973    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/problem_context.py:833(integral_rate)
-     6015    0.076    0.000    0.382    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/problem_context.py:210(__init__)
-    18052    0.070    0.000    0.110    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:376(<dictcomp>)
-180440/54146    0.065    0.000    0.224    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/properties.py:206(__get__)
-    24056    0.055    0.000    0.087    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/solver_testing_components.py:381(Fext)
-    96208    0.054    0.000    0.054    0.000 <attrs generated eq attr._make.Attribute>:1(__eq__)
-   763214    0.050    0.000    0.051    0.000 {built-in method builtins.isinstance}
+    18107    0.147    0.000    0.261    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/engforge_attributes.py:72(_get_init_attrs_data)
+   240576    0.112    0.000    0.393    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:217(value)
+    12029    0.104    0.000    0.418    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/system_reference.py:35(refset_get)
+     6014    0.085    0.000    1.979    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/problem_context.py:834(integral_rate)
+     6015    0.077    0.000    0.383    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/problem_context.py:211(__init__)
+    18052    0.071    0.000    0.113    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/configuration.py:376(<dictcomp>)
+180440/54146    0.065    0.000    0.219    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/properties.py:206(__get__)
+    96208    0.055    0.000    0.055    0.000 <attrs generated eq attr._make.Attribute>:1(__eq__)
+    24056    0.055    0.000    0.087    0.000 /mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/solver_testing_components.py:380(Fext)
+   763238    0.052    0.000    0.052    0.000 {built-in method builtins.isinstance}
 
 
-[flowinput-mint-inverse  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f71570>[0m
-[pipenode-heather-scope  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f71570>[0m
-[flowinput-mint-inverse  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f71630>[0m
-[pipenode-corn-altitude  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f71630>[0m
-[pipenode-heather-scope  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f72a10>[0m
-[pipenode-navy-sensor    ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f72a10>[0m
-[pipenode-corn-altitude  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f70f40>[0m
-[pipenode-navy-sensor    ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f70f40>[0m
-[pipenode-navy-sensor    ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73b50>[0m
-[flowinput-associative-co][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73b50>[0m
-[pipenode-n2z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73a30>[0m
-[pipenode-heather-scope  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73a30>[0m
-[pipenode-corn-altitude  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73e20>[0m
-[pipenode-n3z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73e20>[0m
-[pipenode-navy-sensor    ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f71450>[0m
-[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f71450>[0m
-[pipenode-heather-scope  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73f70>[0m
-[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f73f70>[0m
-[flowinput-naive-league  ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f70d00>[0m
-[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f70d00>[0m
-[pipenode-n3z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f70640>[0m
-[pipenode-n2z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fd566f70640>[0m
-[pipelog                 ][97madding flowinput.140554709871840[0m
-[pipelog                 ][97madding pipe.140554532230512[0m
-[pipelog                 ][97madding pipenode.140554709870976[0m
-[pipelog                 ][97madding pipe.140554532230512[0m
-[pipelog                 ][97madding pipe.140554532235792[0m
-[pipelog                 ][97madding pipenode.140554536803424[0m
-[pipelog                 ][97madding pipe.140554532235792[0m
-[pipelog                 ][97madding pipe.140554532228928[0m
-[pipelog                 ][97madding pipenode.140554709876448[0m
-[pipelog                 ][97madding pipe.140554532230704[0m
-[pipelog                 ][97madding pipe.140554532228928[0m
-[pipelog                 ][97madding pipe.140554532240928[0m
-[pipelog                 ][97madding pipenode.140554536796560[0m
-[pipelog                 ][97madding pipe.140554532240928[0m
-[pipelog                 ][97madding pipe.140554532226624[0m
-[pipelog                 ][97madding pipenode.140554536799104[0m
-[pipelog                 ][97madding pipe.140554532239920[0m
-[pipelog                 ][97madding pipe.140554532226624[0m
-[pipelog                 ][97madding pipe.140554532240208[0m
-[pipelog                 ][97madding flowinput.140554536802272[0m
-[pipelog                 ][97madding pipe.140554532240208[0m
-[pipelog                 ][97madding pipe.140554532230224[0m
-[pipelog                 ][97madding pipenode.140554536812064[0m
-[pipelog                 ][97madding pipe.140554532230224[0m
-[pipelog                 ][97madding pipe.140554532241264[0m
-[pipelog                 ][97madding pipe.140554532228352[0m
-[pipelog                 ][97madding flowinput.140554536803232[0m
-[pipelog                 ][97madding pipe.140554532228352[0m
-[pipesystem-bisque-centro][97mfound cycle: ['pipenode.140554709870976', 'pipenode.140554536799104', 'pipenode.140554536796560', 'pipenode.140554709876448', 'flowinput.140554709871840'][0m
-[pipesystem-bisque-centro][97mfound cycle: ['pipenode.140554709870976', 'pipenode.140554536803424', 'pipenode.140554709876448', 'flowinput.140554709871840'][0m
-[pipesystem-bisque-centro][97mfound cycle: ['pipenode.140554709870976', 'pipenode.140554536812064', 'pipenode.140554536803424'][0m
-[pipelog                 ][97madding flowinput.140554709871840[0m
-[pipelog                 ][97madding pipe.140554532230512[0m
-[pipelog                 ][97madding pipenode.140554709870976[0m
-[pipelog                 ][97madding pipe.140554532230512[0m
-[pipelog                 ][97madding pipe.140554532235792[0m
-[pipelog                 ][97madding pipenode.140554536803424[0m
-[pipelog                 ][97madding pipe.140554532235792[0m
-[pipelog                 ][97madding pipe.140554532228928[0m
-[pipelog                 ][97madding pipenode.140554709876448[0m
-[pipelog                 ][97madding pipe.140554532230704[0m
-[pipelog                 ][97madding pipe.140554532228928[0m
-[pipelog                 ][97madding pipe.140554532240928[0m
-[pipelog                 ][97madding pipenode.140554536796560[0m
-[pipelog                 ][97madding pipe.140554532240928[0m
-[pipelog                 ][97madding pipe.140554532226624[0m
-[pipelog                 ][97madding pipenode.140554536799104[0m
-[pipelog                 ][97madding pipe.140554532239920[0m
-[pipelog                 ][97madding pipe.140554532226624[0m
-[pipelog                 ][97madding pipe.140554532240208[0m
-[pipelog                 ][97madding flowinput.140554536802272[0m
-[pipelog                 ][97madding pipe.140554532240208[0m
-[pipelog                 ][97madding pipe.140554532230224[0m
-[pipelog                 ][97madding pipenode.140554536812064[0m
-[pipelog                 ][97madding pipe.140554532230224[0m
-[pipelog                 ][97madding pipe.140554532241264[0m
-[pipelog                 ][97madding pipe.140554532228352[0m
-[pipelog                 ][97madding flowinput.140554536803232[0m
-[pipelog                 ][97madding pipe.140554532228352[0m
-[pipesystem-bisque-centro][97mfound cycle: ['pipenode.140554709870976', 'pipenode.140554536799104', 'pipenode.140554536796560', 'pipenode.140554709876448', 'flowinput.140554709871840'][0m
-[pipesystem-bisque-centro][97mfound cycle: ['pipenode.140554709870976', 'pipenode.140554536803424', 'pipenode.140554709876448', 'flowinput.140554709871840'][0m
-[pipesystem-bisque-centro][97mfound cycle: ['pipenode.140554709870976', 'pipenode.140554536812064', 'pipenode.140554536803424'][0m
-..[problog                 ][31mERROR:PROB|ctx_273172481058360|79534|[2-ctx_273172481058360]  error in execution context->Traceback (most recent call last):
-
-  File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_problem.py", line 225, in test_error_exit
-    raise TestError('pocket-sand') #TODO: INSERT KING OF THE HILL REFERENCE
-
-engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: pocket-sand
-[0m
-[problog                 ][31mERROR:PROB|2|35848|[1-2]  error in execution context->Traceback (most recent call last):
+[flowinput-silver-paramet][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3d150>[0m
+[pipenode-cyclic-anode   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3d150>[0m
+[flowinput-silver-paramet][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3e470>[0m
+[pipenode-large-vector   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3e470>[0m
+[pipenode-cyclic-anode   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3d810>[0m
+[pipenode-descent-liason ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3d810>[0m
+[pipenode-large-vector   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f730>[0m
+[pipenode-descent-liason ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f730>[0m
+[pipenode-descent-liason ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3e440>[0m
+[flowinput-unsolvable-flu][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3e440>[0m
+[pipenode-n2z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3c1f0>[0m
+[pipenode-cyclic-anode   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3c1f0>[0m
+[pipenode-large-vector   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f7f0>[0m
+[pipenode-n3z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f7f0>[0m
+[pipenode-descent-liason ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f190>[0m
+[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f190>[0m
+[pipenode-cyclic-anode   ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3dae0>[0m
+[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3dae0>[0m
+[flowinput-watery-diagona][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f580>[0m
+[pipenode-n4z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3f580>[0m
+[pipenode-n3z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3fe20>[0m
+[pipenode-n2z            ][33mWARN: pipe already added: <engforge.eng.pipes.Pipe object at 0x7fcc3cf3fe20>[0m
+[pipelog                 ][97madding flowinput.140515403643824[0m
+[pipelog                 ][97madding pipe.140515172667728[0m
+[pipelog                 ][97madding pipenode.140515403631440[0m
+[pipelog                 ][97madding pipe.140515172667728[0m
+[pipelog                 ][97madding pipe.140515172669456[0m
+[pipelog                 ][97madding pipenode.140515172425664[0m
+[pipelog                 ][97madding pipe.140515172669456[0m
+[pipelog                 ][97madding pipe.140515172677424[0m
+[pipelog                 ][97madding pipenode.140515403630864[0m
+[pipelog                 ][97madding pipe.140515172672624[0m
+[pipelog                 ][97madding pipe.140515172677424[0m
+[pipelog                 ][97madding pipe.140515172677616[0m
+[pipelog                 ][97madding pipenode.140515172674640[0m
+[pipelog                 ][97madding pipe.140515172677616[0m
+[pipelog                 ][97madding pipe.140515172679200[0m
+[pipelog                 ][97madding pipenode.140515172668928[0m
+[pipelog                 ][97madding pipe.140515172663792[0m
+[pipelog                 ][97madding pipe.140515172679200[0m
+[pipelog                 ][97madding pipe.140515172672576[0m
+[pipelog                 ][97madding flowinput.140515172677808[0m
+[pipelog                 ][97madding pipe.140515172672576[0m
+[pipelog                 ][97madding pipe.140515172675984[0m
+[pipelog                 ][97madding pipenode.140515172675888[0m
+[pipelog                 ][97madding pipe.140515172675984[0m
+[pipelog                 ][97madding pipe.140515172670176[0m
+[pipelog                 ][97madding pipe.140515172676992[0m
+[pipelog                 ][97madding flowinput.140515172675024[0m
+[pipelog                 ][97madding pipe.140515172676992[0m
+[pipesystem-pure-accuracy][97mfound cycle: ['pipenode.140515403631440', 'pipenode.140515172675888', 'pipenode.140515172425664'][0m
+[pipesystem-pure-accuracy][97mfound cycle: ['pipenode.140515403631440', 'pipenode.140515172668928', 'pipenode.140515172674640', 'pipenode.140515403630864', 'pipenode.140515172425664'][0m
+[pipesystem-pure-accuracy][97mfound cycle: ['pipenode.140515403631440', 'flowinput.140515403643824', 'pipenode.140515403630864', 'pipenode.140515172425664'][0m
+[pipelog                 ][97madding flowinput.140515403643824[0m
+[pipelog                 ][97madding pipe.140515172667728[0m
+[pipelog                 ][97madding pipenode.140515403631440[0m
+[pipelog                 ][97madding pipe.140515172667728[0m
+[pipelog                 ][97madding pipe.140515172669456[0m
+[pipelog                 ][97madding pipenode.140515172425664[0m
+[pipelog                 ][97madding pipe.140515172669456[0m
+[pipelog                 ][97madding pipe.140515172677424[0m
+[pipelog                 ][97madding pipenode.140515403630864[0m
+[pipelog                 ][97madding pipe.140515172672624[0m
+[pipelog                 ][97madding pipe.140515172677424[0m
+[pipelog                 ][97madding pipe.140515172677616[0m
+[pipelog                 ][97madding pipenode.140515172674640[0m
+[pipelog                 ][97madding pipe.140515172677616[0m
+[pipelog                 ][97madding pipe.140515172679200[0m
+[pipelog                 ][97madding pipenode.140515172668928[0m
+[pipelog                 ][97madding pipe.140515172663792[0m
+[pipelog                 ][97madding pipe.140515172679200[0m
+[pipelog                 ][97madding pipe.140515172672576[0m
+[pipelog                 ][97madding flowinput.140515172677808[0m
+[pipelog                 ][97madding pipe.140515172672576[0m
+[pipelog                 ][97madding pipe.140515172675984[0m
+[pipelog                 ][97madding pipenode.140515172675888[0m
+[pipelog                 ][97madding pipe.140515172675984[0m
+[pipelog                 ][97madding pipe.140515172670176[0m
+[pipelog                 ][97madding pipe.140515172676992[0m
+[pipelog                 ][97madding flowinput.140515172675024[0m
+[pipelog                 ][97madding pipe.140515172676992[0m
+[pipesystem-pure-accuracy][97mfound cycle: ['pipenode.140515403631440', 'pipenode.140515172675888', 'pipenode.140515172425664'][0m
+[pipesystem-pure-accuracy][97mfound cycle: ['pipenode.140515403631440', 'pipenode.140515172668928', 'pipenode.140515172674640', 'pipenode.140515403630864', 'pipenode.140515172425664'][0m
+[pipesystem-pure-accuracy][97mfound cycle: ['pipenode.140515403631440', 'flowinput.140515403643824', 'pipenode.140515403630864', 'pipenode.140515172425664'][0m
+..[problog                 ][31mERROR:PROB|ctx_216063219593013|32382|[2-ctx_216063219593013]  error in execution context->Traceback (most recent call last):
 
   File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_problem.py", line 225, in test_error_exit
     raise TestError('pocket-sand') #TODO: INSERT KING OF THE HILL REFERENCE
 
 engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: pocket-sand
 [0m
-[problog                 ][31mERROR:PROB|top|32716|[0-top]  error in execution context->Traceback (most recent call last):
+[problog                 ][31mERROR:PROB|2|20590|[1-2]  error in execution context->Traceback (most recent call last):
+
+  File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_problem.py", line 225, in test_error_exit
+    raise TestError('pocket-sand') #TODO: INSERT KING OF THE HILL REFERENCE
+
+engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: pocket-sand
+[0m
+[problog                 ][31mERROR:PROB|top|33222|[0-top]  error in execution context->Traceback (most recent call last):
 
   File "/mnt/c/Users/Sup/Ottermatics Dropbox/Ottermatics/engforge/engforge/test/test_problem.py", line 225, in test_error_exit
     raise TestError('pocket-sand') #TODO: INSERT KING OF THE HILL REFERENCE
@@ -492,7 +816,7 @@ engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: 
   warn("The following arguments have no effect for a chosen solver: {}."
 ..../home/olly/miniconda3/envs/nept/lib/python3.10/site-packages/scipy/optimize/_optimize.py:404: RuntimeWarning: Values in x were outside bounds during a minimize step, clipping to bounds
   warnings.warn("Values in x were outside bounds during a "
-..............{'output': {0: {'Xstart': {'Rc': 0.25, 'Ro': 0.33, 'Lo': 0.3, 'y_offset': 0, 'x_offset': 0, 'X_spring_center': 0, 'main_gear_speed_max': 12.56636, 'gear_thickness': 0.0127, 'main_gear_speed_min': 2.0943933333333336}, 'Ystart': {'cost_slv': 100.6987015536568, 'sym_slv': 0.24998547725644396}, 'Xans': {'Rc': 0.12498459333546105, 'Ro': 0.2843320919434929, 'Lo': 0.30001323443077565, 'y_offset': 0.005110987482299045, 'x_offset': 0.0, 'X_spring_center': 0.0, 'main_gear_speed_max': 16.5735248799717, 'gear_thickness': 0.0, 'main_gear_speed_min': 2.0943933333333336}, 'success': True, 'Yobj': {'cost_slv': 0.0, 'sym_slv': 0.06249999999999997}, 'Ycon': {'val_slidercrank_min_Lo': 0.05003154930051998, 'eq_slidercrank.gear_pos_slv_ineq_REF[3bdcc0][callable.REF[3bd3c0][slidercrank.final_gear_ratio]_0_ineq]': 4.166153111182036, 'eq_slidercrank.crank_pos_slv_ineq_REF[3bd140][callable.REF[3bd0c0][slidercrank.crank_gear_ratio]_0_ineq]': 0.43957258739650124, 'eq_slidercrank.motor_pos_slv_ineq_REF[3bd240][callable.REF[3be9c0][slidercrank.motor_gear_ratio]_0_ineq]': 9.47773639811643, 'eq_slidercrank.size_ineq_REF[3bf5c0][callable.REF[3bd340][callable.<lambda>]_REF[3be340][slidercrank.overall_length]_ineq]': 0.05001757889830227, 'eq_slidercrank.gear_speed_slv_eq_REF[3bdb40][callable.REF[3bd2c0][slidercrank.dx_goal]_0_eq]': -5.551115123125783e-17, 'eq_slidercrank.range_slv_eq_REF[3bdc40][callable.REF[3bdbc0][slidercrank.ds_goal]_0_eq]': -4.192202140984591e-13}, 'ans':  message: Optimization terminated successfully
+..............{'output': {0: {'Xstart': {'Rc': 0.25, 'Ro': 0.33, 'Lo': 0.3, 'y_offset': 0, 'x_offset': 0, 'X_spring_center': 0, 'main_gear_speed_max': 12.56636, 'gear_thickness': 0.0127, 'main_gear_speed_min': 2.0943933333333336}, 'Ystart': {'cost_slv': 100.6987015536568, 'sym_slv': 0.24998547725644396}, 'Xans': {'Rc': 0.12498459333546105, 'Ro': 0.2843320919434929, 'Lo': 0.30001323443077565, 'y_offset': 0.005110987482299045, 'x_offset': 0.0, 'X_spring_center': 0.0, 'main_gear_speed_max': 16.5735248799717, 'gear_thickness': 0.0, 'main_gear_speed_min': 2.0943933333333336}, 'success': True, 'Yobj': {'cost_slv': 0.0, 'sym_slv': 0.06249999999999997}, 'Ycon': {'val_slidercrank_min_Lo': 0.05003154930051998, 'eq_slidercrank.gear_pos_slv_ineq_REF[fc74c0][callable.REF[fc7440][slidercrank.final_gear_ratio]_0_ineq]': 4.166153111182036, 'eq_slidercrank.crank_pos_slv_ineq_REF[fc75c0][callable.REF[fc7540][slidercrank.crank_gear_ratio]_0_ineq]': 0.43957258739650124, 'eq_slidercrank.motor_pos_slv_ineq_REF[fc76c0][callable.REF[fc7640][slidercrank.motor_gear_ratio]_0_ineq]': 9.47773639811643, 'eq_slidercrank.size_ineq_REF[fc78c0][callable.REF[fc7740][callable.<lambda>]_REF[fc77c0][slidercrank.overall_length]_ineq]': 0.05001757889830227, 'eq_slidercrank.gear_speed_slv_eq_REF[fc7240][callable.REF[fc72c0][slidercrank.dx_goal]_0_eq]': -5.551115123125783e-17, 'eq_slidercrank.range_slv_eq_REF[fc73c0][callable.REF[fc7340][slidercrank.ds_goal]_0_eq]': -4.192202140984591e-13}, 'ans':  message: Optimization terminated successfully
  success: True
   status: 0
      fun: 0.06249999999999997
@@ -502,7 +826,7 @@ engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: 
      jac: [ 1.000e+00  0.000e+00 -1.240e-04  5.503e-03  0.000e+00
             0.000e+00  0.000e+00  5.903e+03  0.000e+00]
     nfev: 51
-    njev: 5, 'weights': None, 'constraints': {'constraints': [{'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667d5b40>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667d5e10>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667caef0>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667cacb0>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667caa70>}, {'type': 'eq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667ca710>}, {'type': 'eq', 'fun': <function objectify.<locals>.<lambda> at 0x7fd5667ca320>}], 'bounds': [[None, None], [None, None], [None, None], [None, None], [None, None], [None, None], [0, None], [0, None], [0, None]], 'info': ['val_slidercrank_min_Lo', 'eq_slidercrank.gear_pos_slv_ineq_REF[3bdcc0][callable.REF[3bd3c0][slidercrank.final_gear_ratio]_0_ineq]', 'eq_slidercrank.crank_pos_slv_ineq_REF[3bd140][callable.REF[3bd0c0][slidercrank.crank_gear_ratio]_0_ineq]', 'eq_slidercrank.motor_pos_slv_ineq_REF[3bd240][callable.REF[3be9c0][slidercrank.motor_gear_ratio]_0_ineq]', 'eq_slidercrank.size_ineq_REF[3bf5c0][callable.REF[3bd340][callable.<lambda>]_REF[3be340][slidercrank.overall_length]_ineq]', 'eq_slidercrank.gear_speed_slv_eq_REF[3bdb40][callable.REF[3bd2c0][slidercrank.dx_goal]_0_eq]', 'eq_slidercrank.range_slv_eq_REF[3bdc40][callable.REF[3bdbc0][slidercrank.ds_goal]_0_eq]']}}}, 'input_sets': {0: {}}}
+    njev: 5, 'weights': None, 'constraints': {'constraints': [{'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30cb80>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30ce50>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30d090>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30d2d0>}, {'type': 'ineq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30d510>}, {'type': 'eq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30d870>}, {'type': 'eq', 'fun': <function objectify.<locals>.<lambda> at 0x7fcc3c30dc60>}], 'bounds': [[None, None], [None, None], [None, None], [None, None], [None, None], [None, None], [0, None], [0, None], [0, None]], 'info': ['val_slidercrank_min_Lo', 'eq_slidercrank.gear_pos_slv_ineq_REF[fc74c0][callable.REF[fc7440][slidercrank.final_gear_ratio]_0_ineq]', 'eq_slidercrank.crank_pos_slv_ineq_REF[fc75c0][callable.REF[fc7540][slidercrank.crank_gear_ratio]_0_ineq]', 'eq_slidercrank.motor_pos_slv_ineq_REF[fc76c0][callable.REF[fc7640][slidercrank.motor_gear_ratio]_0_ineq]', 'eq_slidercrank.size_ineq_REF[fc78c0][callable.REF[fc7740][callable.<lambda>]_REF[fc77c0][slidercrank.overall_length]_ineq]', 'eq_slidercrank.gear_speed_slv_eq_REF[fc7240][callable.REF[fc72c0][slidercrank.dx_goal]_0_eq]', 'eq_slidercrank.range_slv_eq_REF[fc73c0][callable.REF[fc7340][slidercrank.ds_goal]_0_eq]']}}}, 'input_sets': {0: {}}}
 .  message: The solver successfully reached the end of the integration interval.
   success: True
    status: 0
@@ -517,7 +841,7 @@ engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: 
      nfev: 74
      njev: 0
       nlu: 0
-.........[shapelysection-shapely s][33mWARN: overriding material Material(name='default', elastic_modulus=1, poissons_ratio=0, yield_strength=1, density=1, color='w') with ANSI_4130(name='steel 4130', elastic_modulus=205000000000.0, poissons_ratio=0.28, yield_strength=460000000.0, density=7872.0, color=(0.304148, 0.764704, 0.419943, 1.0))[0m
+.........[shapelysection-shapely s][33mWARN: overriding material Material(name='default', elastic_modulus=1, poissons_ratio=0, yield_strength=1, density=1, color='w') with ANSI_4130(name='steel 4130', elastic_modulus=205000000000.0, poissons_ratio=0.28, yield_strength=460000000.0, density=7872.0, color=(0.143343, 0.522773, 0.556295, 1.0))[0m
 [shapelysection-shapely s][97mcalculating shape bounds![0m
 [shapelysection-shapely s][97mcalculating shape bounds![0m
 [cantilever_beam         ][97mrunning with combos: None | () | {} [0m
@@ -543,7 +867,7 @@ engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: 
 [beam-mem                ][97mevaluating stresses for gravity @ 0.0 w {}[0m
 [beam-mem                ][97mevaluating stresses for gravity @ 0.5 w {}[0m
 [beam-mem                ][97mevaluating stresses for gravity @ 1.0 w {}[0m
-.[shapelysection-shapely s][33mWARN: overriding material Material(name='default', elastic_modulus=1, poissons_ratio=0, yield_strength=1, density=1, color='w') with ANSI_4130(name='steel 4130', elastic_modulus=205000000000.0, poissons_ratio=0.28, yield_strength=460000000.0, density=7872.0, color=(0.496615, 0.826376, 0.306377, 1.0))[0m
+.[shapelysection-shapely s][33mWARN: overriding material Material(name='default', elastic_modulus=1, poissons_ratio=0, yield_strength=1, density=1, color='w') with ANSI_4130(name='steel 4130', elastic_modulus=205000000000.0, poissons_ratio=0.28, yield_strength=460000000.0, density=7872.0, color=(0.647257, 0.8584, 0.209861, 1.0))[0m
 [shapelysection-shapely s][97mcalculating shape bounds![0m
 [shapelysection-shapely s][97mcalculating shape bounds![0m
 [truss                   ][97mrunning with combos: None | () | {} [0m
@@ -555,7 +879,7 @@ engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: 
 +------------------+--------+----------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
 | Load Combination | Sum FX |  Sum RX  | Sum FY | Sum RY | Sum FZ | Sum RZ | Sum MX | Sum RMX | Sum MY | Sum RMY |  Sum MZ  | Sum RMZ |
 +------------------+--------+----------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
-|     gravity      |   0    | 1.14e-13 | -3e+03 | 3e+03  |   0    |   0    |   0    |    0    |   0    |    0    | -1.2e+05 | 1.2e+05 |
+|     gravity      |   0    | 4.55e-13 | -3e+03 | 3e+03  |   0    |   0    |   0    |    0    |   0    |    0    | -1.2e+05 | 1.2e+05 |
 +------------------+--------+----------+--------+--------+--------+--------+--------+---------+--------+---------+----------+---------+
 
 [truss                   ][97mdetermining failures for gravity[0m
@@ -573,14 +897,14 @@ engforge.test.test_problem.TestContextExits.test_error_exit.<locals>.TestError: 
 [testconfig              ][97msetting attrs prop df 15.0 => 31.0[0m
 .......
 ----------------------------------------------------------------------
-Ran 90 tests in 104.338s
+Ran 91 tests in 95.085s
 
 OK
          name dynamic_input_vars  ... test_four index
-0  testconfig                 []  ...  0.889167     0
-1  testconfig                 []  ...  0.779509     1
-2  testconfig                 []  ...  0.270361     2
-3  testconfig                 []  ...  0.625773     3
-4  testconfig                 []  ...  0.248548     4
+0  testconfig                 []  ...  0.770421     0
+1  testconfig                 []  ...  0.568764     1
+2  testconfig                 []  ...  0.765791     2
+3  testconfig                 []  ...  0.079552     3
+4  testconfig                 []  ...  0.859008     4
 
 [5 rows x 11 columns]

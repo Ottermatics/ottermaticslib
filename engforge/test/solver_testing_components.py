@@ -279,7 +279,7 @@ class DynamicSystem(System):
 
     sig = Signal.define("trns.a", "spring_accel")
     fig = Signal.define("comp.Fext", "Force")
-    slv =Solver.declare_var( "Force")
+    slv =Solver.declare_var("Force")
     #slv = Solver.declare_var("delta_a")
 
     nonlinear: bool = True
@@ -341,7 +341,6 @@ class SpringMass(System):
 
     res =Solver.constraint_equality("sumF")
     var_a = Solver.declare_var("a",combos='a',active=False)
-    
     var_b = Solver.declare_var("u",combos='u',active=False)
     var_b.add_var_constraint(0.0,kind="min")
     var_b.add_var_constraint(1.0,kind="max")
