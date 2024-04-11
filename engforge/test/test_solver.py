@@ -134,7 +134,7 @@ import pprint
 class SingleCompSolverTest(unittest.TestCase):
     inequality_min = -1E-6
     def setUp(self) -> None:
-        self.sc = CubeSystem()
+        self.sc = CubeSystem(comp=CubeComp())
 
     def test_exec_results(self):
         extra = dict(combos=indep_l,slv_vars=indep,activate=[],only_active=True)

@@ -571,7 +571,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             comp = getattr(self, comp)
             if "." not in key:
                 return Ref(comp, sub, **kw)
-            return comp.locate_ref(sub, fail=fail, **kw)
+            if comp:
+                return comp.locate_ref(sub, fail=fail, **kw)
+            else:
+                return None
 
         elif key in self.input_fields():
             # val= cls.input_fields()[key]

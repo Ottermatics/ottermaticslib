@@ -238,6 +238,9 @@ class DynamicsMixin(Configuration, SolveableMixin):
         self.static_F = self.create_state_constants(**kw)
         self.static_K = self.create_output_constants(**kw)
 
+        if self.nonlinear:
+            self.update_dynamics(0, self.dynamic_state, self.dynamic_input)
+
     # Nonlinear Support
     # Override these callbacks to modify the state space model
     def update_state(self, t, A, X) -> np.ndarray:
@@ -276,9 +279,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
         # Output
         self.dynamic_C = self.update_output_matrix(t, self.static_C, X)
-        self.dynamic_D = self.update_feedthrough(
-            t, self.static_D, X, U
-        )
+        self.dynamic_D = self.update_feedthrough(t, self.static_D, X, U)
 
         # Constants
         self.dynamic_F = self.update_state_constants(t, self.static_F, X)
@@ -496,7 +497,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
         dt = max(time - lt, 0)
         self.info(f"cache dXdt {time} {lt} {dt}")
-        step = self.step(time, dt, self.state, self.input)
+        step = self.step(time, dt, self.dynamic_state, self.dynamic_input)
         return step
 
     def ref_dXdt(self, name: str):
@@ -514,9 +515,9 @@ class DynamicsMixin(Configuration, SolveableMixin):
         """determine the nearest stationary state"""
 
         if X is None:
-            X = self.state
+            X = self.dynamic_state
         if U is None:
-            U = self.input
+            U = self.dynamic_input
 
         if self.nonlinear:
             self.update_dynamics(t, X, U)
@@ -551,28 +552,28 @@ class GlobalDynamics(DynamicsMixin):
         """simulate the system over the course of time.
         return a dictionary of dataframes
         """
-        tr_opts = self.parse_simulation_input(**kwargs)
-        from engforge.solver import SolveableMixin
+        #
+        #from engforge.solver import SolveableMixin
 
-        dt = tr_opts["dt"]
-        endtime = tr_opts["endtime"]
+        dt = kwargs.pop('dt',0.001)
+        endtime = kwargs.pop('endtime',10)
 
-        if isinstance(self, SolveableMixin):
-            #adapt simulate to use the solver
-            sim = lambda Xo,*args, **kw: self.simulate(
-                dt, endtime,Xo, eval_kw=eval_kw, sys_kw=sys_kw,  **kw
-            )
-            self._iterate_input_matrix(
-                sim,
-                dt,
-                endtime,
-                eval_kw=eval_kw,
-                sys_kw=sys_kw,
-                return_results=True,
-                **kwargs,
-            )
-        else:
-            self.simulate(dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw)
+        with ProblemExec(self,kwargs,level_name='simmtx',dxdt=True,copy_system=True) as pbx:
+            if isinstance(self, SolveableMixin):
+                #adapt simulate to use the solver            
+                sim = lambda Xo,*args, **kw: self.simulate(
+                    dt, endtime,Xo, eval_kw=eval_kw, sys_kw=sys_kw,  **kw
+                )
+                out = self._iterate_input_matrix(
+                    sim,
+                    eval_kw=eval_kw,
+                    sys_kw=sys_kw,
+                    return_results=True,
+                    **kwargs,
+                )
+            else:
+                out =  self.simulate(dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw)
+        return out
 
     #TODO: swap between vars and constraints depending on dxdt=True
     def simulate(

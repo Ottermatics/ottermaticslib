@@ -70,7 +70,8 @@ import uuid
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 #TODO: define the dataframe / data storage feature
 
-min_kw_dflt = {"tol": 1e-10, "method": "SLSQP"}
+min_opt = {'finite_diff_rel_step': 0.1, 'xtol': 0.1, 'eps': 0.1}
+min_kw_dflt = {"tol":1e-10, "method": "SLSQP",'jac':'3-point', 'options':min_opt}
 
 
 #The KW Defaults for Solver via kw_dict
@@ -398,9 +399,6 @@ class ProblemExec:
     
         if self.copy_system:
             system = system.copy_config_at_state()
-        
-        if system.is_dynamic:
-            system.setup_global_dynamics()
 
         #place me here after system has been modified
         self.system = system
@@ -485,6 +483,10 @@ class ProblemExec:
         if sesh.pre_exec:
             sesh.pre_execute()
 
+        #apply changes to the dynamics models
+        if self.dynamic_comps:
+            self.system.setup_global_dynamics()            
+
     def min_refresh(self,sesh=None):
         sesh = sesh if sesh is not None else  self.sesh
 
@@ -501,7 +503,8 @@ class ProblemExec:
         sesh.Yref = sesh.sys_solver_objectives()
         
         cons = {} #TODO: parse additional constraints
-        sesh.constraints = sesh.sys_solver_constraints(cons)          
+        sesh.constraints = sesh.sys_solver_constraints(cons) 
+
 
     @property
     def check_dynamics(self):
@@ -583,7 +586,8 @@ class ProblemExec:
             if exc_value.revert:
                 self.revert_to_start()
                 if self.pre_exec:
-                    self.pre_execute()         
+                    self.pre_execute()
+
             lvl_match = False
             #Decide our exit conditon (if we should exit)
             if isinstance(exc_value,ProblemExitAtLevel):
@@ -609,7 +613,8 @@ class ProblemExec:
                 elif self.class_cache.session is self and not ext:
                     #never ever leave the top level without deleting the session
                     self.class_cache.level_number = 0
-                    self.problems_dict.pop(self._problem_id,None)
+                    if type(self.problems_dict) is not dict:
+                        self.problems_dict.pop(self._problem_id,None)
                     del self.class_cache.session 
                     raise KeyError(f'cant exit to level! {exc_value.level} not found!!')
             
@@ -620,7 +625,8 @@ class ProblemExec:
                 ext = True #basic exit is one level up
             
             self.clean_context()
-            self.problems_dict.pop(self._problem_id,None)
+            if type(self.problems_dict) is not dict:
+                self.problems_dict.pop(self._problem_id,None)
             return ext
         
         #default exit scenerios
@@ -630,7 +636,8 @@ class ProblemExec:
             ext = self.exit_action()
 
         self.clean_context()
-        self.problems_dict.pop(self._problem_id,None)
+        if type(self.problems_dict) is not dict:
+            self.problems_dict.pop(self._problem_id,None)
         return ext
         
     def debug_levels(self):
@@ -858,7 +865,8 @@ class ProblemExec:
             for compnm, compdict in pbx.dynamic_comps.items():
                 comp = compdict#["comp"]
                 if not comp.dynamic_state_vars and not comp.dynamic_input_vars:
-                    continue
+                    continue #nothing to do...
+
                 Xds = np.array([r.value() for r in comp.Xt_ref.values()])
                 Uds = np.array([r.value() for r in comp.Ut_ref.values()])
                 # time updated in step
@@ -1667,7 +1675,8 @@ class ProblemExec:
     
 
 #TODO: move all system_reference concept inside problem context, remove from system/tabulation ect.
-#TODO: use prob.register(comp,key='') to add components to the problem context, mapping subcomponents to the problem context
+#TODO: use prob.register/change(comp,key='') to add components to the problem context, mapping subcomponents to the problem context
+#TODO: make a graph of all problem dependencies and use that to determine the order of operations, and subsequent updates.
 
     
 #subclass before altering please!
