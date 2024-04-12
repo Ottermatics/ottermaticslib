@@ -380,7 +380,9 @@ class Solver(ATTR_BASE):
         assert cls.slvtype == "var", "only Solver.declare_var can have constraints"
         assert kind in ("min", "max")
 
-        combos = kwargs.get("combos", "default")
+        combo_dflt = "default,lim"
+        cmbs = kwargs.get("combos",'')
+        combos = cls.process_combos(cmbs,combo_dflt,combo_dflt)
         if isinstance(combos,str):
             combos = combos.split(',')
         active = kwargs.get("active", True)

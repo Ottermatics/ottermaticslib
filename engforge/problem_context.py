@@ -52,6 +52,7 @@ from engforge.logging import LoggingMixin
 from engforge.system_reference import Ref
 from engforge.dataframe import DataframeMixin,pandas
 from engforge.solver_utils import *
+from engforge.env_var import EnvVariable
 import weakref
 
 from scipy.integrate import solve_ivp
@@ -70,7 +71,7 @@ import uuid
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 #TODO: define the dataframe / data storage feature
 
-min_opt = {'finite_diff_rel_step': 0.1}
+min_opt = {'finite_diff_rel_step': 0.1,'maxiter':2500}
 min_kw_dflt = {"tol":1e-10, "method": "SLSQP",'jac':'3-point', 'options':min_opt}
 
 
@@ -254,7 +255,7 @@ class ProblemExec:
         # temp solver storage
         self.solver_hist = expiringdict.ExpiringDict(100, 60)  
 
-        if self.log_level < 15:
+        if self.log_level < 5:
             if hasattr(self.class_cache,'session'):
                 self.debug(f'subctx{self.level_number}|  keywords: {kw_dict} and misc: {opts}')
             else:
@@ -375,12 +376,14 @@ class ProblemExec:
                 self.level_name = level_name
 
             self.temp_state = Xnew
-            self.establish_system(system,kw_dict=kw_dict,**opt_out)
+            self.establish_system(system,kw_dict=kw_dict,**opt_out)                  
+
             #Finally we record where we started!
-            self.set_checkpoint()        
+            self.set_checkpoint()       
 
         if log.log_level < 10:
-            self.info(f'new execution context for {system}| {opts} | {self._slv_kw}')            
+            self.info(f'new execution context for {system}| {opts} | {self._slv_kw}')
+
         elif log.log_level <= 3:
             self.msg(f'new execution context for {system}| {self._slv_kw}')
 
@@ -467,7 +470,7 @@ class ProblemExec:
         check_dynamics = sesh.check_dynamics
         sesh._num_refs = sesh.system.system_references(numeric_only=True)
         sesh._sys_refs = sesh.system.solver_vars(check_dynamics=check_dynamics,addable=sesh._num_refs,**sesh._slv_kw)
-
+        
         sesh.update_methods(sesh=sesh)
         sesh.min_refresh(sesh=sesh)
                 
@@ -479,10 +482,6 @@ class ProblemExec:
         sesh._update_refs = sesh.system.collect_update_refs()
         #TODO: find subsystems that are not-subsolvers and execute them
         sesh._post_update_refs = sesh.system.collect_post_update_refs()
-
-        #initial establishment costs / ect
-        if sesh.pre_exec:
-            sesh.pre_execute()
 
         #apply changes to the dynamics models
         if self.dynamic_comps:
@@ -523,6 +522,10 @@ class ProblemExec:
         #Important managed updates / refs from Xnew input
         self.activate_temp_state()
         self.entered = True
+
+        #signals / updates
+        if self.pre_exec:
+            self.pre_execute()           
 
         #TODO: create a component-slot ref-update graph, and update the system references accordingly.
         #TODO: map the signals to the system references, and update the system references accordingly.
@@ -1035,6 +1038,13 @@ class ProblemExec:
         objs = sys_refs.get('attrs',{}).get('solver.obj',{})
         return {k:v for k,v in objs.items()}
     
+    def pos_obj(self,ref):
+        """converts an objective to a positive value"""
+        def f(sys,prob):
+            return (1+ref.value(sys,prob)**2)
+        
+        return ref.copy(key=f)
+
     @property
     def final_objectives(self)->dict:
         """returns the final objective of the system"""
@@ -1048,12 +1058,13 @@ class ProblemExec:
         #now make up an objective
         elif not Yobj and Yeq:
             #TODO: handle case of Yineq == None with root solver
-            self.debug(f'making Yobj from Yeq: {Yeq}')
-            Yobj = { k: v.copy(key = lambda sys,prob: (1+v.value(sys,prob)**2)) for k,v in Yeq.items() }
+            self.info(f'making Yobj from Yeq: {Yeq}')
+            Yobj = { k: self.pos_obj(v) for k,v in Yeq.items() }
 
         elif not Yobj:
             #minimize the product of all vars, so the smallest value is the best that satisfies all constraints
-            self.debug(f'making Yobj from X: {Xss}')
+            if self.session_id == True:
+                self.info(f'making Yobj from X: {Xss}')
             def dflt(sys,prob)->float:
                 out = 1
                 for k,v in prob.problem_opt_vars.items():
@@ -1073,6 +1084,7 @@ class ProblemExec:
 
         system = sesh.system
         sys_refs = sesh._sys_refs
+        all_refz = sesh.ref_attrs
 
         extra_kw = self.kwargs
         
@@ -1197,7 +1209,7 @@ class ProblemExec:
 
                     #add the dynamic parameters when configured
                     if not slv_var and rate_val is not None:
-                        print(f'adding dynamic constraint {slvr} {rate_val}')
+                        #print(f'adding dynamic constraint {slvr} {rate_val}')
                         #if kind in ('min','max') and slvr in Xvars:
                         varref = Xrefs[slvr]
                         #varref = slv.rate_ref
@@ -1236,11 +1248,15 @@ class ProblemExec:
         for slvr, ref in self.problem_ineq.items():
             slv = slv_inst[slvr]
             slv_constraints = slv.constraints
+            parent= self.get_parent_key(slvr,look_back_num=2) #get the parent comp
             for ctype in slv_constraints:
                 cval = ctype['value']
                 kind = ctype['type']                    
                 if cval is not None:
-                    con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
+                    name = f'ineq_{parent}{ref.comp.classname}.{slvr}_{kind}_{cval}'
+                    if log.log_level < 5:
+                        self.debug(f'filtering constraint {slvr} |{name}')
+                    con_info.append(name)
                     con_list.append(
                         create_constraint(
                             system,Xrefs, 'ineq', cval, **kw
@@ -1248,23 +1264,29 @@ class ProblemExec:
                     )
 
         for slvr, ref in self.problem_eq.items():
-            if slvr in slv_inst:
+            parent= self.get_parent_key(slvr,look_back_num=2) #get the parent comp
+            if slvr in slv_inst and slvr in all_refz.get('solver.eq',{}):
                 slv = slv_inst[slvr]
                 slv_constraints = slv.constraints
+                
                 for ctype in slv_constraints:
                     cval = ctype['value']
                     kind = ctype['type']                    
                     if cval is not None:
-                        con_info.append(f'eq_{ref.comp.classname}.{slvr}_{kind}_{cval}')
+                        name = f'eq_{parent}{ref.comp.classname}.{slvr}_{kind}_{cval}'
+                        if log.log_level < 5:
+                            self.debug(f'filtering constraint {slvr} |{name}')
+                        con_info.append(name)                        
+                        con_info.append(f'eq_{parent}{ref.comp.classname}.{slvr}_{kind}_{cval}')
                         con_list.append(
                             create_constraint(
                                 system,Xrefs, 'eq', cval, **kw
                             )
                         )
             else:
-                #This must be a dynamic rate, #TODO add check 
-                self.debug(f'no solver instance for {slvr} ')
-                con_info.append(f'eq_{ref.comp.classname}.{slvr}_rate')
+                #This must be a dynamic rate
+                self.debug(f'dynamic rate eq {slvr} ')
+                con_info.append(f'eq_{parent}{ref.comp.classname}.{slvr}_rate')
                 con_list.append(
                     create_constraint(
                         system,Xrefs, 'eq', ref, **kw
@@ -1398,6 +1420,10 @@ class ProblemExec:
             Ref.refset_input(sesh.all_comps_and_vars,self.temp_state,fail=False)
         elif self.log_level < 9:
             self.debug(f'no state to set: {new_state}')
+
+        #initial establishment costs / ect
+        if sesh.pre_exec:
+            sesh.pre_execute()                
         
 
     #System Events
@@ -1439,6 +1465,7 @@ class ProblemExec:
         """Updates the pre/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
         if log.log_level < 5:
             self.msg(f"pre execute")
+
         sesh = self.sesh
         sesh.apply_pre_signals()
         sesh.update_system(*args,**kwargs)
@@ -1448,6 +1475,7 @@ class ProblemExec:
         """Updates the post/both signals after the solver has been executed. This is useful for updating the system state after the solver has been executed."""
         if log.log_level < 5:
             self.msg(f"post execute")
+
         sesh = self.sesh
         sesh.apply_post_signals()
         sesh.post_update_system(*args,**kwargs)
@@ -1458,7 +1486,7 @@ class ProblemExec:
     #Logging to class logger
     @property
     def identity(self):
-        return f'PROB|{self.level_name}|{str(self.session_id)[0:5]}'
+        return f'PROB|{str(self.session_id)[0:5]}'
 
     @property
     def log_level(self):
@@ -1549,7 +1577,7 @@ class ProblemExec:
         base_eq.update(self.dynamic_rate_eq)
         
         if len(base_eq) > len(self.Xref):
-            self.warning(f'problem_eq has more variables than Xref {base_eq} {self.Xref}')
+            self.warning(f'problem_eq has more items than variables {base_eq} {self.Xref}')
             #TODO: in this case combine the rate_eq to prevent this error
 
         return base_eq
@@ -1648,12 +1676,12 @@ class ProblemExec:
         return res
 
     #TODO: expose optoin for saving all or part of the system information, for now lets default to all (saftey first, then performance :)
-    def get_parent_key(self,key):
+    def get_parent_key(self,key,look_back_num=1):
         """returns the parent key of the key"""
         if not key:
             return ''
-        elif '.' in key:
-            return '.'.join(key.split('.')[:-1])+'.'
+        elif key.count('.') >= look_back_num:
+            return '.'.join(key.split('.')[:-look_back_num])+'.'
         return ''
         
     #Dynamics Interface
@@ -1676,6 +1704,7 @@ class ProblemExec:
         if sesh.dynamic_solve and not sesh._dxdt is True:
             varx.update(sesh.dynamic_state)
             varx.update(self.filter_vars(sesh.integrator_vars))
+            
         return varx
 
     @property

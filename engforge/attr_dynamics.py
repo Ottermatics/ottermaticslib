@@ -184,8 +184,9 @@ class Time(ATTR_BASE):
         var = cls.var
         assert var is not None, "must provide var on non-var solvers"
         assert kind in ("min", "max")
-
-        combos = kwargs.get("combos", "default")
+        combo_dflt = "default,lim"
+        cmbs = kwargs.get("combos",'')
+        combos = cls.process_combos(cmbs,combo_dflt,combo_dflt)
         if isinstance(combos,str):
             combos = combos.split(',')
         active = kwargs.get("active", True)

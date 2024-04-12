@@ -103,7 +103,7 @@ def objectify(function,system,Xrefs,prob=None,*args,**kwargs):
     """converts a function f(system,slv_info:dict) into a function that safely changes states to the desired values and then runs the function. A function is returend as f(x,*args,**kw)"""
     from engforge.problem_context import ProblemExec
     base_dict = dict(system=system,Xrefs=Xrefs,args=args,**kwargs)
-    lvl_name = f'obj_{function.__name__}'
+    lvl_name = f'obj_{str(function.__name__.split("<function")[0])}'
     alias_name = kwargs.pop("alias_name",lvl_name)
     
     prob = prob
@@ -120,8 +120,8 @@ def objectify(function,system,Xrefs,prob=None,*args,**kwargs):
             prob = locals().get('prob',updtinfo)
 
             out= function(system,prob)
-            if system.log_level < 5:
-                system.msg(f'obj {alias_name}: {x} -> {out}')
+            if system.log_level <= 10:
+                system.debug(f'obj {alias_name}: {x} -> {out}')
             return out        
     
     if system.log_level < 3:
@@ -129,7 +129,7 @@ def objectify(function,system,Xrefs,prob=None,*args,**kwargs):
         system.msg(inspect.getsource(function))
 
     fo = lambda x,*a,**kw: f_obj(x,prob,*a,**kw)
-    fo.__name__ =f'OBJ_{function.__name__}'
+    fo.__name__ =f'OBJ_{alias_name}'
     return fo
 
 def secondary_obj(
@@ -215,6 +215,9 @@ def create_constraint(
         "eq",
         "ineq",
     ), f"bad constraint type: {contype}"
+
+    if system.log_level < 5:
+        system.debug(f'create constraint {contype} {ref} {args} {kwargs}| {con_args}')
 
     # its a function
     _fun = lambda *args,**kw: ref.value(*args,**kw)

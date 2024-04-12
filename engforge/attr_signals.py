@@ -73,7 +73,8 @@ class Signal(ATTR_BASE):
         assert mode in VALID_MODES, f"invalid mode: {mode}"
 
         active = kw.get("active", True)
-        combos = kw.get("combos", 'default')
+        combo_dflt = 'default,signals'
+        combos = kw.get("combos",None)
 
         # Create A New Signals Class
         new_name = f"Signal_{mode}_{source}_to_{target}".replace(".", "_")
@@ -84,7 +85,7 @@ class Signal(ATTR_BASE):
             target=target,
             source=source,
             active=active,
-            combos=combos,
+            combos=cls.process_combos(combos,combo_dflt,combo_dflt),
             default_options=cls.default_options.copy(),
         )
         new_slot = type(new_name, (Signal,), new_dict)

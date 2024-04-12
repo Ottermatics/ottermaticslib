@@ -783,7 +783,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
             if check_atr_f or any([v for v in skipped.values()]):
                 #print('skipped',skipped)
-                skipd = set().union(*(set(v) for v in skipped.values()))
+                skipd = set()#.union(*(set(v) for v in skipped.values()))
+                if self.log_level <= 5:
+                    self.msg(f'skipd {skipd}')
+
                 for pre,refs in dyn_refs.items():
                     
                     if pre not in attr_dict:
@@ -791,6 +794,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                     for var,ref in refs.items():
                         
+                        val_type = None
                         key_segs = var.split('.')
                         key = '' if len(key_segs) == 1 else '.'.join(key_segs[:-1])
                         scoped_name = f'{var}'
@@ -798,27 +802,28 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                         is_ref = isinstance(ref,Ref) 
                         if not is_ref:
-                            conf.info(f'not ref {ref}')
+                            conf.info(f'not ref {scoped_name}')
                             continue
 
                         if is_ref and not ref.allow_set:
                             #adding settables
                             attr_dict[pre].update(**{var:ref})
+                            self.debug(f'set escape: {scoped_name} {ref}')
                             continue
 
 
-                        val_setskip = ( is_ref and ref.key in skipd)
-                        val_type = None
+                        #val_setskip = ( is_ref and ref.key in skipd)
                         
-                        if scoped_name in skipd:
-                            conf.msg(f'dynvar skip {pre,ref.key,val_type,skipd}')
-                            continue
-
-                        elif val_setskip:
-                            conf.msg(f'dynvar r-skip {pre,ref.key,val_type,skipd}')
-                            continue
+                        
+#                         if scoped_name in skipd:
+#                             conf.msg(f'dynvar skip {pre,ref.key,val_type,skipd}')
+#                             continue
+# 
+#                         elif val_setskip:
+#                             conf.msg(f'dynvar r-skip {pre,ref.key,val_type,skipd}')
+#                             continue
                             
-                        elif check_atr_f and check_atr_f(pre,ref.key,val_type,check_kw):
+                        if check_atr_f and isinstance(ref.key,str) and check_atr_f(pre,ref.key,val_type,check_kw):
                             conf.msg(f'dynvar add {pre,ref.key,val_type,skipd}')
                             attr_dict[pre].update(**{var:ref})
                         else:

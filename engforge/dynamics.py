@@ -206,7 +206,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
         """creates the state matrix for the system"""
         return np.zeros((self.dynamic_state_size, self.dynamic_state_size))
 
-    def create_state_input_matrix(self, **kwargs) -> np.ndarray:
+    def create_input_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called B"""
         return np.zeros((self.dynamic_state_size, max(self.dynamic_input_size, 1)))
 
@@ -224,13 +224,13 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
     def create_output_constants(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called O"""
-        return np.zeros(max(self.dynamic_output_size, 1))
+        return np.zeros(self.dynamic_output_size)
 
     def create_dynamic_matricies(self, **kw):
         """creates a dynamics object for the system"""
         # State + Control
         self.static_A = self.create_state_matrix(**kw)
-        self.static_B = self.create_state_input_matrix(**kw)
+        self.static_B = self.create_input_matrix(**kw)
         # Output
         self.static_C = self.create_output_matrix(**kw)
         self.static_D = self.create_feedthrough_matrix(**kw)
@@ -417,7 +417,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
         # return {k: Ref(comp,'time',False,True) for k,l,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
 
     # optimized convience funcitons
-    def nonlinear_step(self, t, dt, X, U=None, set_Y=True):
+    def nonlinear_step(self, t, dt, X, U=None, set_Y=False):
         """Optimal nonlinear steps"""
         #self.time = t #important for simulation, moved to context.integrate
         self.update_dynamics(t, X, U)
@@ -431,7 +431,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
         return dXdt
 
-    def linear_step(self, t, dt, X, U=None, set_Y=True):
+    def linear_step(self, t, dt, X, U=None, set_Y=False):
         """Optimal nonlinear steps"""
         #self.time = t #important for simulation, moved to context.integrate
         self.update_dynamics(t, X, U)
@@ -444,7 +444,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
         return dXdt
 
-    def step(self, t, dt, X, U=None, set_Y=True):
+    def step(self, t, dt, X, U=None, set_Y=False):
         try:
             if self.nonlinear:
                 return self.nonlinear_step(t, dt, X, U, set_Y=set_Y)
@@ -456,6 +456,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
             raise e
 
     #Solver Refs
+    #TODO: move to problem context
     @property
     def Xt_ref(self):
         """alias for state values"""
@@ -496,9 +497,9 @@ class DynamicsMixin(Configuration, SolveableMixin):
             lt = 0
 
         dt = max(time - lt, 0)
-        if self.log_level <= 4:
-            self.debug(f"cache dXdt {time} {lt} {dt}")
         step = self.step(time, dt, self.dynamic_state, self.dynamic_input)
+        if self.log_level <= 10:
+            self.debug(f"cache dXdt {time} {lt} {dt}| {step}")        
         return step
 
     def ref_dXdt(self, name: str):

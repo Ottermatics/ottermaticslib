@@ -696,7 +696,7 @@ class SliderCrank(System,CostModel):
 
         return np.array([[0,1],[0,-self.b_rot/self.Imain_gear]])  
     
-    def create_state_input_matrix(self, **kwargs) -> np.ndarray:
+    def create_input_matrix(self, **kwargs) -> np.ndarray:
         return np.array([[0],[1/self.Imain_gear]])
     
     def create_state_constants(self, **kwargs) -> np.ndarray:
