@@ -108,11 +108,9 @@ def objectify(function,system,Xrefs,prob=None,*args,**kwargs):
     
     prob = prob
 
-
+    #hello anonymous function
     def f_obj(x,*rt_args,**rt_kwargs):
         new_state = {p: x[i] for i, p in enumerate(Xrefs)}
-        #with revert_X(system, Xrefs, Xnext=new_state ) as x_prev:
-        
         #Enter existing problem context
         with ProblemExec(system,{},Xnew=new_state,ctx_fail_new=True,level_name=lvl_name) as exc:
             updtinfo = base_dict.copy()
@@ -228,6 +226,7 @@ def create_constraint(
         cons['args'] = con_args
     return cons
 
+#TODO: integrate / merge with ProblemExec (all cmted out)
 # def misc_to_ref(system,val,*args,**kwargs):
 #     """takes a var reference and a value and returns a function that can be used as a constraint for min/max cases. The function will be a function of the system and the info dictionary. The function will return the difference between the var value and the value.
 #     """
@@ -321,6 +320,12 @@ def refmin_solve(
     """
     vars = list(Xref.keys())  # static x_basis
     
+    # The above code is a Python script that includes a TODO comment indicating
+    # that x-normalization needs to be incorporated into the code. The code itself
+    # is not shown, but it likely involves some operations on a variable or data
+    # structure named "x" that require normalization. The TODO comment serves as a
+    # reminder for the developer to implement this functionality at a later time.
+    #TODO: incorporate x-normilization
     norm_x,weights = handle_normalize(weights,Xref,Yref)
 
     # make objective function
@@ -339,8 +344,6 @@ def refmin_solve(
     kw.pop('info',None) #info added from context constraints
     ans = sciopt.minimize(Fc, Xo, **kw)
     return ans
-    #return process_ans(ans,vars,Xref,x_pre,doset,reset,fail,ret_ans)
-
 
 def handle_normalize(norm,Xref,Yref):
     vars = list(Xref.keys())  # static x_basis
@@ -356,35 +359,6 @@ def handle_normalize(norm,Xref,Yref):
         normY = np.array([norm[p] if p in norm else 1 for p in Yref])
 
     return normX,normY  
-
-
-# def process_ans(ans,vars,Xref,x_pre,doset,reset,fail,ret_ans):
-#     if ret_ans:
-#         return ans
-# 
-#     if ans.success:
-#         ans_dct = {p: a for p, a in zip(vars, ans.x)}
-#         if doset:
-#             Ref.refset_input(Xref, ans_dct)
-#         elif reset:
-#             Ref.refset_input(Xref, x_pre)
-#         return ans_dct
-# 
-#     else:
-#         min_dict = {p: a for p, a in zip(vars, ans.x)}
-#         if reset:
-#             Ref.refset_input(Xref, x_pre)
-#         elif doset:
-#             Ref.refset_input(Xref, min_dict)
-#             return min_dict
-#         if fail:
-#             raise Exception(f"failed to solve {ans.message}")
-#         return min_dict
-
-
-
-
-
 
 
 
@@ -407,6 +381,52 @@ def ext_str_list(extra_kw,key,default=None):
     else:
         out = default
     return out
+
+SLVR_SCOPE_PARM = ['solver.eq','solver.ineq','solver.var','solver.obj','time.var','time.rate','dynamics.state','dynamics.rate']
+
+def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
+    #TODO: allow solver_inst to be None for dyn-classes
+    #proceed to filter active items if vars / combos inputs is '*' select all, otherwise discard if not active
+    #corresondes to problem_context.slv_dflt_options
+    if extra_kw is None:
+        extra_kw = {}
+
+    outa = True
+    if extra_kw.get('only_active',True):
+
+        outa  =  filt_active(var_name,solver_inst,extra_kw=extra_kw,dflt=False)
+        if not outa:
+            log.msg(f'filt not active: {var_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
+            return False
+        
+    both_match =  extra_kw.get('both_match',True)
+    #Otherwise look at the combo filter, its its false return that
+    outc = filter_combos(var_name,solver_inst, extra_kw,combos)
+    outp = None
+
+    #if the combo filter didn't explicitly fail, check the var filter
+    if (outc and both_match) or (not outc and not both_match):
+        outp = filter_vals(var_name,solver_inst, extra_kw)
+        if log.log_level <=2:
+            log.msg(f'both match? {var_name:>20}| {outp} {outc}')
+
+        if both_match:
+            outr = all((outp,outc))
+        else:
+            outr = any((outp,outc))
+    else:
+        if log.log_level <=2:
+            log.msg(f'initial match: {var_name:>20}| {outc}')
+        outr = outc
+    
+    fin =  bool(outr) and outa
+
+    if not fin:
+        log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
+    elif fin:
+        log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos}')
+
+    return fin
 
 #filters return true for items they want to remove
 def filter_combos(var,inst,extra_kw=None,combos_in=None):
@@ -445,30 +465,27 @@ def filter_combos(var,inst,extra_kw=None,combos_in=None):
         if not any(initial_match):
             if log.log_level < 3:
                 log.msg(f'skip {var}: nothing ')
-            continue #not even 
+            continue #not even
+
         if onlygrp and not any(arg_var_compare(var,grp) for grp in onlygrp):
             if log.log_level < 3:
                 log.msg(f'skip {var} not in {onlygrp}')
             continue
+
         if igngrp and any(arg_var_compare(var,grp) for grp in igngrp):
             if log.log_level < 3:
                 log.msg(f'skip {var} in {igngrp}')
             continue
-        return True
+        
+        return True #you've passed all the filters and found a match
     
-    return False    
+    return False    #no matches, return false
     
 def filter_vals(var,inst,extra_kw=None):
     from engforge.attr_solver import SolverInstance
     from engforge.attr_dynamics import IntegratorInstance
     from engforge.attr_signals import SignalInstance
-    
-    if log.log_level <= 2:
-        log.info(f'checking combos: {var} {inst} {extra_kw}')
-
-    #not considered
-    if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance)):
-        return True
+    from engforge.dynamics import DynamicsMixin
     
     #add_vars = ext_str_list(extra_kw,'add_vars',None)
     groups = ext_str_list(extra_kw,'slv_vars','')
@@ -477,6 +494,13 @@ def filter_vals(var,inst,extra_kw=None):
     
     igngrp = ext_str_list(extra_kw,'ign_vars',None)
     onlygrp = ext_str_list(extra_kw,'only_vars',None)
+
+    if log.log_level <= 2:
+        log.info(f'checking vals: {var} {inst} {extra_kw}')
+
+    #vars not considered
+    if not isinstance(inst,(SolverInstance,IntegratorInstance,SignalInstance,DynamicsMixin)):
+        return True
 
     #add vars overrides all other filters
     #NOTE: add_vars is for variables that aren't defined already, slv_vars is for variables that are defined
@@ -488,6 +512,9 @@ def filter_vals(var,inst,extra_kw=None):
 
     #check values, and filters
     initial_match = [grp for grp in groups if arg_var_compare(var,grp)]
+    if log.log_level < 2:
+        log.msg(f'initial match: {var} in {initial_match}')
+
     if not any(initial_match):
         if log.log_level < 3:
             log.msg(f'skip {var}: nothing')

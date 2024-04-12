@@ -17,6 +17,7 @@ from engforge.properties import *
 from engforge.system_reference import *
 from engforge.system_reference import Ref
 from engforge.solver_utils import *
+from engforge.attr_dynamics import IntegratorInstance
 
 import collections
 import itertools
@@ -700,7 +701,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         #No Room For Components (SLOTS feature)
                         if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
                             if conf.log_level <= 5:
-                                conf.debug(f'skipping {val}')
+                                conf.debug(f'skipping comp attr {val}')
                             continue   
 
                         if val is None:
@@ -780,21 +781,22 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             #TODO: generalize this with a function to update the attr dict serach result when changing components
             out['dynamic_comps'] = dyn_comp = dyn_refs.pop('dynamic_comps',{})
             
-
+            #Check the dynamics for the system
             if check_atr_f or any([v for v in skipped.values()]):
-                #print('skipped',skipped)
-                skipd = set()#.union(*(set(v) for v in skipped.values()))
-                if self.log_level <= 5:
-                    self.msg(f'skipd {skipd}')
 
+                skipd = set()
+                #check each group of dynamics
                 for pre,refs in dyn_refs.items():
                     
-                    if pre not in attr_dict:
-                        attr_dict[pre] =  {}
+                    if pre not in skipped:
+                        skipped[pre] = []
 
+                    if pre not in attr_dict:
+                        attr_dict[pre] =  {} #initalize dynamic group
+                    
+                    #eval each ref for inclusion
                     for var,ref in refs.items():
                         
-                        val_type = None
                         key_segs = var.split('.')
                         key = '' if len(key_segs) == 1 else '.'.join(key_segs[:-1])
                         scoped_name = f'{var}'
@@ -806,28 +808,17 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             continue
 
                         if is_ref and not ref.allow_set:
-                            #adding settables
+                            #adding unsettables (likely rates)
                             attr_dict[pre].update(**{var:ref})
                             self.debug(f'set escape: {scoped_name} {ref}')
                             continue
-
-
-                        #val_setskip = ( is_ref and ref.key in skipd)
                         
-                        
-#                         if scoped_name in skipd:
-#                             conf.msg(f'dynvar skip {pre,ref.key,val_type,skipd}')
-#                             continue
-# 
-#                         elif val_setskip:
-#                             conf.msg(f'dynvar r-skip {pre,ref.key,val_type,skipd}')
-#                             continue
-                            
-                        if check_atr_f and isinstance(ref.key,str) and check_atr_f(pre,ref.key,val_type,check_kw):
-                            conf.msg(f'dynvar add {pre,ref.key,val_type,skipd}')
+                        val_type = ref.comp
+                        if check_atr_f and isinstance(var,str) and check_atr_f(pre,var,val_type,check_kw):
+                            conf.msg(f'dynvar add {pre,var,val_type,skipd}')
                             attr_dict[pre].update(**{var:ref})
                         else:
-                            conf.msg(f'dynvar endskip {pre,ref.key,val_type,skipd}')
+                            conf.msg(f'dynvar endskip {pre,var,val_type,skipd}')
                             if check_atr_f: #then it didn't checkout
                                 skipped[pre].append(scope_name)
 

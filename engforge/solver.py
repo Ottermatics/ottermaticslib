@@ -43,44 +43,6 @@ class SolverLog(LoggingMixin):
 
 log = SolverLog()
 
-SLVR_SCOPE_PARM = ['solver.eq','solver.ineq','solver.var','solver.obj','time.var','time.rate','dynamics.state','dynamics.rate']
-
-def combo_filter(attr_name,var_name, solver_inst, extra_kw,combos=None)->bool:
-    #TODO: allow solver_inst to be None for dyn-classes
-    #proceed to filter active items if vars / combos inputs is '*' select all, otherwise discard if not active
-    if extra_kw is None:
-        extra_kw = {}
-
-    outa = True
-    if extra_kw.get('only_active',True):
-
-        outa  =  filt_active(var_name,solver_inst,extra_kw=extra_kw,dflt=False)
-        if not outa:
-            log.msg(f'filt not active: {var_name:>10} {attr_name:>15}| C:{False}\tV:{False}\tA:{False}\tO:{False}')
-            return False
-    both_match =  extra_kw.get('both_match',True)
-    #Otherwise look at the combo filter, its its false return that
-    outc = filter_combos(var_name,solver_inst, extra_kw,combos)
-    outp = False
-    #if the combo filter didn't explicitly fail, check the var filter
-    if (outc and attr_name in SLVR_SCOPE_PARM) or not both_match:
-        outp = filter_vals(var_name,solver_inst, extra_kw)
-        if extra_kw.get('both_match',True):
-            outr = all((outp,outc)) #redundant per above
-        else:
-            outr = any((outp,outc))
-    else:
-        outr = outc
-    
-
-    fin =  bool(outr) and outa
-
-    if not fin:
-        log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}')
-    elif fin:
-        log.debug(f'filter: {var_name:>20} {attr_name:>15}| C:{outc}\tV:{outp}\tA:{outa}\tO:{fin}| {combos}')
-
-    return fin 
 
 # add to any SolvableMixin to allow solver use from its namespace
 class SolverMixin(SolveableMixin):

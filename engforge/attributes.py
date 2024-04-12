@@ -89,7 +89,9 @@ class ATTR_BASE(attrs.Attribute):
         elif isinstance(combos, list):
             if any(['*' in c for c in combos]):
                 raise KeyError("wildcard (*) not allowed in combos!")            
-            out = combos     
+            out = combos
+        else:
+            out = []    
         
         if add_combos is not None:
             out += cls.process_combos(add_combos,default=default)

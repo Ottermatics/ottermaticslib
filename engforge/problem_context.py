@@ -1069,6 +1069,11 @@ class ProblemExec:
                 out = 1
                 for k,v in prob.problem_opt_vars.items():
                     val = v.value(sys,prob)
+                    # The code snippet is calculating the linear norm of positive
+                    # values greater than 1 by adding the square root of the sum
+                    # of 1 and the square of the value to the variable `out`. This
+                    # operation is intended to apply a large penalty to positive
+                    # values greater than 1.
                     out = out + (1+val**2)**0.5 #linear norm of positive values > 1 should be very large penalty 
                 return 1
             
@@ -1704,7 +1709,7 @@ class ProblemExec:
         if sesh.dynamic_solve and not sesh._dxdt is True:
             varx.update(sesh.dynamic_state)
             varx.update(self.filter_vars(sesh.integrator_vars))
-            
+
         return varx
 
     @property
