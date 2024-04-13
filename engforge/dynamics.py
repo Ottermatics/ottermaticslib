@@ -486,7 +486,14 @@ class DynamicsMixin(Configuration, SolveableMixin):
         """caches the time differential of the state,
         uses current state of X and U to determine the dXdt
         """
-        # TODO: gather timestep
+
+        #we need to check the active session to determine if we should refresh the problem matrix
+        if hasattr(ProblemExec.class_cache, "session"):
+            session = ProblemExec.class_cache.session
+            if session and session.dynamic_solve and self.is_dynamic:
+                if session.dxdt != True: #integration update is handeled, all others are some kind of SS.
+                    self.create_dynamic_matricies()
+
         ctx = getattr(self,'last_context',None)
         
         if ctx:

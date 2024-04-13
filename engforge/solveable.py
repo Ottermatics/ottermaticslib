@@ -370,18 +370,6 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             inputs = {}
             result = {"output": output, "input_sets": inputs}
 
-            # if revert:
-            #     # revert all internal components too with `system_state` and set_system_state(**x,comp.x...)
-            #     sys_refs = self.get_system_input_refs(all=True)
-            #     revert_x = Ref.refset_get(sys_refs)
-
-            # prep references for keys
-            # refs = {}
-            # for k, v in _input.items():
-            #     refs[k] = self.locate_ref(k)
-            # for k in sequence_keys:
-            #     refs[k] = self.locate_ref(k)
-
             # Pre Run Callback
             self.pre_run_callback(eval_kw=eval_kw, sys_kw=sys_kw, **kwargs)
 

@@ -18,7 +18,7 @@ log = ConfigLog()
 conv_nms = lambda v: v.split(',') if isinstance(v,str) else v
 NAME_ADJ = EnvVariable('FORGE_NAME_ADJ',default=('geometry','size','algorithms','complexity','colors','materials'),type_conv=conv_nms)
 NAME_NOUN = EnvVariable('FORGE_NAME_NOUN',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
-FORGE_DEBUG = EnvVariable('FORGE_LOG_LEVEL',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=int)
+FORGE_DEBUG = EnvVariable('FORGE_LOG_LEVEL',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
 
 def name_generator(instance):
     """a name generator for the instance"""
@@ -108,25 +108,32 @@ def meta(title, desc=None, **kwargs):
 def property_changed(instance, variable, value):
     """a callback for when a property changes, this will set the _anything_changed flag to True, and change value when appropriate"""
     from engforge.tabulation import TabulationMixin
+    from engforge.problem_context import ProblemExec
 
     #TODO: determine when, in an active problem if components change, and update refs accordingly!
 
     if not isinstance(instance, (TabulationMixin)):
         return value
+    
+    #Establish Active Session
+    session = None
+    if hasattr(ProblemExec.class_cache, "session"):
+        session = ProblemExec.class_cache.session
 
-    if instance._anything_changed:
+    if not session and instance._anything_changed:
         # Bypass Check since we've already flagged for an update
         if log.log_level <= 2:
             log.debug(f"already property changed {instance}{variable.name} {value}")
         return value
+    #log.info(f'property changed {variable.name} {value}')
 
     if log.log_level <= 6:
         log.debug(f"checking property changed {instance}{variable.name} {value}")
 
     #Check if should be updated
     cur = getattr(instance, variable.name)
-    attrs = attr.fields(instance.__class__)
-    if variable in attrs and value != cur:
+    attrs = attr.fields(instance.__class__) #check identity of variable
+    if not instance._anything_changed and variable in attrs and value != cur:
         if log.log_level < 5:
             log.debug(f"changing variables: {variable.name} {value}")
         instance._anything_changed = True
@@ -135,6 +142,18 @@ def property_changed(instance, variable, value):
         log.warning(
             f"didnt change variables {variable.name}| {value} == {cur}"
         )
+    
+    #If active session in dynamic mode and the component is dynamic, flag for matrix update
+    #TODO: determine if dynamic matricies affected by this.
+    
+    if session and session.dynamic_solve and instance.is_dynamic:
+        #log.info(f'dynamics changed')
+        session.dynamics_updated = True #flag for update
+        
+    elif session:
+        #log.info(f'static change')
+        session.dynamics_updated = False
+
     return value
 
 
@@ -147,6 +166,8 @@ def signals_slots_handler(
 
     Customize initalization with slots,signals,solvers and sys flags.
     """
+    from engforge.problem_context import ProblemExec
+
     log.debug(f"transforming signals and slots for {cls.__name__}")
 
     for t in fields:
@@ -189,53 +210,6 @@ def signals_slots_handler(
         )
         out.append(name)
 
-    # Assert there is no time in attributes if not a transient
-
-    # Index
-    # assert 'index' not in field_names, f'`index` is a reserved attribute'
-    #if sys:
-        # if "index" not in field_names:
-        #     index = attrs.Attribute(
-        #         name="index",
-        #         default=0,
-        #         validator=None,
-        #         repr=True,
-        #         cmp=None,
-        #         hash=None,
-        #         init=False,
-        #         metadata=None,
-        #         type=int,
-        #         converter=None,
-        #         kw_only=True,
-        #         eq=None,
-        #         order=None,
-        #         on_setattr=None,
-        #         inherited=False,
-        #     )
-        #     out.append(index)
-
-        # Add Time Parm
-        # TODO: remove after formulated in testing
-        # if cls.transients_attributes():
-        #     time = attrs.Attribute(
-        #         name="time",
-        #         default=0,
-        #         validator=None,
-        #         repr=True,
-        #         cmp=None,
-        #         hash=None,
-        #         init=False,
-        #         metadata=None,
-        #         type=float,
-        #         converter=None,
-        #         kw_only=True,
-        #         eq=None,
-        #         order=None,
-        #         on_setattr=None,
-        #         inherited=False,
-        #     )
-        #     out.append(time)
-
     # Add Slots
     if slots:
         for slot_name, slot in cls.slots_attributes().items():
@@ -270,18 +244,9 @@ def signals_slots_handler(
             out.append(at)
 
     created_fields = set([o.name for o in out])
-    # print options
-#     if cls.log_level < 10:
-#         from engforge.attr_plotting import Plot
-# 
-#         for o in out:
-#             if isinstance(o.type, Plot):
-#                 # print(o)
-#                 continue
 
     # Merge Fields Checking if we are overriding an attribute with system_property
     # hack since TabulationMixin isn't available yet
-    # print(cls.mro())
     if "TabulationMixin" in str(cls.mro()):
         cls_properties = cls.system_properties_classdef(True)
     else:
@@ -311,7 +276,7 @@ def signals_slots_handler(
             )
 
     # Enforce Property Changing
-    # FIXME: is this more reliable?
+    # FIXME: is this more reliable than a class wide callback?
     # real_out = []
     # for fld in out:
     #     if fld.type in (int,float,str):

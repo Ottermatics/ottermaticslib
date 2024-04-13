@@ -71,8 +71,8 @@ import uuid
 #TODO: implement add_vars feature, ie it creates a solver variable, or activates one if it doesn't exist from in system.heirarchy.format
 #TODO: define the dataframe / data storage feature
 
-min_opt = {'finite_diff_rel_step': 0.1,'maxiter':2500}
-min_kw_dflt = {"tol":1e-10, "method": "SLSQP",'jac':'3-point', 'options':min_opt}
+min_opt = {'finite_diff_rel_step': 0.25,'maxiter':10000}
+min_kw_dflt = {"tol":1e-10, "method": "SLSQP",'jac':'cs', 'hess':'cs','options':min_opt}
 
 
 #The KW Defaults for Solver via kw_dict
@@ -243,6 +243,7 @@ class ProblemExec:
         :param  exit_on_failure: Whether to exit on failure, or continue on. Default is True.
         """
 
+        self.dynamics_updated = False #it is known
 
         if kw_dict is None:
             #kw_dict is stateful so you can mix system & context args together, and ensure context args are removed. in the case this is unused, we'll create an empty dict to avoid errors
@@ -483,8 +484,13 @@ class ProblemExec:
         #TODO: find subsystems that are not-subsolvers and execute them
         sesh._post_update_refs = sesh.system.collect_post_update_refs()
 
+        sesh.update_dynamics(sesh=sesh)
+
+    def update_dynamics(self,sesh=None):
         #apply changes to the dynamics models
+        sesh = sesh if sesh is not None else self.sesh
         if self.dynamic_comps:
+            self.info(f'update dynamics')
             self.system.setup_global_dynamics()            
 
     def min_refresh(self,sesh=None):
@@ -518,6 +524,8 @@ class ProblemExec:
         if self.entered:
             #TODO: enable env-var STRICT MODE to fail on things like this
             self.warning(f'context already entered!')
+        elif self.log_level < 10:
+            self.debug(f'enter context: {self.level_name} {self._dxdt} {self.dynamics_updated}')
         
         #Important managed updates / refs from Xnew input
         self.activate_temp_state()
@@ -525,7 +533,7 @@ class ProblemExec:
 
         #signals / updates
         if self.pre_exec:
-            self.pre_execute()           
+            self.pre_execute()            
 
         #TODO: create a component-slot ref-update graph, and update the system references accordingly.
         #TODO: map the signals to the system references, and update the system references accordingly.
@@ -535,6 +543,9 @@ class ProblemExec:
         if not sesh._dxdt is True and self.enter_refresh:
             sesh.update_methods(sesh=sesh)
             sesh.min_refresh(sesh=sesh)
+        
+        elif sesh.dynamics_updated:
+            sesh.update_dynamics(sesh=sesh)
 
         #Check for existing session        
         if sesh not in [None,self]:
@@ -1315,16 +1326,21 @@ class ProblemExec:
             #print(f'removing option {key} {option}')
             if option is None:
                 return option,False
+            
             elif isinstance(option,(int,float,bool)):
                 return option,False
+            
             elif isinstance(option,str):
                 if not empty_str and not option:
                      return None,False
+                
                 option = option.split(',')
                     
-            return option,False 
+            return option,False
+        
         elif key in defaults:
             return defaults[key],True
+        
         return None,None
         
 
@@ -1358,13 +1374,14 @@ class ProblemExec:
         """records the state of the system using session"""
         #refs = self.all_variable_refs
         sesh = self.sesh
-        refs = sesh.all_comps_and_vars
+        refs = sesh.all_comps_and_vars #no need for properties
         return Ref.refset_get(refs,sys=sesh.system,prob=self)
 
     @property
     def output_state(self)->dict:
         """records the state of the system"""
         sesh = self.sesh
+        #TODO: add system_properties to num_refs / all_system_refs ect.
         if 'nums' == sesh.save_mode:
             refs = sesh.num_refs
         elif 'all' == sesh.save_mode:
@@ -1377,7 +1394,7 @@ class ProblemExec:
             raise KeyError(f'unknown save mode {sesh.save_mode}, not in {save_modes}')
 
         out = Ref.refset_get(refs,sys=sesh.system,prob=self)
-
+        #Integration
         if sesh._dxdt == True:
             out['time'] = sesh._time
 
@@ -1419,12 +1436,13 @@ class ProblemExec:
         sesh = self.sesh
         #TODO: STRICT MODE Fail for refset_input
         if new_state:
+            if self.log_level < 3: self.debug(f'new-state: {self.temp_state}')
             Ref.refset_input(sesh.all_comps_and_vars,new_state,fail=False)
         elif self.temp_state:
-            self.debug(f'activating temp state: {self.temp_state}')
+            if self.log_level < 3: self.debug(f'act-state: {self.temp_state}')
             Ref.refset_input(sesh.all_comps_and_vars,self.temp_state,fail=False)
-        elif self.log_level < 9:
-            self.debug(f'no state to set: {new_state}')
+        elif self.log_level < 3:
+            self.debug(f'no-state: {new_state}')
 
         #initial establishment costs / ect
         if sesh.pre_exec:
