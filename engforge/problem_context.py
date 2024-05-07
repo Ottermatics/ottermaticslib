@@ -132,6 +132,7 @@ class ProblemExec:
     -  _problem_id: uuid for subproblems, or True for top level, None means uninitialized
 
     """
+    #TODO: convert this to a system based cache where there is a unique problem for each system instance. On subprobem copy a system and add o dictionary.
     class_cache = None #ProblemExec is assigned below
     
     #this class, wide, dont redefine it

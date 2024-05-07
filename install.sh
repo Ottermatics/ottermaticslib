@@ -1,7 +1,7 @@
 #!/bin/bash
 # Find our package manager
 
-sudo add-apt-repository ppa:mc3man/trusty-media
+#sudo add-apt-repository ppa:mc3man/trusty-media #use for media
 sudo apt-get update
 
 sudo apt-get install git
@@ -21,15 +21,14 @@ mkdir sw
 cd sw
 if grep -q microsoft /proc/version; then
   #Install SYSTEMCTL
-  echo "Install WSL Stuff... systemctl"
-  git clone https://github.com/DamionGans/ubuntu-wsl2-systemd-script.git
-  bash ubuntu-wsl2-systemd-script/ubuntu-wsl2-systemd-script.sh
+  echo "Install WSL..."
 else
-  echo "native Linux"
+  echo "native Linux stuff"
 fi
 
 cd ~/
 
+#TODO: env-var option for venv vs conda
 # echo 'Installing Python3'
 # sudo apt-get install python3 python3-pip python3-dev python3-setuptools
 # python3 -m pip install --upgrade pip
