@@ -257,9 +257,10 @@ class PlotInstance(AttributeInstance):
         self.plot_cls = plot_cls
         self.system = system
 
-        
         _sys_refs = self.system.system_references()
-        sys_refs = {k:v for atr,grp in _sys_refs.items() for k,v in grp.items()}
+        sys_refs = {
+            k: v for atr, grp in _sys_refs.items() for k, v in grp.items()
+        }
 
         diff = set()
         varss = set()
@@ -278,18 +279,21 @@ class PlotInstance(AttributeInstance):
         if self.system.log_level < 10:
             log.debug(f"system references: {sys_refs}")
             if diff:
-                log.warning(f"has diff {diff}| found: {varss}| possible: {sys_refs}")
+                log.warning(
+                    f"has diff {diff}| found: {varss}| possible: {sys_refs}"
+                )
 
         if diff:
-            #raise KeyError(f"has system diff: {diff} found: {vars}| from: {sys_ref}")
-            log.warning(f"has system diff: {diff} found: {vars}| from: {sys_refs}")
+            # raise KeyError(f"has system diff: {diff} found: {vars}| from: {sys_ref}")
+            log.warning(
+                f"has system diff: {diff} found: {vars}| from: {sys_refs}"
+            )
 
         self.refs = {k: sys_refs[k] for k in varss}
 
     def plot(self, **kwargs):
         """applies the system dataframe to the plot"""
         return self(**kwargs)
-        
 
     def __call__(self, **override_kw):
         """
@@ -412,15 +416,16 @@ class PlotBase(ATTR_BASE):
             )
 
         if diff:
-            log.warning(f"bad plot vars: {diff} do not exist in system: {valid}")
-            #TODO: fix time being defined on components
+            log.warning(
+                f"bad plot vars: {diff} do not exist in system: {valid}"
+            )
+            # TODO: fix time being defined on components
             # raise KeyError(
             #     f"bad plot vars: {diff} do not exist in system: {valid}"
             # )
 
-    
     @classmethod
-    def handle_instance(cls,canidate):
+    def handle_instance(cls, canidate):
         """no interacion with system, reporing only"""
         return None
 
@@ -649,9 +654,7 @@ class Trace(PlotBase):
         log.info(f"adding Trace|{kind} {x},{y},{y2},{kwargs}")
 
         # Create A New Signals Class
-        new_name = f"Trace_x_{x}_y_{y}".replace(
-            ".", "_"
-        ).replace("-", "")
+        new_name = f"Trace_x_{x}_y_{y}".replace(".", "_").replace("-", "")
         new_dict = dict(
             name=new_name,
             x=x,
@@ -785,9 +788,7 @@ class Plot(PlotBase):
         )
 
         # Create A New Signals Class
-        new_name = f"PLOT_x_{x}_y_{y}".replace(
-            ".", "_"
-        ).replace("-", "")
+        new_name = f"PLOT_x_{x}_y_{y}".replace(".", "_").replace("-", "")
         new_dict = dict(
             name=new_name,
             x=x,

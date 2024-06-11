@@ -46,14 +46,15 @@ class Test(unittest.TestCase):
     test_dir = "~/"
 
     def setUp(self):
-        self.test_config = TestConfig(name='testconfig')
-#         self.test_dir = tempfile.mkdtemp()
-# 
-#     def tearDown(self):
-#         contents_local = os.listdir(self.test_dir)
-#         for fil in contents_local:
-#             if self.test_file_name in fil:
-#                 rfil = os.path.join(self.test_dir, fil)
+        self.test_config = TestConfig(name="testconfig")
+
+    #         self.test_dir = tempfile.mkdtemp()
+    #
+    #     def tearDown(self):
+    #         contents_local = os.listdir(self.test_dir)
+    #         for fil in contents_local:
+    #             if self.test_file_name in fil:
+    #                 rfil = os.path.join(self.test_dir, fil)
 
     def test_property_labels(self):
         ans = set(["four", "test_two", "test_one", "three"])
@@ -80,11 +81,13 @@ class Test(unittest.TestCase):
             )
 
     def test_assemble_data_always_save(self):
-        self.test_config.info(f"testing data assembly {self.test_config.always_save_data}")
+        self.test_config.info(
+            f"testing data assembly {self.test_config.always_save_data}"
+        )
         self.test_config._always_save_data = True
         # Run before test_table_to...
         self.assertFalse(self.test_config.dataframe.shape[0])
-        with ProblemExec(self.test_config,{}) as px:
+        with ProblemExec(self.test_config, {}) as px:
             px.save_data()
 
             self.assertTrue(px.dataframe.shape[0])
@@ -100,12 +103,14 @@ class Test(unittest.TestCase):
         # Run before test_table_to...
         self.assertFalse(self.test_config.dataframe.shape[0])
         self.test_config._always_save_data = False
-        self.test_config.info(f"testing data assembly {self.test_config.always_save_data}")        
+        self.test_config.info(
+            f"testing data assembly {self.test_config.always_save_data}"
+        )
 
-        with ProblemExec(self.test_config,{}) as px:
+        with ProblemExec(self.test_config, {}) as px:
             px.save_data()
 
-            #print(px.dataframe,len(px.dataframe))
+            # print(px.dataframe,len(px.dataframe))
             self.assertTrue(px.dataframe.shape[0])
             self.assertTrue(1 == px.dataframe.shape[0])
 
@@ -119,7 +124,7 @@ class Test(unittest.TestCase):
             self.test_config.info(
                 f"setting attrs prop on in {cur_val } => {new_val}"
             )
-            
+
             self.test_config.attrs_prop = new_val
             px.save_data()
             self.assertTrue(2 == px.dataframe.shape[0])
@@ -127,12 +132,14 @@ class Test(unittest.TestCase):
     def test_dataframe(self, iter=5):
         attr_in = {}
         cur_dict = self.test_config.data_dict
-        with ProblemExec(self.test_config,{}) as px:
+        with ProblemExec(self.test_config, {}) as px:
             for i in range(iter):
-                with ProblemExec(self.test_config,{}) as px:
+                with ProblemExec(self.test_config, {}) as px:
                     cur_val = self.test_config.attrs_prop
                     attr_in[i] = val = cur_val + i**2.0
-                    self.test_config.info(f"setting attrs prop df {cur_val } => {val}")
+                    self.test_config.info(
+                        f"setting attrs prop df {cur_val } => {val}"
+                    )
                     self.test_config.attrs_prop = val
                     px.save_data()
                     px.exit_with_state()
@@ -141,7 +148,7 @@ class Test(unittest.TestCase):
             px.exit_with_state()
 
         postdict = self.test_config.data_dict
-        #self.test_config.info(f'cur_dict {cur_dict} postdict {postdict}')
+        # self.test_config.info(f'cur_dict {cur_dict} postdict {postdict}')
         self.assertDictEqual(cur_dict, postdict)
 
         df = self.test_config.dataframe
@@ -161,14 +168,14 @@ class Test(unittest.TestCase):
 
 
 # TODO: move these to reporting
-    # def file_in_format(self, fileextension, path=True):
-    #     fille = "{}.{}".format(self.test_file_name, fileextension)
-    #     if path:
-    #         path = os.path.join(self.test_dir, fille)
-    #         return path
-    #     else:
-    #         return fille        
-#     def test_table_to_csv(self):        
+# def file_in_format(self, fileextension, path=True):
+#     fille = "{}.{}".format(self.test_file_name, fileextension)
+#     if path:
+#         path = os.path.join(self.test_dir, fille)
+#         return path
+#     else:
+#         return fille
+#     def test_table_to_csv(self):
 #         pass
 #         print('saving '+self.file_in_format('xlsx'))
 #         self.test_config.save_csv(self.file_in_format('csv'))
@@ -208,9 +215,9 @@ class TestStatic(unittest.TestCase):
 
     def test_static(self, num=10):
         cur_dict = self.test_config.data_dict
-        with ProblemExec(self.test_config,{}) as px:
+        with ProblemExec(self.test_config, {}) as px:
             for i in range(num):
-                with ProblemExec(self.test_config,{}) as px:
+                with ProblemExec(self.test_config, {}) as px:
                     px.save_data()
                 postdict = self.test_config.data_dict
                 self.assertDictEqual(cur_dict, postdict)
@@ -219,12 +226,14 @@ class TestStatic(unittest.TestCase):
 
     def test_input(self, num=10):
         cur_dict = self.test_config.data_dict
-        with ProblemExec(self.test_config,{}) as px:
+        with ProblemExec(self.test_config, {}) as px:
             for i in range(num):
-                with ProblemExec(self.test_config,{}) as px:
-                    self.test_config.attrs_prop = i + self.test_config.attrs_prop
+                with ProblemExec(self.test_config, {}) as px:
+                    self.test_config.attrs_prop = (
+                        i + self.test_config.attrs_prop
+                    )
                     px.save_data()
                 postdict = self.test_config.data_dict
-                self.assertDictEqual(cur_dict, postdict)                    
+                self.assertDictEqual(cur_dict, postdict)
 
         self.assertEqual(len(self.test_config.dataframe), num)

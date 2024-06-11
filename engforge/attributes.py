@@ -8,15 +8,18 @@ from engforge.logging import LoggingMixin, log
 
 class ATTRLog(LoggingMixin):
     pass
+
+
 log = ATTRLog()
 
 
-DEFAULT_COMBO = 'default'
+DEFAULT_COMBO = "default"
+
 
 class AttributeInstance:
     class_attr: "ATTR_BASE"
     system: "System"
-    classname: str = "attribute" #for ref compatability
+    classname: str = "attribute"  # for ref compatability
     backref: "ATTR_BASE"
 
     # TODO: universal slots method
@@ -33,36 +36,37 @@ class AttributeInstance:
         # raise NotImplementedError("Override Me!")
         pass
 
-    def as_ref_dict(self)->dict:
-        log.info(f'pass - as ref {self}')
+    def as_ref_dict(self) -> dict:
+        log.info(f"pass - as ref {self}")
         return None
-    
-    def get_alias(self,path):
-        return path.split('.')[-1]
-    
-    def is_active(self,value=False) -> bool:
-        mthd = 'dflt'
-        if hasattr(self,'_active'):
-            mthd = 'instance'
+
+    def get_alias(self, path):
+        return path.split(".")[-1]
+
+    def is_active(self, value=False) -> bool:
+        mthd = "dflt"
+        if hasattr(self, "_active"):
+            mthd = "instance"
             value = self._active
 
-        elif hasattr(self.class_attr,'active'):
-            mthd = 'class'
+        elif hasattr(self.class_attr, "active"):
+            mthd = "class"
             value = self.class_attr.active
-        
-        #print(f'{self}| {mthd} is_active: {value}')
-        #the default
-        return value       
-    
+
+        # print(f'{self}| {mthd} is_active: {value}')
+        # the default
+        return value
+
     @property
     def combos(self):
         return self.class_attr.combos
-    
+
     @property
     def active(self):
-        return self.class_attr.active    
+        return self.class_attr.active
 
-#TODO: add a concept of queries of ATTR_BASE subclasses, where multiple types may be selected or filtered, with individual arguments.
+
+# TODO: add a concept of queries of ATTR_BASE subclasses, where multiple types may be selected or filtered, with individual arguments.
 class ATTR_BASE(attrs.Attribute):
     """A base class that handles initalization in the attrs meta class scheme by ultimately createing an Instance"""
 
@@ -73,37 +77,36 @@ class ATTR_BASE(attrs.Attribute):
     default_options: dict
     template_class = True
 
-    #TODO: add generic selection & activation of attributes
+    # TODO: add generic selection & activation of attributes
     active: bool
     combos: list
 
     none_ok = False
 
-    #Activation & Combo Selection Functionality
+    # Activation & Combo Selection Functionality
     @classmethod
-    def process_combos(cls, combos,default=None,add_combos=None):
+    def process_combos(cls, combos, default=None, add_combos=None):
         if isinstance(combos, str):
-            if '*' in combos:
+            if "*" in combos:
                 raise KeyError("wildcard (*) not allowed in combos!")
-            out = combos.split(",") 
+            out = combos.split(",")
         elif isinstance(combos, list):
-            if any(['*' in c for c in combos]):
-                raise KeyError("wildcard (*) not allowed in combos!")            
+            if any(["*" in c for c in combos]):
+                raise KeyError("wildcard (*) not allowed in combos!")
             out = combos
         else:
-            out = []    
-        
-        if add_combos is not None:
-            out += cls.process_combos(add_combos,default=default)
+            out = []
 
+        if add_combos is not None:
+            out += cls.process_combos(add_combos, default=default)
 
         if out:
             return out
         if default:
             return default
-        return ['default']
+        return ["default"]
 
-    #Initialization
+    # Initialization
     @classmethod
     def configure_for_system(cls, name, config_class, cb=None, **kwargs):
         """add the config class, and perform checks with `class_validate)
@@ -113,11 +116,13 @@ class ATTR_BASE(attrs.Attribute):
         cls.name = name
         cls.config_cls = config_class
 
-        if isinstance(cls.instance_class,ATTR_BASE) and not hasattr(cls.instance_class, "backref"):
-            #get parent class
-            refs = [cls,ATTR_BASE]
+        if isinstance(cls.instance_class, ATTR_BASE) and not hasattr(
+            cls.instance_class, "backref"
+        ):
+            # get parent class
+            refs = [cls, ATTR_BASE]
             mro_group = cls.mro()
-            mro_group = mro_group[:mro_group.index(ATTR_BASE)]
+            mro_group = mro_group[: mro_group.index(ATTR_BASE)]
             cans = [v for v in mro_group if v not in refs]
             last = cans[-1]
             # if not hasattr(cls,'instance_class') or not cls.instance_class:
@@ -125,7 +130,7 @@ class ATTR_BASE(attrs.Attribute):
             cls.instance_class.backref = last
         else:
             pass
-            #print(f'backref exists {cls.instance_class.backref} {cls}')
+            # print(f'backref exists {cls.instance_class.backref} {cls}')
 
         if cb is not None:
             cb(cls, config_class, **kwargs)
@@ -145,7 +150,7 @@ class ATTR_BASE(attrs.Attribute):
         cls.class_validate(instance=instance)
         return cls.instance_class(cls, instance)
 
-    #Override Me:
+    # Override Me:
     @classmethod
     def configure_instance(cls, instance, attribute, value):
         """validates the instance given attr's init routine"""
@@ -160,12 +165,14 @@ class ATTR_BASE(attrs.Attribute):
     def define_validate(cls, **kwargs):
         """A method to validate the kwargs passed to the define method"""
         pass
-    
-    #Interafce & Utility
+
+    # Interafce & Utility
     @classmethod
     def define(cls, **kwargs):
         """taking a component or system class as possible input valid input is later validated as an instance of that class or subclass"""
-        assert not cls.template_class, f"{cls} is not template class and cannot defined anything, ie anything that has been created as a function of `define` cannot be defined"
+        assert (
+            not cls.template_class
+        ), f"{cls} is not template class and cannot defined anything, ie anything that has been created as a function of `define` cannot be defined"
 
         cls.define_validate(**kwargs)
 
@@ -179,25 +186,24 @@ class ATTR_BASE(attrs.Attribute):
 
     @classmethod
     def _setup_cls(cls, name, new_dict, **kwargs):
-       
-        #randomize name for specifics reasons
+        # randomize name for specifics reasons
         uid = str(uuid.uuid4())
         name = name + "_" + uid.replace("-", "")[0:16]
-        new_dict['uuid'] = uid
-        new_dict['default_options'] = cls.default_options.copy()
-        new_dict['template_class'] = False
-        new_dict['name'] = name
+        new_dict["uuid"] = uid
+        new_dict["default_options"] = cls.default_options.copy()
+        new_dict["template_class"] = False
+        new_dict["name"] = name
         new_slot = type(name, (cls,), new_dict)
         new_slot.default_options["default"] = new_slot.make_factory()
         new_slot.default_options["validator"] = new_slot.configure_instance
         log.debug(
             f"defined {name}|{new_slot} with {kwargs}| {new_slot.default_options}"
-        )         
-        return new_slot   
+        )
+        return new_slot
 
     @classmethod
     def make_factory(cls, **kwargs):
-        #print(f"{cls} making factory with: {kwargs}")
+        # print(f"{cls} making factory with: {kwargs}")
         return attrs.Factory(cls.create_instance, takes_self=True)
 
     @classmethod
@@ -224,60 +230,70 @@ class ATTR_BASE(attrs.Attribute):
 
     # Structural Orchestration Through Subclassing
     @classmethod
-    def collect_cls(cls,system)->dict:
+    def collect_cls(cls, system) -> dict:
         """collects all the attributes for a system"""
-        if not isinstance(system,type):
+        if not isinstance(system, type):
             system = system.__class__
-        return {k:at.type for k,at in system._get_init_attrs_data(cls).items()}
-    
+        return {
+            k: at.type for k, at in system._get_init_attrs_data(cls).items()
+        }
+
     @classmethod
-    def collect_attr_inst(cls,system,handle_inst=True)->dict:
+    def collect_attr_inst(cls, system, handle_inst=True) -> dict:
         """collects all the attribute instances for a system"""
         cattr = cls.collect_cls(system)
         out = {}
-        for k,v in cattr.items():
-            inst = getattr(system,k)
-            if (inst is None and getattr(cls.instance_class,'none_ok',False)) or (cls.instance_class is not None and not isinstance(inst,cls.instance_class)):
-                log.warning(f"Attribute {k}|{inst} is not an instance of {cls.instance_class} in {system}")
+        for k, v in cattr.items():
+            inst = getattr(system, k)
+            if (
+                inst is None and getattr(cls.instance_class, "none_ok", False)
+            ) or (
+                cls.instance_class is not None
+                and not isinstance(inst, cls.instance_class)
+            ):
+                log.warning(
+                    f"Attribute {k}|{inst} is not an instance of {cls.instance_class} in {system}"
+                )
                 continue
 
             if inst and handle_inst:
                 inst = cls.handle_instance(inst)
-                
+
             if inst is not None:
                 out[k] = inst
         return out
 
     @staticmethod
-    def unpack_atrs(d,pre='',conv=None):
-
+    def unpack_atrs(d, pre="", conv=None):
         if not conv:
             conv = lambda v: v
-        if isinstance(d,dict):
-            for k,v in d.items():
-                if not isinstance(v,dict):
-                    yield k,pre,conv(v)
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if not isinstance(v, dict):
+                    yield k, pre, conv(v)
                 elif v:
-                    if pre and not pre.endswith('.'): ppre = pre+'.'
-                    ck = f'{ppre}{k}'
-                    for kii,ki,vi in ATTR_BASE.unpack_atrs(v,ck):
-                        yield kii,ki,conv(vi)
+                    if pre and not pre.endswith("."):
+                        ppre = pre + "."
+                    ck = f"{ppre}{k}"
+                    for kii, ki, vi in ATTR_BASE.unpack_atrs(v, ck):
+                        yield kii, ki, conv(vi)
                 else:
-                    if pre and not pre.endswith('.'): ppre = pre+'.'
-                    ck = f'{ppre}{k}'           
-                    yield '',ck,v
+                    if pre and not pre.endswith("."):
+                        ppre = pre + "."
+                    ck = f"{ppre}{k}"
+                    yield "", ck, v
         return d
-    
-    @classmethod
-    def handle_instance(cls,canidate):
-        """handles the instance, override as you wish"""
-        #print('handle_instance',cls,canidate,cls.instance_class)
 
-        if isinstance(canidate,cls.instance_class):
-            o =  canidate.as_ref_dict()
+    @classmethod
+    def handle_instance(cls, canidate):
+        """handles the instance, override as you wish"""
+        # print('handle_instance',cls,canidate,cls.instance_class)
+
+        if isinstance(canidate, cls.instance_class):
+            o = canidate.as_ref_dict()
             return o
-        return canidate #live and let live
-    
+        return canidate  # live and let live
+
     @classmethod
     def subclasses(cls, out=None):
         """return all subclasses of components, including their subclasses
@@ -294,7 +310,8 @@ class ATTR_BASE(attrs.Attribute):
             out.add(cls)
             cls.subclasses(out)
 
-        return out    
+        return out
+
 
 ATTR_BASE.default_options = dict(
     # validator=ATTR_BASE.configure_instance,

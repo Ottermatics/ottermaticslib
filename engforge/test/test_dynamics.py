@@ -23,23 +23,23 @@ jac = lambda t, a, b, w: np.array(
 ls = lambda x, t, y: (x[0] * np.sin(x[1] * t + x[3]) + x[2]) - y
 f = lambda x, t, y: (x[0] * np.sin(x[1] * t + x[3]) + x[2])
 
-class TestDynamics(unittest.TestCase):
 
+class TestDynamics(unittest.TestCase):
     def test_sim(self):
         """tests free undamped motion"""
 
-        sm = SpringMass(Fa=0,u=0)
+        sm = SpringMass(Fa=0, u=0)
 
-        #the analytical answer
+        # the analytical answer
         self.w_ans = np.sqrt(sm.k / sm.m)
 
         dt = 0.001
 
         df = sm.simulate(dt=dt, endtime=10)
-        #TODO: add passing flag to context
-        #self.assertTrue(sm.solved)
-        #self.assertTrue(sm.converged)
-        
+        # TODO: add passing flag to context
+        # self.assertTrue(sm.solved)
+        # self.assertTrue(sm.converged)
+
         X = df.x
         T = df.time
         t = T[T < 2]
@@ -62,28 +62,28 @@ class TestDynamics(unittest.TestCase):
 
         self.assertAlmostEqual(ans.x[1], self.w_ans, delta=0.01)
 
-
     def test_damping(self):
         """test that the ss answer is equal to the result with damping"""
-        sm = SpringMass(Fa=0,u=5)
-        sm.run(dxdt=0,combos='time') #time captures integral via combos
+        sm = SpringMass(Fa=0, u=5)
+        sm.run(dxdt=0, combos="time")  # time captures integral via combos
 
-        dfss =sm.last_context.dataframe
-        trsm,df = sm.simulate(dt=0.001, endtime=10,return_all=True)
+        dfss = sm.last_context.dataframe
+        trsm, df = sm.simulate(dt=0.001, endtime=10, return_all=True)
 
-        self.assertAlmostEqual(df.iloc[-1].x,dfss.iloc[0].x, delta=0.01)
+        self.assertAlmostEqual(df.iloc[-1].x, dfss.iloc[0].x, delta=0.01)
 
     def test_forcing(self):
         """test that the ss answer is equal to the result with damping"""
-        sm = SpringMass(Fa=10,u=0,wo_f=1)
-        sm.wo_f = w_ans = np.sqrt(sm.k / sm.m) * 0.1 #very different frequency
+        sm = SpringMass(Fa=10, u=0, wo_f=1)
+        sm.wo_f = w_ans = np.sqrt(sm.k / sm.m) * 0.1  # very different frequency
 
-        sm.run(dxdt=0,combos='time')
-        dfss =sm.dataframe
-        sm.x = dfss.iloc[0].x #no residual input
-        
-        
-        trsm,df = sm.simulate(dt=0.001, endtime=10,run_solver=False,combos='*',return_all=True)
+        sm.run(dxdt=0, combos="time")
+        dfss = sm.dataframe
+        sm.x = dfss.iloc[0].x  # no residual input
+
+        trsm, df = sm.simulate(
+            dt=0.001, endtime=10, run_solver=False, combos="*", return_all=True
+        )
 
         X = df.x
         T = df.time
@@ -105,4 +105,4 @@ class TestDynamics(unittest.TestCase):
         if not ans.success:
             raise Exception("failure")
 
-        self.assertAlmostEqual(ans.x[1], w_ans, delta=0.01)       
+        self.assertAlmostEqual(ans.x[1], w_ans, delta=0.01)

@@ -8,6 +8,7 @@ import attr
 
 from engforge.common import inst_vectorize, chunks
 from engforge.properties import engforge_prop
+
 # from engforge.configuration import Configuration, forge
 from engforge.logging import LoggingMixin
 from engforge.typing import *
@@ -56,15 +57,16 @@ key_func = lambda kv: len(kv[1]) / len(kv[0].split("."))
 #         mtches[v1].add(v2)
 #         mtches[v2].add(v1)
 
-#TODO: integrate statistical output of dataframe, if at all in problem domain
-#1. stats_mode: mean, median,min,max mode, std, var, skew, kurtosis
-#2. min_mode: mean,median,std,min,max
-#3. sub_mode: store the dataframe completely separately
+
+# TODO: integrate statistical output of dataframe, if at all in problem domain
+# 1. stats_mode: mean, median,min,max mode, std, var, skew, kurtosis
+# 2. min_mode: mean,median,std,min,max
+# 3. sub_mode: store the dataframe completely separately
 class dataframe_property(engforge_prop):
     pass
 
 
-#aliases
+# aliases
 dataframe_prop = dataframe_property
 df_prop = dataframe_property
 

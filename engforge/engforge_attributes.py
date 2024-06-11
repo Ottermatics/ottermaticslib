@@ -50,7 +50,6 @@ def get_attributes_of(cls, subclass_of: type = None, exclude=False):
 class AttributedBaseMixin(LoggingMixin):
     """A mixin that adds the ability to configure all engforge.core attributes of a class"""
 
-
     # Auto Configuration Methods
     @classmethod
     def collect_all_attributes(cls):
@@ -60,14 +59,14 @@ class AttributedBaseMixin(LoggingMixin):
             nm = base_class.__name__.lower()
             out[nm] = base_class.collect_cls(cls)
         return out
-    
-    def collect_inst_attributes(self,**kw):
+
+    def collect_inst_attributes(self, **kw):
         """collects all the attributes for a system"""
         out = {}
         for base_class in ATTR_BASE.subclasses():
             nm = base_class.__name__.lower()
-            out[nm] = base_class.collect_attr_inst(self,**kw)
-        return out  
+            out[nm] = base_class.collect_attr_inst(self, **kw)
+        return out
 
     @classmethod
     def _get_init_attrs_data(cls, subclass_of: type, exclude=False):
@@ -93,8 +92,6 @@ class AttributedBaseMixin(LoggingMixin):
     @property
     def attrs_fields(self) -> set:
         return set(attr.fields(self.__class__))
-
-
 
     @classmethod
     def _extract_type(cls, typ):
@@ -205,12 +202,12 @@ class AttributedBaseMixin(LoggingMixin):
 
     @classmethod
     def input_fields(cls):
-        '''no attr base types, no tuples, no lists, no dicts'''
+        """no attr base types, no tuples, no lists, no dicts"""
         ignore_types = (
             ATTR_BASE,
-            #tuple,
-            #list,
-            #dict,
+            # tuple,
+            # list,
+            # dict,
         )
         return cls._get_init_attrs_data(ignore_types, exclude=True)
 
@@ -332,4 +329,3 @@ class AttributedBaseMixin(LoggingMixin):
         finally:
             rstdict = {k: _temp_vars[k] for k, v in kwargs.items()}
             self.setattrs(rstdict)
-  

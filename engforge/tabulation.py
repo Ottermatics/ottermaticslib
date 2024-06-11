@@ -24,27 +24,28 @@ import os
 import collections
 import uuid
 
+
 class TableLog(LoggingMixin):
     pass
+
+
 log = TableLog()
 
-SKIP_REF = ["run_id", "converged", "name", "index",'converged']
-
-
+SKIP_REF = ["run_id", "converged", "name", "index", "converged"]
 
 
 class TabulationMixin(SolveableMixin, DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
-    #index = 0  # Not an attr on purpose, we want pandas to provide the index
+    # index = 0  # Not an attr on purpose, we want pandas to provide the index
 
     # override per class:
     _skip_table_vars: list = None
     _skip_plot_vars: list
 
     # Cached and private
-    #_table: dict = None
+    # _table: dict = None
     _anything_changed: bool
     _always_save_data = False
 
@@ -66,11 +67,13 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     @property
     def last_context(self):
         """Returns the last context"""
-        raise NotImplemented('this should be implemented in the solvable class')
+        raise NotImplemented("this should be implemented in the solvable class")
 
     @solver_cached
     def dataframe(self):
-        if hasattr(self,'last_context') and hasattr(self.last_context, "dataframe"):
+        if hasattr(self, "last_context") and hasattr(
+            self.last_context, "dataframe"
+        ):
             return self.last_context.dataframe
         return pandas.DataFrame([])
 
@@ -102,7 +105,7 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
     @property
     def data_dict(self):
         """this is what is captured and used in each row of the dataframe / table"""
-        #NOTE: Solver class overrides this with full system references
+        # NOTE: Solver class overrides this with full system references
         out = collections.OrderedDict()
         sref = self.internal_references()
         for k, v in sref["attributes"].items():
@@ -264,4 +267,3 @@ class TabulationMixin(SolveableMixin, DataframeMixin):
         """returns an instance unique id based on id(self)"""
         idd = id(self)
         return f"{self.classname}.{idd}"
-

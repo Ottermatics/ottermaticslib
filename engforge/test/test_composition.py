@@ -26,7 +26,7 @@ class MockComponent(Component):
         return self.input * self.input
 
 
-def limit_max(system,prb):
+def limit_max(system, prb):
     return 4 - system.input
 
 
@@ -47,12 +47,11 @@ class MockSystem(System):
     Solver.constraint_equality("in_out_diff")
     Solver.constraint_equality("in2out2")
 
-    var_in =Solver.declare_var("input")
+    var_in = Solver.declare_var("input")
     var_in.add_var_constraint(kind="min", value=0)
     var_in.add_var_constraint(kind="max", value=1)
 
-    
-    sol2 =Solver.declare_var("in2")
+    sol2 = Solver.declare_var("in2")
     sol2.add_var_constraint(kind="max", value=limit_max)
     sol2.add_var_constraint(kind="min", value=0)
 
@@ -88,13 +87,13 @@ class TestComposition(unittest.TestCase):
 
         # Pre Signals Test
         outsys = self.system.output
-        outcomp = self.system.comp.output        
+        outcomp = self.system.comp.output
         sysstart = self.system.input
         compstart = self.system.comp.input
         self.assertNotEqual(sysstart, compstart)  # no signals transfering input
 
-        log.warning(f'test signals: {sysstart} {compstart}| {outsys} {outcomp}')
-        with ProblemExec(self.system,{},post_exec=True,pre_exec=True) as pbx:
+        log.warning(f"test signals: {sysstart} {compstart}| {outsys} {outcomp}")
+        with ProblemExec(self.system, {}, post_exec=True, pre_exec=True) as pbx:
             sysend = self.system.input
             compend = self.system.comp.input
             self.assertEqual(sysend, compend)  # signals should work as defined
@@ -104,16 +103,16 @@ class TestComposition(unittest.TestCase):
             sysstart = self.system.output
             compstart = self.system.comp.output
             self.assertNotEqual(sysstart, compstart)  # they aren't aligned
-            log.info(f'pre-vert: {sysstart} {compstart}')
-            
-            #preserve changes
+            log.info(f"pre-vert: {sysstart} {compstart}")
+
+            # preserve changes
             pbx.exit_with_state()
 
-        #now post signals should be applied
+        # now post signals should be applied
         sysend = self.system.output
         compend = self.system.comp.output
 
-        log.info(f'final: {sysstart} {compstart}')
+        log.info(f"final: {sysstart} {compstart}")
 
         self.assertEqual(sysend, compend)  # signals should work
         self.assertEqual(compstart, compend)  # output should change
@@ -129,11 +128,12 @@ class TestComposition(unittest.TestCase):
         # self.assertEqual(set(self.system.comp.dataframe["aux"]), set([5]))
         # self.assertEqual(set(self.system.comp.comp.dataframe["aux"]), set([6]))
 
+
 #         # solver constraints checking
 #         input = self.system.dataframe["input"][0]
 #         self.assertGreaterEqual(input, -1e3)  # min protection
 #         self.assertLessEqual(input, 1)  # max protection
-# 
+#
 #         in2 = self.system.dataframe["in2"][0]
 #         self.assertGreaterEqual(in2, -1e3)  # min protection
 #         self.assertLessEqual(in2, 4 - input)  # max protection

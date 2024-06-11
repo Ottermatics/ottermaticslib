@@ -228,7 +228,9 @@ class system_property(engforge_prop):
 
     def deleter(self, fdel):
         return type(self)(self.fget, self.fset, fdel, self.__doc__)
-#aliases
+
+
+# aliases
 sys_prop = system_property
 system_prop = system_property
 
@@ -277,9 +279,11 @@ class cached_system_property(system_property):
         setattr(instance, self.private_var, val)
         return val
 
-#aliases
+
+# aliases
 cached_sys_prop = system_property
 cached_system_prop = system_property
+
 
 # TODO: install solver reset / declarative instance cache+
 class solver_cached(cache_prop):
