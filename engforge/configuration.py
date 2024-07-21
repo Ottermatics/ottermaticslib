@@ -47,19 +47,8 @@ NAME_NOUN = EnvVariable(
 )
 FORGE_DEBUG = EnvVariable(
     "FORGE_LOG_LEVEL",
-    default=(
-        "chemistry",
-        "astronomy",
-        "linear_algebra",
-        "geometry",
-        "coding",
-        "corporate_job",
-        "design",
-        "car_parts",
-        "machine_learning",
-        "physics_units",
-    ),
-    type_conv=conv_nms,
+    default=20,
+    type_conv=int,
 )
 
 
