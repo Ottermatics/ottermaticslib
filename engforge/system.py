@@ -77,6 +77,14 @@ class System(SolverMixin, SolveableInterface, PlottingMixin, GlobalDynamics):
             return None
         return self.last_context.converged
 
+    @property
+    def _converged(self):
+        return self.last_context.converged
+
+    @_converged.setter
+    def _converged(self,inpt):
+        self.last_context._converged = inpt
+
     @system_property
     def run_id(self) -> int:
         if self.last_context is None:

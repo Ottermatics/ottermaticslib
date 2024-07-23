@@ -17,6 +17,7 @@ from engforge.components import Component
 from engforge.system import System
 from engforge.analysis import Analysis
 from engforge.env_var import EnvVariable
+from engforge.problem_context import ProblemExec
 
 #We build off attrs officially for our interface / composition
 from attrs import field
