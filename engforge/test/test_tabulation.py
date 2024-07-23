@@ -57,15 +57,15 @@ class Test(unittest.TestCase):
     #                 rfil = os.path.join(self.test_dir, fil)
 
     def test_property_labels(self):
-        ans = set(["four", "test_two", "test_one", "three"])
+        ans = set(["four", "test_two", "test_one", "three",'converged','run_id'])
         self.assertEqual(set(self.test_config.system_properties_labels), ans)
 
     def test_property_types(self):
-        ans = [int, float, int, float]
+        ans = [int, float, int, float,int,int]
         self.assertEqual(self.test_config.system_properties_types, ans)
 
     def test_property_desc(self):
-        ans = ["", "", "some words", "would make sense"]
+        ans = ["", "", "some words", "would make sense",'','']
         self.assertEqual(self.test_config.system_properties_description, ans)
 
     def test_table_vals(self):

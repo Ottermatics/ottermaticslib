@@ -222,7 +222,9 @@ class SolverMixin(SolveableMixin):
             Xnew=Xo,
         ) as pbx:
             out = self.execute(**kw)
+            pbx.save_data() #context handles checking if anything changed
             pbx.exit_to_level(level="eval", revert=False)
+
 
         if self.log_level >= 20:
             sys.stdout.write(".")

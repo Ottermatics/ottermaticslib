@@ -65,7 +65,7 @@ def name_generator(instance):
     return out
 
 
-PROTECTED_NAMES = ["solver", "dataframe", "_anything_changed"]
+PROTECTED_NAMES = ["solver", "dataframe", "_anything_changed","time","run_id", "converged"]
 
 
 # Wraps Configuration with a decorator, similar to @attrs.define(**options)

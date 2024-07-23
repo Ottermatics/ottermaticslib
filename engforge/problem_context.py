@@ -14,7 +14,7 @@ This isn't technically a singleton pattern, but it does provide a similar interf
         for i in range(10):
             pe.solve_min(pe.Xref,pe.Yref,**other_args)
             pe.set_checkpoint() #save the state of the system 
-            self.save_data()
+            pe.save_data()
             
 
     #Solver Module (can use without knowledge of the runtime system)
@@ -32,6 +32,9 @@ The `slv_vars` argument can be used to select a specific set of solvables. From 
 The `only_active` argument can be used to select only active items. The `activate` and `deactivate` arguments can be used to activate or deactivate specific solvables.
 
 `add_obj` can be used to add an objective to the solver. 
+
+# Root Parameter Determination:
+Any session's may access root session parameters defined in the `root_parameters` dictionary like `converged`, or `data` can be accessed by calling `session.<parm>` this eventually calls `root._<parm>` via the __getattr__ method.
 
 # Exit Mode Handling
 
@@ -448,7 +451,7 @@ class ProblemExec:
             self._problem_id = True  # this is the top level
             self.problems_dict[self._problem_id] = self  # carry that weight
             self._prob_levels = {}
-
+            self._converged = None
             self._dxdt = dxdt
             self.reset_data()
 
@@ -1158,6 +1161,7 @@ class ProblemExec:
         de = answer.fun
         if answer.success and de < thresh if thresh else True:
             sesh.system._converged = True  # TODO: put in context
+            sesh._converged = True
             output["success"] = True
 
         elif answer.success:
@@ -1166,10 +1170,12 @@ class ProblemExec:
                 f"solver didnt meet threshold: {de} <? {thresh} ! {answer.x} -> residual: {answer.fun}"
             )
             sesh.system._converged = False
+            sesh._converged = False
             output["success"] = False  # only false with threshold
 
         else:
             sesh.system._converged = False
+            sesh._converged = False
             if self.opt_fail:
                 raise Exception(f"solver didnt converge: {answer}")
             else:

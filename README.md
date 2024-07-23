@@ -52,10 +52,10 @@ from engforge.reporting import CSVReporter,DiskPlotReporter
 from engforge.properties import system_property
 from engforge.components import Component
 from engforge.system import System
-from engforge.plotting import PLOT
+from engforge import Plot
 from engforge.slots import SLOT
 from engforge.solver import Solver
-from engforge.signals import SIGNAL
+from engforge import Signal
 from engforge.configuration import forge
 import numpy as np
 import os,pathlib
