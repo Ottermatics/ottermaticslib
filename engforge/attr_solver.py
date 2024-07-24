@@ -13,7 +13,7 @@ import datetime
 import typing
 
 from engforge.attributes import ATTR_BASE, AttributeInstance
-from engforge.system_reference import Ref,maybe_attr_inst,maybe_ref
+from engforge.system_reference import Ref, maybe_attr_inst, maybe_ref
 from engforge.properties import *
 
 import itertools
@@ -30,7 +30,7 @@ log = AttrSolverLog()
 
 
 indep_type = typing.Union[str]
-dep_type = typing.Union[system_property,callable]
+dep_type = typing.Union[system_property, callable]
 ref_type = typing.Union[str, system_property, callable, float, int]
 
 
@@ -51,8 +51,7 @@ class SolverInstance(AttributeInstance):
     _active: bool
     _constraints: list
 
-
-    def __init__(self, solver: "Solver", system: "System",**kw) -> None:
+    def __init__(self, solver: "Solver", system: "System", **kw) -> None:
         """kwargs passed to compile"""
         self.class_attr = self.solver = solver
         self.system = system
@@ -60,106 +59,134 @@ class SolverInstance(AttributeInstance):
 
     def compile(self, **kwargs):
         """establishes the references for the solver to use directly"""
-        from engforge.solver import objectify,secondary_obj
         if self.solver.slvtype == "var":
             self.var = self.system.locate_ref(self.solver.var)
             self.system.debug(f"solving with indpendent: {self.var}")
 
         elif self.solver.slvtype in ["ineq", "eq"]:
             self.lhs = self.system.locate_ref(self.solver.lhs)
-            
-            if hasattr(self.solver, "rhs") and (isinstance(self.solver.rhs, str)or callable(self.solver.rhs)):
+
+            if hasattr(self.solver, "rhs") and (
+                isinstance(self.solver.rhs, str) or callable(self.solver.rhs)
+            ):
                 self.rhs = self.system.locate_ref(self.solver.rhs)
             elif hasattr(self.solver, "rhs") and self.solver.rhs is not None:
-                #raise Exception(f"bad rhs: {self.solver.rhs}")
+                # raise Exception(f"bad rhs: {self.solver.rhs}")
                 self.rhs = self.solver.rhs
-                
+
             m = " = " if self.solver.slvtype == "eq" else " >= "
             self.system.debug(f"solving {self.lhs}{m}{self.rhs}")
 
-            if hasattr(self,'rhs') and self.rhs is not None:
-                mult=1
-                bias=None
-                power=None
-                #careful with kw vs positional args here
-                fun = lambda sys,prob: maybe_ref(self.lhs,SolverInstance,sys=sys,prob=prob,mult=mult,bias=bias,power=power) - maybe_ref(self.rhs,SolverInstance,sys=sys,prob=prob,mult=mult,bias=bias,power=power)
+            if hasattr(self, "rhs") and self.rhs is not None:
+                mult = 1
+                bias = None
+                power = None
+                # careful with kw vs positional args here
+                fun = lambda sys, prob: maybe_ref(
+                    self.lhs,
+                    SolverInstance,
+                    sys=sys,
+                    prob=prob,
+                    mult=mult,
+                    bias=bias,
+                    power=power,
+                ) - maybe_ref(
+                    self.rhs,
+                    SolverInstance,
+                    sys=sys,
+                    prob=prob,
+                    mult=mult,
+                    bias=bias,
+                    power=power,
+                )
                 fun.__name__ = f"{self.lhs}_{self.rhs}_{self.solver.slvtype}"
-                objfunc = Ref(self.system,fun)
+                objfunc = Ref(self.system, fun)
             else:
                 objfunc = self.lhs
-            
+
             if log.log_level <= 6:
                 self.system.debug(f"const defined: {objfunc}|{self.solver}")
 
             self.const_f = objfunc
 
-        elif self.solver.slvtype == 'obj':
+        elif self.solver.slvtype == "obj":
             self.obj_ref = self.system.locate_ref(self.solver.obj)
-            if self.solver.kind == 'max':
-                mult=None
-                bias=None
-                power=None
+            if self.solver.kind == "max":
+                mult = None
+                bias = None
+                power = None
             else:
-                mult=None
-                bias=None
-                power=None
+                mult = None
+                bias = None
+                power = None
 
-            fun = lambda sys,prob: maybe_ref(self.obj_ref,SolverInstance,sys=sys,prob=prob,mult=mult,bias=bias,power=power)  
+            fun = lambda sys, prob: maybe_ref(
+                self.obj_ref,
+                SolverInstance,
+                sys=sys,
+                prob=prob,
+                mult=mult,
+                bias=bias,
+                power=power,
+            )
             fun.__name__ = f"obj_{self.solver.obj}_{self.solver.kind}"
-            self.obj = Ref(self.system,fun)
-            #self.obj = self.system.locate_ref(fun)
+            self.obj = Ref(self.system, fun)
+            # self.obj = self.system.locate_ref(fun)
             self.system.debug(f"solving with obj: {self.obj}")
-            
+
     @property
     def constraints(self):
-        if hasattr(self,'_constraints'):
+        if hasattr(self, "_constraints"):
             return self._constraints
-        if self.solver.slvtype in ['var','obj']:
+        if self.solver.slvtype in ["var", "obj"]:
             return self.solver.constraints
         else:
-            #just me
-            return [{'type':self.slvtype,'var':self.solver.lhs,'value':self.const_f}]
-        
+            # just me
+            return [
+                {
+                    "type": self.slvtype,
+                    "var": self.solver.lhs,
+                    "value": self.const_f,
+                }
+            ]
 
     @property
     def slvtype(self):
         return self.solver.slvtype
-    
+
     @property
     def combos(self):
         return self.solver.combos
-    
+
     @property
     def normalize(self):
         return self.solver.normalize
-    
+
     @property
     def active(self):
-        if hasattr(self,'_active'):
-            return self._active        
+        if hasattr(self, "_active"):
+            return self._active
         return self.solver.active
-    
-    def get_alias(self,pre):
-        if self.solver.slvtype  == 'var':
-            return self.var.key #direct ref
-        return super().get_alias(pre) #default
+
+    def get_alias(self, pre):
+        if self.solver.slvtype == "var":
+            return self.var.key  # direct ref
+        return super().get_alias(pre)  # default
 
     def as_ref_dict(self):
-        out = {'var':None,'eq':None,'ineq':None,'obj':None}
+        out = {"var": None, "eq": None, "ineq": None, "obj": None}
 
         if self.solver.slvtype == "var":
-                out['var'] = self.var
+            out["var"] = self.var
         elif self.solver.slvtype == "obj":
-                out['obj'] = self.obj
+            out["obj"] = self.obj
         elif self.solver.slvtype == "eq":
-                out['eq'] =  self.const_f
+            out["eq"] = self.const_f
         elif self.solver.slvtype == "ineq":
-                out['ineq'] =  self.const_f
-        
+            out["ineq"] = self.const_f
+
         return out
 
-            
-            
 
 class Solver(ATTR_BASE):
     """solver creates subclasses per solver balance"""
@@ -171,7 +198,7 @@ class Solver(ATTR_BASE):
     slvtype: str
     constraints: dict
     combos: list = None
-    
+
     normalize: ref_type
     allow_constraint_override: bool = True
 
@@ -181,27 +208,28 @@ class Solver(ATTR_BASE):
 
     define = None
 
-
     @classmethod
     def configure_for_system(cls, name, config_class, cb=None, **kwargs):
         """add the config class, and perform checks with `class_validate)
         :returns: [optional] a dictionary of options to be used in the make_attribute method
         """
-        pre_name = cls.name #random attr name
-        super(Solver,cls).configure_for_system(name,config_class,cb,**kwargs)
+        pre_name = cls.name  # random attr name
 
-        #change name of constraint  var if 
+        super(Solver, cls).configure_for_system(
+            name, config_class, cb, **kwargs
+        )
+
+        # change name of constraint  var if
         if cls.slvtype == "var":
-            #provide defaults ot constraints, and update combo_var with attribut name
+            # provide defaults ot constraints, and update combo_var with attribut name
             for const in cls.constraints:
-                if 'combo_var' in const and const['combo_var'] == pre_name:
-                    const['combo_var'] = name #update me
-                elif 'combo_var' not in const:
-                    const['combo_var'] = name #update me
-                
-                if 'combos' not in const:
-                    const['combos'] = 'default'
-                    
+                if "combo_var" in const and const["combo_var"] == pre_name:
+                    const["combo_var"] = name  # update me
+                elif "combo_var" not in const:
+                    const["combo_var"] = name  # update me
+
+                if "combos" not in const:
+                    const["combos"] = "default"
 
     # TODO: add normalize attribute to tune optimizations
     @classmethod
@@ -212,17 +240,17 @@ class Solver(ATTR_BASE):
         :param combos: The combinations of the solver variable.
         :return: The setup class for the solver variable.
         """
-        assert ',' not in var, f"var cannot have commas: {var}"
+        assert "," not in var, f"var cannot have commas: {var}"
 
         # Create A New Signals Class
         active = kwargs.get("active", True)
-        combos = kwargs.get("combos", f'default,{var}') #default + var_name
+        combos = kwargs.get("combos", f"default,{var}")  # default + var_name
 
         new_name = f"Solver_var_{var}".replace(".", "_")
         bkw = {"var": var, "value": None}
         constraints = [{"type": "min", **bkw}, {"type": "max", **bkw}]
         new_dict = dict(
-            name=new_name, #until configured for system, it gets the assigned name
+            name=new_name,  # until configured for system, it gets the assigned name
             active=active,
             var=var,
             slvtype="var",
@@ -231,7 +259,6 @@ class Solver(ATTR_BASE):
             default_options=cls.default_options.copy(),
         )
         return cls._setup_cls(new_name, new_dict)
-
 
     @classmethod
     def objective(cls, obj: str, **kwargs):
@@ -263,7 +290,7 @@ class Solver(ATTR_BASE):
         )
         return cls._setup_cls(new_name, new_dict)
 
-    obj = objective  
+    obj = objective
 
     @classmethod
     def constraint_equality(
@@ -357,7 +384,7 @@ class Solver(ATTR_BASE):
         return SolverInstance(cls, system)
 
     @classmethod
-    def add_var_constraint(cls, value, kind="min",**kwargs):
+    def add_var_constraint(cls, value, kind="min", **kwargs):
         """adds a `type` constraint to the solver. If value is numeric it is used as a bound with `scipy` optimize.
 
         If value is a function it should be of the form value(Xarray) and will establish an inequality constraint that var var must be:
@@ -377,22 +404,31 @@ class Solver(ATTR_BASE):
 
         var = cls.var
         assert var is not None, "must provide var on non-var solvers"
-        assert cls.slvtype == "var", "only Solver.declare_var can have constraints"
+        assert (
+            cls.slvtype == "var"
+        ), "only Solver.declare_var can have constraints"
         assert kind in ("min", "max")
 
         combo_dflt = "default,lim"
-        cmbs = kwargs.get("combos",'')
-        combos = cls.process_combos(cmbs,combo_dflt,combo_dflt)
-        if isinstance(combos,str):
-            combos = combos.split(',')
+        cmbs = kwargs.get("combos", "")
+        combos = cls.process_combos(cmbs, combo_dflt, combo_dflt)
+        if isinstance(combos, str):
+            combos = combos.split(",")
         active = kwargs.get("active", True)
-        const = {"type": kind, "value": value, "var": var, "active": active, "combos": combos, 'combo_var':cls.name}
-        #print(const,cls.__dict__)
+        const = {
+            "type": kind,
+            "value": value,
+            "var": var,
+            "active": active,
+            "combos": combos,
+            "combo_var": cls.name,
+        }
+        # print(const,cls.__dict__)
 
         cinx = cls.constraint_exists(type=kind, var=var)
         inix = cinx is not None
         if cls.allow_constraint_override and inix:
-            log.debug(f'replacing constraint {cinx} with {kind} {value} {var}')
+            log.debug(f"replacing constraint {cinx} with {kind} {value} {var}")
             constraint = cls.constraints[cinx]
             constraint.update(const)
         elif not cls.allow_constraint_override and inix:
@@ -400,7 +436,6 @@ class Solver(ATTR_BASE):
             raise Exception(f"constraint already exists! {cnx}")
         else:
             cls.constraints.append(const)
-
 
     @classmethod
     def constraint_exists(cls, **kw):

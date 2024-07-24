@@ -35,6 +35,7 @@ import attr, attrs
 
 # Index maps are used to translate between different indexes (local & global)
 
+
 def valid_mtx(arr):
     if arr is None:
         return False
@@ -42,8 +43,9 @@ def valid_mtx(arr):
         return 0
     return True
 
+
 ##TODO: compile problems using index_map
-#TODO: move to problem module
+# TODO: move to problem module
 class INDEX_MAP:
     oppo = {str: int, int: str}
 
@@ -98,9 +100,6 @@ class INDEX_MAP:
         return oop2
 
 
-
-
-
 # Quickly create a state space model
 # TODO: How to add delay, and feedback?
 # TODO: How to add control and limits in general?
@@ -109,11 +108,11 @@ class INDEX_MAP:
 class DynamicsMixin(Configuration, SolveableMixin):
     """dynamic mixin for components and systems that have dynamics, such as state space models, while allowing nonlinear dynamics via matrix modification. This mixin is intended to work alongside the solver module and the Time integrating attributes, and will raise an error if a conflict is detected #TODO."""
 
-    #time: float = attrs.field(default=0.0)
+    # time: float = attrs.field(default=0.0)
 
-    dynamic_state_vars: list = []#attrs.field(factory=list)
-    dynamic_input_vars: list =  []#attrs.field(factory=list)
-    dynamic_output_vars: list =  []#attrs.field(factory=list)
+    dynamic_state_vars: list = []  # attrs.field(factory=list)
+    dynamic_input_vars: list = []  # attrs.field(factory=list)
+    dynamic_output_vars: list = []  # attrs.field(factory=list)
 
     # state variables
     dynamic_A = None
@@ -124,19 +123,19 @@ class DynamicsMixin(Configuration, SolveableMixin):
     dynamic_K = None
 
     # Static linear state
-    static_A= None
-    static_B= None
-    static_C= None
-    static_D= None
-    static_F= None
-    static_K= None
+    static_A = None
+    static_B = None
+    static_C = None
+    static_D = None
+    static_F = None
+    static_K = None
 
     # TODO:
     # dynamic_control_module = None
     # control_interval:float = 0.0 ##TODO: how often to update the control
     # TODO: how often to update the physics, 0 is everytime
-    update_interval: float =  0
-    #delay_ms: float = attrs.field(default=None)
+    update_interval: float = 0
+    # delay_ms: float = attrs.field(default=None)
     nonlinear: bool = False
 
     # TODO: add integration state dynamic cache to handle relative time steps
@@ -157,10 +156,10 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
     @property
     def time(self):
-        #convience function 
-        ctx = getattr(self,'last_context',None)
+        # convience function
+        ctx = getattr(self, "last_context", None)
         if ctx:
-            time = getattr(ctx,'_time',0)
+            time = getattr(ctx, "_time", 0)
         else:
             time = 0
         return time
@@ -201,22 +200,27 @@ class DynamicsMixin(Configuration, SolveableMixin):
             [getattr(self, var, np.nan) for var in self.dynamic_output_vars]
         )
 
-
     def create_state_matrix(self, **kwargs) -> np.ndarray:
         """creates the state matrix for the system"""
         return np.zeros((self.dynamic_state_size, self.dynamic_state_size))
 
     def create_input_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called B"""
-        return np.zeros((self.dynamic_state_size, max(self.dynamic_input_size, 1)))
+        return np.zeros(
+            (self.dynamic_state_size, max(self.dynamic_input_size, 1))
+        )
 
     def create_output_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called C"""
-        return np.zeros((max(self.dynamic_output_size, 1), self.dynamic_state_size))
+        return np.zeros(
+            (max(self.dynamic_output_size, 1), self.dynamic_state_size)
+        )
 
     def create_feedthrough_matrix(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called D"""
-        return np.zeros((max(self.dynamic_output_size, 1), max(self.dynamic_input_size, 1)))
+        return np.zeros(
+            (max(self.dynamic_output_size, 1), max(self.dynamic_input_size, 1))
+        )
 
     def create_state_constants(self, **kwargs) -> np.ndarray:
         """creates the input matrix for the system, called F"""
@@ -285,12 +289,14 @@ class DynamicsMixin(Configuration, SolveableMixin):
         self.dynamic_F = self.update_state_constants(t, self.static_F, X)
         self.dynamic_K = self.update_output_constants(t, self.static_K, X)
 
-        if self.log_level <=4:
-            self.info(f'update_dynamics A:{self.dynamic_A} B:{self.dynamic_B} C:{self.dynamic_C} D:{self.dynamic_D} F:{self.dynamic_F} K:{self.dynamic_K}| time:{t} X:{X} U:{U}')
+        if self.log_level <= 4:
+            self.info(
+                f"update_dynamics A:{self.dynamic_A} B:{self.dynamic_B} C:{self.dynamic_C} D:{self.dynamic_D} F:{self.dynamic_F} K:{self.dynamic_K}| time:{t} X:{X} U:{U}"
+            )
 
         # except Exception as e:
         #     self.warning(f'update dynamics failed! A:{self.dynamic_A} B:{self.dynamic_B} C:{self.dynamic_C} D:{self.dynamic_D} F:{self.dynamic_F} K:{self.dynamic_K}| time:{t} X:{X} U:{U}')
-        #     raise e         
+        #     raise e
 
     # linear and nonlinear system level IO
 
@@ -309,11 +315,11 @@ class DynamicsMixin(Configuration, SolveableMixin):
         if self.nonlinear:
             return self.rate_nonlinear(t, dt, X, U, *args, **kwargs)
         else:
-            return self.rate_linear(t, dt, X, U, *args, **kwargs)            
+            return self.rate_linear(t, dt, X, U, *args, **kwargs)
 
     def rate_linear(self, t, dt, X, U=None):
         """simulate the system over the course of time. Return time differential of the state."""
-        
+
         O = 0
         if valid_mtx(self.static_A) and valid_mtx(X):
             O = self.static_A @ X
@@ -362,16 +368,16 @@ class DynamicsMixin(Configuration, SolveableMixin):
         """
         if update:
             self.update_dynamics(t, X, U)
-        
+
         O = 0
         if valid_mtx(self.dynamic_A) and valid_mtx(X):
-            O = O+self.dynamic_A @ X
+            O = O + self.dynamic_A @ X
 
         if valid_mtx(U) and valid_mtx(self.dynamic_B):
-            O = O+self.dynamic_B @ U
+            O = O + self.dynamic_B @ U
 
         if valid_mtx(self.dynamic_F):
-            O = O+self.dynamic_F
+            O = O + self.dynamic_F
         return O
 
     def nonlinear_output(self, t, dt, X, U=None, update=True):
@@ -387,41 +393,40 @@ class DynamicsMixin(Configuration, SolveableMixin):
         """
         if update:
             self.update_dynamics(t, X, U)
-        
+
         O = 0
-        if valid_mtx(self.dynamic_C)and valid_mtx(X):
-            O = O+self.dynamic_C @ X
+        if valid_mtx(self.dynamic_C) and valid_mtx(X):
+            O = O + self.dynamic_C @ X
 
         if valid_mtx(U) and valid_mtx(self.dynamic_D):
-            O = O+self.dynamic_D @ U
+            O = O + self.dynamic_D @ U
 
         if valid_mtx(self.dynamic_K):
-            O = O+self.dynamic_K
+            O = O + self.dynamic_K
         return O
 
-    def set_time(self, t, system=True,subcomponents=True):
+    def set_time(self, t, system=True, subcomponents=True):
         """sets the time of the system and context"""
-        pass        
-        #set components
-        #if subcomponents:
+        pass
+        # set components
+        # if subcomponents:
         #    for cdyn_name, comp in self.comp_times.items():
         #        comp.set_value(t)
 
         # if system: #set system time only
         #     self.time = t
 
-
-    #@instance_cached #TODO: cache on solver due to changes of components
-    #def comp_times(self) -> dict:
+        # @instance_cached #TODO: cache on solver due to changes of components
+        # def comp_times(self) -> dict:
         """returns a dictionary of time references to components which will be set to the current time"""
         # return {k: Ref(comp,'time',False,True) for k,l,comp in self.go_through_configurations() if isinstance(comp,DynamicsMixin)}
 
     # optimized convience funcitons
     def nonlinear_step(self, t, dt, X, U=None, set_Y=False):
         """Optimal nonlinear steps"""
-        #self.time = t #important for simulation, moved to context.integrate
+        # self.time = t #important for simulation, moved to context.integrate
         self.update_dynamics(t, X, U)
-        
+
         dXdt = self.rate_nonlinear(t, dt, X, U, update=False)
         out = self.nonlinear_output(t, dt, X, U, update=False)
 
@@ -433,7 +438,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
 
     def linear_step(self, t, dt, X, U=None, set_Y=False):
         """Optimal nonlinear steps"""
-        #self.time = t #important for simulation, moved to context.integrate
+        # self.time = t #important for simulation, moved to context.integrate
         self.update_dynamics(t, X, U)
         dXdt = self.rate_linear(t, dt, X, U)
         out = self.linear_output(t, dt, X, U)
@@ -450,13 +455,15 @@ class DynamicsMixin(Configuration, SolveableMixin):
                 return self.nonlinear_step(t, dt, X, U, set_Y=set_Y)
             else:
                 return self.linear_step(t, dt, X, U, set_Y=set_Y)
-            
+
         except Exception as e:
-            self.warning(f'update dynamics failed {e}! A:{self.dynamic_A} B:{self.dynamic_B} C:{self.dynamic_C} D:{self.dynamic_D} F:{self.dynamic_F} K:{self.dynamic_K}| time:{t} X:{X} U:{U} setY:{set_Y}')
+            self.warning(
+                f"update dynamics failed {e}! A:{self.dynamic_A} B:{self.dynamic_B} C:{self.dynamic_C} D:{self.dynamic_D} F:{self.dynamic_F} K:{self.dynamic_K}| time:{t} X:{X} U:{U} setY:{set_Y}"
+            )
             raise e
 
-    #Solver Refs
-    #TODO: move to problem context
+    # Solver Refs
+    # TODO: move to problem context
     @property
     def Xt_ref(self):
         """alias for state values"""
@@ -474,7 +481,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
         """alias for input values"""
         d = [(var, Ref(self, var)) for var in self.dynamic_input_vars]
         return OrderedDict(d)
-    
+
     @property
     def dXtdt_ref(self):
         """a dictionary of state var rates"""
@@ -487,17 +494,19 @@ class DynamicsMixin(Configuration, SolveableMixin):
         uses current state of X and U to determine the dXdt
         """
 
-        #we need to check the active session to determine if we should refresh the problem matrix
+        # we need to check the active session to determine if we should refresh the problem matrix
         if hasattr(ProblemExec.class_cache, "session"):
             session = ProblemExec.class_cache.session
             if session and session.dynamic_solve and self.is_dynamic:
-                if session.dxdt != True: #integration update is handeled, all others are some kind of SS.
+                if (
+                    session.dxdt != True
+                ):  # integration update is handeled, all others are some kind of SS.
                     self.create_dynamic_matricies()
 
-        ctx = getattr(self,'last_context',None)
-        
+        ctx = getattr(self, "last_context", None)
+
         if ctx:
-            time = getattr(ctx,'_time',0)
+            time = getattr(ctx, "_time", 0)
             lt = getattr(ctx, "_last_time", 0)
         else:
             time = 0
@@ -506,7 +515,7 @@ class DynamicsMixin(Configuration, SolveableMixin):
         dt = max(time - lt, 0)
         step = self.step(time, dt, self.dynamic_state, self.dynamic_input)
         if self.log_level <= 10:
-            self.debug(f"cache dXdt {time} {lt} {dt}| {step}")        
+            self.debug(f"cache dXdt {time} {lt} {dt}| {step}")
         return step
 
     def ref_dXdt(self, name: str):
@@ -514,10 +523,9 @@ class DynamicsMixin(Configuration, SolveableMixin):
         vars = self.dynamic_state_vars
         assert name in vars, f"name {name} not in state vars"
         inx = vars.index(name)
-        accss = lambda sys,prob: self.cache_dXdt[inx]
+        accss = lambda sys, prob: self.cache_dXdt[inx]
         accss.__name__ = f"ref_dXdt_{name}"
         return Ref(self, accss)
-    
 
     def determine_nearest_stationary_state(
         self, t=0, X=None, U=None
@@ -553,26 +561,27 @@ class GlobalDynamics(DynamicsMixin):
 
     def setup_global_dynamics(self, **kwargs):
         """recursively creates numeric matricies for the simulation"""
-        for skey,lvl,conf in self.go_through_configurations():
-            if isinstance(conf,DynamicsMixin) and conf.is_dynamic:
+        for skey, lvl, conf in self.go_through_configurations():
+            if isinstance(conf, DynamicsMixin) and conf.is_dynamic:
                 conf.create_dynamic_matricies(**kwargs)
-    
 
     def sim_matrix(self, eval_kw=None, sys_kw=None, **kwargs):
         """simulate the system over the course of time.
         return a dictionary of dataframes
         """
         #
-        #from engforge.solver import SolveableMixin
+        # from engforge.solver import SolveableMixin
 
-        dt = kwargs.pop('dt',0.001)
-        endtime = kwargs.pop('endtime',10)
+        dt = kwargs.pop("dt", 0.001)
+        endtime = kwargs.pop("endtime", 10)
 
-        with ProblemExec(self,kwargs,level_name='simmtx',dxdt=True,copy_system=True) as pbx:
+        with ProblemExec(
+            self, kwargs, level_name="simmtx", dxdt=True, copy_system=True
+        ) as pbx:
             if isinstance(self, SolveableMixin):
-                #adapt simulate to use the solver            
-                sim = lambda Xo,*args, **kw: self.simulate(
-                    dt, endtime,Xo, eval_kw=eval_kw, sys_kw=sys_kw,  **kw
+                # adapt simulate to use the solver
+                sim = lambda Xo, *args, **kw: self.simulate(
+                    dt, endtime, Xo, eval_kw=eval_kw, sys_kw=sys_kw, **kw
                 )
                 out = self._iterate_input_matrix(
                     sim,
@@ -582,10 +591,10 @@ class GlobalDynamics(DynamicsMixin):
                     **kwargs,
                 )
             else:
-                out =  self.simulate(dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw)
+                out = self.simulate(dt, endtime, eval_kw=eval_kw, sys_kw=sys_kw)
         return out
 
-    #TODO: swap between vars and constraints depending on dxdt=True
+    # TODO: swap between vars and constraints depending on dxdt=True
     def simulate(
         self,
         dt,
@@ -606,7 +615,7 @@ class GlobalDynamics(DynamicsMixin):
 
         A copy of this system is made, and the simulation is run on the copy, so as to not affect the state of the original system.
 
-        #TODO: 
+        #TODO:
         """
         min_kw_dflt = {"method": "SLSQP"}
         #'tol':1e-6,'options':{'maxiter':100}}
@@ -617,40 +626,54 @@ class GlobalDynamics(DynamicsMixin):
             min_kw_dflt.update(min_kw)
         mkw = min_kw_dflt
 
-        #force transient
-        kwargs['dxdt'] = True
+        # force transient
+        kwargs["dxdt"] = True
 
-        #variables if failed
-        pbx,system = None,self
+        # variables if failed
+        pbx, system = None, self
         try:
-
-            #Time Iteration Context
+            # Time Iteration Context
             data = []
-            with ProblemExec(system,kwargs,level_name='sim',dxdt=True,copy_system=True,run_solver=run_solver,post_callback=cb) as pbx:
-                self._sim_ans = pbx.integrate(endtime=endtime,dt=dt,X0=X0,eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
-                system = pbx.system #hello copy
+            with ProblemExec(
+                system,
+                kwargs,
+                level_name="sim",
+                dxdt=True,
+                copy_system=True,
+                run_solver=run_solver,
+                post_callback=cb,
+            ) as pbx:
+                self._sim_ans = pbx.integrate(
+                    endtime=endtime,
+                    dt=dt,
+                    X0=X0,
+                    eval_kw=eval_kw,
+                    sys_kw=sys_kw,
+                    **kwargs,
+                )
+                system = pbx.system  # hello copy
 
-                #data = [{"time": k, **v} for k, v in  pbx.data.items()]
+                # data = [{"time": k, **v} for k, v in  pbx.data.items()]
 
-                #this will affect the context copy, not self
-                pbx.exit_to_level('sim',False) 
+                # this will affect the context copy, not self
+                pbx.exit_to_level("sim", False)
 
             # convert to list with time
-            #df = pandas.DataFrame(data)
-            #self.format_columns(df)
+            # df = pandas.DataFrame(data)
+            # self.format_columns(df)
             df = pbx.dataframe
 
-            #TODO: move to context
+            # TODO: move to context
             if return_all:
-                return system,(data if return_data else df)
+                return system, (data if return_data else df)
             if return_system:
-                return system        
+                return system
             if return_data:
-                return data        
+                return data
             return df
 
         except Exception as e:
-            self.error(e,f"simulation failed, return (sys,prob)")
+            self.error(e, f"simulation failed, return (sys,prob)")
             if debug_fail:
-                return system,pbx
+                return system, pbx
             raise e

@@ -49,9 +49,10 @@ class SystemsLog(LoggingMixin):
 
 log = SystemsLog()
 
-#NOTE: solver must come before solvable interface since it overrides certain methods
+
+# NOTE: solver must come before solvable interface since it overrides certain methods
 @forge
-class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
+class System(SolverMixin, SolveableInterface, PlottingMixin, GlobalDynamics):
     """A system defines SlotS for Components, and data flow between them using SignalS
 
     The system records all attribues to its subcomponents via system_references with scoped keys to references to set or get attributes, as well as observe system properties. These are cached upon first access in an instance.
@@ -60,27 +61,33 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
 
     When solving by default the run(revert=True) call will revert the system state to what it was before the system began.
     """
-    
-    #default to nothing
+
+    # default to nothing
     dynamic_input_vars: list = attrs.field(factory=list)
     dynamic_state_vars: list = attrs.field(factory=list)
     dynamic_output_vars: list = attrs.field(factory=list)
-    
 
     _anything_changed_ = True
-    _solver_override: bool = False #this comp will run with run_internal_systems when True, otherwise it resolves to global solver behavior, also prevents the solver from reaching into this system
-
+    _solver_override: bool = False  # this comp will run with run_internal_systems when True, otherwise it resolves to global solver behavior, also prevents the solver from reaching into this system
 
     # Properties!
     @system_property
     def converged(self) -> int:
-        if self.last_context is None: 
-            return None        
+        if self.last_context is None:
+            return None
         return self.last_context.converged
+
+    @property
+    def _converged(self):
+        return self.last_context.converged
+
+    @_converged.setter
+    def _converged(self,inpt):
+        self.last_context._converged = inpt
 
     @system_property
     def run_id(self) -> int:
-        if self.last_context is None: 
+        if self.last_context is None:
             return None
         return self.last_context.problem_id
 
@@ -117,7 +124,9 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
         """looks at internal components as well as flag for anything chagned."""
         if self._anything_changed_:
             return True
-        elif any([c.anything_changed for k, c in self.comp_references().items()]):
+        elif any(
+            [c.anything_changed for k, c in self.comp_references().items()]
+        ):
             return True
         return False
 
@@ -126,8 +135,8 @@ class System(SolverMixin, SolveableInterface, PlottingMixin,GlobalDynamics):
         """allows default functionality with new property system"""
         self.mark_all_comps_changed(inpt)
 
-    def mark_all_comps_changed(self,inpt:bool):
+    def mark_all_comps_changed(self, inpt: bool):
         """mark all components as changed, useful for forcing a re-run of the system, or for marking data as saved"""
         self._anything_changed_ = inpt
         for k, c in self.comp_references().items():
-            c._anything_changed = inpt       
+            c._anything_changed = inpt

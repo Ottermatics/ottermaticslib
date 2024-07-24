@@ -1,4 +1,4 @@
-import attrs,attr
+import attrs, attr
 import uuid
 import numpy
 import numpy as np
@@ -29,58 +29,79 @@ class SolvableLog(LoggingMixin):
     pass
 
 
-
 log = SolvableLog()
 
-#Anonymous Update Funcs (solve scoping issue)
-def _update_func(comp,eval_kw):
-    def updt(*args,**kw):
+
+# Anonymous Update Funcs (solve scoping issue)
+def _update_func(comp, eval_kw):
+    def updt(*args, **kw):
         eval_kw.update(kw)
         if log.log_level <= 5:
-            log.msg(f'update| {comp.name} ',lvl=5)
+            log.msg(f"update| {comp.name} ", lvl=5)
         return comp.update(comp.parent, *args, **eval_kw)
+
     if log.log_level <= 5:
-        log.msg(f'create method| {comp.name}| {eval_kw}')
-    updt.__name__ = f'{comp.name}_update'
+        log.msg(f"create method| {comp.name}| {eval_kw}")
+    updt.__name__ = f"{comp.name}_update"
     return updt
 
-def _post_update_func(comp,eval_kw):
-    def updt(*args,**kw):
+
+def _post_update_func(comp, eval_kw):
+    def updt(*args, **kw):
         eval_kw.update(kw)
         return comp.post_update(comp.parent, *args, **eval_kw)
+
     if log.log_level <= 5:
-        log.msg(f'create post method| {comp.name}| {eval_kw}')
-    updt.__name__ = f'{comp.name}_post_update'
+        log.msg(f"create post method| {comp.name}| {eval_kw}")
+    updt.__name__ = f"{comp.name}_post_update"
     return updt
+
 
 def _cost_update(comp):
-    from engforge.eng.costs import Economics,CostModel    
-    
-    if isinstance(comp,Economics):
-        def updt(*args,**kw):
+    from engforge.eng.costs import Economics, CostModel
+
+    if isinstance(comp, Economics):
+
+        def updt(*args, **kw):
             if log.log_level <= 8:
-                log.debug(f'update economics {comp.name} | {comp.term_length} ')
+                log.debug(f"update economics {comp.name} | {comp.term_length} ")
             comp.system_properties_classdef(True)
             comp.update(comp.parent, *args, **kw)
+
         if log.log_level <= 8:
-            log.debug(f'economics update cb {comp.name} | {comp.term_length} ')
-        updt.__name__ = f'{comp.name}_econ_update'
+            log.debug(f"economics update cb {comp.name} | {comp.term_length} ")
+        updt.__name__ = f"{comp.name}_econ_update"
     else:
-        def updt(*args,**kw):
+
+        def updt(*args, **kw):
             if log.log_level <= 7:
-                log.msg(f'update costs {comp.name} ',lvl=5)
+                log.msg(f"update costs {comp.name} ", lvl=5)
             comp.system_properties_classdef(True)
             return comp.update_dflt_costs()
+
         if log.log_level <= 7:
-            log.debug(f'cost update cb {comp.name} ')
-        updt.__name__ = f'{comp.name}_cost_update'
-        
+            log.debug(f"cost update cb {comp.name} ")
+        updt.__name__ = f"{comp.name}_cost_update"
+
     return updt
 
-dflt_dynamics = {'dynamics.state':{},'dynamics.input':{},'dynamics.rate':{},'dynamics.output':{},'dynamic_comps':{}}
-skipa_attr_names = ("index","parent","dynamic_input_vars","dynamic_state_vars","dynamic_output_vars")
 
-    
+dflt_dynamics = {
+    "dynamics.state": {},
+    "dynamics.input": {},
+    "dynamics.rate": {},
+    "dynamics.output": {},
+    "dynamic_comps": {},
+}
+skipa_attr_names = (
+    "index",
+    "parent",
+    "dynamic_input_vars",
+    "dynamic_state_vars",
+    "dynamic_output_vars",
+)
+
+
 class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     """commonality for components,systems that identifies subsystems and states for solving.
 
@@ -99,7 +120,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     _prv_system_references: dict
 
     # Update Flow
-    #TODO: pass the problem vs the parent component, then locate this component in the problem and update any references
+    # TODO: pass the problem vs the parent component, then locate this component in the problem and update any references
     def update(self, parent, *args, **kwargs):
         """Kwargs comes from eval_kw in solver"""
         if log.log_level <= 5:
@@ -110,51 +131,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         if log.log_level <= 5:
             log.debug(f"void post-updating {self.__class__.__name__}.{self}")
 
-    def collect_update_refs(self,eval_kw=None,ignore=None):
+    def collect_update_refs(self, eval_kw=None, ignore=None):
         """checks all methods and creates ref's to execute them later"""
-        from engforge.eng.costs import CostModel,Economics
+        from engforge.eng.costs import CostModel, Economics
 
-        updt_refs = {}
-        from engforge.components import Component
-        from engforge.component_collections import ComponentIter
-
-        # Ignore
-        if ignore is None:
-            ignore = set()
-        elif self in ignore:
-            return
-        
-        for key, comp in self.internal_configurations(False).items():
-            if ignore is not None and comp in ignore:
-                continue
-
-            if not isinstance(comp,SolveableMixin):
-                continue            
-
-            #provide add eval_kw
-            if eval_kw and key in eval_kw:
-                eval_kw_comp = eval_kw[key]
-            else:
-                eval_kw_comp = {}
-            ekw = eval_kw_comp
-
-            #Add if its a unique update method (not the passthrough)
-            if isinstance(comp,(CostModel,Economics)):
-                ref = Ref(comp,_cost_update(comp))
-                updt_refs[key+'._cost_model_'] =  ref            
-            
-            elif comp.__class__.update != SolveableMixin.update:
-                ref = Ref(comp,_update_func(comp,ekw))
-                updt_refs[key] =  ref
-            
-            #Cost Models
-
-
-        ignore.add(self)
-        return updt_refs
-
-    def collect_post_update_refs(self,eval_kw=None,ignore=None):
-        """checks all methods and creates ref's to execute them later"""
         updt_refs = {}
         from engforge.components import Component
         from engforge.component_collections import ComponentIter
@@ -169,21 +149,61 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             if ignore is not None and comp in ignore:
                 continue
 
-            if not isinstance(comp,SolveableMixin):
-                continue            
+            if not isinstance(comp, SolveableMixin):
+                continue
 
             # provide add eval_kw
             if eval_kw and key in eval_kw:
                 eval_kw_comp = eval_kw[key]
             else:
                 eval_kw_comp = {}
-            
             ekw = eval_kw_comp
-                
-            #Add if its a unique update method (not the passthrough)
+
+            # Add if its a unique update method (not the passthrough)
+            if isinstance(comp, (CostModel, Economics)):
+                ref = Ref(comp, _cost_update(comp))
+                updt_refs[key + "._cost_model_"] = ref
+
+            elif comp.__class__.update != SolveableMixin.update:
+                ref = Ref(comp, _update_func(comp, ekw))
+                updt_refs[key] = ref
+
+            # Cost Models
+
+        ignore.add(self)
+        return updt_refs
+
+    def collect_post_update_refs(self, eval_kw=None, ignore=None):
+        """checks all methods and creates ref's to execute them later"""
+        updt_refs = {}
+        from engforge.components import Component
+        from engforge.component_collections import ComponentIter
+
+        # Ignore
+        if ignore is None:
+            ignore = set()
+        elif self in ignore:
+            return
+
+        for key, comp in self.internal_configurations(False).items():
+            if ignore is not None and comp in ignore:
+                continue
+
+            if not isinstance(comp, SolveableMixin):
+                continue
+
+            # provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}
+
+            ekw = eval_kw_comp
+
+            # Add if its a unique update method (not the passthrough)
             if comp.__class__.post_update != SolveableMixin.post_update:
-                ref = Ref(comp,_post_update_func(comp,ekw))
-                updt_refs[key] =  ref
+                ref = Ref(comp, _post_update_func(comp, ekw))
+                updt_refs[key] = ref
 
         ignore.add(self)
         return updt_refs
@@ -191,7 +211,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
     # internals caching
     # instance attributes
 
-    #TODO: move all system / property & identification to the problem_context or new system_identificaiton class (problem/base)
+    # TODO: move all system / property & identification to the problem_context or new system_identificaiton class (problem/base)
     @instance_cached
     def signals(self):
         """this is just a record of signals from this solvable. dont use this to get the signals, use high level signals strategy #TODO: add signals strategy"""
@@ -199,12 +219,12 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
     @instance_cached
     def solvers(self):
-        """this is just a record of any solvable attribute. dont use this to get the attribute, use another strategy"""        
+        """this is just a record of any solvable attribute. dont use this to get the attribute, use another strategy"""
         return {k: getattr(self, k) for k in self.solvers_attributes()}
 
     @instance_cached(allow_set=True)
     def transients(self):
-        """this is just a record of any transient attribute. dont use this to get the transient, use another strategy"""   
+        """this is just a record of any transient attribute. dont use this to get the transient, use another strategy"""
         return {k: getattr(self, k) for k in self.transients_attributes()}
 
     def internal_components(self, recache=False) -> dict:
@@ -253,16 +273,19 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             if isinstance(v, ComponentIter) and not v.wide
         }
 
-    def internal_references(self, recache=False,numeric_only=False) -> dict:
+    def internal_references(self, recache=False, numeric_only=False) -> dict:
         """get references to all internal attributes and values, only saving when complete cache info is requested (vs numeric only)"""
-        if not numeric_only and (recache == False and hasattr(self, "_prv_internal_references")):
+        if not numeric_only and (
+            recache == False and hasattr(self, "_prv_internal_references")
+        ):
             return self._prv_internal_references
 
         out = self._gather_references(numeric_only=numeric_only)
-        if not numeric_only: self._prv_internal_references = out
+        if not numeric_only:
+            self._prv_internal_references = out
         return out
 
-    def _gather_references(self,numeric_only=False) -> dict:
+    def _gather_references(self, numeric_only=False) -> dict:
         out = {}
         out["attributes"] = at = {}
         out["properties"] = pr = {}
@@ -307,12 +330,14 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for ck, comp in components.items():
                 comp.reset()
 
-    def comp_references(self,ignore_none_comp=True,**kw):
+    def comp_references(self, ignore_none_comp=True, **kw):
         """A cached set of recursive references to any slot component
         #FIXME: by instance recache on iterative component change or other signals
         """
         out = {}
-        for key, lvl, comp in self.go_through_configurations(parent_level=1,**kw):
+        for key, lvl, comp in self.go_through_configurations(
+            parent_level=1, **kw
+        ):
             if ignore_none_comp and not isinstance(comp, SolveableMixin):
                 continue
             out[key] = comp
@@ -349,7 +374,9 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         self.debug(
             f"running [Solver].{method} {self.identity} with input {kwargs}"
         )
-        assert hasattr(ProblemExec.class_cache,'session'), 'must be active context!'
+        assert hasattr(
+            ProblemExec.class_cache, "session"
+        ), "must be active context!"
         # create iterable null for sequence
         if sequence is None or not sequence:
             sequence = [{}]
@@ -386,16 +413,14 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
 
                     # Iterate over Sequence (or run once)
                     for seq in sequence:
-                        #apply sequence values
+                        # apply sequence values
                         icur = cur.copy()
-                        #apply sequence values
+                        # apply sequence values
                         if seq:
                             icur.update(**seq)
 
                         # Run The Method with inputs provisioned
-                        out = method(
-                            icur, eval_kw, sys_kw, cb=cb, **method_kw
-                        )
+                        out = method(icur, eval_kw, sys_kw, cb=cb, **method_kw)
 
                         if return_results:
                             # store the output
@@ -404,7 +429,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                             inputs[max(inputs) + 1 if inputs else 0] = icur
 
             # nice
-            #TODO: wrap this with context manager
+            # TODO: wrap this with context manager
             self._solved = True
 
             # Pre Run Callback with current state
@@ -544,13 +569,15 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         log.msg(f"locating {self.identity} | key: {key}")
         val = None
 
-        #Handle callable key override
+        # Handle callable key override
         if callable(key):
             comp = kw.pop("comp", self)
             func = copy.copy(key)
             return Ref(comp, func, **kw)
         else:
-            assert 'comp' not in kw, f"comp kwarg not allowed with string key {key}"
+            assert (
+                "comp" not in kw
+            ), f"comp kwarg not allowed with string key {key}"
 
         if "." in key:
             args = key.split(".")
@@ -587,36 +614,42 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         return val
 
     # Reference Caching
-    #TODO: move to problem context
-    def system_references(self, recache=False,numeric_only=False,**kw):
+    # TODO: move to problem context
+    def system_references(self, recache=False, numeric_only=False, **kw):
         """gather a list of references to attributes and"""
-        if not numeric_only and not kw and (recache == False and hasattr(self, "_prv_system_references")):
+        if (
+            not numeric_only
+            and not kw
+            and (recache == False and hasattr(self, "_prv_system_references"))
+        ):
             return self._prv_system_references
 
-        out = self.internal_references(recache,numeric_only=numeric_only)
+        out = self.internal_references(recache, numeric_only=numeric_only)
         tatr = out["attributes"]
         tprp = out["properties"]
-        comp_dict = {'':self}
-        out['components'] = comp_set_ref = {}
+        comp_dict = {"": self}
+        out["components"] = comp_set_ref = {}
 
         # component iternals
         for key, comp in self.comp_references(**kw).items():
-            sout = comp.internal_references(recache,numeric_only=numeric_only)
+            sout = comp.internal_references(recache, numeric_only=numeric_only)
             satr = sout["attributes"]
             sprp = sout["properties"]
-            
-            #find the parent component
-            key_segs = key.split('.')
-            if len(key_segs) == 1:
-                parent = ''
-            else:
-                parent = '.'.join(key_segs[:-1])
 
-            #parent refs for assigning a component
+            # find the parent component
+            key_segs = key.split(".")
+            if len(key_segs) == 1:
+                parent = ""
+            else:
+                parent = ".".join(key_segs[:-1])
+
+            # parent refs for assigning a component
             comp_dict[key] = comp
             if parent in comp_dict:
-                attr_name = key.split('.')[-1]
-                comp_set_ref[key] = Ref(comp_dict[parent],attr_name,False,True)
+                attr_name = key.split(".")[-1]
+                comp_set_ref[key] = Ref(
+                    comp_dict[parent], attr_name, False, True
+                )
 
             # Fill in
             for k, v in satr.items():
@@ -627,29 +660,36 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             for k, v in sprp.items():
                 tprp[f"{key}.{k}"] = v
 
-        if not numeric_only and not kw : self._prv_system_references = out
+        if not numeric_only and not kw:
+            self._prv_system_references = out
         return out
-    
-    def collect_comp_refs(self,conf:"Configuration"=None,**kw):
-        """collects all the references for the system grouped by component"""    
+
+    def collect_comp_refs(self, conf: "Configuration" = None, **kw):
+        """collects all the references for the system grouped by component"""
         if conf is None:
             conf = self
         comp_dict = {}
         attr_dict = {}
         cls_dict = {}
-        out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict}
+        out = {"comps": comp_dict, "attrs": attr_dict, "type": cls_dict}
         for key, lvl, conf in self.go_through_configurations(**kw):
             comp_dict[key] = conf
             attr_dict[key] = conf.collect_inst_attributes()
 
         return out
-    
-    
-    def collect_solver_refs(self,conf:"Configuration"=None,check_atr_f=None,check_kw=None,check_dynamics=True,**kw):
-        """collects all the references for the system grouped by function and prepended with the system key"""    
+
+    def collect_solver_refs(
+        self,
+        conf: "Configuration" = None,
+        check_atr_f=None,
+        check_kw=None,
+        check_dynamics=True,
+        **kw,
+    ):
+        """collects all the references for the system grouped by function and prepended with the system key"""
         from engforge.attributes import ATTR_BASE
         from engforge.engforge_attributes import AttributedBaseMixin
-        
+
         confobj = conf
         if confobj is None:
             confobj = self
@@ -659,170 +699,184 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         cls_dict = {}
         skipped = {}
 
-        out = {'comps':comp_dict,'attrs':attr_dict,'type':cls_dict,'skipped':skipped}
-        
-        #Go through all components
-        for key, lvl, conf in confobj.go_through_configurations(**kw):
+        out = {
+            "comps": comp_dict,
+            "attrs": attr_dict,
+            "type": cls_dict,
+            "skipped": skipped,
+        }
 
+        # Go through all components
+        for key, lvl, conf in confobj.go_through_configurations(**kw):
             if conf is None:
                 continue
-            
-            if hasattr(conf,'_solver_override') and conf._solver_override:
+
+            if hasattr(conf, "_solver_override") and conf._solver_override:
                 continue
 
-            #Get attributes & attribute instances
+            # Get attributes & attribute instances
             atrs = conf.collect_inst_attributes()
             rawattr = conf.collect_inst_attributes(handle_inst=False)
-            key = f'{key}.' if key else '' #you need a dot if there's a key
+            key = f"{key}." if key else ""  # you need a dot if there's a key
             comp_dict[key] = conf
-            #Gather attribute heirarchy and make key.var the dictionary entry
-            for atype,aval in atrs.items():
-                
+            # Gather attribute heirarchy and make key.var the dictionary entry
+            for atype, aval in atrs.items():
                 ck_type = rawattr[atype]
                 if atype not in cls_dict:
                     cls_dict[atype] = {}
 
-                if isinstance(aval,dict) and aval:
-                                       
-                    for k,pre,val in ATTR_BASE.unpack_atrs(aval,atype):
-
-                        #No Room For Components (SLOTS feature)
-                        if isinstance(val,(AttributedBaseMixin,ATTR_BASE)):
+                if isinstance(aval, dict) and aval:
+                    for k, pre, val in ATTR_BASE.unpack_atrs(aval, atype):
+                        # No Room For Components (SLOTS feature)
+                        if isinstance(val, (AttributedBaseMixin, ATTR_BASE)):
                             if conf.log_level <= 5:
-                                conf.debug(f'skipping comp attr {val}')
-                            continue   
+                                conf.debug(f"skipping comp attr {val}")
+                            continue
 
                         if val is None:
                             continue
 
                         if conf.log_level <= 5:
-                            conf.msg(f'')
-                            conf.msg(f'got val: {k} {pre} {val}')  
+                            conf.msg(f"")
+                            conf.msg(f"got val: {k} {pre} {val}")
 
                         slv_type = None
-                        pre_var = pre.split('.')[-1]
-                        if hasattr(conf,pre_var):
-                            _var = getattr(conf,pre_var)
-                            if isinstance(_var,AttributeInstance):
+                        pre_var = pre.split(".")[-1]
+                        if hasattr(conf, pre_var):
+                            _var = getattr(conf, pre_var)
+                            if isinstance(_var, AttributeInstance):
                                 slv_type = _var
-                            conf.msg(f'slv type: {conf.classname}.{pre_var} -> {_var}')
+                            conf.msg(
+                                f"slv type: {conf.classname}.{pre_var} -> {_var}"
+                            )
 
                         val_type = ck_type[pre_var]
 
-                        #Otherwise assign the data from last var and the compoenent name
-                        var_name = pre_var #prer alias
+                        # Otherwise assign the data from last var and the compoenent name
+                        var_name = pre_var  # prer alias
                         if slv_type:
                             var_name = slv_type.get_alias(pre)
-                        
-                        #Keep reference to the original type and name
-                        scope_name = f'{key}{var_name}'
-                        cls_dict[atype][scope_name] = val_type
-                        
-                        if conf.log_level <= 5:
-                            conf.msg(f'rec: {var_name} {k} {pre} {val} {slv_type}')
 
-                        #Check to skip this item
-                        #keep references even if null
-                        pre = f'{atype}.{k}' #pre switch
+                        # Keep reference to the original type and name
+                        scope_name = f"{key}{var_name}"
+                        cls_dict[atype][scope_name] = val_type
+
+                        if conf.log_level <= 5:
+                            conf.msg(
+                                f"rec: {var_name} {k} {pre} {val} {slv_type}"
+                            )
+
+                        # Check to skip this item
+                        # keep references even if null
+                        pre = f"{atype}.{k}"  # pre switch
                         if pre not in attr_dict:
                             attr_dict[pre] = {}
-                        
-                        if isinstance(val,Ref) and val.allow_set:
-                            #its a var, skip it if it's already been skipped
+
+                        if isinstance(val, Ref) and val.allow_set:
+                            # its a var, skip it if it's already been skipped
                             current_skipped = [set(v) for v in skipped.values()]
-                            if current_skipped and val.key in set.union(*current_skipped):
+                            if current_skipped and val.key in set.union(
+                                *current_skipped
+                            ):
                                 continue
-                        
-                        #Perform the check
-                        if check_atr_f and not check_atr_f(pre,scope_name,val_type,check_kw):
+
+                        # Perform the check
+                        if check_atr_f and not check_atr_f(
+                            pre, scope_name, val_type, check_kw
+                        ):
                             if conf.log_level <= 5:
-                                conf.msg(f'chk skip {scope_name} {k} {pre} {val}')
+                                conf.msg(
+                                    f"chk skip {scope_name} {k} {pre} {val}"
+                                )
                             if pre not in skipped:
                                 skipped[pre] = []
 
-                            if isinstance(val,Ref) and val.allow_set:
-                                #its a var
-                                skipped[pre].append(f'{key}{val.key}') 
+                            if isinstance(val, Ref) and val.allow_set:
+                                # its a var
+                                skipped[pre].append(f"{key}{val.key}")
                             else:
-                                #not objective or settable, must be a obj/cond
+                                # not objective or settable, must be a obj/cond
                                 skipped[pre].append(scope_name)
                             continue
 
-                        #if the value is a dictionary, unpack it with comp key
+                        # if the value is a dictionary, unpack it with comp key
                         if val:
-                            attr_dict[pre].update({scope_name:val})
+                            attr_dict[pre].update({scope_name: val})
                         else:
                             if attr_dict[pre]:
-                                continue #keep it!
+                                continue  # keep it!
                             else:
-                                attr_dict[pre] = {} #reset it
+                                attr_dict[pre] = {}  # reset it
 
                 elif atype not in attr_dict or not attr_dict[atype]:
-                   #print(f'unpacking {atype} {aval}')
-                   attr_dict[atype] = {}
-        
-        #Dynamic Variables Add, following the skipped items
+                    # print(f'unpacking {atype} {aval}')
+                    attr_dict[atype] = {}
+
+        # Dynamic Variables Add, following the skipped items
         if check_dynamics:
             dyn_refs = self.collect_dynamic_refs(confobj).copy()
-            #house keeping to organize special returns 
-            
-            #TODO: generalize this with a function to update the attr dict serach result when changing components
-            out['dynamic_comps'] = dyn_comp = dyn_refs.pop('dynamic_comps',{})
-            
-            #Check the dynamics for the system
-            if check_atr_f or any([v for v in skipped.values()]):
+            # house keeping to organize special returns
 
+            # TODO: generalize this with a function to update the attr dict serach result when changing components
+            out["dynamic_comps"] = dyn_comp = dyn_refs.pop("dynamic_comps", {})
+
+            # Check the dynamics for the system
+            if check_atr_f or any([v for v in skipped.values()]):
                 skipd = set()
-                #check each group of dynamics
-                for pre,refs in dyn_refs.items():
-                    
+                # check each group of dynamics
+                for pre, refs in dyn_refs.items():
                     if pre not in skipped:
                         skipped[pre] = []
 
                     if pre not in attr_dict:
-                        attr_dict[pre] =  {} #initalize dynamic group
-                    
-                    #eval each ref for inclusion
-                    for var,ref in refs.items():
-                        
-                        key_segs = var.split('.')
-                        key = '' if len(key_segs) == 1 else '.'.join(key_segs[:-1])
-                        scoped_name = f'{var}'
-                        conf = dyn_comp.get(key)                        
+                        attr_dict[pre] = {}  # initalize dynamic group
 
-                        is_ref = isinstance(ref,Ref) 
+                    # eval each ref for inclusion
+                    for var, ref in refs.items():
+                        key_segs = var.split(".")
+                        key = (
+                            ""
+                            if len(key_segs) == 1
+                            else ".".join(key_segs[:-1])
+                        )
+                        scoped_name = f"{var}"
+                        conf = dyn_comp.get(key)
+
+                        is_ref = isinstance(ref, Ref)
                         if not is_ref:
-                            conf.info(f'not ref {scoped_name}')
+                            conf.info(f"not ref {scoped_name}")
                             continue
 
                         if is_ref and not ref.allow_set:
-                            #adding unsettables (likely rates)
-                            attr_dict[pre].update(**{var:ref})
-                            self.debug(f'set escape: {scoped_name} {ref}')
+                            # adding unsettables (likely rates)
+                            attr_dict[pre].update(**{var: ref})
+                            self.debug(f"set escape: {scoped_name} {ref}")
                             continue
-                        
+
                         val_type = ref.comp
-                        if check_atr_f and isinstance(var,str) and check_atr_f(pre,var,val_type,check_kw):
-                            conf.msg(f'dynvar add {pre,var,val_type,skipd}')
-                            attr_dict[pre].update(**{var:ref})
+                        if (
+                            check_atr_f
+                            and isinstance(var, str)
+                            and check_atr_f(pre, var, val_type, check_kw)
+                        ):
+                            conf.msg(f"dynvar add {pre,var,val_type,skipd}")
+                            attr_dict[pre].update(**{var: ref})
                         else:
-                            conf.msg(f'dynvar endskip {pre,var,val_type,skipd}')
-                            if check_atr_f: #then it didn't checkout
+                            conf.msg(f"dynvar endskip {pre,var,val_type,skipd}")
+                            if check_atr_f:  # then it didn't checkout
                                 skipped[pre].append(scope_name)
 
             else:
-                #There's no checks to be done, just add these
+                # There's no checks to be done, just add these
                 attr_dict.update(**dyn_refs)
         else:
             cpy = dflt_dynamics.copy()
-            cpy.pop('dynamic_comps',{})
+            cpy.pop("dynamic_comps", {})
             attr_dict.update(cpy)
-            
-                         
 
         return out
 
-    #Dynamics info refs
+    # Dynamics info refs
     def collect_dynamic_refs(
         self, conf: "ConfigurationMixin" = None, **kw
     ) -> dict:
@@ -831,9 +885,10 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         2. Dynamic Instances
         """
         from engforge.dynamics import DynamicsMixin
+
         if conf is None:
             conf = self
-        dynamics = {k:{} for k in dflt_dynamics}
+        dynamics = {k: {} for k in dflt_dynamics}
 
         for key, lvl, conf in conf.go_through_configurations(**kw):
             # FIXME: add a check for the dynamics mixin, that isn't hacky
@@ -843,16 +898,15 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
             if not isinstance(conf, DynamicsMixin) or not conf.is_dynamic:
                 continue
 
-            sval = f'{key}.' if key else ''
-            scope = lambda d: {f'{sval}{k}':v for k,v in d.items()}
-            dynamics['dynamics.state'].update(scope(conf.Xt_ref))
-            dynamics['dynamics.input'].update(scope(conf.Ut_ref))
-            dynamics['dynamics.output'].update(scope(conf.Yt_ref))
-            dynamics['dynamics.rate'].update(scope(conf.dXtdt_ref))
-            dynamics['dynamic_comps'][key] = conf
+            sval = f"{key}." if key else ""
+            scope = lambda d: {f"{sval}{k}": v for k, v in d.items()}
+            dynamics["dynamics.state"].update(scope(conf.Xt_ref))
+            dynamics["dynamics.input"].update(scope(conf.Ut_ref))
+            dynamics["dynamics.output"].update(scope(conf.Yt_ref))
+            dynamics["dynamics.rate"].update(scope(conf.dXtdt_ref))
+            dynamics["dynamic_comps"][key] = conf
 
         return dynamics
-
 
     def get_system_input_refs(
         self,
@@ -876,6 +930,7 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
         :rtype: dict
         """
         from engforge.tabulation import SKIP_REF
+
         refs = {}
         for ckey, lvl, comp in self.go_through_configurations(**kw):
             if comp is None:
@@ -910,4 +965,3 @@ class SolveableMixin(AttributedBaseMixin):  #'Configuration'
                         )
 
         return refs
-

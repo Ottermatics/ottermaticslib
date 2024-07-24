@@ -9,10 +9,12 @@ from engforge.logging import LoggingMixin
 SLOT_TYPES = typ.Union["Component", "System"]
 ITERATOR = typ.Union["ComponentIterator"]
 
-class SlotLog(LoggingMixin):pass
-log = SlotLog()
 
-    
+class SlotLog(LoggingMixin):
+    pass
+
+
+log = SlotLog()
 
 
 class Slot(ATTR_BASE):
@@ -24,7 +26,7 @@ class Slot(ATTR_BASE):
     config_cls: "System"
     attr_prefix = "Slot"
     none_ok: bool
-    instance_class = None #add the component or system on define
+    instance_class = None  # add the component or system on define
 
     dflt_kw: dict = None  # a dictionary of input in factory for custom inits
     default_ok = True  # otherwise accept class with defaults
@@ -82,23 +84,23 @@ class Slot(ATTR_BASE):
         ), "Not System Or Component Input"
 
         ### Cost models should always default to None
-        #FIXME: is this nessicary?
+        # FIXME: is this nessicary?
         if any([issubclass(c, CostModel) for c in component_or_systems]):
             default_ok = False
             none_ok = True
 
-        new_dict =  dict(
-                accepted=component_or_systems,
-                none_ok=none_ok,
-                default_ok=default_ok,
-                dflt_kw=dflt_kw,
-                instance_class = component_or_systems[0],
-                default_options=cls.default_options.copy(),
-            )
+        new_dict = dict(
+            accepted=component_or_systems,
+            none_ok=none_ok,
+            default_ok=default_ok,
+            dflt_kw=dflt_kw,
+            instance_class=component_or_systems[0],
+            default_options=cls.default_options.copy(),
+        )
 
-        #slot
-        new_name = cls.attr_prefix+'_'
-        new_sig = cls._setup_cls(new_name, new_dict)     
+        # slot
+        new_name = cls.attr_prefix + "_"
+        new_sig = cls._setup_cls(new_name, new_dict)
         return new_sig
 
     @classmethod
@@ -145,12 +147,12 @@ class Slot(ATTR_BASE):
                 dflt_kw=dflt_kw,
                 is_iter=True,
                 wide=wide,
-                instance_class = component_or_systems[0],
+                instance_class=component_or_systems[0],
                 default_options=cls.default_options.copy(),
             ),
         )
-        new_slot.default_options['validator'] = new_slot.configure_instance
-        new_slot.default_options['default'] =  new_slot.make_factory()
+        new_slot.default_options["validator"] = new_slot.configure_instance
+        new_slot.default_options["default"] = new_slot.make_factory()
         return new_slot
 
     # Create a validator function
@@ -181,27 +183,28 @@ class Slot(ATTR_BASE):
     @classmethod
     def make_factory(cls, **kwargs):
         accepted = cls.accepted
-        log.debug(f'slot instance factory: {cls} {accepted}, {kwargs}')
+        log.debug(f"slot instance factory: {cls} {accepted}, {kwargs}")
 
         if isinstance(accepted, (tuple, list)) and len(accepted) > 0:
             accepted = accepted[0]
 
-        log.debug(f'slot factory: {accepted},{cls.dflt_kw},{cls.default_ok}')
+        log.debug(f"slot factory: {accepted},{cls.dflt_kw},{cls.default_ok}")
         if cls.dflt_kw:
-            return attrs.Factory(cls.make_accepted(accepted,**cls.dflt_kw), False)
+            return attrs.Factory(
+                cls.make_accepted(accepted, **cls.dflt_kw), False
+            )
         elif cls.default_ok:
             return attrs.Factory(accepted, False)
         else:
             return None
 
     @classmethod
-    def make_accepted(cls,accepted,**kw):
-        log.debug(f'making accepted: {cls.instance_class} {kw}')
+    def make_accepted(cls, accepted, **kw):
+        log.debug(f"making accepted: {cls.instance_class} {kw}")
         return lambda: accepted(**kw)
-    
-        
+
     @classmethod
-    def handle_instance(cls,canidate):
+    def handle_instance(cls, canidate):
         """a passthrough"""
         return canidate
 

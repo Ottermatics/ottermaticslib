@@ -18,9 +18,7 @@ class test_cantilever(unittest.TestCase):
 
         self.ibeam = i_section(0.3072, 0.1243, 0.0121, 0.008, 0.0089, 4)
         beam = ShapelySection(shape=self.ibeam, material=ANSI_4130())
-        self.bm = self.st.add_member(
-            "mem", "wall", "free", section=beam
-        )
+        self.bm = self.st.add_member("mem", "wall", "free", section=beam)
 
         self.st.def_support(
             "wall",
@@ -48,25 +46,27 @@ class test_cantilever(unittest.TestCase):
         # self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
         self.subtest_assert_near(float(self.bm.data_dict["max_shear_y"]), 3000)
 
-        df = self.st.node_dataframe.loc['gravity']
+        df = self.st.node_dataframe.loc["gravity"]
 
         dfw = df.loc["wall"]
         dff = df.loc["free"]
 
-        self.subtest_assert_near(float(dfw["rxfx"]), -3000,msg='wall rxfx')
-        self.subtest_assert_near(float(dfw["rxmz"]), 15000,msg='wall rxmz')
-        self.subtest_assert_near(float(dfw["dx"]), 0,msg='wall dx')
+        self.subtest_assert_near(float(dfw["rxfx"]), -3000, msg="wall rxfx")
+        self.subtest_assert_near(float(dfw["rxmz"]), 15000, msg="wall rxmz")
+        self.subtest_assert_near(float(dfw["dx"]), 0, msg="wall dx")
 
-        self.subtest_assert_near(float(dff["dx"]), 0.0076,msg='dx')
-        self.subtest_assert_near(float(dff["rxfx"]), 0,msg='rxfx')
-        self.subtest_assert_near(float(dff["rxmz"]), 0,msg='rxmz')
+        self.subtest_assert_near(float(dff["dx"]), 0.0076, msg="dx")
+        self.subtest_assert_near(float(dff["rxfx"]), 0, msg="rxfx")
+        self.subtest_assert_near(float(dff["rxmz"]), 0, msg="rxmz")
 
         stress_obj = self.bm.get_stress_at(0, "gravity")
         # stress_obj.plot_stress_vm()
 
-    def subtest_assert_near(self, value, truth, pct=0.025,**kw):
+    def subtest_assert_near(self, value, truth, pct=0.025, **kw):
         with self.subTest(**kw):
-            self.assertAlmostEqual(value, truth, delta=max(abs(truth * pct),abs(pct)))
+            self.assertAlmostEqual(
+                value, truth, delta=max(abs(truth * pct), abs(pct))
+            )
 
 
 class test_truss(unittest.TestCase):
@@ -111,10 +111,7 @@ class test_truss(unittest.TestCase):
 
         self.beam = sections.rectangular_section(1.5, 1.5)
         material = ANSI_4130()
-        self.section = ShapelySection(
-                                shape=self.beam,
-                                material= material
-                                )
+        self.section = ShapelySection(shape=self.beam, material=material)
 
         constrained = ("A", "E")
         for n1, n2 in pairs:
@@ -123,9 +120,9 @@ class test_truss(unittest.TestCase):
                 bkey,
                 n1,
                 n2,
-                #material=ANSI_4130(),
+                # material=ANSI_4130(),
                 section=self.section,
-                #min_mesh_size=0.01,
+                # min_mesh_size=0.01,
             )
 
             # if n1 not in constrained:
@@ -164,11 +161,11 @@ class test_truss(unittest.TestCase):
         # self.st.visulize()
 
     def test_reactions(self):
-        df = self.st.node_dataframe.loc['gravity']
+        df = self.st.node_dataframe.loc["gravity"]
         # print(df)
 
-        dfa = df.loc['A']
-        dfe = df.loc['E']
+        dfa = df.loc["A"]
+        dfe = df.loc["E"]
 
         # print(dfa)
         # print(dfe)

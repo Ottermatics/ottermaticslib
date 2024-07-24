@@ -17,7 +17,10 @@ BASIC_LOG_FMT = "[%(name)-24s]%(message)s"
 global LOG_LEVEL
 LOG_LEVEL = logging.INFO
 
-def change_all_log_levels(inst=None,new_log_level: int=20, check_function=None):
+
+def change_all_log_levels(
+    inst=None, new_log_level: int = 20, check_function=None
+):
     """Changes All Log Levels With pyee broadcast before reactor is running
     :param new_log_level: int - changes unit level log level (10-msg,20-debug,30-info,40-warning,50-error,60-crit)
     :param check_function: callable -> bool - (optional) if provided if check_function(unit) is true then the new_log_level is applied
@@ -33,13 +36,15 @@ def change_all_log_levels(inst=None,new_log_level: int=20, check_function=None):
 
     global LOG_LEVEL
     LOG_LEVEL = new_log_level
-    
+
     if LoggingMixin.log_level != new_log_level:
         print(f"changing log levels to {new_log_level}...")
         log.info(f"Changing All Logging Units To Level {new_log_level}")
     log_change_emitter.emit("change_level", new_log_level, check_function)
     LoggingMixin.log_level = new_log_level
-    if inst: inst.log_level = new_log_level
+    if inst:
+        inst.log_level = new_log_level
+
 
 class LoggingMixin(logging.Filter):
     """Class to include easy formatting in subclasses"""
@@ -54,7 +59,7 @@ class LoggingMixin(logging.Filter):
     slack_webhook_url = None
     # log_silo = False
 
-    change_all_log_lvl = lambda s, *a, **kw: change_all_log_levels(s,*a, **kw)
+    change_all_log_lvl = lambda s, *a, **kw: change_all_log_levels(s, *a, **kw)
 
     @property
     def logger(self):
@@ -84,7 +89,7 @@ class LoggingMixin(logging.Filter):
                         self.__class__.log_level = new_level
                         self.info(msg)
                         self._log.setLevel(new_level)
-                        self.log_level=new_level
+                        self.log_level = new_level
                         self.resetLog()
 
             log_change_emitter.add_listener("change_level", _change_log)
@@ -127,11 +132,12 @@ class LoggingMixin(logging.Filter):
         self.add_fields(record)
         return True
 
-    def msg(self, *args,lvl=5):
+    def msg(self, *args, lvl=5):
         """Writes to log... this should be for raw data or something... least priorty"""
         if self.log_on:
             self.logger.log(
-                lvl, self.message_with_identiy(self.extract_message(args), "blue")
+                lvl,
+                self.message_with_identiy(self.extract_message(args), "blue"),
             )
 
     def debug(self, *args):

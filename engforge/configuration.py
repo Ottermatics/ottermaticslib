@@ -13,24 +13,60 @@ import copy
 class ConfigLog(LoggingMixin):
     pass
 
+
 log = ConfigLog()
 
-conv_nms = lambda v: v.split(',') if isinstance(v,str) else v
-NAME_ADJ = EnvVariable('FORGE_NAME_ADJ',default=('geometry','size','algorithms','complexity','colors','materials'),type_conv=conv_nms)
-NAME_NOUN = EnvVariable('FORGE_NAME_NOUN',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
-FORGE_DEBUG = EnvVariable('FORGE_LOG_LEVEL',default=('chemistry','astronomy','linear_algebra','geometry','coding','corporate_job','design','car_parts','machine_learning','physics_units'),type_conv=conv_nms)
+conv_nms = lambda v: v.split(",") if isinstance(v, str) else v
+NAME_ADJ = EnvVariable(
+    "FORGE_NAME_ADJ",
+    default=(
+        "geometry",
+        "size",
+        "algorithms",
+        "complexity",
+        "colors",
+        "materials",
+    ),
+    type_conv=conv_nms,
+)
+NAME_NOUN = EnvVariable(
+    "FORGE_NAME_NOUN",
+    default=(
+        "chemistry",
+        "astronomy",
+        "linear_algebra",
+        "geometry",
+        "coding",
+        "corporate_job",
+        "design",
+        "car_parts",
+        "machine_learning",
+        "physics_units",
+    ),
+    type_conv=conv_nms,
+)
+FORGE_DEBUG = EnvVariable(
+    "FORGE_LOG_LEVEL",
+    default=20,
+    type_conv=int,
+)
+
 
 def name_generator(instance):
     """a name generator for the instance"""
-    base = str(instance.__class__.__name__).lower()+'-'
+    base = str(instance.__class__.__name__).lower() + "-"
     if instance.__class__._use_random_name:
-        out =base+ randomname.get_name(adj=NAME_ADJ.secret,noun=NAME_NOUN.secret)
+        out = base + randomname.get_name(
+            adj=NAME_ADJ.secret, noun=NAME_NOUN.secret
+        )
     else:
         out = base
     log.debug(f"generated name: {out}")
     return out
 
-PROTECTED_NAMES = ['solver','dataframe','_anything_changed']
+
+PROTECTED_NAMES = ["solver", "dataframe", "_anything_changed","time","run_id", "converged"]
+
 
 # Wraps Configuration with a decorator, similar to @attrs.define(**options)
 def forge(cls=None, **kwargs):
@@ -74,7 +110,7 @@ def forge(cls=None, **kwargs):
             **kwargs,
         )
         if FORGE_DEBUG.in_env:
-            change_all_log_levels(inst=acls,new_log_level=FORGE_DEBUG.secret)        
+            change_all_log_levels(inst=acls, new_log_level=FORGE_DEBUG.secret)
         # must be here since can't inspect till after fields corrected
         acls.pre_compile()  # custom class compiler
         acls.validate_class()
@@ -86,8 +122,8 @@ def forge(cls=None, **kwargs):
 
         def f(cls, *args):
             return forge(cls, **kwargs)
-        
-        f.__name__ ==  "forge_wrapper"
+
+        f.__name__ == "forge_wrapper"
 
         return f
 
@@ -110,12 +146,12 @@ def property_changed(instance, variable, value):
     from engforge.tabulation import TabulationMixin
     from engforge.problem_context import ProblemExec
 
-    #TODO: determine when, in an active problem if components change, and update refs accordingly!
+    # TODO: determine when, in an active problem if components change, and update refs accordingly!
 
     if not isinstance(instance, (TabulationMixin)):
         return value
-    
-    #Establish Active Session
+
+    # Establish Active Session
     session = None
     if hasattr(ProblemExec.class_cache, "session"):
         session = ProblemExec.class_cache.session
@@ -123,35 +159,37 @@ def property_changed(instance, variable, value):
     if not session and instance._anything_changed:
         # Bypass Check since we've already flagged for an update
         if log.log_level <= 2:
-            log.debug(f"already property changed {instance}{variable.name} {value}")
+            log.debug(
+                f"already property changed {instance}{variable.name} {value}"
+            )
         return value
-    #log.info(f'property changed {variable.name} {value}')
+    # log.info(f'property changed {variable.name} {value}')
 
     if log.log_level <= 6:
-        log.debug(f"checking property changed {instance}{variable.name} {value}")
+        log.debug(
+            f"checking property changed {instance}{variable.name} {value}"
+        )
 
-    #Check if should be updated
+    # Check if should be updated
     cur = getattr(instance, variable.name)
-    attrs = attr.fields(instance.__class__) #check identity of variable
+    attrs = attr.fields(instance.__class__)  # check identity of variable
     if not instance._anything_changed and variable in attrs and value != cur:
         if log.log_level < 5:
             log.debug(f"changing variables: {variable.name} {value}")
         instance._anything_changed = True
 
     elif log.log_level < 4 and variable in attrs:
-        log.warning(
-            f"didnt change variables {variable.name}| {value} == {cur}"
-        )
-    
-    #If active session in dynamic mode and the component is dynamic, flag for matrix update
-    #TODO: determine if dynamic matricies affected by this.
-    
+        log.warning(f"didnt change variables {variable.name}| {value} == {cur}")
+
+    # If active session in dynamic mode and the component is dynamic, flag for matrix update
+    # TODO: determine if dynamic matricies affected by this.
+
     if session and session.dynamic_solve and instance.is_dynamic:
-        #log.info(f'dynamics changed')
-        session.dynamics_updated = True #flag for update
-        
+        # log.info(f'dynamics changed')
+        session.dynamics_updated = True  # flag for update
+
     elif session:
-        #log.info(f'static change')
+        # log.info(f'static change')
         session.dynamics_updated = False
 
     return value
@@ -172,7 +210,9 @@ def signals_slots_handler(
 
     for t in fields:
         if t.name in PROTECTED_NAMES:
-            raise Exception(f"cannot use {t.name} as a field name, its protected")        
+            raise Exception(
+                f"cannot use {t.name} as a field name, its protected"
+            )
         if t.type is None:
             log.warning(f"{cls.__name__}.{t.name} has no type")
 
@@ -180,8 +220,8 @@ def signals_slots_handler(
     field_names = set([o.name for o in fields])
     log.debug(f"fields: {field_names}")
 
-    #Add Fields (no underscored fields)
-    in_fields = {f.name: f for f in fields if not f.name.startswith("_") }
+    # Add Fields (no underscored fields)
+    in_fields = {f.name: f for f in fields if not f.name.startswith("_")}
     if "name" in in_fields:
         name = in_fields.pop("name")
         out.append(name)
@@ -264,7 +304,7 @@ def signals_slots_handler(
                 log.debug(
                     f"{cls.__name__} overriding inherited attr: {o.name} as {cls_dict[k]} in cls"
                 )
-                #FIXME: should we deepcopy?
+                # FIXME: should we deepcopy?
                 cls.__anony_store[k] = sscb = lambda: copy.copy(cls_dict[k])
                 out.append(o.evolve(default=attrs.Factory(sscb)))
             else:
@@ -295,7 +335,6 @@ comp_transform = lambda c, f: signals_slots_handler(
 )
 
 
-
 # TODO: Make A MetaClass for Configuration, and provide forge interface there. Problem with replaceing metaclass later, as in the case of a singleton.
 @forge
 class Configuration(AttributedBaseMixin):
@@ -322,11 +361,14 @@ class Configuration(AttributedBaseMixin):
     _subclass_init: bool = True
 
     # Configuration Information
-    def internal_configurations(self, check_config=True, use_dict=True,none_ok=False) -> dict:
+    def internal_configurations(
+        self, check_config=True, use_dict=True, none_ok=False
+    ) -> dict:
         """go through all attributes determining which are configuration objects
         additionally this skip any configuration that start with an underscore (private variable)
         """
         from engforge.configuration import Configuration
+
         slots = self.slots_attributes()
 
         if check_config:
@@ -388,21 +430,26 @@ class Configuration(AttributedBaseMixin):
         # Finally make the new system with changed internals
         self.debug(f"changing with changes {self} {kwcomps} {kw}")
         new_sys = attrs.evolve(self, **kwcomps, **kw)
-        changed[self] = new_sys 
+        changed[self] = new_sys
 
-        #Finally change references!
+        # Finally change references!
         if isinstance(new_sys, SolveableInterface):
             new_sys.system_references(recache=True)
 
-        #update the parents
-        if hasattr(self,'parent'):
+        # update the parents
+        if hasattr(self, "parent"):
             if self.parent in changed:
                 new_sys.parent = changed[self.parent]
 
         return new_sys
 
     def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0, only_inst=True,**kw
+        self,
+        level=0,
+        levels_to_descend=-1,
+        parent_level=0,
+        only_inst=True,
+        **kw,
     ):
         """A generator that will go through all internal configurations up to a certain level
         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
@@ -424,16 +471,16 @@ class Configuration(AttributedBaseMixin):
         level += 1
         if "check_config" not in kw:
             kw["check_config"] = False
-        
+
         for key, config in self.internal_configurations(**kw).items():
             if isinstance(config, Configuration):
                 for skey, level, iconf in config.go_through_configurations(
                     level, levels_to_descend, parent_level
                 ):
-                    if not only_inst or iconf is not None :
+                    if not only_inst or iconf is not None:
                         yield f"{key}.{skey}" if skey else key, level, iconf
             else:
-                if not only_inst or config is not None :
+                if not only_inst or config is not None:
                     yield key, level, config
 
     # Our Special Init Methodology
@@ -460,14 +507,17 @@ class Configuration(AttributedBaseMixin):
         if self._subclass_init:
             try:
                 for comp in self.__class__.mro():
-                    if hasattr(comp, "__pre_init__") and comp.__pre_init__ != Configuration.__pre_init__:
+                    if (
+                        hasattr(comp, "__pre_init__")
+                        and comp.__pre_init__ != Configuration.__pre_init__
+                    ):
                         comp.__pre_init__(self)
             except Exception as e:
                 self.error(e, f"error in __pre_init__ {e}")
 
         # Assign Parents, ensure single componsition
-        #TODO: allow multi-parent, w/wo keeping state, state swap on update()?
-        #TODO: replace parent concept with problem context
+        # TODO: allow multi-parent, w/wo keeping state, state swap on update()?
+        # TODO: replace parent concept with problem context
         for compnm, comp in self.internal_configurations(False).items():
             if isinstance(comp, Component):
                 # TODO: allow multiple parents
@@ -486,7 +536,10 @@ class Configuration(AttributedBaseMixin):
         if self._subclass_init:
             try:
                 for comp in self.__class__.mro():
-                    if hasattr(comp, "__on_init__") and comp.__on_init__ != Configuration.__on_init__:
+                    if (
+                        hasattr(comp, "__on_init__")
+                        and comp.__on_init__ != Configuration.__on_init__
+                    ):
                         comp.__on_init__(self)
             except Exception as e:
                 self.error(e, f"error in __on_init__")

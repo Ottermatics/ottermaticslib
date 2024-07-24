@@ -102,18 +102,20 @@ class TestWide(unittest.TestCase):
                 for p in props:
                     tkn = f"{ck}.{v}.{p}"
                     should_keys.add(tkn)
-                    dataframe_keys.add(tkn.replace('.','_'))
+                    dataframe_keys.add(tkn.replace(".", "_"))
 
         sys_key = set(self.system.data_dict.keys())
-        mtch =should_keys.issubset(sys_key)
-        self.system.debug(f'keys: {should_keys} vs {sys_key}')
-        self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
+        mtch = should_keys.issubset(sys_key)
+        self.system.debug(f"keys: {should_keys} vs {sys_key}")
+        self.assertTrue(mtch, msg=f"missing keys: {should_keys - sys_key}")
 
         # save the data to table
-        self.system.run(revert_last=False,revert_every=False,save_on_exit=True)
+        self.system.run(
+            revert_last=False, revert_every=False, save_on_exit=True
+        )
 
         df = self.system.last_context.dataframe
-        self.assertTrue(len(df) == 1,msg=f"len: {len(df)}|\n{str(df)}")
+        self.assertTrue(len(df) == 1, msg=f"len: {len(df)}|\n{str(df)}")
         self.assertTrue(dataframe_keys.issubset(set(df.iloc[0].keys())))
         self.assertTrue(dataframe_keys.issubset(set(df.keys())))
 
@@ -133,7 +135,7 @@ class TestNarrow(unittest.TestCase):
         self.system = NarrowSystem(cdict=dc, citer=lc)
 
     def test_keys(self):
-        self.assertFalse(len(self.system.dataframe)>0)
+        self.assertFalse(len(self.system.dataframe) > 0)
 
         dat = self.system.data_dict
 
@@ -161,12 +163,12 @@ class TestNarrow(unittest.TestCase):
             for p in props:
                 tkn = f"{ck}.{p}"
                 should_keys.add(tkn)
-                dataframe_keys.add(tkn.replace('.', '_'))
+                dataframe_keys.add(tkn.replace(".", "_"))
 
         sys_key = set(self.system.data_dict.keys())
-        mtch =should_keys.issubset(sys_key)
-        self.system.info(f'keys: {should_keys} vs {sys_key}')
-        self.assertTrue(mtch,msg=f"missing keys: {should_keys - sys_key}")
+        mtch = should_keys.issubset(sys_key)
+        self.system.info(f"keys: {should_keys} vs {sys_key}")
+        self.assertTrue(mtch, msg=f"missing keys: {should_keys - sys_key}")
 
         # save the data to table
         self.system.run()

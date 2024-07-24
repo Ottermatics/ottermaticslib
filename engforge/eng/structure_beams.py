@@ -20,7 +20,7 @@ from engforge.system import System
 from engforge.eng.solid_materials import *
 from engforge.common import *
 import engforge.eng.geometry as ottgeo
-from engforge.eng.costs import CostModel,cost_property
+from engforge.eng.costs import CostModel, cost_property
 
 import sectionproperties
 import sectionproperties.pre.geometry as geometry
@@ -59,7 +59,7 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 @forge
-class Beam(Component,CostModel):
+class Beam(Component, CostModel):
     """Beam is a wrapper for emergent useful properties of the structure"""
 
     # parent structure, will be in its _beams
@@ -125,12 +125,14 @@ class Beam(Component,CostModel):
 
         self.debug(f"determining {section} properties...")
         if isinstance(self.section, geometry.Geometry):
-            self.debug(f'converting to shapelysection {section}')
+            self.debug(f"converting to shapelysection {section}")
             if not self.section.material:
                 material = self.material
             else:
                 material = self.section.material
-            self.section = ottgeo.ShapelySection(shape=self.section,material=self.material)
+            self.section = ottgeo.ShapelySection(
+                shape=self.section, material=self.material
+            )
 
         if isinstance(self.section, ottgeo.ShapelySection):
             self.debug(f"determining profile {section} properties...")
@@ -142,7 +144,7 @@ class Beam(Component,CostModel):
 
         elif isinstance(self.section, ottgeo.Profile2D):
             self.warning(f"use shapely section instead {section} properties...")
-            #raise Exception("use shapely section instead")
+            # raise Exception("use shapely section instead")
             self.in_Ix = self.section.Ixx
             self.in_Iy = self.section.Iyy
             self.in_J = self.section.J
@@ -307,7 +309,7 @@ class Beam(Component,CostModel):
     def mass(self) -> float:
         return self.material.density * self.Vol
 
-    @cost_property(category='mfg,material,beams')
+    @cost_property(category="mfg,material,beams")
     def cost(self) -> float:
         return self.mass * self.material.cost_per_kg
 
@@ -392,14 +394,16 @@ class Beam(Component,CostModel):
     def show_mesh(self):
         return self.section._sec.plot_mesh()
 
-    def estimate_stress(self, force_calc=True,**forces):
+    def estimate_stress(self, force_calc=True, **forces):
         """uses the best available method to determine max stress in the beam, for ShapelySections this is done through a learning process, for other sections it is done through a simple calculation aimed at providing a conservative estimate"""
         if isinstance(self.section, ottgeo.ShapelySection):
-            return self.section.estimate_stress(**forces,force_calc=force_calc)
+            return self.section.estimate_stress(**forces, force_calc=force_calc)
         else:
             return self._fallback_estimate_stress(**forces)
-        
-    def _fallback_estimate_stress(self, n, vx, vy, mxx, myy, mzz,SM=5,**extra):
+
+    def _fallback_estimate_stress(
+        self, n, vx, vy, mxx, myy, mzz, SM=5, **extra
+    ):
         """sum the absolute value of each stress component. This isn't accurate but each value here should represent the worst sections, and take the 1-norm to max for each type of stress"""
 
         if self.section.x_bounds is None:
@@ -427,15 +431,15 @@ class Beam(Component,CostModel):
         max_bend = abs(sigma_bx) + abs(sigma_by)
         max_shear = abs(sigma_vx) + abs(sigma_vy)
 
-        return (abs(sigma_n) + max_bend + abs(sigma_tw) + max_shear)*SM
+        return (abs(sigma_n) + max_bend + abs(sigma_tw) + max_shear) * SM
 
-    def get_forces_at(self, x, combo=None,lower=True,skip_principle=True):
+    def get_forces_at(self, x, combo=None, lower=True, skip_principle=True):
         """outputs pynite results in section_properties.calculate_stress() input"""
         if combo is None:
             combo = self.structure.current_combo
 
         x = x * self.L  # frac of L
-        principles = ['m11','m22','m33']
+        principles = ["m11", "m22", "m33"]
 
         inp = dict(
             N=self.member.axial(x, combo),
@@ -447,28 +451,32 @@ class Beam(Component,CostModel):
             M22=0,
             Mzz=self.member.torque(x, combo),
         )
-        inp = {k.lower():v for k, v in inp.items() if any([k.lower() not in principles]) or not skip_principle}
+        inp = {
+            k.lower(): v
+            for k, v in inp.items()
+            if any([k.lower() not in principles]) or not skip_principle
+        }
         return inp
 
-    def get_stress_at(self, x, combo=None,**kw):
+    def get_stress_at(self, x, combo=None, **kw):
         """takes force input and runs stress calculation as a fraction of material properties"""
         if combo is None:
             combo = self.structure.current_combo
 
         inp = self.get_forces_at(x, combo)
-        
-        #preferr real stresses to fail fraction
-        if 'value' not in kw:
-            kw['value'] = True
 
-        return self.calculate_stress(**inp,**kw)
+        # preferr real stresses to fail fraction
+        if "value" not in kw:
+            kw["value"] = True
+
+        return self.calculate_stress(**inp, **kw)
 
     def calculate_stress(self, **forces):
         """takes force input and runs stress calculation as a fraction of material properties, see ShapelySection.calculate_stress() for more details"""
-        #preferr real stresses to fail fraction
-        if 'value' not in forces:
-            forces['value'] = True        
-            
+        # preferr real stresses to fail fraction
+        if "value" not in forces:
+            forces["value"] = True
+
         return self.section.calculate_stress(**forces)
 
     @property
@@ -482,21 +490,24 @@ class Beam(Component,CostModel):
         """estimates these are proportional to stress but 2D FEA is "truth" since we lack cross section specifics"""
         if not self.structure._any_solved:
             return numpy.nan
-        
-        vals = [ self.estimate_stress(**self.get_forces_at(x),value=True) for x in [0, 0.5, 1]]
+
+        vals = [
+            self.estimate_stress(**self.get_forces_at(x), value=True)
+            for x in [0, 0.5, 1]
+        ]
 
         try:
             return max(vals)
-            
+
         except Exception as e:
-            self.warning(f'failed to get max stress estimate {e}| {vals}')
+            self.warning(f"failed to get max stress estimate {e}| {vals}")
             return numpy.nan
 
     @system_property
     def fail_factor_estimate(self) -> float:
         """the ratio of max estimated stress to the material's allowable stress"""
         if not self.structure._any_solved:
-            return numpy.nan              
+            return numpy.nan
         return self.max_stress_estimate / self.material.allowable_stress
 
     # axial
@@ -509,32 +520,32 @@ class Beam(Component,CostModel):
     @system_property
     def max_axial(self) -> float:
         if not self.structure._any_solved:
-            return numpy.nan        
+            return numpy.nan
         return self.member.max_axial(self.structure.current_combo)
 
     # deflection
     @system_property
     def min_deflection_x(self) -> float:
         if not self.structure._any_solved:
-            return numpy.nan        
+            return numpy.nan
         return self.member.min_deflection("dx", self.structure.current_combo)
 
     @system_property
     def max_deflection_x(self) -> float:
         if not self.structure._any_solved:
-            return numpy.nan        
+            return numpy.nan
         return self.member.max_deflection("dx", self.structure.current_combo)
 
     @system_property
     def min_deflection_y(self) -> float:
         if not self.structure._any_solved:
-            return numpy.nan        
+            return numpy.nan
         return self.member.min_deflection("dy", self.structure.current_combo)
 
     @system_property
     def max_deflection_y(self) -> float:
         if not self.structure._any_solved:
-            return numpy.nan        
+            return numpy.nan
         return self.member.max_deflection("dy", self.structure.current_combo)
 
     # torsion
@@ -721,10 +732,10 @@ class Beam(Component,CostModel):
         """The worst of the worst cases, after adjusting the beem orientation for best loading"""
         # TODO: make faster system property
         return numpy.nanmax([self.max_von_mises_by_case()])
-    
+
     def max_von_mises_by_case(self, combos=None):
         """Gathers max vonmises stress info per case"""
-    
+
         cmprv = {}
         for rxy in [True, False]:
             new = []
@@ -734,20 +745,20 @@ class Beam(Component,CostModel):
                     continue
                 new.append(numpy.nanmax(vm_stress_vec))
             cmprv[rxy] = numpy.array(new)
-    
+
         if cmprv[True] and cmprv[False]:
             vt = numpy.nanmax(cmprv[True])
             vf = numpy.nanmax(cmprv[False])
-    
+
             # We choose the case with the
             if vf < vt:
                 self.min_stress_xy = False
                 return vf
-    
+
             self.min_stress_xy = True
             return vt
-    
-    #TODO: Breakout other stress vectors
+
+    # TODO: Breakout other stress vectors
     @solver_cached
     def von_mises_stress_l(self):
         """Max von-mises stress"""
@@ -760,19 +771,17 @@ class Beam(Component,CostModel):
                 rows.append(max_vm)
             out[combo] = numpy.array(rows)
         return out
-    
-    
-    def section_stresses(self,**kwargs):
+
+    def section_stresses(self, **kwargs):
         # FIXME: enable: assert self.structure.solved, f'must be solved first!'
         combos = {}
         for combo in self.structure.frame.LoadCombos:
             combos[combo] = spans = {}
             for i in numpy.linspace(0, 1, self.analysis_intervals):
                 self.info(f"evaluating stresses for {combo} @ {i} w {kwargs}")
-                sol = self.get_stress_at(i, combo,**kwargs)
+                sol = self.get_stress_at(i, combo, **kwargs)
                 spans[i] = sol
-        return combos               
-        
+        return combos
 
     # #TODO: remove or refactor
     # @solver_cached
@@ -822,7 +831,5 @@ class Beam(Component,CostModel):
     #                 oout.update(min_vals)
     #                 oout.update(avg_vals)
     #             rows.append(oout)
-    # 
+    #
     #     return pandas.DataFrame(rows)
-
- 

@@ -8,7 +8,7 @@ import numpy
 import inspect
 import sys
 import uuid
-import json,hashlib
+import json, hashlib
 
 # One Material To Merge Them All
 from PyNite import Material as PyNiteMat
@@ -28,9 +28,10 @@ CMAP = matplotlib.cm.get_cmap("viridis")
 def random_color():
     return CMAP(random.randint(0, 255))
 
+
 def ih(val):
     """ignore hash"""
-    return ''
+    return ""
 
 
 @forge(hash=False)
@@ -40,7 +41,7 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
     __metaclass__ = SecMat
 
     name: str = attr.ib(default="solid material")
-    color: float = attr.ib(factory=random_color,hash=False,eq=ih)
+    color: float = attr.ib(factory=random_color, hash=False, eq=ih)
 
     # Structural Properties
     density: float = attr.ib(default=1.0)
@@ -124,11 +125,12 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
 
     def __hash__(self):
         """a stable hash that ignores name, color and unique id, ie only the material properties are the same if two hashes are the equal"""
-        #print('hashing...')
-        ignore = ['color','_unique_id','name']
-        ict = {k:v for k,v in self.input_as_dict.items() if k not in ignore}
+        # print('hashing...')
+        ignore = ["color", "_unique_id", "name"]
+        ict = {k: v for k, v in self.input_as_dict.items() if k not in ignore}
         d = hashlib.sha1(json.dumps(ict, sort_keys=True).encode())
-        return int(d.hexdigest(),16)    
+        return int(d.hexdigest(), 16)
+
 
 @forge(hash=False)
 class SS_316(SolidMaterial):

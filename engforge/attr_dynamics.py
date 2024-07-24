@@ -27,12 +27,12 @@ class IntegratorInstance(AttributeInstance):
         self.system.debug(f"integrating {self.var_ref} with {self.rate_ref}")
 
     def as_ref_dict(self):
-        return {'rate':self.rate_ref,'var':self.var_ref}
-    
+        return {"rate": self.rate_ref, "var": self.var_ref}
+
     @property
     def rates(self):
         return {self.name: self.class_attr.rate}
-    
+
     @property
     def integrated(self):
         return {self.name: self.class_attr.var}
@@ -40,56 +40,55 @@ class IntegratorInstance(AttributeInstance):
     @property
     def var(self):
         return self.class_attr.var
-    
+
     @property
     def rate(self):
         return self.class_attr.rate
-    
+
     @property
     def current_rate(self):
         return self.rate_ref.value(self.system, self.system.last_context)
-    
+
     @property
     def constraint_refs(self):
-        if self.solver.slvtype in ["eq","ineq"]:
+        if self.solver.slvtype in ["eq", "ineq"]:
             return self.const_f
         return None
 
     @property
     def constraints(self):
-        if hasattr(self,'_constraints'):
+        if hasattr(self, "_constraints"):
             return self._constraints
-        
+
         return self.solver.constraints
-    
+
         # return [{'type':self.slvtype,'var':self.solver.lhs,'value':self.const_f}]
         # if self.solver.slvtype in ['var','obj']:
         #    return self.solver.constraints
-        #else:
-            #just me
-        
-        
+        # else:
+        # just me
 
     @property
     def slvtype(self):
         return self.solver.slvtype
-    
+
     @property
     def combos(self):
         return self.solver.combos
-    
+
     @property
     def normalize(self):
         return self.solver.normalize
-    
+
     @property
     def active(self):
-        if hasattr(self,'_active'):
-            return self._active         
+        if hasattr(self, "_active"):
+            return self._active
 
 
-#TODO: depriciate modes and update for dynamicmixin strategies
-#TODO: add Time.add_profile(parm, time:parameter_values, combos,active) to add a transient profile to be run on the system that is selectable by the user
+# TODO: depriciate modes and update for dynamicmixin strategies
+# TODO: add Time.add_profile(parm, time:parameter_values, combos,active) to add a transient profile to be run on the system that is selectable by the user
+
 
 class Time(ATTR_BASE):
     """Transient is a base class for integrators over time"""
@@ -97,7 +96,7 @@ class Time(ATTR_BASE):
     mode: str
     var: str
     rate: str
-    constraints:list
+    constraints: list
     allow_constraint_override: bool = True
     instance_class = IntegratorInstance
 
@@ -108,25 +107,23 @@ class Time(ATTR_BASE):
         rate: "system_property",
         mode: str = "euler",
         active=True,
-        combos='default'
+        combos="default",
     ):
         """Defines an ODE like integrator that will be integrated over time with the defined integration rule.
 
         Input should be of strings to look up the particular property or field
         """
         # Create A New Signals Class
-        new_name = f"TRANSIENT_{mode}_{var}_{rate}".replace(
-            ".", "_"
-        )
-        #new_name = new_name
+        new_name = f"TRANSIENT_{mode}_{var}_{rate}".replace(".", "_")
+        # new_name = new_name
         new_dict = dict(
             mode=mode,
             name=new_name,
             var=var,
             rate=rate,
             active=active,
-            constraints=[], #TODO: parse kwargs for limits
-            combos=cls.process_combos(combos,add_combos=f'time,{var}')
+            constraints=[],  # TODO: parse kwargs for limits
+            combos=cls.process_combos(combos, add_combos=f"time,{var}"),
         )
         return cls._setup_cls(new_name, new_dict)
 
@@ -169,7 +166,7 @@ class Time(ATTR_BASE):
         # else: attributes are not checked, youre in command
 
     @classmethod
-    def add_var_constraint(cls, value, kind="min",**kwargs):
+    def add_var_constraint(cls, value, kind="min", **kwargs):
         """adds a `type` constraint to the solver. If value is numeric it is used as a bound with `scipy` optimize.
 
         :param type: str, must be either min or max with var value comparison, or with a function additionally eq,ineq (same as max(0)) can be used
@@ -185,18 +182,25 @@ class Time(ATTR_BASE):
         assert var is not None, "must provide var on non-var solvers"
         assert kind in ("min", "max")
         combo_dflt = "default,lim"
-        cmbs = kwargs.get("combos",'')
-        combos = cls.process_combos(cmbs,combo_dflt,combo_dflt)
-        if isinstance(combos,str):
-            combos = combos.split(',')
+        cmbs = kwargs.get("combos", "")
+        combos = cls.process_combos(cmbs, combo_dflt, combo_dflt)
+        if isinstance(combos, str):
+            combos = combos.split(",")
         active = kwargs.get("active", True)
-        const = {"type": kind, "value": value, "var": var, "active": active, "combos": combos, 'combo_var':cls.name}
-        #print(const,cls.__dict__)
+        const = {
+            "type": kind,
+            "value": value,
+            "var": var,
+            "active": active,
+            "combos": combos,
+            "combo_var": cls.name,
+        }
+        # print(const,cls.__dict__)
 
         cinx = cls.constraint_exists(type=kind, var=var)
         inix = cinx is not None
         if cls.allow_constraint_override and inix:
-            #print(f'replacing constraint {cinx} with {kind} {value} {var}')
+            # print(f'replacing constraint {cinx} with {kind} {value} {var}')
             constraint = cls.constraints[cinx]
             constraint.update(const)
         elif not cls.allow_constraint_override and inix:
@@ -212,7 +216,6 @@ class Time(ATTR_BASE):
             if all([c[k] == v for k, v in kw.items()]):
                 return i
         return None
-
 
 
 # Support Previous API
