@@ -28,9 +28,129 @@ class TableLog(LoggingMixin):
 
 log = TableLog()
 
+#Dataframe interrogation functions
+def is_uniform(s:pandas.Series):
+    a = s.to_numpy() # s.values (pandas<0.24)
+    if (a[0] == a).all():
+        return True
+    try:
+        if not numpy.isfinite(a).any():
+            return True
+    except:
+        pass
+    return False
 
-# @otterize
-class TabulationMixin(Configuration):
+#key_func = lambda kv: len(kv[0].split('.'))*len(kv[1])
+#length of matches / length of key
+key_func = lambda kv: len(kv[1])/len(kv[0].split('.'))
+#key_func = lambda kv: len(kv[1])
+
+    
+#TODO: remove duplicate columns
+# mtches = collections.defaultdict(set)
+# dfv = ecs.dataframe_variants[0]
+# for v1,v2 in itertools.combinations(dfv.columns,2):
+#     if numpy.all(dfv[v1]==dfv[v2]):
+#         
+#         mtches[v1].add(v2)
+#         mtches[v2].add(v1)
+        
+    
+def determine_split(raw,top:int=1,key_f = key_func):
+    parents = {}
+
+    for rw in raw:
+        grp = rw.split('.')
+        for i in range(len(grp)):
+            tkn = '.'.join(grp[0:i+1])
+            parents[tkn] = set()
+        
+    for rw in raw:
+        for par in parents:
+            if rw.startswith(par):
+                parents[par].add(rw)
+
+
+    grps = sorted(parents.items(),key=key_f,reverse=True)[:top]
+    return [g[0] for g in grps]
+
+def split_dataframe(df:pandas.DataFrame)->tuple:
+    """split dataframe into a dictionary of invariants and a dataframe of variable values
+    
+    :returns tuple: constants,dataframe
+    """
+    uniform = {}
+    for s in df:
+        c = df[s]
+        if is_uniform(c):
+            uniform[s] = c[0]
+
+    df_unique = df.copy().drop(columns=list(uniform))
+    return uniform,df_unique
+
+class DataframeMixin:
+    dataframe: pandas.DataFrame
+
+    def smart_split_dataframe(self,df=None,split_groups=0,key_f = key_func):
+        """splits dataframe between constant values and variants"""
+        if df is None:
+            df = self.dataframe
+        out = {}
+        const,vardf = split_dataframe( df )
+        out['constants'] = const
+        columns = set(vardf.columns)
+        split_groups = min(split_groups,len(columns)-1)
+        if split_groups==0:
+            out['variants'] = vardf
+        else:
+            nconst = {}
+            cgrp = determine_split(const,min(split_groups,len(const)-1))
+            for i,grp in enumerate(sorted(cgrp,reverse=True)):
+                columns = set(const)
+                bad_columns = [c for c in columns if not c.startswith(grp)]
+                good_columns = [c for c in columns if c.startswith(grp)]
+                nconst[grp] = {c:const[c] for c in good_columns}
+                for c in good_columns:
+                    if c in columns:
+                        columns.remove(c)
+            out['constants'] = nconst
+
+            raw = sorted(set(df.columns))
+            grps = determine_split(raw,split_groups,key_f=key_f)
+            
+            for i,grp in enumerate(sorted(grps,reverse=True)):
+                columns = set(vardf.columns)
+                bad_columns = [c for c in columns if not c.startswith(grp)]
+                good_columns = [c for c in columns if c.startswith(grp)]
+                out[grp] = vardf.copy().drop(columns=bad_columns)
+                #remove columns from vardf
+                vardf = vardf.drop(columns=good_columns) 
+            if vardf.size>0:
+                out['misc'] = vardf
+        return out
+    
+    @solver_cached
+    def _split_dataframe(self):
+        """splits dataframe between constant values and variants"""
+        return split_dataframe(self.dataframe)    
+    
+    @property
+    def dataframe_constants(self):
+        return self._split_dataframe[0]
+    
+    @property
+    def dataframe_variants(self):
+        return self._split_dataframe[1:]    
+
+    #Plotting Interface
+    @property
+    def skip_plot_vars(self) -> list:
+        """accesses '_skip_plot_vars' if it exists, otherwise returns empty list"""
+        if hasattr(self,'_skip_plot_vars'):
+            return [var.lower() for var in self._skip_plot_vars]
+        return []
+
+class TabulationMixin(Configuration,DataframeMixin):
     """In which we define a class that can enable tabulation"""
 
     # Super Special Tabulating Index
@@ -44,6 +164,7 @@ class TabulationMixin(Configuration):
     _table: dict = None
     _anything_changed: bool
     _always_save_data = False
+    _prv_internal_references: dict 
 
     # Data Tabulation - Intelligent Lookups
     def save_data(
@@ -80,7 +201,7 @@ class TabulationMixin(Configuration):
 
         # TODO: move to slots structure
         if save_internal:
-            for config in self.internal_components.values():
+            for config in self.internal_components().values():
                 if config is None:
                     continue
                 if config not in saved:
@@ -92,12 +213,36 @@ class TabulationMixin(Configuration):
         # reset value
         self._anything_changed = False
 
-    @instance_cached
-    def internal_components(self) -> dict:
+    def internal_components(self,recache=False) -> dict:
         """get all the internal components"""
+        if recache == False and hasattr(self,'_prv_internal_components'):
+            return self._prv_internal_components 
+        from ottermatics.components import Component
+        o = {k: getattr(self, k) for k in self.slots_attributes()}
+        o = {k: v for k, v in o.items() if isinstance(v, Component)}
+        self._prv_internal_components = o
+        return o
+    
+    def internal_systems(self,recache=False) -> dict:
+        """get all the internal components"""
+        if recache == False and hasattr(self,'_prv_internal_systems'):
+            return self._prv_internal_systems 
+        from ottermatics.system import System
+        o = {k: getattr(self, k) for k in self.slots_attributes()}
+        o = {k: v for k, v in o.items() if isinstance(v, System)}
+        self._prv_internal_systems = o
+        return o    
+    
+    def internal_tabulations(self,recache=False) -> dict:
+        """get all the internal tabulations"""
+        
+        if recache == False and hasattr(self,'_prv_internal_tabs'):
+            return self._prv_internal_tabs 
+            
         o = {k: getattr(self, k) for k in self.slots_attributes()}
         o = {k: v for k, v in o.items() if isinstance(v, TabulationMixin)}
-        return o
+        self._prv_internal_tabs = o
+        return o    
 
     @instance_cached
     def iterable_components(self) -> dict:
@@ -106,22 +251,29 @@ class TabulationMixin(Configuration):
 
         return {
             k: v
-            for k, v in self.internal_components.items()
+            for k, v in self.internal_components().items()
             if isinstance(v, ComponentIter) and not v.wide
         }
 
-    @instance_cached
-    def internal_references(self) -> dict:
+    def internal_references(self,recache=False) -> dict:
         """get references to all internal attributes and values"""
+        if recache == False and hasattr(self,'_prv_internal_references'):
+            return self._prv_internal_references  
+              
+        out = self._gather_references()
+        self._prv_internal_references = out
+        return out
+    
+    def _gather_references(self) -> dict:
         out = {}
         out["attributes"] = at = {}
         out["properties"] = pr = {}
 
         for key in self.classmethod_system_properties():
-            pr[key] = Ref(self, key)
+            pr[key] = Ref(self, key,True,False)
 
         for key in self.input_fields():
-            at[key] = Ref(self, key, False)
+            at[key] = Ref(self, key, False,True)
 
         return out
 
@@ -133,9 +285,10 @@ class TabulationMixin(Configuration):
             self._anything_changed = True
 
         if self._anything_changed or self.always_save_data:
-            self.debug(
-                f"change: {self._anything_changed}| always: {self.always_save_data}"
-            )
+            if self.log_level <= 5:
+                self.msg(
+                    f"change: {self._anything_changed}| always: {self.always_save_data}"
+                )
             return True
         return False
 
@@ -143,6 +296,9 @@ class TabulationMixin(Configuration):
         """Resets the table, and attrs label stores"""
         self.index = 0
         self._table = None
+        cls = self.__class__
+        if hasattr(cls,'_{cls.__name__}_system_properties'):
+            return  setattr(cls,'_{cls.__name__}_system_properties',None)    
 
     @property
     def TABLE(self):
@@ -158,16 +314,10 @@ class TabulationMixin(Configuration):
 
     @solver_cached
     def dataframe(self):
+        """The table compiled into a dataframe"""
         data = [self.TABLE[v] for v in sorted(self.TABLE)]
         return pandas.DataFrame(data=data, copy=True)
-
-    #Plotting Interface
-    @property
-    def skip_plot_vars(self) -> list:
-        """accesses '_skip_plot_vars' if it exists, otherwise returns empty list"""
-        if hasattr(self,'_skip_plot_vars'):
-            return [var.lower() for var in self._skip_plot_vars]
-        return []
+    
 
     @property
     def plotable_variables(self):
@@ -193,7 +343,7 @@ class TabulationMixin(Configuration):
         """this is what is captured and used in each row of the dataframe / table"""
 
         out = collections.OrderedDict()
-        sref = self.internal_references
+        sref = self.internal_references()
         for k, v in sref["attributes"].items():
             if k in self.attr_raw_keys:
                 out[k] = v.value()
@@ -203,7 +353,7 @@ class TabulationMixin(Configuration):
 
     @instance_cached
     def skip_attr(self) -> list:
-        base = list(self.internal_configurations.keys())
+        base = list((self.internal_configurations()).keys())
         if self._skip_table_parms is None:
             return base
         return self._skip_table_parms + base
@@ -335,8 +485,16 @@ class TabulationMixin(Configuration):
         return self.__class__.classmethod_system_properties()
 
     @classmethod
-    def classmethod_system_properties(cls):
+    def classmethod_system_properties(cls,recache=False):
         """Combine other classes table properties into this one, in the case of subclassed system_properties"""
+
+        #Use a cache for deep recursion
+        if not recache and hasattr(cls,'_{cls.__name__}_system_properties'):
+            res=getattr(cls,'_{cls.__name__}_system_properties')
+            if res is not None:
+                return res
+
+        #otherwise make the cache
         __system_properties = {}
         for k, obj in cls.__dict__.items():
             if isinstance(obj, system_property):
@@ -368,6 +526,8 @@ class TabulationMixin(Configuration):
                                 f"adding system property {mrv.__name__}.{k}"
                             )
 
+        setattr(cls,'_{cls.__name__}_system_properties',__system_properties)
+
         return __system_properties
 
     @classmethod
@@ -376,7 +536,7 @@ class TabulationMixin(Configuration):
         if any(
             [
                 v.stochastic
-                for k, v in cls.classmethod_system_properties().items()
+                for k, v in cls.classmethod_system_properties(True).items()
             ]
         ):
             log.info(f"setting always save on {cls.__name__}")
@@ -431,6 +591,9 @@ class TabulationMixin(Configuration):
         elif key in self.classmethod_system_properties():
             # val= cls.classmethod_system_properties()[key]
             return Ref(self, key)
+        
+        elif key in self.internal_configurations() or key in self.slots_attributes():
+            return Ref(self,key)
 
         # Fail on comand but otherwise return val
         if val is None:
@@ -444,29 +607,52 @@ class TabulationMixin(Configuration):
         """returns an instance unique id based on id(self)"""
         idd = id(self)
         return f"{self.classname}.{idd}"
+    
 
 
 class Ref:
-    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated"""
+    """A way to create portable references to system's and their component's properties, ref can also take a key to a zero argument function which will be evaluated,
+    
+    A dictionary can be used
+    """
 
-    __slots__ = ["comp", "key", "use_call"]
+    __slots__ = ["comp", "key", "use_call",'use_dict','allow_set','eval_f']
     comp: "TabulationMixin"
     key: str
     use_call: bool
+    use_dict: bool
+    allow_set: bool
+    eval_f: callable
 
-    def __init__(self, component, key, use_call=True):
+    def __init__(self, component, key, use_call=True,allow_set=True,eval_f=None):
         self.comp = component
+        if isinstance(self.comp,dict):
+            self.use_dict = True
+        else:
+            self.use_dict = False
         self.key = key
         self.use_call = use_call
+        self.allow_set = allow_set
+        self.eval_f = eval_f
 
     def value(self):
-        o = getattr(self.comp, self.key)
+        if self.use_dict:
+            o = self.comp.get(self.key)
+        else:
+            o = getattr(self.comp, self.key)
         if self.use_call and callable(o):
-            return o()
+            o = o()
+        if self.eval_f:
+            return self.eval_f(o)
         return o
 
     def set_value(self, val):
-        return setattr(self.comp, self.key, val)
+        if self.allow_set:
+            return setattr(self.comp, self.key, val)
+        else:
+            raise Exception(f'not allowed to set value on {self.key}')
 
     def __str__(self) -> str:
+        if self.use_dict:
+            return f"REF[DICT.{self.key}]"
         return f"REF[{self.comp.classname}.{self.key}]"

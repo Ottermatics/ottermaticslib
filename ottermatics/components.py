@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import attr
+import typing
 
 # from ottermatics.logging import LoggingMixin, log
 from ottermatics.tabulation import TabulationMixin, system_property
@@ -19,6 +20,8 @@ import matplotlib.pyplot as plt
 class Component(TabulationMixin):
     """Component is an Evaluatable configuration with tabulation and reporting functionality"""
 
+    parent: typing.Union['Component','System'] = attr.ib(default=None)
+
     @classmethod
     def subclasses(cls, out=None):
         """return all subclasses of components, including their subclasses
@@ -35,9 +38,36 @@ class Component(TabulationMixin):
 
         return out
 
-    def update(self, system):
+    #UPDATE & POST UPDATE recieve the same kw args
+    def update(self, system,**kw):
         """override with custom system interaction"""
         pass
+
+    def post_update(self, system,**kw):
+        """override with custom system interaction, will execute after all components have been updated"""
+        pass    
+
+    def update_internal(self,ignore:set=None,**kw):
+        """updates internal components with self"""
+        self.debug(f'updating internal {self.__class__.__name__}.{self}')
+        for key, config in self.internal_components().items():
+            if ignore is not None and config in ignore:
+                continue
+            self.debug(f'updating internal component {key}')
+            config.update(self)
+            config.update_internal(ignore)
+        if ignore: ignore.add(self)
+
+    def post_update_internal(self,ignore:set=None,**kw):
+        """updates internal components with self"""
+        self.debug(f'post updating internal {self.__class__.__name__}.{self}')
+        for key, config in self.internal_components().items():
+            if ignore is not None and config in ignore:
+                continue
+            self.debug(f'post updating internal component {config.__class__.__name__}.{config}')       
+            config.post_update(self)
+            config.post_update_internal(ignore)    
+        if ignore: ignore.add(self)        
 
 
 # TODO: move inspection for components to mixin for inspection of slots
@@ -75,7 +105,7 @@ class Component(TabulationMixin):
 #         self.reset_table()
 #         self._stored_plots = []
 #         self.index = 0
-#         for config in self.internal_components.values():
+#         for config in self.internal_components().values():
 #             config.reset_data()
 #
 

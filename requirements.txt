@@ -22,14 +22,14 @@ deepdiff>=6.3.1
 #Science
 numpy==1.24.3
 scipy
-matplotlib~=3.7.1
+matplotlib~=3.8.1
 jupyter
 pandas
-scikit-learn
+scikit-learn~=1.3.2
 seaborn
 
 #Engineering
-sectionproperties>=1.0.8
+sectionproperties~=3.1.2
 #PyNiteFEA>=0.0.78
 #PyNiteFEA @ git+ssh://git@github.com/Ottermatics/PyNite.git@v1nept
 PyNiteFEA @ git+https://github.com/Ottermatics/PyNite.git@v1nept
@@ -86,3 +86,4 @@ methodtools~=0.4.7
 #cv
 #graypy
 
+  

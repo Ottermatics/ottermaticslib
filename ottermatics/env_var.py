@@ -17,6 +17,23 @@ import inspect
 global warned
 warned = set()  # a nice global variable to hold any warnings
 
+FALSE_VALUES = (False, "false", "no", "n")
+TRUE_VALUES = (True, "checked", "true", "yes", "y")
+
+def parse_bool(input: str):
+    if isinstance(input,str):
+        input = input.lower()
+        
+    if not input:
+        return False
+    elif input in TRUE_VALUES:
+        return True
+    elif input in FALSE_VALUES:
+        return False
+    return False
+
+DEFAULT_CONVERTERS = {bool:parse_bool}
+
 
 class EnvVariable(LoggingMixin):
     """A method to wrap SECRETS and in application with a way to get the value using self.secret
@@ -33,6 +50,8 @@ class EnvVariable(LoggingMixin):
     _replaced = set()
     fail_on_missing: bool
     desc: str = None
+    _upgrd_warn:bool = False
+    _dontovrride: bool = False
 
     def __init__(
         self,
@@ -53,7 +72,8 @@ class EnvVariable(LoggingMixin):
         :param desc: a description of the purpose of the variable
         """
         self.var_name = secret_var_name
-        self.type_conv = type_conv
+        self.type_conv = type_conv if type_conv not in DEFAULT_CONVERTERS else DEFAULT_CONVERTERS[type_conv]
+        self._dontovrride = dontovrride
 
         if default is not None:
             self.default = default
@@ -66,9 +86,10 @@ class EnvVariable(LoggingMixin):
         if secret_var_name in self.__class__._secrets:
             cur = self.__class__._secrets[secret_var_name]
             if dontovrride:
-                pass
+                self.debug(f"not replacing: {cur}->{self}")
+                self.__dict__ = cur.__dict__
             else:
-                self.debug(f"replacing {cur}->{self}")
+                self.info(f"replacing {cur}->{self}")
                 self._replaced.add(cur)
                 self.__class__._secrets[secret_var_name] = self
         else:
@@ -107,6 +128,19 @@ class EnvVariable(LoggingMixin):
 
     @property
     def secret(self):
+
+        #Check if this secret is the one in the secrets registry
+        sec = self.__class__._secrets[self.var_name]
+        if sec is not self and not sec._dontovrride:
+
+            #Provide warning that the secret is being replaced
+            if not self._upgrd_warn:
+                self._upgrd_warn = True
+                self.info(f'upgrading: {self.var_name} from {id(self)}->{id(sec)}')
+                
+            #Monkeypatch dictionary
+            self.__dict__ = sec.__dict__
+
         if hasattr(self, "_override"):
             return self._override
 

@@ -29,10 +29,12 @@ class SLOT(attrs.Attribute):
 
         :param none_ok: will allow no component on that item, oterwise will fail
         :param default_ok: will create the slot class with no input if true, which is the behavior by default
+        #TODO: add default_args,default_kwargs
         """
         from ottermatics.components import Component
         from ottermatics.component_collections import ComponentIter
         from ottermatics.system import System
+        from ottermatics.eng.costs import CostModel
 
         # Format THe Accepted Component Types
         assert (
@@ -47,6 +49,11 @@ class SLOT(attrs.Attribute):
                 for c in component_or_systems
             ]
         ), "Not System Or Component Input"
+
+        ### Cost models should always default to None
+        if any([issubclass(c, CostModel) for c in component_or_systems]):
+            default_ok = False 
+            none_ok = True
 
         # FIXME: come up with a better name :)
         new_name = f"SLOT_{str(uuid.uuid4()).replace('-','')[0:16]}"
@@ -111,8 +118,11 @@ class SLOT(attrs.Attribute):
     def validate_slot(cls, instance, attribute, value):
         from ottermatics.component_collections import ComponentIter
 
+        
+
         # apply wide behavior to componentiter instance
         if isinstance(value, ComponentIter) and attribute.type.wide == False:
+            #print(f'validate {instance} {attribute} {value}')
             value.wide = False
 
         if value in cls.accepted or all([value is None, cls.none_ok]):

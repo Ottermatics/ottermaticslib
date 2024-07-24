@@ -22,14 +22,14 @@ def property_changed(instance, variable, value):
     from ottermatics.tabulation import TabulationMixin
 
     if not isinstance(instance, (TabulationMixin)):
-        return
+        return value
+    
+    if instance._anything_changed:
+        # Bypass Check since we've already flagged for an update
+        return value    
 
     if log.log_level <= 10:
         log.msg(f"checking property changed {instance}{variable.name} {value}")
-
-    if instance._anything_changed:
-        # Bypass Check since we've already flagged for an update
-        return value
 
     # Check if shoudl be updated
     cur = getattr(instance, variable.name)
@@ -78,7 +78,7 @@ def signals_slots_handler(
         log.warning(f"{cls.__name__} does not have a name!")
         name = attrs.Attribute(
             name="name",
-            default="default",
+            default=attrs.Factory(lambda inst: str(inst.__class__.__name__).lower(),True),
             validator=None,
             repr=True,
             eq=True,
@@ -154,12 +154,14 @@ def signals_slots_handler(
 
             log.info(f"{cls.__name__} adding SLOT {slot_name}")
             stype = slot.accepted
-
+            
+            #TODO: expand default options with kwargs and multiple types
             if isinstance(stype, (list, tuple)):
                 stype = stype[0]
+            
             at = attrs.Attribute(
                 name=slot_name,
-                default=attrs.Factory(stype) if slot.default_ok else None,
+                default=attrs.Factory(stype,False) if slot.default_ok else None,
                 validator=slot.validate_slot,
                 repr=True,
                 cmp=None,
@@ -314,10 +316,23 @@ def signals_slots_handler(
             if isinstance(o.type, PLOT):
                 print(o)
 
-    # Merge Fields
+    # Merge Fields Checking if we are overriding an attribute with system_property
+    #hack since TabulationMixin isn't available yet
+    #print(cls.mro())
+    if 'TabulationMixin' in str(cls.mro()):   
+        cls_properties = cls.classmethod_system_properties(True)
+    else:
+        cls_properties = {}
+    #print(f'tab found!! {cls_properties.keys()}')
     for k, o in in_fields.items():
         if k not in created_fields:
-            out.append(o)
+            if k in cls_properties and o.inherited:
+                log.warning(
+                    f"{cls.__name__} overriding inherited attr: {o.name} as a system property overriding it"
+                )
+            else:
+                log.debug(f'{cls.__name__} adding attr: {o.name}')
+                out.append(o)
         else:
             log.warning(
                 f"{cls.__name__} skipping inherited attr: {o.name} as a custom type overriding it"
@@ -353,7 +368,7 @@ def otterize(cls=None, **kwargs):
     3) hash is by object identity"""
 
     # Define defaults and handle conflicts
-    dflts = dict(repr=False, eq=False, slots=False, kw_only=True)
+    dflts = dict(repr=False, eq=False, slots=False, kw_only=True,hash=False)
     for k, v in kwargs.items():
         if k in dflts:
             dflts.pop(k)
@@ -371,8 +386,10 @@ def otterize(cls=None, **kwargs):
             )
 
             # must be here since can't inspect till after fields corrected
-            acls.pre_compile()
+            acls.pre_compile() #custom class compiler
             acls.validate_class()
+            if acls.__name__ != 'Configuration': #prevent configuration lookup
+                acls.cls_compile() #compile subclasses
             return acls
 
         # Component/Config Flow
@@ -385,8 +402,10 @@ def otterize(cls=None, **kwargs):
             **kwargs,
         )
         # must be here since can't inspect till after fields corrected
-        acls.pre_compile()
+        acls.pre_compile() #custom class compiler
         acls.validate_class()
+        if acls.__name__ != 'Configuration': #prevent configuration lookup
+            acls.cls_compile() #compile subclasses
         return acls
 
     else:
@@ -424,7 +443,7 @@ class Configuration(LoggingMixin):
     _temp_vars = None
 
     name: str = attr.ib(
-        default="default",
+        default = attrs.Factory(lambda inst: str(inst.__class__.__name__).lower(),True),
         validator=attr.validators.instance_of(str),
         kw_only=True,
     )
@@ -434,19 +453,40 @@ class Configuration(LoggingMixin):
 
     _created_datetime = None
 
+
     # Our Special Init Methodology
     def __on_init__(self):
-        """Override this when creating your special init functionality, you must use attrs for input variables"""
+        """Override this when creating your special init functionality, you must use attrs for input variables, this is called after parents are assigned"""
+        pass
+
+    def __pre_init__(self):
+        """Override this when creating your special init functionality, you must use attrs for input variables, this is called before parents are assigned"""
         pass
 
     def __attrs_post_init__(self):
         """This is called after __init__ by attr's functionality, we expose __oninit__ for you to use!"""
         # Store abs path On Creation, in case we change
+        
+        from ottermatics.components import Component
+
         self._log = None
         self._anything_changed = True  # save by default first go!
         self._created_datetime = datetime.datetime.utcnow()
+        self.__pre_init__()
+                
+        #Assign Parents, ensure single componsition
+        for compnm,comp in self.internal_configurations(False).items():
+            if isinstance(comp,Component):
+                #TODO: allow multiple parents
+                if (not hasattr(comp,'parent')) and (comp.parent is not None):
+                    self.warning(f"Component {compnm} already has a parent {comp.parent} copying, and assigning to {self}")
+                    setattr(self,compnm,attrs.evolve(comp,parent=self))
+                else:
+                    comp.parent = self
+            
         self.debug(f"created {self.identity}")
         self.__on_init__()
+
 
     @classmethod
     def validate_class(cls):
@@ -455,9 +495,29 @@ class Configuration(LoggingMixin):
 
     @classmethod
     def pre_compile(cls):
+        """an overrideable classmethod that executes when compiled, however will not execute as a subclass"""
         pass
 
-    # Identity & locatoin Methods
+    @classmethod
+    def cls_compile(cls):
+        """compiles all subclass functionality"""
+        
+        for subcls in cls.parent_configurations_cls():
+            if subcls.subcls_compile is not Configuration:
+                log.debug(f'{cls.__name__} compiling {subcls.__name__}')
+            subcls.subcls_compile()
+
+    @classmethod
+    def subcls_compile(cls):
+        """reliably compiles this method even for subclasses, override this to compile functionality for subclass interfaces & mixins"""
+        pass
+
+    @classmethod
+    def parent_configurations_cls(cls)->list:
+        """returns all subclasses that are a Configuration"""
+        return [c for c in cls.mro() if issubclass(c,Configuration)]
+
+    #Identity & location Methods
     @property
     def filename(self):
         """A nice to have, good to override"""
@@ -502,19 +562,24 @@ class Configuration(LoggingMixin):
         return str(type(self).__name__).lower()
 
     # Configuration Information
-    @property
-    def internal_configurations(self):
+    def internal_configurations(self,check_config=True)->dict:
         """go through all attributes determining which are configuration objects
-        we skip any configuration that start with an underscore (private variable)
+        additionally this skip any configuration that start with an underscore (private variable)
         """
+
+        if check_config:
+            chk = lambda k,v: isinstance(v, Configuration)
+        else:
+            chk = lambda k,v: k in self.slots_attributes()
+
         return {
             k: v
             for k, v in self.__dict__.items()
-            if isinstance(v, Configuration) and not k.startswith("_")
+            if chk(k,v) and not k.startswith("_")
         }
 
     def go_through_configurations(
-        self, level=0, levels_to_descend=-1, parent_level=0
+        self, level=0, levels_to_descend=-1, parent_level=0,**kw
     ):
         """A generator that will go through all internal configurations up to a certain level
         if levels_to_descend is less than 0 ie(-1) it will go down, if it 0, None, or False it will
@@ -533,11 +598,17 @@ class Configuration(LoggingMixin):
             yield "", level, self
 
         level += 1
-        for key, config in self.internal_configurations.items():
-            for skey, level, iconf in config.go_through_configurations(
-                level, levels_to_descend, parent_level
-            ):
-                yield f"{key}.{skey}" if skey else key, level, iconf
+        if 'check_config' not in kw:
+            kw['check_config'] = False
+        for key, config in self.internal_configurations(**kw).items():
+
+            if isinstance(config,Configuration):
+                for skey, level, iconf in config.go_through_configurations(
+                    level, levels_to_descend, parent_level
+                ):
+                    yield f"{key}.{skey}" if skey else key, level, iconf
+            else:
+                yield key,level,config
 
     @property
     def attrs_fields(self) -> set:
@@ -562,6 +633,74 @@ class Configuration(LoggingMixin):
 
         return attrval
 
+    @classmethod
+    def _extract_type(cls,typ):
+        """gathers valid types for an attribute.type"""
+        from ottermatics.slots import SLOT
+            
+        if not isinstance(typ,type) or typ is None:
+            return list()
+
+        if issubclass(typ,SLOT):
+            accept = typ.accepted
+            if isinstance(accept,(tuple,list)):
+                return list(accept)
+            return [accept]
+            
+        elif issubclass(typ,Configuration):
+            return [typ]
+        
+        elif issubclass(typ,TABLE_TYPES):
+            return [typ]
+
+    @classmethod
+    def check_ref_slot_type(cls,sys_key:str)->list:
+        """recursively checks class slots for the key, and returns the slot type"""
+        slot_refs = cls.slot_refs()
+        if sys_key in slot_refs:
+            return slot_refs[sys_key]
+        
+        slts = cls.input_attrs()
+        key_segs = sys_key.split('.')
+        out = []
+       # print(slts.keys(),sys_key)
+        if '.' not in sys_key and sys_key not in slts:
+            pass
+
+        elif sys_key in slts:
+            #print(f'slt find {sys_key}')
+            return cls._extract_type(slts[sys_key].type)
+        else:
+            fst = key_segs[0]
+            rem = key_segs[1:]
+            if fst in slts:
+                sub_clss = cls._extract_type(slts[fst].type)
+                out = []
+                for acpt in sub_clss:
+                    if isinstance(acpt,type) and issubclass(acpt,Configuration):
+                        
+                        vals = acpt.check_ref_slot_type('.'.join(rem))
+                        #print(f'recursive find {acpt}.{rem} = {vals}')
+                        if vals:
+                            out.extend(vals)
+                        
+                    elif isinstance(acpt,type):
+                        out.append(acpt)
+
+        slot_refs[sys_key] = out
+
+        return out
+    
+    @classmethod
+    def slot_refs(cls,recache=False):
+        """returns all slot references in this configuration"""
+        key = f'{cls.__name__}_prv_slot_sys_refs'
+        if recache == False and hasattr(cls,key):
+            return getattr(cls,key)
+        o = {}
+        setattr(cls,key,o)
+        return o
+        
     @classmethod
     def slots_attributes(cls) -> typing.Dict[str, "Attribute"]:
         """Lists all slots attributes for class"""
@@ -670,7 +809,7 @@ class Configuration(LoggingMixin):
 
     @property
     def input_as_dict(self):
-        o = {k: getattr(self, k, None) for k in self.input_fields}
+        o = {k: getattr(self, k, None) for k in self.input_fields()}
         o = {
             k: v if not isinstance(v, Configuration) else v.input_as_dict
             for k, v in o.items()
@@ -735,10 +874,15 @@ class Configuration(LoggingMixin):
             self.warning("Could Not Change {}".format(",".join(list(bad_vars))))
 
         try:  # Change Variables To Input
-            for arg, var in kwargs.items():
-                setattr(self, arg, var)
+            self.setattrs(kwargs)
             yield self
         finally:
-            for arg in kwargs.keys():
-                var = _temp_vars[arg]
-                setattr(self, arg, var)
+            rstdict = {k:_temp_vars[k] for k,v in kwargs.items()}
+            self.setattrs(rstdict)
+
+    def setattrs(self,dict):
+        """sets attributes from a dictionary"""
+        msg = f"invalid keys {set(dict.keys()) - set(self.input_attrs())}"
+        assert set(dict.keys()).issubset(set(self.input_attrs())), msg
+        for k,v in dict.items():
+            setattr(self,k,v)

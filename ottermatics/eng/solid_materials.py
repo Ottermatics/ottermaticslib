@@ -8,6 +8,7 @@ import numpy
 import inspect
 import sys
 import uuid
+import json,hashlib
 
 # One Material To Merge Them All
 from PyNite import Material as PyNiteMat
@@ -27,15 +28,19 @@ CMAP = matplotlib.cm.get_cmap("viridis")
 def random_color():
     return CMAP(random.randint(0, 255))
 
+def ih(val):
+    """ignore hash"""
+    return ''
 
-@otterize
+
+@otterize(hash=False)
 class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
     """A class to hold physical properties of solid structural materials and act as both a section property material and a pynite material"""
 
     __metaclass__ = SecMat
 
     name: str = attr.ib(default="solid material")
-    color: float = attr.ib(default=random_color())
+    color: float = attr.ib(factory=random_color,hash=False,eq=ih)
 
     # Structural Properties
     density: float = attr.ib(default=1.0)
@@ -121,8 +126,15 @@ class SolidMaterial(SectionMaterial, PyNiteMat.Material, Configuration):
             self._unique_id = f"{self.name}_{uid}"
         return self._unique_id
 
+    def __hash__(self):
+        """a stable hash that ignores name, color and unique id, ie only the material properties are the same if two hashes are the equal"""
+        #print('hashing...')
+        ignore = ['color','_unique_id','name']
+        ict = {k:v for k,v in self.input_as_dict.items() if k not in ignore}
+        d = hashlib.sha1(json.dumps(ict, sort_keys=True).encode())
+        return int(d.hexdigest(),16)    
 
-@otterize
+@otterize(hash=False)
 class SS_316(SolidMaterial):
     name: str = attr.ib(default="stainless steel 316")
 
@@ -147,7 +159,7 @@ class SS_316(SolidMaterial):
     cost_per_kg: float = attr.ib(default=3.26)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class ANSI_4130(SolidMaterial):
     name: str = attr.ib(default="steel 4130")
 
@@ -172,7 +184,7 @@ class ANSI_4130(SolidMaterial):
     cost_per_kg: float = attr.ib(default=2.92)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class ANSI_4340(SolidMaterial):
     name: str = attr.ib(default="steel 4340")
 
@@ -197,7 +209,7 @@ class ANSI_4340(SolidMaterial):
     cost_per_kg: float = attr.ib(default=2.23)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class Aluminum(SolidMaterial):
     name: str = attr.ib(default="aluminum generic")
 
@@ -222,7 +234,7 @@ class Aluminum(SolidMaterial):
     cost_per_kg: float = attr.ib(default=1.90)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class CarbonFiber(SolidMaterial):
     name: str = attr.ib(default="carbon fiber")
 
@@ -247,7 +259,7 @@ class CarbonFiber(SolidMaterial):
     cost_per_kg: float = attr.ib(default=1.90)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class Concrete(SolidMaterial):
     name: str = attr.ib(default="concrete")
 
@@ -272,7 +284,7 @@ class Concrete(SolidMaterial):
     cost_per_kg: float = attr.ib(default=95.44 / 1000.0)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class DrySoil(SolidMaterial):
     name: str = attr.ib(default="dry soil")
 
@@ -297,7 +309,7 @@ class DrySoil(SolidMaterial):
     cost_per_kg: float = attr.ib(default=44.78 / 1000.0)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class WetSoil(SolidMaterial):
     name: str = attr.ib(default="wet soil")
 
@@ -322,7 +334,7 @@ class WetSoil(SolidMaterial):
     cost_per_kg: float = attr.ib(default=34.44 / 1000.0)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class Rock(SolidMaterial):
     name: str = attr.ib(default="wet soil")
 
@@ -347,7 +359,7 @@ class Rock(SolidMaterial):
     cost_per_kg: float = attr.ib(default=50.44 / 1000.0)  # dollar per kg
 
 
-@otterize
+@otterize(hash=False)
 class Rubber(SolidMaterial):
     name: str = attr.ib(default="rubber")
 

@@ -19,7 +19,7 @@ class TestComponent(Component):
 
     name = attr.ib(default="test", validator=STR_VALIDATOR())
     word = attr.ib(default="bird", validator=STR_VALIDATOR())
-    val = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
+    val = attr.ib(default=10)
 
     always_save_data = True
 
@@ -48,10 +48,10 @@ class TestComponent(Component):
 class OtherComponent(Component):
     arg1 = attr.ib(default="mmmm", validator=STR_VALIDATOR())
     arg2 = attr.ib(default="word", validator=STR_VALIDATOR())
-    argnum = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
+    argnum = attr.ib(default=10)
 
     if suprise:
-        ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
+        ones = attr.ib(default=1111)
         wacky = attr.ib(
             default="one hundred and 111", validator=STR_VALIDATOR()
         )
@@ -76,8 +76,8 @@ if suprise:
     class SupriseComponent(Component):
         arg3 = attr.ib(default="mmmm", validator=STR_VALIDATOR())
         arg4 = attr.ib(default="word", validator=STR_VALIDATOR())
-        argque = attr.ib(default=-999, validator=NUMERIC_VALIDATOR())
-        # ones = attr.ib(default=1111, validator=NUMERIC_VALIDATOR())
+        argque = attr.ib(default=-999)
+        # ones = attr.ib(default=1111)
         # wacky = attr.ib(default='one hundred and 111', validator=STR_VALIDATOR())
         # more = attr.ib(default='other stuff', validator=STR_VALIDATOR())
 
@@ -95,8 +95,8 @@ class TestAnalysis(Analysis):
 
     other_cocomponent = attr.ib(factory=OtherComponent)
     internal_component = attr.ib(factory=TestComponent)
-    some_random_value = attr.ib(default=10, validator=NUMERIC_VALIDATOR())
-    other_rand_val = attr.ib(default=1e6, validator=NUMERIC_VALIDATOR())
+    some_random_value = attr.ib(default=10)
+    other_rand_val = attr.ib(default=1e6)
 
     mode = "iterator"
     iterator = attr.ib(factory=lambda: list(range(10)))

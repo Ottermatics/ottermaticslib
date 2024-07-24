@@ -52,7 +52,7 @@ class SolverMixin:
     def solvers(self):
         return {k: getattr(self, k) for k in self.solvers_attributes()}
 
-    @instance_cached
+    @instance_cached(allow_set=True)
     def transients(self):
         return {k: getattr(self, k) for k in self.transients_attributes()}
 
@@ -97,7 +97,8 @@ class SolverMixin:
         comp_args = {k: v for k, v in kwargs.items() if "." in k}
 
         # check parms
-        argdiff = set(parm_args).difference(set(cls.input_fields()))
+        inpossible = set.union(set(cls.input_fields()),set(cls.slots_attributes()))
+        argdiff = set(parm_args).difference(inpossible)
         assert not argdiff, f"bad input {argdiff}"
 
         # check components
@@ -107,19 +108,28 @@ class SolverMixin:
 
         _input = {}
         _firsts = {}
-        test = lambda v: isinstance(v, (int, float, str)) or v is None
+        test = lambda v,add: isinstance(v, (int, float, str,*add)) or v is None
 
         # parameters input
         for k, v in kwargs.items():
+            
+            #If a slot check the type is applicable
+            subslot = cls.check_ref_slot_type(k)
+            if subslot is not None:
+                #log.debug(f'found subslot {k}: {subslot}')
+                addty = subslot
+            else:
+                addty = []
+
             # Ensure Its a List
             if isinstance(v, numpy.ndarray):
                 v = v.tolist()
 
             if not isinstance(v, list):
-                assert test(v), f"bad values {k}:{v}"
+                assert test(v,addty), f"bad values {k}:{v}"
                 v = [v]
             else:
-                assert all([test(vi) for vi in v]), f"bad values: {k}:{v}"
+                assert all([test(vi,addty) for vi in v]), f"bad values: {k}:{v}"
 
             if k not in _input:
                 _input[k] = v
@@ -128,6 +138,8 @@ class SolverMixin:
                 _input[k].extend(v)
 
         return _firsts, _input, _trans_opts
+
+        
 
     @classmethod
     def sim(cls, _cb=None, **kwargs):
@@ -145,7 +157,7 @@ class SolverMixin:
         system = cls(**_firsts)
         return system.run(**kwargs, **trs_opts, _cb=_cb)
 
-    def run(self, revert=True, _cb=None, sequence:list=None,**kwargs):
+    def run(self, revert=True, _cb=None, sequence:list=None,eval_kw:dict=None,sys_kw:dict=None, force_solve=False,**kwargs):
         """applies a permutation of input parameters for parameters not marked as transient, runs the system instance by applying input to the system and its slot-components, ensuring that the targeted attributes actualy exist. The run command additionally configures the transient parameters
 
         :param dt: timestep in s, required for transients
@@ -153,13 +165,22 @@ class SolverMixin:
         :param revert: will reset the values of X that were recorded at the beginning of the run.
         :param _cb: a callback function that takes the system as an argument cb(system)
         :param sequence: a list of dictionaries that should be run in order per the outer-product of kwargs
+        :param eval_kw: a dictionary of keyword arguments to pass to the evaluate function of each component by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
+        :param sys_kw: a dictionary of keyword arguments to pass to the evaluate function of each system by their name and a set of keyword args. Use this to set values in the component that are not inputs to the system. No iteration occurs upon these values, they are static and irrevertable
         :param kwargs: inputs are run on a product basis asusming they correspond to actual scoped parameters (system.parm or system.slot.parm)
+
+
         :returns: system or list of systems. If transient a set of systems that have been run with permutations of the input, otherwise a single system with all permutations input run
         """
+        from ottermatics.system import System
         self.debug(f"running system {self.identity} with input {kwargs}")
 
         # TODO: allow setting sub-component parameters with `slot1.slot2.attrs`. Ensure checking slots exist, and attrs do as well.
         
+        #Recache system references
+        if isinstance(self,System):
+            self.system_references(recache=True)
+
         #create iterable null for sequence
         if sequence is None:
             sequence = [{}]
@@ -169,8 +190,8 @@ class SolverMixin:
         for seq in sequence:
             sequence_keys = sequence_keys.union(set(seq.keys()))
 
-        # RUN
-        if not self.solved or self.anything_changed:
+        # RUN when not solved, or anything changed, or arguments or if forced
+        if force_solve or not self.solved or self.anything_changed or kwargs:
             _firsts, _input, trs_opts = self.parse_run_kwargs(**kwargs)
 
             if revert:
@@ -184,14 +205,18 @@ class SolverMixin:
             for k in sequence_keys:
                 refs[k] = self.locate_ref(k)
 
+            self.pre_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
+
             # Premute the input as per SS or Transient Logic
             ingrp = list(_input.values())
             keys = list(_input.keys())
+            #Iterate over components
             for itercomp in self._iterate_components():
+                #Iterate over inputs
                 for parms in itertools.product(*ingrp):
                     # Set the reference aliases
                     cur = {k: v for k, v in zip(keys, parms)}
-                    #Sequence Loop (null will loop as well)
+                    #Iterate over Sequence (or run once)
                     for seq in sequence:
                         #apply sequenc evalues
                         icur = cur.copy()
@@ -202,6 +227,8 @@ class SolverMixin:
                             refs[k].set_value(v)
                     
                         # Transeint
+                        if isinstance(self,System):
+                            self.system_references(recache=True)
                         if self.transients and trs_opts:
                             self._run_id = int(uuid.uuid4())
                             self.time = 0
@@ -210,21 +237,40 @@ class SolverMixin:
                             )
 
                         else:
-                            # stead=y state
+                            #steady state
                             if self._run_id is None:
                                 self._run_id = int(uuid.uuid4())
-                            self.evaluate(_cb=_cb)
+                            #Recache system references
+                            self.evaluate(_cb=_cb,eval_kw=eval_kw,sys_kw=sys_kw)
+            
+            #run callback pre-revert
+            self._solved = True
+            self.post_run_callback(eval_kw=eval_kw,sys_kw=sys_kw,**kwargs)
 
             if revert and revert_x:
                 self.set_system_state(ignore=["index"], **revert_x)
-
+            
+            #reapply solved state
             self._solved = True
-        else:
+            
+
+        elif not self.anything_changed:
+            self.warning(f'nothing changed, not running {self.identity}')
+        elif self.solved:
             raise Exception("Analysis Already Solved")
+    
+    def post_run_callback(self,**kwargs):
+        """user callback for when run is complete"""
+        pass
+
+    def pre_run_callback(self,**kwargs):
+        """user callback for when run is beginning"""
+        pass    
 
     def run_transient(self, dt, N, _cb=None):
         """integrates the time series over N points at a increment of dt"""
         for i in range(N):
+            #TODO: adapt timestep & integrate ODE system integrator
             # Run The SS Timestep
             self.evaluate(_cb=_cb)
             # Run Integrators
@@ -233,52 +279,116 @@ class SolverMixin:
             # Mark Time
             self.time = self.time + dt
 
-    # Single Point Flow
-    def evaluate(self, _cb=None, **fields_input):
-        """Evaluates the system with overrides for fields_input
+    def run_internal_systems(self,sys_kw=None):
+        """runs internal systems with potentially scoped kwargs"""
+        # Pre Execute Which Sets Fields And PRE Signals
+        from ottermatics.system import System
+        #Record any changed state in components
+        if isinstance(self,System):
+            self.system_references(recache=True)                              
+        
+        #System Solver Loop
+        for key, comp in self.internal_systems().items():
+            #self.debug(f"checking sys {key}.{comp}")
+            if sys_kw and key in sys_kw:
+                sys_kw_comp = sys_kw[key]
+            else:
+                sys_kw_comp = {}   
+                         
+            #Systems solve cycle
+            if isinstance(comp, System): #should always be true
+                self.info(f"solving {key} with {sys_kw_comp}")
+                comp.evaluate(**sys_kw_comp)
 
+    def update(self,parent,*args,**kwargs):
+        pass
+        
+    def post_update(self,parent,*args,**kwargs):
+        pass        
+        
+    def update_internal(self,eval_kw=None,*args,**kw):
+        """update internal elements with input arguments"""
+        # Solve Each Internal System
+        self.update(self.parent,*args,**kw)
+        self.debug(f'updating internal {self.__class__.__name__}.{self}')
+        for key, comp in self.internal_configurations(False).items():
+            
+
+            #provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}              
+            
+            #comp update cycle
+            self.debug(f"updating {key} {comp.__class__.__name__}.{comp}")
+            if isinstance(comp, ComponentIter):
+                comp.update(self,**eval_kw_comp)
+            elif isinstance(comp, (SolverMixin,Component)):
+                comp.update(self,**eval_kw_comp)
+                comp.update_internal()
+
+    def post_update_internal(self,eval_kw=None,*args,**kw):
+        """Post update all internal components"""
+        #Post Update Self
+        self.post_update(self.parent,*args,**kw)
+        self.debug(f'post updating internal {self.__class__.__name__}.{self}')
+        for key, comp in self.internal_configurations(False).items():
+            
+            #provide add eval_kw
+            if eval_kw and key in eval_kw:
+                eval_kw_comp = eval_kw[key]
+            else:
+                eval_kw_comp = {}   
+
+            self.debug(f"post updating {key} {comp.__class__.__name__}.{comp}")
+            if isinstance(comp, ComponentIter):
+                comp.post_update(self,**eval_kw_comp)
+            elif isinstance(comp, (SolverMixin,Component)):
+                comp.post_update(self,**eval_kw_comp)
+                comp.post_update_internal()
+
+    # Single Point Flow
+    def evaluate(self, _cb=None,eval_kw:dict=None,sys_kw:dict=None, *args,**kw):
+        """Evaluates the system with additional inputs for execute()
         :param _cb: an optional callback taking the system as an argument
         """
 
-        # Pre Execute Which Sets Fields And PRE Signals
-        from ottermatics.system import System
-
         if self.log_level < 20:
-            self.debug(f"running with X: {self.X} & {fields_input}")
-        self.pre_execute(**fields_input)
+            self.debug(f"running with X: {self.X} & args:{args} kw:{kw}")
+        self.pre_execute()
 
         # prep index
         self.index += 1
 
         # Runs The Solver
         try:
-            out = self.execute()
+            out = self.execute( *args,**kw)
         except Exception as e:
             self.error(e, f"solver failed @ {self.X}")
             out = None
             raise e
 
-        # Solve Each Internal System
-        for key, comp in self.internal_components.items():
-            if isinstance(comp, System):
-                comp.evaluate()
-            elif isinstance(comp, ComponentIter):
-                comp.update(self)
-            elif isinstance(comp, Component):
-                comp.update(self)
+        #Update Internal Elements
+        self.update_internal(eval_kw=eval_kw,*args,**kw)
+        
+        self.run_internal_systems(sys_kw=sys_kw)
 
         # Post Execute
         self.post_execute()
 
+        #Post Update Each Internal System
+        self.post_update_internal(eval_kw=eval_kw,*args,**kw)
+             
         # Save The Data
         self.save_data(index=self.index)
 
         if _cb:
-            _cb(self)
+            _cb(self,*args,**kw)
 
         return out
 
-    def pre_execute(self, **fields_input):
+    def pre_execute(self):
         """runs the solver of the system"""
         if self.log_level <= 10:
             self.msg(f"pre execute")
@@ -297,7 +407,7 @@ class SolverMixin:
             if sig.mode == "post" or sig.mode == "both":
                 sig.apply()
 
-    def execute(self):
+    def execute(self, *args,**kw):
         """Solves the system's system of constraints and integrates transients if any exist
 
         Override this function for custom solving functions, and call `system_solver` to use default solver functionality.
