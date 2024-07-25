@@ -29,7 +29,6 @@ ottermatics.egg-info/requires.txt
 ottermatics.egg-info/top_level.txt
 ottermatics/datastores/__init__.py
 ottermatics/datastores/data.py
-ottermatics/datastores/datastores_requirements.txt
 ottermatics/datastores/gdocs.py
 ottermatics/datastores/reporting.py
 ottermatics/datastores/secrets.py
@@ -38,6 +37,7 @@ ottermatics/eng/costs.py
 ottermatics/eng/fluid_material.py
 ottermatics/eng/geometry.py
 ottermatics/eng/pipes.py
+ottermatics/eng/prediction.py
 ottermatics/eng/solid_materials.py
 ottermatics/eng/structure.py
 ottermatics/eng/structure_beams.py
@@ -48,6 +48,7 @@ ottermatics/test/test_airfilter.py
 ottermatics/test/test_analysis.py
 ottermatics/test/test_comp_iter.py
 ottermatics/test/test_composition.py
+ottermatics/test/test_costs.py
 ottermatics/test/test_dynamics.py
 ottermatics/test/test_modules.py
 ottermatics/test/test_pipes.py
